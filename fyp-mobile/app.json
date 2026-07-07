@@ -3,11 +3,6 @@
     "name": "fyp-frontend-v3",
     "slug": "fyp-frontend-v3",
     "version": "1.0.0",
-    "extra": {
-      "eas": {
-        "projectId": "7195391d-d0c2-4b15-a7c4-29ebb43aa380"
-      }
-    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fypfrontendv3",
@@ -21,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.munibafarooq574.fypfrontendv3"
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +29,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -46,6 +42,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "49dee060-aa00-4879-8a67-0eac14b7e4e6"
+      }
     }
   }
 }

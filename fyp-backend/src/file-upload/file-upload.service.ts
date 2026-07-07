@@ -9,15 +9,15 @@ import { extname } from 'path';
 export class FileUploadService {
     AWS_S3_BUCKET = 'eventify-hub';
     s3 = new AWS.S3({
-        accessKeyId: 'process.env.AWS_ACCESS_KEY_ID',
-        secretAccessKey: ' process.env.AWS_SECRET_ACCESS_KEY',
+          accessKeyId: 'AKIAUMYCIOJLCYLVOTU5',
+        secretAccessKey: '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',
     });
 
     constructor() {
         this.s3 = new AWS.S3({
             credentials: {
-                accessKeyId: "process.env.AWS_ACCESS_KEY_ID",
-                secretAccessKey: " process.env.AWS_SECRET_ACCESS_KEY",
+                  accessKeyId: 'AKIAUMYCIOJLCYLVOTU5',
+                secretAccessKey: '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',
             },
             region: "ap-south-1",
         });

@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 export default async function Register(email: string, password: string, name: string, role: string, buisnessCategory: string, phone?: string) {
     try {
-        const url = `http://13.233.214.252:3000/auth/register`;
+        const url = `http://192.168.1.20:3000/auth/register`;
         const config: AxiosRequestConfig = {
             maxBodyLength: Infinity,
             method: "POST",
