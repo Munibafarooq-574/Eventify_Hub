@@ -1,0 +1,1275 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly after category selection 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={
+      [
+        {
+          "_id": "1",
+          "description": "All food vendors",
+          "image": "https://example.com/food.jpg",
+          "name": "Food",
+        },
+      ]
+    }
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View>
+      <View
+        onFocusCapture={[Function]}
+        onLayout={[Function]}
+        style={null}
+      >
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#fff",
+              "borderRadius": 12,
+              "elevation": 2,
+              "flexDirection": "row",
+              "marginBottom": 12,
+              "opacity": 1,
+              "padding": 16,
+              "shadowColor": "#000",
+              "shadowOpacity": 0.1,
+              "shadowRadius": 4,
+            }
+          }
+        >
+          <Image
+            source={
+              {
+                "uri": "https://example.com/food.jpg",
+              }
+            }
+            style={
+              {
+                "borderRadius": 25,
+                "height": 50,
+                "marginRight": 16,
+                "width": 50,
+              }
+            }
+          />
+          <View
+            style={
+              {
+                "flex": 1,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#000",
+                  "fontSize": 16,
+                  "fontWeight": "bold",
+                }
+              }
+            >
+              Food
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#666",
+                  "fontSize": 14,
+                  "marginTop": 4,
+                }
+              }
+            >
+              All food vendors
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly when no categories are available 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={[]}
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View />
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly with back button 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={[]}
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View />
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly with default layout 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={[]}
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View />
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly with long category names 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={
+      [
+        {
+          "_id": "1",
+          "description": "Long description",
+          "image": "https://example.com/image.jpg",
+          "name": "Super Long Category Name That Overflows",
+        },
+      ]
+    }
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View>
+      <View
+        onFocusCapture={[Function]}
+        onLayout={[Function]}
+        style={null}
+      >
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#fff",
+              "borderRadius": 12,
+              "elevation": 2,
+              "flexDirection": "row",
+              "marginBottom": 12,
+              "opacity": 1,
+              "padding": 16,
+              "shadowColor": "#000",
+              "shadowOpacity": 0.1,
+              "shadowRadius": 4,
+            }
+          }
+        >
+          <Image
+            source={
+              {
+                "uri": "https://example.com/image.jpg",
+              }
+            }
+            style={
+              {
+                "borderRadius": 25,
+                "height": 50,
+                "marginRight": 16,
+                "width": 50,
+              }
+            }
+          />
+          <View
+            style={
+              {
+                "flex": 1,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#000",
+                  "fontSize": 16,
+                  "fontWeight": "bold",
+                }
+              }
+            >
+              Super Long Category Name That Overflows
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#666",
+                  "fontSize": 14,
+                  "marginTop": 4,
+                }
+              }
+            >
+              Long description
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly with multiple categories 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={
+      [
+        {
+          "_id": "1",
+          "description": "All food vendors",
+          "image": "https://example.com/food.jpg",
+          "name": "Food",
+        },
+        {
+          "_id": "2",
+          "description": "Fashion vendors",
+          "image": "https://example.com/clothing.jpg",
+          "name": "Clothing",
+        },
+      ]
+    }
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View>
+      <View
+        onFocusCapture={[Function]}
+        onLayout={[Function]}
+        style={null}
+      >
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#fff",
+              "borderRadius": 12,
+              "elevation": 2,
+              "flexDirection": "row",
+              "marginBottom": 12,
+              "opacity": 1,
+              "padding": 16,
+              "shadowColor": "#000",
+              "shadowOpacity": 0.1,
+              "shadowRadius": 4,
+            }
+          }
+        >
+          <Image
+            source={
+              {
+                "uri": "https://example.com/food.jpg",
+              }
+            }
+            style={
+              {
+                "borderRadius": 25,
+                "height": 50,
+                "marginRight": 16,
+                "width": 50,
+              }
+            }
+          />
+          <View
+            style={
+              {
+                "flex": 1,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#000",
+                  "fontSize": 16,
+                  "fontWeight": "bold",
+                }
+              }
+            >
+              Food
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#666",
+                  "fontSize": 14,
+                  "marginTop": 4,
+                }
+              }
+            >
+              All food vendors
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View
+        onFocusCapture={[Function]}
+        onLayout={[Function]}
+        style={null}
+      >
+        <View
+          accessibilityState={
+            {
+              "busy": undefined,
+              "checked": undefined,
+              "disabled": undefined,
+              "expanded": undefined,
+              "selected": undefined,
+            }
+          }
+          accessibilityValue={
+            {
+              "max": undefined,
+              "min": undefined,
+              "now": undefined,
+              "text": undefined,
+            }
+          }
+          accessible={true}
+          collapsable={false}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#fff",
+              "borderRadius": 12,
+              "elevation": 2,
+              "flexDirection": "row",
+              "marginBottom": 12,
+              "opacity": 1,
+              "padding": 16,
+              "shadowColor": "#000",
+              "shadowOpacity": 0.1,
+              "shadowRadius": 4,
+            }
+          }
+        >
+          <Image
+            source={
+              {
+                "uri": "https://example.com/clothing.jpg",
+              }
+            }
+            style={
+              {
+                "borderRadius": 25,
+                "height": 50,
+                "marginRight": 16,
+                "width": 50,
+              }
+            }
+          />
+          <View
+            style={
+              {
+                "flex": 1,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#000",
+                  "fontSize": 16,
+                  "fontWeight": "bold",
+                }
+              }
+            >
+              Clothing
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#666",
+                  "fontSize": 14,
+                  "marginTop": 4,
+                }
+              }
+            >
+              Fashion vendors
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  </RCTScrollView>
+</View>
+`;
+
+exports[`VendorCategoriesIndex Component VendorCategoriesIndex Snapshot Testing renders correctly with search input 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+      "paddingHorizontal": 16,
+      "paddingTop": 70,
+    }
+  }
+>
+  <View
+    accessibilityState={
+      {
+        "busy": undefined,
+        "checked": undefined,
+        "disabled": undefined,
+        "expanded": undefined,
+        "selected": undefined,
+      }
+    }
+    accessibilityValue={
+      {
+        "max": undefined,
+        "min": undefined,
+        "now": undefined,
+        "text": undefined,
+      }
+    }
+    accessible={true}
+    collapsable={false}
+    focusable={true}
+    onClick={[Function]}
+    onResponderGrant={[Function]}
+    onResponderMove={[Function]}
+    onResponderRelease={[Function]}
+    onResponderTerminate={[Function]}
+    onResponderTerminationRequest={[Function]}
+    onStartShouldSetResponder={[Function]}
+    style={
+      {
+        "left": 16,
+        "opacity": 1,
+        "padding": 8,
+        "position": "absolute",
+        "top": 10,
+        "zIndex": 10,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#000",
+          "fontSize": 16,
+          "fontWeight": "500",
+          "paddingTop": 70,
+        }
+      }
+    >
+      Back
+    </Text>
+  </View>
+  <Text
+    style={
+      {
+        "color": "#000",
+        "fontSize": 24,
+        "fontWeight": "bold",
+        "marginBottom": 16,
+        "textAlign": "center",
+      }
+    }
+  >
+    Vendor Categories
+  </Text>
+  <TextInput
+    onChangeText={[Function]}
+    placeholder="Search vendor categories"
+    placeholderTextColor="#aaa"
+    style={
+      {
+        "backgroundColor": "#fff",
+        "borderColor": "#ddd",
+        "borderRadius": 24,
+        "borderWidth": 1,
+        "fontSize": 16,
+        "marginBottom": 16,
+        "padding": 12,
+        "paddingLeft": 40,
+      }
+    }
+    value=""
+  />
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingBottom": 16,
+      }
+    }
+    data={[]}
+    getItem={[Function]}
+    getItemCount={[Function]}
+    keyExtractor={[Function]}
+    onContentSizeChange={[Function]}
+    onLayout={[Function]}
+    onMomentumScrollBegin={[Function]}
+    onMomentumScrollEnd={[Function]}
+    onScroll={[Function]}
+    onScrollBeginDrag={[Function]}
+    onScrollEndDrag={[Function]}
+    removeClippedSubviews={false}
+    renderItem={[Function]}
+    scrollEventThrottle={0.0001}
+    stickyHeaderIndices={[]}
+    viewabilityConfigCallbackPairs={[]}
+  >
+    <View />
+  </RCTScrollView>
+</View>
+`;

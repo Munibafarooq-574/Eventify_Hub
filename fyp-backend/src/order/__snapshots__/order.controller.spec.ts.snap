@@ -1,0 +1,42 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`OrderController Snapshot Tests should match snapshot for completeOrder string response 1`] = `"Order is done"`;
+
+exports[`OrderController Snapshot Tests should match snapshot for completeVendorOrder response 1`] = `
+{
+  "status": "done",
+  "vendorId": "vDone",
+}
+`;
+
+exports[`OrderController Snapshot Tests should match snapshot for placeOrder response 1`] = `
+{
+  "_id": "orderSnap123",
+  "eventName": "ABC",
+  "guests": 6000,
+  "organizerId": "snapTest",
+  "services": [
+    {
+      "price": 8000,
+      "serviceName": "Lights",
+      "vendorId": "vSnap",
+    },
+  ],
+  "status": "created",
+}
+`;
+
+exports[`OrderController Snapshot Tests should match snapshot for rejected vendor response 1`] = `
+{
+  "reason": "Busy",
+  "status": "rejected",
+  "vendorId": "vReject",
+}
+`;
+
+exports[`OrderController Snapshot Tests should match snapshot for vendor response update 1`] = `
+{
+  "status": "accepted",
+  "vendorId": "vSnap",
+}
+`;

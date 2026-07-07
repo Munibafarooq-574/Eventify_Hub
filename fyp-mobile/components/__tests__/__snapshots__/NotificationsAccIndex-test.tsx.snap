@@ -1,0 +1,658 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`NotificationsAccIndex matches snapshot 1`] = `
+<RCTSafeAreaView
+  style={
+    {
+      "backgroundColor": "#F8E9F0",
+      "flex": 1,
+    }
+  }
+>
+  <View
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#fff",
+        "borderBottomColor": "#E0E0E0",
+        "borderBottomWidth": 1,
+        "flexDirection": "row",
+        "justifyContent": "space-between",
+        "paddingHorizontal": 20,
+        "paddingVertical": 15,
+      }
+    }
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "opacity": 1,
+        }
+      }
+    >
+      <Text
+        style={
+          {
+            "color": "#780C60",
+            "fontSize": 16,
+          }
+        }
+      >
+        &lt;
+         Back
+      </Text>
+    </View>
+    <Text
+      style={
+        {
+          "fontSize": 20,
+          "fontWeight": "bold",
+        }
+      }
+    >
+      Notifications
+    </Text>
+    <View
+      style={
+        {
+          "width": 40,
+        }
+      }
+    />
+  </View>
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "paddingHorizontal": 20,
+        "paddingVertical": 10,
+      }
+    }
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+  >
+    <View>
+      <View
+        style={
+          {
+            "alignItems": "flex-start",
+            "borderBottomColor": "#E0E0E0",
+            "borderBottomWidth": 1,
+            "flexDirection": "row",
+            "justifyContent": "space-between",
+            "paddingVertical": 15,
+          }
+        }
+      >
+        <View
+          style={
+            {
+              "flex": 1,
+              "marginRight": 10,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#000",
+                "fontSize": 16,
+                "fontWeight": "500",
+                "lineHeight": 22,
+              }
+            }
+          >
+            Receive notification when guests RSVP to the event
+          </Text>
+        </View>
+        <RCTSwitch
+          accessibilityRole="switch"
+          onChange={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          onTintColor="#780C60"
+          style={
+            {
+              "height": 31,
+              "width": 51,
+            }
+          }
+          testID="rsvp-switch"
+          thumbTintColor="#FFFFFF"
+          tintColor="#E0E0E0"
+          value={true}
+        />
+      </View>
+      <View
+        style={
+          {
+            "alignItems": "flex-start",
+            "borderBottomColor": "#E0E0E0",
+            "borderBottomWidth": 1,
+            "flexDirection": "row",
+            "justifyContent": "space-between",
+            "paddingVertical": 15,
+          }
+        }
+      >
+        <View
+          style={
+            {
+              "flex": 1,
+              "marginRight": 10,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#000",
+                "fontSize": 16,
+                "fontWeight": "500",
+                "lineHeight": 22,
+              }
+            }
+          >
+            Receive notification for activity that involves me
+          </Text>
+          <Text
+            style={
+              {
+                "color": "#848484",
+                "fontSize": 14,
+                "lineHeight": 20,
+                "marginTop": 5,
+              }
+            }
+          >
+            When a guest replies to me, mentions, or tags me
+          </Text>
+        </View>
+        <RCTSwitch
+          accessibilityRole="switch"
+          onChange={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          onTintColor="#780C60"
+          style={
+            {
+              "height": 31,
+              "width": 51,
+            }
+          }
+          testID="activity-switch"
+          thumbTintColor="#f4f3f4"
+          tintColor="#E0E0E0"
+          value={false}
+        />
+      </View>
+      <View
+        style={
+          {
+            "alignItems": "flex-start",
+            "borderBottomColor": "#E0E0E0",
+            "borderBottomWidth": 1,
+            "flexDirection": "row",
+            "justifyContent": "space-between",
+            "paddingVertical": 15,
+          }
+        }
+      >
+        <View
+          style={
+            {
+              "flex": 1,
+              "marginRight": 10,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#000",
+                "fontSize": 16,
+                "fontWeight": "500",
+                "lineHeight": 22,
+              }
+            }
+          >
+            Receive notification about approaching deadlines for tasks
+          </Text>
+        </View>
+        <RCTSwitch
+          accessibilityRole="switch"
+          onChange={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          onTintColor="#780C60"
+          style={
+            {
+              "height": 31,
+              "width": 51,
+            }
+          }
+          testID="deadline-switch"
+          thumbTintColor="#FFFFFF"
+          tintColor="#E0E0E0"
+          value={true}
+        />
+      </View>
+      <View
+        style={
+          {
+            "height": 80,
+          }
+        }
+      />
+    </View>
+  </RCTScrollView>
+  <View
+    style={
+      {
+        "alignItems": "center",
+        "backgroundColor": "#fff",
+        "borderTopColor": "#E0E0E0",
+        "borderTopWidth": 1,
+        "bottom": 0,
+        "flexDirection": "row",
+        "height": 80,
+        "justifyContent": "space-around",
+        "position": "absolute",
+        "width": "100%",
+      }
+    }
+  >
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 1,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#780C60",
+            "borderRadius": 25,
+            "height": 30,
+            "justifyContent": "center",
+            "marginBottom": 5,
+            "width": 30,
+          }
+        }
+      >
+        <Image
+          source={
+            {
+              "testUri": "../../../assets/images/myevent.png",
+            }
+          }
+          style={
+            {
+              "height": 37,
+              "marginBottom": 5,
+              "width": 37,
+            }
+          }
+        />
+      </View>
+      <Text
+        style={
+          {
+            "color": "#000000",
+            "fontSize": 10,
+          }
+        }
+      >
+        My Events
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 1,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#780C60",
+            "borderRadius": 25,
+            "height": 30,
+            "justifyContent": "center",
+            "marginBottom": 5,
+            "width": 30,
+          }
+        }
+      >
+        <Image
+          source={
+            {
+              "uri": "https://cdn.builder.io/api/v1/image/assets/TEMP/549e73c4-da91-40a5-a5c8-fd173b0e2a62?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
+            }
+          }
+          style={
+            {
+              "height": 37,
+              "marginBottom": 5,
+              "width": 37,
+            }
+          }
+        />
+      </View>
+      <Text
+        style={
+          {
+            "color": "#000000",
+            "fontSize": 10,
+          }
+        }
+      >
+        Messages
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 1,
+          "transform": [
+            {
+              "translateY": -10,
+            },
+          ],
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#780C60",
+            "borderRadius": 27.5,
+            "height": 55,
+            "justifyContent": "center",
+            "marginBottom": 5,
+            "width": 55,
+          }
+        }
+      />
+      <Text
+        style={
+          {
+            "color": "#000000",
+            "fontSize": 10,
+          }
+        }
+      >
+        Home
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 1,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#780C60",
+            "borderRadius": 25,
+            "height": 30,
+            "justifyContent": "center",
+            "marginBottom": 5,
+            "width": 30,
+          }
+        }
+      >
+        <Image
+          source={
+            {
+              "uri": "https://cdn.builder.io/api/v1/image/assets/TEMP/198f4cc8-49ff-4ccc-b97b-619e572143d4?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
+            }
+          }
+          style={
+            {
+              "height": 37,
+              "marginBottom": 5,
+              "width": 37,
+            }
+          }
+        />
+      </View>
+      <Text
+        style={
+          {
+            "color": "#000000",
+            "fontSize": 10,
+          }
+        }
+      >
+        Notifications
+      </Text>
+    </View>
+    <View
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": undefined,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 1,
+        }
+      }
+    >
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "backgroundColor": "#780C60",
+            "borderRadius": 25,
+            "height": 30,
+            "justifyContent": "center",
+            "marginBottom": 5,
+            "width": 30,
+          }
+        }
+      >
+        <Image
+          source={
+            {
+              "uri": "https://cdn.builder.io/api/v1/image/assets/TEMP/73089a6f-a9a6-4c94-9fd1-4cdd5923a137?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
+            }
+          }
+          style={
+            {
+              "height": 37,
+              "marginBottom": 5,
+              "width": 37,
+            }
+          }
+        />
+      </View>
+      <Text
+        style={
+          {
+            "color": "#000000",
+            "fontSize": 10,
+          }
+        }
+      >
+        Account
+      </Text>
+    </View>
+  </View>
+</RCTSafeAreaView>
+`;

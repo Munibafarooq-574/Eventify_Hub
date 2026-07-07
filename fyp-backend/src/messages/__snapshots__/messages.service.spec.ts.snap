@@ -1,0 +1,15 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Snapshot Testing - MessagesService should match snapshot for empty message list 1`] = `[]`;
+
+exports[`Snapshot Testing - MessagesService should match snapshot for single message result 1`] = `
+[
+  {
+    "chatId": "chat1",
+    "message": "Snapshot test",
+    "receiverId": "user2",
+    "senderId": "user1",
+    "timestamp": 2023-01-01T00:00:00.000Z,
+  },
+]
+`;

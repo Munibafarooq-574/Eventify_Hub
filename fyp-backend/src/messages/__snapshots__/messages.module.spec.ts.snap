@@ -1,0 +1,64 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`MessagesModule Snapshot Testing should consistently snapshot controller constructor shape 1`] = `"function"`;
+
+exports[`MessagesModule Snapshot Testing should ensure schema fields are stable across runs 1`] = `
+[
+  "chatId",
+  "senderId",
+  "receiverId",
+  "message",
+  "timestamp",
+  "_id",
+  "__v",
+]
+`;
+
+exports[`MessagesModule Snapshot Testing should match snapshot for MessagesController 1`] = `
+MessagesController {
+  "messagesService": MessagesService {
+    "messageModel": [Function],
+  },
+}
+`;
+
+exports[`MessagesModule Snapshot Testing should match snapshot for MessagesService 1`] = `
+MessagesService {
+  "messageModel": [Function],
+}
+`;
+
+exports[`MessagesModule Snapshot Testing should match snapshot for Mongoose schema 1`] = `
+{
+  "chatId": {
+    "required": true,
+    "type": [Function],
+  },
+  "message": {
+    "required": true,
+    "type": [Function],
+  },
+  "receiverId": {
+    "required": true,
+    "type": [Function],
+  },
+  "senderId": {
+    "required": true,
+    "type": [Function],
+  },
+  "timestamp": {
+    "default": [Function],
+    "type": [Function],
+  },
+}
+`;
+
+exports[`MessagesModule Snapshot Testing should snapshot schema structure keys 1`] = `
+[
+  "chatId",
+  "senderId",
+  "receiverId",
+  "message",
+  "timestamp",
+]
+`;

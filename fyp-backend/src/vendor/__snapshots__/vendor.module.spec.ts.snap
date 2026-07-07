@@ -1,0 +1,378 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`VendorModule - Snapshot Testing should match UserModel methods snapshot 1`] = `
+[
+  "find",
+  "findOne",
+  "create",
+]
+`;
+
+exports[`VendorModule - Snapshot Testing should match VendorController methods snapshot 1`] = `
+[
+  "constructor",
+  "getVendorsByCategoryId",
+  "createContactDetails",
+  "createPhotographerBuisnessDetails",
+  "addPackages",
+  "getContactDetails",
+  "getBusinessDetails",
+  "getPackages",
+  "getVendor",
+  "uploadImages",
+]
+`;
+
+exports[`VendorModule - Snapshot Testing should match VendorService instance snapshot 1`] = `
+VendorService {
+  "userModel": {
+    "create": [MockFunction] {
+      "calls": [
+        [
+          {
+            "name": "Created User",
+          },
+        ],
+        [
+          {
+            "name": "New Mock User",
+          },
+        ],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+      ],
+    },
+    "find": [MockFunction] {
+      "calls": [
+        [],
+        [],
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": [
+            {
+              "name": "Test User",
+            },
+          ],
+        },
+        {
+          "type": "return",
+          "value": [],
+        },
+        {
+          "type": "return",
+          "value": undefined,
+        },
+      ],
+    },
+    "findOne": [MockFunction] {
+      "calls": [
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": null,
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`VendorModule - Snapshot Testing should match VendorService methods snapshot 1`] = `
+[
+  "constructor",
+  "getAllVendorsByCategoryId",
+  "createContactDetails",
+  "createBuisnessDetails",
+  "addPackages",
+  "getContactDetails",
+  "getBusinessDetails",
+  "getPackages",
+  "getVendor",
+  "associateImagesWithUser",
+]
+`;
+
+exports[`VendorModule - Snapshot Testing should match VendorService provider instance snapshot 1`] = `
+VendorService {
+  "userModel": {
+    "create": [MockFunction] {
+      "calls": [
+        [
+          {
+            "name": "Created User",
+          },
+        ],
+        [
+          {
+            "name": "New Mock User",
+          },
+        ],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+      ],
+    },
+    "find": [MockFunction] {
+      "calls": [
+        [],
+        [],
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": [
+            {
+              "name": "Test User",
+            },
+          ],
+        },
+        {
+          "type": "return",
+          "value": [],
+        },
+        {
+          "type": "return",
+          "value": undefined,
+        },
+      ],
+    },
+    "findOne": [MockFunction] {
+      "calls": [
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": null,
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`VendorModule - Snapshot Testing should match the UserModel injection snapshot 1`] = `
+{
+  "create": [MockFunction] {
+    "calls": [
+      [
+        {
+          "name": "Created User",
+        },
+      ],
+      [
+        {
+          "name": "New Mock User",
+        },
+      ],
+    ],
+    "results": [
+      {
+        "type": "return",
+        "value": Promise {},
+      },
+      {
+        "type": "return",
+        "value": Promise {},
+      },
+    ],
+  },
+  "find": [MockFunction] {
+    "calls": [
+      [],
+      [],
+      [],
+    ],
+    "results": [
+      {
+        "type": "return",
+        "value": [
+          {
+            "name": "Test User",
+          },
+        ],
+      },
+      {
+        "type": "return",
+        "value": [],
+      },
+      {
+        "type": "return",
+        "value": undefined,
+      },
+    ],
+  },
+  "findOne": [MockFunction] {
+    "calls": [
+      [],
+    ],
+    "results": [
+      {
+        "type": "return",
+        "value": null,
+      },
+    ],
+  },
+}
+`;
+
+exports[`VendorModule - Snapshot Testing should match the VendorController snapshot 1`] = `
+VendorController {
+  "logger": Logger {
+    "context": "fyp",
+    "options": {},
+  },
+  "vendorService": VendorService {
+    "userModel": {
+      "create": [MockFunction] {
+        "calls": [
+          [
+            {
+              "name": "Created User",
+            },
+          ],
+          [
+            {
+              "name": "New Mock User",
+            },
+          ],
+        ],
+        "results": [
+          {
+            "type": "return",
+            "value": Promise {},
+          },
+          {
+            "type": "return",
+            "value": Promise {},
+          },
+        ],
+      },
+      "find": [MockFunction] {
+        "calls": [
+          [],
+          [],
+          [],
+        ],
+        "results": [
+          {
+            "type": "return",
+            "value": [
+              {
+                "name": "Test User",
+              },
+            ],
+          },
+          {
+            "type": "return",
+            "value": [],
+          },
+          {
+            "type": "return",
+            "value": undefined,
+          },
+        ],
+      },
+      "findOne": [MockFunction] {
+        "calls": [
+          [],
+        ],
+        "results": [
+          {
+            "type": "return",
+            "value": null,
+          },
+        ],
+      },
+    },
+  },
+}
+`;
+
+exports[`VendorModule - Snapshot Testing should match the VendorService provider snapshot 1`] = `
+VendorService {
+  "userModel": {
+    "create": [MockFunction] {
+      "calls": [
+        [
+          {
+            "name": "Created User",
+          },
+        ],
+        [
+          {
+            "name": "New Mock User",
+          },
+        ],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+        {
+          "type": "return",
+          "value": Promise {},
+        },
+      ],
+    },
+    "find": [MockFunction] {
+      "calls": [
+        [],
+        [],
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": [
+            {
+              "name": "Test User",
+            },
+          ],
+        },
+        {
+          "type": "return",
+          "value": [],
+        },
+        {
+          "type": "return",
+          "value": undefined,
+        },
+      ],
+    },
+    "findOne": [MockFunction] {
+      "calls": [
+        [],
+      ],
+      "results": [
+        {
+          "type": "return",
+          "value": null,
+        },
+      ],
+    },
+  },
+}
+`;

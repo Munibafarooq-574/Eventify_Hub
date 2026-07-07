@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SelectRoleScreen Snapshot Tests matches snapshot after confirming a selection 1`] = `null`;
+
+exports[`SelectRoleScreen Snapshot Tests matches snapshot after selecting a role 1`] = `null`;
+
+exports[`SelectRoleScreen Snapshot Tests matches snapshot when modal is open 1`] = `null`;
+
+exports[`SelectRoleScreen Snapshot Tests matches the initial render snapshot 1`] = `null`;

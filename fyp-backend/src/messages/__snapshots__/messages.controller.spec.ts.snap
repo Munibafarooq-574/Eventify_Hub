@@ -1,0 +1,55 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`MessagesController Snapshot Testing should match snapshot for empty message list 1`] = `[]`;
+
+exports[`MessagesController Snapshot Testing should match snapshot for error when chatId is invalid 1`] = `"Invalid chatId"`;
+
+exports[`MessagesController Snapshot Testing should match snapshot for messages list by chatId 1`] = `
+[
+  {
+    "_id": "m1",
+    "chatId": "snap-chat",
+    "message": "Hi",
+    "receiverId": "u2",
+    "senderId": "u1",
+  },
+  {
+    "_id": "m2",
+    "chatId": "snap-chat",
+    "message": "Hello",
+    "receiverId": "u1",
+    "senderId": "u2",
+  },
+]
+`;
+
+exports[`MessagesController Snapshot Testing should match snapshot for multiple messages 1`] = `
+[
+  {
+    "_id": "m1",
+    "chatId": "snap-multi",
+    "message": "First",
+    "receiverId": "y",
+    "senderId": "x",
+  },
+  {
+    "_id": "m2",
+    "chatId": "snap-multi",
+    "message": "Second",
+    "receiverId": "x",
+    "senderId": "y",
+  },
+]
+`;
+
+exports[`MessagesController Snapshot Testing should match snapshot when no messages exist for chatId 1`] = `[]`;
+
+exports[`MessagesController Snapshot Testing should match snapshot with special characters in message 1`] = `
+{
+  "_id": "id-@#",
+  "chatId": "snap-special",
+  "message": "Hello 🤖✨ #special!",
+  "receiverId": "2",
+  "senderId": "1",
+}
+`;
