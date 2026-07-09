@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function getConversationMessages(chatId: string) {
-    const url = `http://13.233.214.252:3000/chat/messages/${chatId}`; // Backend URL to fetch conversations
+    const url = `https://eventify-hub.onrender.com/chat/messages/${chatId}`; // Backend URL to fetch conversations
     // const url = `http://192.168.100.15:3000/chat/messages/${chatId}`;
     const config: AxiosRequestConfig = {
         maxBodyLength: Infinity,

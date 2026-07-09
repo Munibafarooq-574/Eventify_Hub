@@ -18,7 +18,7 @@ export interface TopVendor {
 }
 
 export default async function getPopularVendors(limit: number = 5): Promise<TopVendor[]> {
-    const url = `http://13.233.214.252:3000/reviews/top-vendors`;
+    const url = `https://eventify-hub.onrender.com/reviews/top-vendors`;
     // const url = `http://192.168.100.15:3000/reviews/top-vendors`;
     const params = { limit };
 

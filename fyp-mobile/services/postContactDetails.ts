@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from "axios";
 
 export default async function postContactDetails(userId: string, contactDetails: FormData) {
     console.log(userId, contactDetails)
-    const url = `http://13.233.214.252:3000/vendor/contactDetails?userId=${userId}`;
+    const url = `https://eventify-hub.onrender.com/vendor/contactDetails?userId=${userId}`;
     const config: AxiosRequestConfig = {
         maxBodyLength: Infinity,
         method: "POST",

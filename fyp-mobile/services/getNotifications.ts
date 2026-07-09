@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function getUserNotifications(userId: string) {
-    const url = `http://13.233.214.252:3000/notifications/${userId}`; // Update to your backend base URL
+    const url = `https://eventify-hub.onrender.com/notifications/${userId}`; // Update to your backend base URL
 
     const config: AxiosRequestConfig = {
         method: "GET",

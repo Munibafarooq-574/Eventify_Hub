@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function getVendorReviews(vendorId: string) {
-    const url = `http://13.233.214.252:3000/reviews?vendorId=${vendorId}`;
+    const url = `https://eventify-hub.onrender.com/reviews?vendorId=${vendorId}`;
     const config: AxiosRequestConfig = {
         method: "GET",
         url,

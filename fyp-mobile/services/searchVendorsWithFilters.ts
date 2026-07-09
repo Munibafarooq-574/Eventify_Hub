@@ -16,7 +16,7 @@ const searchVendorsWithFilters = async (filters: {
         if (filters.minRating) query.append("minRating", filters.minRating.toString());
         if (filters.staff) query.append("staff", filters.staff.toUpperCase());
         if (filters.cancellationPolicy) query.append("cancellationPolicy", filters.cancellationPolicy.toUpperCase());
-        const response = await axios.get(`http://13.233.214.252:3000/auth/vendor-search?${query.toString()}`);
+        const response = await axios.get(`https://eventify-hub.onrender.com/auth/vendor-search?${query.toString()}`);
         // const response = await axios.get(`http://192.168.100.15:3000/auth/vendor-search?${query.toString()}`);
         return response.data;
     } catch (error) {

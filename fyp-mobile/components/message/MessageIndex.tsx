@@ -35,7 +35,7 @@ const ChatScreen: React.FC = () => {
         fetchMessages();
 
         // Initialize WebSocket connection
-        const socket = io("http://13.233.214.252:3000"); // Replace with your server URL
+        const socket = io("https://eventify-hub.onrender.com"); // Replace with your server URL
         socket.emit("joinConversation", chatId); // Join the conversation room
 
         // Listen for incoming messages

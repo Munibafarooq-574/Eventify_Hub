@@ -11,7 +11,7 @@ import axios from 'axios';
  * @throws Will throw an error if the upload fails.
  */
 export async function uploadMultipleImages(userId: string, imageUris: string[]): Promise<string[]> {
-    const url = `http://13.233.214.252:3000/vendor/image?userId=${userId}`; // Replace with your actual backend URL
+    const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`; // Replace with your actual backend URL
 
     // Create a new FormData instance
     const formData = new FormData();
@@ -35,7 +35,7 @@ export async function uploadMultipleImages(userId: string, imageUris: string[]):
         // Assuming the backend returns { message: string, urls: string[] }
         if (response.data && response.data.urls) {
             // Construct the full URLs if necessary
-            const uploadedUrls = response.data.urls.map((url: any) => `http://13.233.214.252:3000${url}`); // Adjust based on your backend configuration
+            const uploadedUrls = response.data.urls.map((url: any) => `https://eventify-hub.onrender.com${url}`); // Adjust based on your backend configuration
             return uploadedUrls;
         } else {
             throw new Error('Upload failed: No URLs returned');

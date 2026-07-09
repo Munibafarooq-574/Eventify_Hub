@@ -23,7 +23,7 @@ const PhotosScreen: React.FC = () => {
 
   const fetchImages = async () => {
     try {
-      const response = await axios.get(`http://13.233.214.252:3000/vendor?userId=${vendorId}`);
+      const response = await axios.get(`https://eventify-hub.onrender.com/vendor?userId=${vendorId}`);
       setImages(response.data.images.map((image: string) => `${image}`));
 
     } catch (error) {

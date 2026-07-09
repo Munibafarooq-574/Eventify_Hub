@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from "axios";
 
 export default async function Login(email: string, password: string) {
     try {
-        const url = `http://13.233.214.252:3000/auth/login`;
+        const url = `https://eventify-hub.onrender.com/auth/login`;
         const config: AxiosRequestConfig = {
             maxBodyLength: Infinity,
             method: "POST",

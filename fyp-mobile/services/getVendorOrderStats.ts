@@ -8,7 +8,7 @@ interface OrderStats {
 }
 
 export default async function getVendorOrderStats(type: string, userId: string): Promise<OrderStats> {
-    const url = `http://13.233.214.252:3000/orders/stats`;
+    const url = `https://eventify-hub.onrender.com/orders/stats`;
     // const url = `http://192.168.100.15:3000/orders/stats`;
     const params = {
         type,

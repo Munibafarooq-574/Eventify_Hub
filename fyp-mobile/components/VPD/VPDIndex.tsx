@@ -40,7 +40,7 @@ const PhotographerDetailsScreen: React.FC = () => {
     useEffect(() => {
         const fetchVendorDetails = async () => {
             try {
-                const response = await axios.get(`http://13.233.214.252:3000/vendor?userId=${id}`);
+                const response = await axios.get(`https://eventify-hub.onrender.com/vendor?userId=${id}`);
                 setVendorData(response.data);
                 setActivePackage(response.data.packages?.[0]?._id || null); // Set the first package as active by default
             } catch (error) {

@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function patchUpdateOrderStatus(orderId: string, status: 'pending' | 'confirmed' | 'completed' | 'cancelled') {
-    const url = `http://13.233.214.252:3000/orders/${orderId}/status`;
+    const url = `https://eventify-hub.onrender.com/orders/${orderId}/status`;
 
     const config: AxiosRequestConfig = {
         method: "PATCH",

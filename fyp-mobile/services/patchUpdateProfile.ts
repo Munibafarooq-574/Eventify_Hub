@@ -9,7 +9,7 @@ interface UpdateProfileDto {
 }
 
 export default async function patchUpdateProfile(userId: string, data: UpdateProfileDto) {
-  const url = `http://13.233.214.252:3000/auth/update`; // Your backend update profile endpoint
+  const url = `https://eventify-hub.onrender.com/auth/update`; // Your backend update profile endpoint
 
   const config: AxiosRequestConfig = {
     method: "PATCH",

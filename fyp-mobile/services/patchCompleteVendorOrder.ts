@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function patchCompleteVendorOrder(vendorOrderId: string) {
-    const url = `http://13.233.214.252:3000/orders/complete-vendor/${vendorOrderId}`;
+    const url = `https://eventify-hub.onrender.com/orders/complete-vendor/${vendorOrderId}`;
     const config: AxiosRequestConfig = {
         method: "PATCH",
         url,

@@ -6,7 +6,7 @@ export default async function postVendorReview(userId: string, reviewData: {
     rating: number;
     reviewerName: string;
 }) {
-    const url = `http://13.233.214.252:3000/reviews?userId=${userId}`;
+    const url = `https://eventify-hub.onrender.com/reviews?userId=${userId}`;
     const config: AxiosRequestConfig = {
         method: "POST",
         url,
