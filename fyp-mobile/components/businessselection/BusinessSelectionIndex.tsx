@@ -17,9 +17,16 @@ const BusinessSelectionIndex: React.FC = () => {
     }, []);
 
     const getCategories = async () => {
-        const response = await getAllCategories();
-        setCategories(response);
-    };
+  try {
+    const response = await getAllCategories();
+
+    console.log("Categories Response:", response);
+
+    setCategories(response);
+  } catch (error) {
+    console.log("Category Error:", error);
+  }
+};
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
