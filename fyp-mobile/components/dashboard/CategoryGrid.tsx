@@ -55,6 +55,7 @@ const CategoryGrid: React.FC = () => {
         keyExtractor={(item) => item._id}
         numColumns={4}
         columnWrapperStyle={styles.row}
+         scrollEnabled={false}
       />
     </View>
   );

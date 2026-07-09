@@ -62,7 +62,7 @@ const Header: React.FC = () => {
       <View style={styles.welcomeContainer}>
         <View>
           <Text style={styles.welcomeText}>Welcome</Text>
-          <Text style={styles.username}>{username}</Text> Display the username
+          <Text style={styles.username}>{username}</Text>
         </View>
         <TouchableOpacity
           style={styles.planButton}
