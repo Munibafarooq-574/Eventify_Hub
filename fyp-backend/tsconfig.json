@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-     "types": ["jest", "node"],
+    "types": ["jest", "node"],
     "module": "commonjs",
     "declaration": true,
     "removeComments": true,
@@ -10,6 +10,7 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
@@ -19,17 +20,15 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-      "typeRoots": [
+    "typeRoots": [
       "./node_modules/@types",
       "./src/types"
     ]
   },
-   "include": [
-  "src/**/*.ts",
-  "src/**/*.spec.ts",
-  "jest.config.ts"
-],
-
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.spec.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist"
