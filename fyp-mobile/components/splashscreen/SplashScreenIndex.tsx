@@ -174,6 +174,8 @@ import {
     Dimensions,
     Easing,
     Image,
+    Text,
+    ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -186,7 +188,7 @@ const SplashScreen: React.FC = () => {
     // Animation values
     const bubbleOpacity = useRef(new Animated.Value(0.7)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current; // Start with opacity 0
-    const logoScale = useRef(new Animated.Value(0.5)).current; // Start smaller
+    const logoScale = useRef(new Animated.Value(0.8)).current; // Start smaller
 
     const bubbleAnimations = Array.from({ length: 12 }).map(() =>
         useRef(new Animated.Value(0)).current
@@ -222,29 +224,30 @@ const SplashScreen: React.FC = () => {
         // Animate bubble opacity out and logo fade-in with scale-up
         const hideBubblesTimer = setTimeout(() => {
             Animated.parallel([
-                Animated.timing(bubbleOpacity, {
-                    toValue: 0, // Fade out bubbles
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(logoOpacity, {
-                    toValue: 1, // Fade in logo
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(logoScale, {
-                    toValue: 1.2, // Scale up the logo
-                    duration: 1500,
-                    easing: Easing.out(Easing.exp),
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        }, 5000);
+            Animated.timing(bubbleOpacity, {
+             toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+            }),
+        Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+        }),
+         Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 60,
+        useNativeDriver: true,
+         }),
+    ]).start();
+        }, 2000);
 
-        // Navigate to the next screen after 8 seconds
-        const navigateTimer = setTimeout(() => {
-            router.push('/sandwich1');
-        }, 8000);
+        
+        // Navigate after 4 seconds
+            const navigateTimer = setTimeout(() => {
+    router.replace('/sandwich1');
+            }, 4000);
 
         return () => {
             clearTimeout(hideBubblesTimer);
@@ -300,7 +303,7 @@ const SplashScreen: React.FC = () => {
             style={styles.container}
         >
             {/* Logo with scale and fade-in animation */}
-            <Animated.View
+              <Animated.View
                 style={[
                     styles.logoContainer,
                     { opacity: logoOpacity, transform: [{ scale: logoScale }] },
@@ -314,6 +317,16 @@ const SplashScreen: React.FC = () => {
                     style={styles.logoImage}
                     accessibilityLabel="Company Logo"
                 />
+
+                <Animated.View style={{
+                marginTop: 25,
+                 opacity: logoOpacity,
+                     }} >
+                <ActivityIndicator
+                size="large"
+                    color="#7B2869"
+                     />
+            </Animated.View>
             </Animated.View>
 
             {/* Animated bubbles */}
@@ -344,13 +357,29 @@ const styles = StyleSheet.create({
         paddingBottom: 246,
         flexDirection: 'column',
         overflow: 'hidden',
-        alignItems: 'stretch',
+        alignItems: 'center',
+        justifyContent: 'center',
+
     },
     logoImage: {
         position: 'relative',
         display: 'flex',
         width: '100%',
         aspectRatio: 0.87,
+    },
+    title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#7B2869',
+    marginTop: 20,
+    textAlign: 'center',
+    },
+
+    subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
     },
 });
 
