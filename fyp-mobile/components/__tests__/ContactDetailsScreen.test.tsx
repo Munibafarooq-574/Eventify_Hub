@@ -211,7 +211,7 @@ test("ensures success alert is shown on successful form submission", async () =>
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
       "Success",
-      "Contact details saved successfully!"
+      "https://eventify-hub.onrender.com saved successfully!"
     );
   });
 });
@@ -370,7 +370,7 @@ test("ensures input fields reset after successful submission", async () => {
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
       "Success",
-      "Contact details saved successfully!"
+      "https://eventify-hub.onrender.com saved successfully!"
     );
   });
 });
@@ -401,7 +401,7 @@ test("ensures success alert appears after form submission", async () => {
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
       "Success",
-      "Contact details saved successfully!"
+      "https://eventify-hub.onrender.com saved successfully!"
     );
   });
 });

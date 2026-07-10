@@ -85,7 +85,7 @@ const BusinessSelectionIndex: React.FC = () => {
 
         <View style={styles.logoWrapper}>
         <Image
-            source={{ uri: image }}
+            source={image}
             style={styles.logo}
         />
             </View>
