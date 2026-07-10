@@ -115,7 +115,11 @@ export class VendorService {
         file: Express.Multer.File
     ): Promise<User> {
         const user = await this.userModel.findById(userId).exec();
-        const fileUrl = await this.fileUploadService.uploadFile(file);
+        let fileUrl = null;
+
+            if (file) {
+            fileUrl = await this.fileUploadService.uploadFile(file);
+        }
         if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
 
         user.contactDetails = { ...createContactDetailsDto, brandLogo: fileUrl?.Location || "" }

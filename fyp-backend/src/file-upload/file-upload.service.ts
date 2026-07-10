@@ -24,16 +24,22 @@ export class FileUploadService {
     }
 
     async uploadFile(file: any) {
-        console.log(file);
-        const { originalname } = file;
 
-        return await this.s3_upload(
-            file.buffer,
-            this.AWS_S3_BUCKET,
-            originalname,
-            file.mimetype,
-        );
+    if (!file) {
+        return null;
     }
+
+    console.log(file);
+
+    const { originalname } = file;
+
+    return await this.s3_upload(
+        file.buffer,
+        this.AWS_S3_BUCKET,
+        originalname,
+        file.mimetype,
+    );
+}
 
     async s3_upload(file: any, bucket: any, name: any, mimetype: any) {
         const params = {
