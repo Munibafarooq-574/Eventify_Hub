@@ -7,19 +7,16 @@ import { extname } from 'path';
 
 @Injectable()
 export class FileUploadService {
-    AWS_S3_BUCKET = 'eventify-hub';
-    s3 = new AWS.S3({
-          accessKeyId: 'AKIAUMYCIOJLCYLVOTU5',
-        secretAccessKey: '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',
-    });
+    AWS_S3_BUCKET = process.env.AWS_S3_BUCKET;
+    s3: AWS.S3;
 
     constructor() {
         this.s3 = new AWS.S3({
             credentials: {
-                  accessKeyId: 'AKIAUMYCIOJLCYLVOTU5',
-                secretAccessKey: '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',
+                accessKeyId: 'AKIA2XBKS45YRNT5QST3',
+                secretAccessKey: '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',
             },
-            region: "ap-south-1",
+            region: process.env.AWS_REGION,
         });
     }
 
@@ -50,7 +47,7 @@ export class FileUploadService {
             ContentType: mimetype,
             ContentDisposition: 'inline',
             CreateBucketConfiguration: {
-                LocationConstraint: 'ap-south-1',
+                LocationConstraint: process.env.AWS_REGION,
             },
         };
 
