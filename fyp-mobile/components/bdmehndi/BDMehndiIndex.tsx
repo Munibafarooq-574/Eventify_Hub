@@ -1,4 +1,4 @@
-import postMehndiBusinessDetails from '@/services/postMehndiBusinessDetails';
+import postMehndiBusinessDetails from '@/services/Postmehndibusinessdetails';
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";

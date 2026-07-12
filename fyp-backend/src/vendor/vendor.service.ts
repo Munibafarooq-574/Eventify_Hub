@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails } from '../auth/schemas/user.schema';
+import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails } from '../auth/schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
 import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
+import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { Category } from 'src/auth/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
@@ -59,7 +60,8 @@ export class VendorService {
                         { venueBusinessDetails: { $exists: true, $ne: null } },
                         { cateringBusinessDetails: { $exists: true, $ne: null } },
                         { photographerBusinessDetails: { $exists: true, $ne: null } },
-                        { cakeBusinessDetails: { $exists: true, $ne: null } }
+                        { cakeBusinessDetails: { $exists: true, $ne: null } },
+                        { mehndiBusinessDetails: { $exists: true, $ne: null } }
                     ]
                 }
             },
@@ -78,8 +80,19 @@ export class VendorService {
                                         $cond: [
                                             { $ifNull: ['$cateringBusinessDetails', false] },
                                             '$cateringBusinessDetails',
-                                            '$photographerBusinessDetails' ,// Assumes at least one exists
-                                             '$cakeBusinessDetails'
+                                            {
+                                                $cond: [
+                                                    { $ifNull: ['$photographerBusinessDetails', false] },
+                                                    '$photographerBusinessDetails',
+                                                    {
+                                                        $cond: [
+                                                            { $ifNull: ['$cakeBusinessDetails', false] },
+                                                            '$cakeBusinessDetails',
+                                                            '$mehndiBusinessDetails'
+                                                        ]
+                                                    }
+                                                ]
+                                            }
                                         ]
                                     }
                                 ]
@@ -94,7 +107,9 @@ export class VendorService {
                     salonBusinessDetails: 0,
                     venueBusinessDetails: 0,
                     cateringBusinessDetails: 0,
-                    photographerBusinessDetails: 0
+                    photographerBusinessDetails: 0,
+                    cakeBusinessDetails: 0,
+                    mehndiBusinessDetails: 0
                 }
             }
         ];
@@ -135,8 +150,9 @@ export class VendorService {
             CreatePhotographerBusinessDetailsDto |
             CreateSalonBusinessDetailsDto |
             CreateVenueBusinessDetailsDto |
-            CreateCateringBusinessDetailsDto | 
-            CreateCakeBusinessDetailsDto,
+            CreateCateringBusinessDetailsDto |
+            CreateCakeBusinessDetailsDto |
+            CreateMehndiBusinessDetailsDto,
     ): Promise<User> {
         const user = await this.userModel.findById(userId).populate('buisnessCategory').exec();
         if (!user) {
@@ -157,8 +173,8 @@ export class VendorService {
         } else if (categoryName === "makeup") {
             user.salonBusinessDetails = { ...dto } as unknown as SalonBusinessDetails;
         } else if (categoryName === "mehndi") {
-            user.salonBusinessDetails = { ...dto } as unknown as SalonBusinessDetails;
-        }  else if (categoryName === "cakes") {
+            user.mehndiBusinessDetails = { ...dto } as unknown as MehndiBusinessDetails;
+        } else if (categoryName === "cakes") {
            user.cakeBusinessDetails = { ...dto } as unknown as CakeBusinessDetails;
        }
         else {
@@ -187,7 +203,7 @@ export class VendorService {
 
     async getBusinessDetails(userId: string) {
         const user = await this.userModel.findById(userId).select(
-            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails',
+            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails mehndiBusinessDetails',
         );
 
         if (!user) throw new NotFoundException('User not found');
@@ -199,6 +215,7 @@ export class VendorService {
             ...(user.cateringBusinessDetails && { cateringBusinessDetails: user.cateringBusinessDetails }),
             ...(user.venueBusinessDetails && { venueBusinessDetails: user.venueBusinessDetails }),
             ...(user.cakeBusinessDetails && { cakeBusinessDetails: user.cakeBusinessDetails}),
+            ...(user.mehndiBusinessDetails && { mehndiBusinessDetails: user.mehndiBusinessDetails}),
         };
 
         return businessDetails;
@@ -224,6 +241,8 @@ export class VendorService {
                      user.salonBusinessDetails :
                      user?.cakeBusinessDetails ?
                      user.cakeBusinessDetails :
+                     user?.mehndiBusinessDetails ?
+                     user.mehndiBusinessDetails :
                      undefined
         }
         if (!user) throw new NotFoundException('User not found');
@@ -277,7 +296,17 @@ export class VendorService {
                                     {
                                         $cond: [
                                             { $ifNull: ['$cateringBusinessDetails', false] }, '$cateringBusinessDetails',
-                                            '$photographerBusinessDetails'
+                                            {
+                                                $cond: [
+                                                    { $ifNull: ['$photographerBusinessDetails', false] }, '$photographerBusinessDetails',
+                                                    {
+                                                        $cond: [
+                                                            { $ifNull: ['$cakeBusinessDetails', false] }, '$cakeBusinessDetails',
+                                                            '$mehndiBusinessDetails'
+                                                        ]
+                                                    }
+                                                ]
+                                            }
                                         ]
                                     }
                                 ]
@@ -291,7 +320,9 @@ export class VendorService {
                     salonBusinessDetails: 0,
                     venueBusinessDetails: 0,
                     cateringBusinessDetails: 0,
-                    photographerBusinessDetails: 0
+                    photographerBusinessDetails: 0,
+                    cakeBusinessDetails: 0,
+                    mehndiBusinessDetails: 0
                 }
             }
         ];
