@@ -13,12 +13,26 @@ import {
     View,
 } from "react-native";
 
+const STAFF_TYPES = [
+    { label: 'SOLO', icon: 'user' },
+    { label: 'SALON', icon: 'cut' },
+    { label: 'HOME-BASED SALON', icon: 'home' },
+];
+
+const STAFF_GENDERS = [
+    { label: 'MALE', icon: 'male' },
+    { label: 'FEMALE', icon: 'female' },
+    { label: 'TRANSGENDER', icon: 'transgender-alt' },
+];
+
 const BusinessDetailsForm = () => {
-    const [staffType, setStaffType] = useState<string>("");
+    // Single-select: vendor picks exactly one business type
+    const [staffType, setStaffType] = useState<string | null>(null);
     const [expertise, setExpertise] = useState<string>("");
     const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
     const [cityCovered, setCityCovered] = useState<string>("");
-    const [staffGender, setStaffGender] = useState<string>("");
+    // Multi-select: vendor can offer more than one staff gender
+    const [staffGender, setStaffGender] = useState<string[]>([]);
     const [minimumPrice, setMinimumPrice] = useState<string>("");
     const [description, setDescription] = useState<string>("");
     const [additionalInfo, setAdditionalInfo] = useState<string>("");
@@ -27,20 +41,15 @@ const BusinessDetailsForm = () => {
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
     const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null>(null);
 
+    const toggleStaffGender = (label: string) => {
+        setStaffGender((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
+
     const submit = async () => {
-        // console.log("staffType", staffType);
-        // console.log("expertise", expertise);
-        // console.log("travelsToClientHome", travelsToClientHome);
-        // console.log("cityCovered", staffType);
-        // console.log("staffGender", expertise);
-        // console.log("minimumPrice", minimumPrice);
-        // console.log("description", description);
-        // console.log("downPaymentType", downPaymentType);
-        // console.log("downPayment", downPayment);
-        // console.log("covidCompliant", covidCompliant);
-        // console.log("cancellationPolicy", cancellationPolicy);
         if (
-            staffType && staffType.length === 0 ||
+            !staffType ||
             !expertise ||
             travelsToClientHome === null ||
             !cityCovered ||
@@ -56,13 +65,14 @@ const BusinessDetailsForm = () => {
             return;
         }
 
-        const travel = travelsToClientHome === "YES" ? true : false
+        const travel = travelsToClientHome === "YES" ? true : false;
+
         try {
             const user = JSON.parse(await getSecureData("user") || "");
             await postSalonBusinessDetails(user._id, {
                 staffType,
                 expertise,
-                travelsToClientHome: travel ,
+                travelsToClientHome: travel,
                 cityCovered,
                 staffGender,
                 minimumPrice: Number(minimumPrice),
@@ -81,497 +91,538 @@ const BusinessDetailsForm = () => {
         }
     };
 
-    function setSelectedCity(text: string): void {
-        throw new Error("Function not implemented.");
-    }
-
-    console.log("travelsToClientHome", travelsToClientHome);
-
     return (
-        <ScrollView style={styles.container}>
-            {/* Title */}
-            <Text style={styles.header}>Business Details</Text>
-            <Text style={styles.subText}>
-                Want to start your business with us? Enter your following info details
-            </Text>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-            {/* Type */}
-            <Text style={styles.label}>Type</Text>
-            <View style={styles.typeContainer}>
-                {[
-                    { label: 'SOLO', icon: 'user' },
-                    { label: 'SALON', icon: 'cut' },
-                    { label: 'HOME-BASED SALON', icon: 'home' },
-                ].map((type) => (
-                    <TouchableOpacity
-                        key={type.label}
-                        style={[
-                            styles.typeOption,
-                            staffType === type.label && styles.typeSelected,
-                        ]}
-                        onPress={() => setStaffType(type.label)}
-                    >
-                        <FontAwesome5 name={type.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                staffType === type.label && styles.typeSelectedIcon,
-                            ]} />
-
-                        {/* <Icon
-                            name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                selectedStaff === staff.label && styles.staffSelectedIcon,
-                            ]}
-                        /> */}
-                        <Text
-                            style={[
-                                styles.staffText,
-                                staffType === type.label && styles.staffSelectedText,
-                            ]}
-                        >
-                            {type.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Header */}
+            <View style={styles.headerWrap}>
+                <View style={styles.headerIconBadge}>
+                    <FontAwesome5 name="cut" size={22} color="#780C60" />
+                </View>
+                <Text style={styles.header}>Business Details</Text>
+                <Text style={styles.subHeader}>
+                    Want to start your business with us? Enter your following info details
+                </Text>
+                <View style={styles.dotsRow}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <View key={i} style={[styles.dot, i === 2 && styles.dotAccent]} />
+                    ))}
+                </View>
             </View>
 
+            {/* Type - single select */}
+            <View style={styles.card}>
+                <SectionTitle icon="cut" title="Type" required />
+                <View style={styles.chipContainer}>
+                    {STAFF_TYPES.map((type) => {
+                        const isSelected = staffType === type.label;
+                        return (
+                            <TouchableOpacity
+                                key={type.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => setStaffType(type.label)}
+                            >
+                                <FontAwesome5
+                                    name={type.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {type.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
 
             {/* Expertise */}
-            <Text style={styles.label}>Expertise* </Text>
-            <TextInput style={styles.input} onChangeText={(text) => { setExpertise(text); }} placeholder="Enter expertise" />
+            <View style={styles.card}>
+                <SectionTitle icon="star" title="Expertise" required />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter expertise"
+                    placeholderTextColor="#B99DAF"
+                    value={expertise}
+                    onChangeText={setExpertise}
+                />
+            </View>
 
-            {/* Travels to Client Home */}
-            <Text style={styles.label}>Travels to Client Home*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            travelsToClientHome === option && styles.covidSelected,
-                        ]}
-                        onPress={() => {console.log(option); setTravelsToClientHome(option as "YES" || "NO")}}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                travelsToClientHome === option && styles.covidSelectedText,
-                            ]}
+            {/* Travels to Client Home - single select */}
+            <View style={styles.card}>
+                <SectionTitle icon="route" title="Travels to Client Home" required />
+                <View style={styles.pillRow}>
+                    {['YES', 'NO'].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, travelsToClientHome === option && styles.pillSelected]}
+                            onPress={() => setTravelsToClientHome(option as "YES" | "NO")}
                         >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text style={[styles.pillText, travelsToClientHome === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
 
             {/* City Covered */}
-            <Text style={styles.label}>City Covered*</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Select Cities"
-                value={cityCovered}
-                onChangeText={setCityCovered}
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="map-marker-alt" title="City Covered" required />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Select Cities"
+                    placeholderTextColor="#B99DAF"
+                    value={cityCovered}
+                    onChangeText={setCityCovered}
+                />
+            </View>
 
-            {/* Staff */}
-            <Text style={styles.label}>Staff</Text>
-            <View style={styles.staffContainer}>
-                {[
-                    { label: 'MALE', icon: 'male' },
-                    { label: 'FEMALE', icon: 'female' },
-                    { label: 'TRANSGENDER', icon: 'transgender-alt' },
-                ].map((staff) => (
-                    <TouchableOpacity
-                        key={staff.label}
-                        style={[
-                            styles.staffOption,
-                            staffGender === staff.label && styles.staffSelected,
-                        ]}
-                        onPress={() => setStaffGender(staff.label)}
-                    >
-                        <FontAwesome5 name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                staffGender === staff.label && styles.staffSelectedIcon,
-                            ]} />
-
-                        {/* <Icon
-                            name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                selectedStaff === staff.label && styles.staffSelectedIcon,
-                            ]}
-                        /> */}
-                        <Text
-                            style={[
-                                styles.staffText,
-                                staffGender === staff.label && styles.staffSelectedText,
-                            ]}
-                        >
-                            {staff.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Staff - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="users" title="Staff" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {STAFF_GENDERS.map((staff) => {
+                        const isSelected = staffGender.includes(staff.label);
+                        return (
+                            <TouchableOpacity
+                                key={staff.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleStaffGender(staff.label)}
+                            >
+                                <FontAwesome5
+                                    name={staff.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {staff.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
             </View>
 
             {/* Minimum Price */}
-            <Text style={styles.label}>Minimum Price</Text>
-            <TextInput style={styles.input} onChangeText={(text) => { setMinimumPrice(text) }} keyboardType="numeric" />
-
-            {/* Description */}
-            <Text style={styles.label}>Description *</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Description"
-                value={description}
-                onChangeText={setDescription}
-            />
-
-            {/* Down Payment Type */}
-
-            <Text style={styles.label}>Down Payment Type*</Text>
-            <View style={styles.covidContainer}>
-                {['PERCENTAGE', 'FIXED'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            downPaymentType === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setDownPaymentType(option as 'PERCENTAGE' || "FIXED")}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                downPaymentType === option && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.card}>
+                <SectionTitle icon="tag" title="Minimum Price" />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        keyboardType="numeric"
+                        placeholder="Enter price"
+                        placeholderTextColor="#B99DAF"
+                        value={minimumPrice}
+                        onChangeText={setMinimumPrice}
+                    />
+                </View>
             </View>
 
+            {/* Description */}
+            <View style={styles.card}>
+                <SectionTitle icon="align-left" title="Description" required />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Enter Description"
+                    placeholderTextColor="#B99DAF"
+                    value={description}
+                    onChangeText={setDescription}
+                />
+            </View>
+
+            {/* Additional Info */}
+            <View style={styles.card}>
+                <SectionTitle icon="sticky-note" title="Additional Info" />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Add any special notes..."
+                    placeholderTextColor="#B99DAF"
+                    value={additionalInfo}
+                    onChangeText={setAdditionalInfo}
+                />
+            </View>
+
+            {/* Down Payment Type */}
+            <View style={styles.card}>
+                <SectionTitle icon="money-bill-wave" title="Down Payment Type" required />
+                <View style={styles.pillRow}>
+                    {['PERCENTAGE', 'FIXED'].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, downPaymentType === option && styles.pillSelected]}
+                            onPress={() => setDownPaymentType(option as "PERCENTAGE" | "FIXED")}
+                        >
+                            <Text style={[styles.pillText, downPaymentType === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
 
             {/* Down Payment */}
-            <Text style={styles.label}>Down Payment *</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Down Payment"
-                keyboardType="numeric"
-                value={downPayment}
-                onChangeText={setDownPayment}
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="wallet" title="Down Payment" required />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        placeholder="Enter Down Payment"
+                        placeholderTextColor="#B99DAF"
+                        keyboardType="numeric"
+                        value={downPayment}
+                        onChangeText={setDownPayment}
+                    />
+                </View>
+            </View>
+
             {/* Covid Compliant */}
-            <Text style={styles.label}>Covid Compliant*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            covidCompliant === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setCovidCompliant(option as "YES" || "NO")}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                covidCompliant === option && styles.covidSelectedText,
-                            ]}
+            <View style={styles.card}>
+                <SectionTitle icon="shield-virus" title="Covid Compliant" required />
+                <View style={styles.pillRow}>
+                    {['YES', 'NO'].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, covidCompliant === option && styles.pillSelected]}
+                            onPress={() => setCovidCompliant(option as "YES" | "NO")}
                         >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text style={[styles.pillText, covidCompliant === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
 
             {/* Refund Policy */}
-            <Text style={styles.label}>Refund Policy*</Text>
-            <View style={styles.covidContainer}>
-                {['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'].map(
-                    (policy) => (
+            <View style={styles.card}>
+                <SectionTitle icon="undo-alt" title="Refund Policy" required />
+                <View style={styles.pillRowWrap}>
+                    {(['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'] as const).map((policy) => (
                         <TouchableOpacity
                             key={policy}
-                            style={[
-                                styles.covidOption,
-                                cancellationPolicy === policy && styles.covidSelected,
-                            ]}
-                            onPress={() => setCancellationPolicy(policy as 'REFUNDABLE' || 'NON-REFUNDABLE' || 'PARTIALLY REFUNDABLE')}
+                            activeOpacity={0.85}
+                            style={[styles.pill, cancellationPolicy === policy && styles.pillSelected]}
+                            onPress={() => setCancellationPolicy(policy)}
                         >
-                            <Text
-                                style={[
-                                    styles.covidText,
-                                    cancellationPolicy === policy && styles.covidSelectedText,
-                                ]}
-                            >
+                            <Text style={[styles.pillText, cancellationPolicy === policy && styles.pillTextSelected]}>
                                 {policy}
                             </Text>
                         </TouchableOpacity>
-                    )
-                )}
+                    ))}
+                </View>
             </View>
 
             {/* Buttons */}
             <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.saveButton}
+                    activeOpacity={0.9}
                     onPress={() => {
                         submit();
                     }}>
                     <Text style={styles.buttonText}>Save & Continue</Text>
+                    <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>
+
+            <View style={{ height: 30 }} />
         </ScrollView>
     );
 };
 
+// Small reusable section title with icon + optional required marker
+const SectionTitle: React.FC<{ icon: string; title: string; required?: boolean }> = ({ icon, title, required }) => (
+    <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionIconWrap}>
+            <FontAwesome5 name={icon} size={12} color="#780C60" />
+        </View>
+        <Text style={styles.label}>
+            {title}
+            {required ? <Text style={styles.requiredStar}> *</Text> : null}
+        </Text>
+    </View>
+);
+
 export default BusinessDetailsForm;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8E9F0', padding: 20, paddingTop: 70, },
-    header: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-    subText: { color: "#333", marginBottom: 15 },
-    // label: { fontSize: 14, fontWeight: "bold", marginVertical: 10 },
-    // input: {
-    //     backgroundColor: "#fff",
-    //     borderWidth: 1,
-    //     borderColor: "#C97BAA",
-    //     borderRadius: 5,
-    //     padding: 10,
-    //     marginBottom: 10,
-    // },
-    // textArea: {
-    //     backgroundColor: "#fff",
-    //     borderWidth: 1,
-    //     borderColor: "#C97BAA",
-    //     borderRadius: 5,
-    //     padding: 10,
-    //   //  height: 80,
-    //     //textAlignVertical: "top",
-    //     marginBottom: 10,
-    // },
-    row: { flexDirection: "row", marginBottom: 10, gap: 10 },
-    button: {
-        borderWidth: 1,
-        borderColor: "#C97BAA",
-        borderRadius: 5,
+    container: {
+        padding: 20,
+        backgroundColor: '#FDF4F8',
+        flexGrow: 1,
+        paddingTop: 65,
+        paddingBottom: 40,
+    },
+
+    // Header
+    headerWrap: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    headerIconBadge: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#F4D8EC',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    header: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#2A1B26',
+        textAlign: 'center',
+    },
+    subHeader: {
+        fontSize: 14,
+        color: '#8A7A85',
+        marginTop: 8,
+        textAlign: 'center',
+        lineHeight: 20,
+        maxWidth: 300,
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        marginTop: 16,
+        gap: 6,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#F0D3E6',
+    },
+    dotAccent: {
+        backgroundColor: '#780C60',
+        width: 18,
+    },
+
+    // Card wrapper for each section
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 14,
+        shadowColor: '#780C60',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+
+    sectionTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    sectionIconWrap: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: '#FBEFF7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#2A1B26',
+    },
+    requiredStar: {
+        color: '#C0396F',
+        fontWeight: '700',
+    },
+    hint: {
+        fontSize: 11,
+        color: '#B199AB',
+        marginLeft: 34,
+        marginBottom: 10,
+    },
+
+    // Inputs
+    input: {
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        fontSize: 14,
+        color: '#2A1B26',
         paddingVertical: 10,
-        paddingHorizontal: 15,
+        paddingHorizontal: 12,
+        backgroundColor: '#FEFBFD',
     },
-    selectedButton: {
-        backgroundColor: "#C97BAA",
+    textArea: {
+        minHeight: 70,
+        textAlignVertical: 'top',
     },
-    //buttonText: { color: "#C97BAA" },
-    selectedButtonText: { color: "#fff" },
-    footer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 20,
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        backgroundColor: '#FEFBFD',
+        paddingHorizontal: 12,
     },
-    secondaryButton: {
-        backgroundColor: "#E0D4DB",
-        padding: 10,
-        borderRadius: 5,
+    currencyPrefix: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#780C60',
+        marginRight: 6,
     },
-    primaryButton: {
-        backgroundColor: "#6D2057",
-        padding: 10,
-        borderRadius: 5,
-    },
-    footerText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
-    staffContainer: {
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-
-    staffOption: {
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
+    inputFlex: {
+        flex: 1,
+        fontSize: 14,
+        color: '#2A1B26',
+        paddingVertical: 10,
     },
 
-    staffSelected: {
-        backgroundColor: '#780C60', // Selected box background color
+    // Chips (Type single-select / Staff multi-select)
+    chipContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        backgroundColor: '#FEFBFD',
+        position: 'relative',
+    },
+    chipSelected: {
+        backgroundColor: '#780C60',
         borderColor: '#780C60',
     },
-
-    staffIcon: {
-        color: '#780C60', // Default icon color
-        fontSize: 20,
-        marginRight: 2, // Space between icon and text
+    chipIcon: {
+        color: '#780C60',
+        marginRight: 8,
+    },
+    chipIconSelected: {
+        color: '#FFFFFF',
+    },
+    chipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#780C60',
+        letterSpacing: 0.3,
+    },
+    chipTextSelected: {
+        color: '#FFFFFF',
+    },
+    checkBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F0DCEA',
     },
 
-    staffSelectedIcon: {
-        color: '#FFF', // White color for selected icon
+    // Single-select pills (Yes/No, payment type, cancellation policy, covid)
+    pillRow: {
+        flexDirection: 'row',
+        gap: 10,
     },
-
-    staffText: {
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
+    pillRowWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
     },
-
-    staffSelectedText: {
-        color: '#FFF', // White color for selected text
+    pill: {
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        backgroundColor: '#FEFBFD',
     },
-    covidContainer: {
-        // flexDirection: 'row',
-        // justifyContent: 'space-between',
-        // marginBottom: 16,
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-    covidOption: {
-        // padding: 10,
-        // borderWidth: 1,
-        // borderColor: '#B3A3A3',
-        // borderRadius: 8,
-        // flex: 1,
-        // alignItems: 'center',
-        // marginHorizontal: 4,
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-    covidSelected: {
-        // backgroundColor: '#FBEFF7',
-        // borderColor: '#800080',
-        backgroundColor: '#780C60', // Selected box background color
+    pillSelected: {
+        backgroundColor: '#780C60',
         borderColor: '#780C60',
     },
-    covidText: {
-        // fontSize: 14,
-        // color: '#666',
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
+    pillText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#780C60',
+        letterSpacing: 0.3,
     },
-    covidSelectedText: {
-        // color: "#780C60",
-        // fontWeight: 'bold',
-        color: '#FFF', // White color for selected text
+    pillTextSelected: {
+        color: '#FFFFFF',
     },
+
+    // Bottom buttons
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 20,
+        marginTop: 10,
+        gap: 12,
     },
     backButton: {
         flex: 1,
-        marginRight: 10,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#780C60',
-        borderRadius: 8,
-        paddingVertical: 12,
+        borderRadius: 14,
+        paddingVertical: 14,
         alignItems: 'center',
         backgroundColor: '#fff',
     },
     backButtonText: {
         color: '#780C60',
-        fontWeight: '600',
+        fontWeight: '700',
+        fontSize: 14,
     },
     saveButton: {
-        flex: 1,
-        backgroundColor: "#780C60",
-        paddingVertical: 12,
+        flex: 1.4,
+        flexDirection: 'row',
+        backgroundColor: '#780C60',
+        paddingVertical: 14,
+        justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 8,
+        borderRadius: 14,
+        shadowColor: '#780C60',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
     },
     buttonText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontWeight: '700',
         fontSize: 14,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginVertical: 8,
-    },
-    input: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
-    },
-    textArea: {
-        //     backgroundColor: "#fff",
-        //     borderWidth: 1,
-        //     borderColor: "#C97BAA",
-        //     borderRadius: 5,
-        //     padding: 10,
-        //   //  height: 80,
-        //     //textAlignVertical: "top",
-        //     marginBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
-    },
-    typeContainer: {
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-
-    typeOption: {
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-
-    typeSelected: {
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-
-    typeIcon: {
-        color: '#780C60', // Default icon color
-        fontSize: 20,
-        marginRight: 2, // Space between icon and text
-    },
-
-    typeSelectedIcon: {
-        color: '#FFF', // White color for selected icon
-    },
-
-    typeText: {
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-
-    typeSelectedText: {
-        color: '#FFF', // White color for selected text
     },
 });

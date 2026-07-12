@@ -48,7 +48,11 @@ export const PhotographerBusinessDetailsSchema = SchemaFactory.createForClass(
 
 @Schema()
 export class SalonBusinessDetails extends BusinessDetails {
-  @Prop({ type: String, enum: ['SOLO', 'SALON', 'HOME-BASED SALON'], required: true })
+  @Prop({
+    type: String,
+    enum: ['SOLO', 'SALON', 'HOME-BASED SALON'],
+    required: true,
+  })
   staffType: string;
 
   @Prop({ required: true })
@@ -60,8 +64,12 @@ export class SalonBusinessDetails extends BusinessDetails {
   @Prop({ required: true })
   cityCovered: string;
 
-  @Prop({ type: String, enum: ['MALE', 'FEMALE', 'TRANSGENDER'] })
-  staffGender: string;
+  @Prop({
+    type: [String],
+    enum: ['MALE', 'FEMALE', 'TRANSGENDER'],
+    default: [],
+  })
+  staffGender: string[];
 
   @Prop()
   minimumPrice: number;
