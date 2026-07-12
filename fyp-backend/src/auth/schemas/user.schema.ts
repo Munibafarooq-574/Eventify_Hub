@@ -268,6 +268,57 @@ export const CakeBusinessDetailsSchema =
 SchemaFactory.createForClass(CakeBusinessDetails);
 
 @Schema()
+export class MehndiBusinessDetails extends BusinessDetails {
+  @Prop({
+    type: [String],
+    enum: ['BRIDAL', 'PARTY', 'ARABIC', 'GLITTER'],
+    default: [],
+  })
+  mehndiType: string[];
+
+  @Prop({ type: Boolean, required: true })
+  travelsToClientHome: boolean;
+
+  @Prop({ required: true })
+  cityCovered: string;
+
+  @Prop({
+    type: [String],
+    enum: ['MALE', 'FEMALE', 'TRANSGENDER'],
+    default: [],
+  })
+  staffGender: string[];
+
+  @Prop()
+  minimumPrice: number;
+
+  @Prop({ required: true })
+  description: string;
+
+  @Prop()
+  additionalInfo?: string;
+
+  @Prop({ enum: ['PERCENTAGE', 'FIXED'], default: 'PERCENTAGE' })
+  downPaymentType: string;
+
+  @Prop({ required: true })
+  downPayment: number;
+
+  @Prop({ enum: ['YES', 'NO'], required: true })
+  covidCompliant: string;
+
+  @Prop({
+    enum: ['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'],
+    required: true,
+  })
+  cancellationPolicy: string;
+}
+
+export const MehndiBusinessDetailsSchema = SchemaFactory.createForClass(
+  MehndiBusinessDetails,
+);
+
+@Schema()
 export class Package {
   @Prop({ required: true })
   packageName: string;
@@ -340,6 +391,9 @@ export class User extends Document {
   @Prop({ type: CakeBusinessDetailsSchema })
 cakeBusinessDetails?: CakeBusinessDetails;
 
+  @Prop({ type: MehndiBusinessDetailsSchema })
+  mehndiBusinessDetails?: MehndiBusinessDetails;
+
   @Prop({ type: [PackageSchema], default: [] })
   packages: Package[];
 
@@ -376,4 +430,9 @@ export const VenueDiscriminator = BusinessDetailsSchema.discriminator(
 export const CakeDiscriminator = BusinessDetailsSchema.discriminator(
   'Cake',
   CakeBusinessDetailsSchema,
+);
+
+export const MehndiDiscriminator = BusinessDetailsSchema.discriminator(
+  'Mehndi',
+  MehndiBusinessDetailsSchema,
 );
