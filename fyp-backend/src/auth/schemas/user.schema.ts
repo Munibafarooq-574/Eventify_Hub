@@ -219,14 +219,20 @@ export const VenueBusinessDetailsSchema = SchemaFactory.createForClass(
 @Schema()
 export class CakeBusinessDetails extends BusinessDetails {
 
-  @Prop()
-  cakeType: string;
+  @Prop({
+  type: [String],
+  default: [],
+})
+cakeTypes: string[];
 
   @Prop()
   minimumPrice: number;
 
-  @Prop()
-  deliveryOptions: string;
+  @Prop({
+  type: [String],
+  default: [],
+})
+deliveryOptions: string[];
 
   @Prop()
   deliveryToHome: boolean;
