@@ -126,7 +126,7 @@ export class VendorService {
         return await user.save();
     }
 
-    async createBuisnessDetails(
+   async createBuisnessDetails(
         userId: string,
         dto:
             CreatePhotographerBusinessDetailsDto |
@@ -155,7 +155,9 @@ export class VendorService {
             throw new NotFoundException(`Business Category not found or not defined yet.`);
         }
         return await user.save();
-    }
+    } 
+
+    
 
     async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> {
         const user = await this.userModel.findById(userId);

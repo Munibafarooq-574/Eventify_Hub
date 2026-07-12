@@ -90,8 +90,12 @@ useEffect(() => {
 
 
   const submit = async () => {
-    if (!brandName || !contactNumber || !instagramLink || !bookingEmail || !city) {
+     if (!brandName || !contactNumber || !instagramLink || !bookingEmail || !city) {
       Alert.alert("Error", "Please fill in all the required fields marked with *.");
+      return;
+    }
+    if (!logoUri) {
+      Alert.alert("Logo Required", "Please upload your business logo to continue.");
       return;
     }
     try {
@@ -220,7 +224,7 @@ useEffect(() => {
   )}
 
   <Text style={styles.logoTitle}>
-    Business Logo
+    Business Logo *
   </Text>
 
   <Text style={styles.logoText}>
