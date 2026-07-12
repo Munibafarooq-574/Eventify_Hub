@@ -217,6 +217,43 @@ export const VenueBusinessDetailsSchema = SchemaFactory.createForClass(
 );
 
 @Schema()
+export class CakeBusinessDetails extends BusinessDetails {
+
+  @Prop()
+  cakeType: string;
+
+  @Prop()
+  minimumPrice: number;
+
+  @Prop()
+  deliveryOptions: string;
+
+  @Prop()
+  deliveryToHome: boolean;
+
+  @Prop()
+  description: string;
+
+  @Prop()
+  additionalInfo: string;
+
+  @Prop()
+  downPaymentType: string;
+
+  @Prop()
+  downPayment: number;
+
+  @Prop()
+  cancellationPolicy: string;
+
+  @Prop()
+  covidCompliant: string;
+}
+
+export const CakeBusinessDetailsSchema =
+SchemaFactory.createForClass(CakeBusinessDetails);
+
+@Schema()
 export class Package {
   @Prop({ required: true })
   packageName: string;
@@ -286,6 +323,9 @@ export class User extends Document {
   @Prop({ type: PhotographerBusinessDetailsSchema })
   photographerBusinessDetails?: PhotographerBusinessDetails;
 
+  @Prop({ type: CakeBusinessDetailsSchema })
+cakeBusinessDetails?: CakeBusinessDetails;
+
   @Prop({ type: [PackageSchema], default: [] })
   packages: Package[];
 
@@ -317,4 +357,9 @@ export const CateringDiscriminator = BusinessDetailsSchema.discriminator(
 export const VenueDiscriminator = BusinessDetailsSchema.discriminator(
   'Venue',
   VenueBusinessDetailsSchema,
+);
+
+export const CakeDiscriminator = BusinessDetailsSchema.discriminator(
+  'Cake',
+  CakeBusinessDetailsSchema,
 );

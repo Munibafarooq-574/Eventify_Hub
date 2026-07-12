@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails } from '../auth/schemas/user.schema';
+import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails } from '../auth/schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
+import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { Category } from 'src/auth/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
@@ -57,7 +58,8 @@ export class VendorService {
                         { salonBusinessDetails: { $exists: true, $ne: null } },
                         { venueBusinessDetails: { $exists: true, $ne: null } },
                         { cateringBusinessDetails: { $exists: true, $ne: null } },
-                        { photographerBusinessDetails: { $exists: true, $ne: null } }
+                        { photographerBusinessDetails: { $exists: true, $ne: null } },
+                        { cakeBusinessDetails: { $exists: true, $ne: null } }
                     ]
                 }
             },
@@ -76,7 +78,8 @@ export class VendorService {
                                         $cond: [
                                             { $ifNull: ['$cateringBusinessDetails', false] },
                                             '$cateringBusinessDetails',
-                                            '$photographerBusinessDetails' // Assumes at least one exists
+                                            '$photographerBusinessDetails' ,// Assumes at least one exists
+                                             '$cakeBusinessDetails'
                                         ]
                                     }
                                 ]
@@ -132,25 +135,33 @@ export class VendorService {
             CreatePhotographerBusinessDetailsDto |
             CreateSalonBusinessDetailsDto |
             CreateVenueBusinessDetailsDto |
-            CreateCateringBusinessDetailsDto,
+            CreateCateringBusinessDetailsDto | 
+            CreateCakeBusinessDetailsDto,
     ): Promise<User> {
         const user = await this.userModel.findById(userId).populate('buisnessCategory').exec();
         if (!user) {
             throw new NotFoundException(`User not found or not defined yet.`);
         }
         const category = user.buisnessCategory as Category;
+        const categoryName = category.name.trim().toLowerCase();
+
+        console.log("Category:", JSON.stringify(category.name));
+        console.log("Normalized:", categoryName);
         if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
-        if (category.name === "Venues") {
+        if (categoryName === "venues") {
             user.venueBusinessDetails = { ...dto } as unknown as VenueBusinessDetails;
-        } else if (category.name === "Caterings") {
+        } else if (categoryName === "caterings") {
             user.cateringBusinessDetails = { ...dto } as unknown as CateringBusinessDetails;
-        } else if (category.name === "Photography") {
+        } else if (categoryName === "photography") {
             user.photographerBusinessDetails = { ...dto } as PhotographerBusinessDetails;
-        } else if (category.name === "Makeup") {
+        } else if (categoryName === "makeup") {
             user.salonBusinessDetails = { ...dto } as unknown as SalonBusinessDetails;
-        } else if (category.name === "Mehndi") {
+        } else if (categoryName === "mehndi") {
             user.salonBusinessDetails = { ...dto } as unknown as SalonBusinessDetails;
-        } else {
+        }  else if (categoryName === "cakes") {
+           user.cakeBusinessDetails = { ...dto } as unknown as CakeBusinessDetails;
+       }
+        else {
             console.log("No Buisness Category", category);
             throw new NotFoundException(`Business Category not found or not defined yet.`);
         }
@@ -176,7 +187,7 @@ export class VendorService {
 
     async getBusinessDetails(userId: string) {
         const user = await this.userModel.findById(userId).select(
-            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails',
+            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails',
         );
 
         if (!user) throw new NotFoundException('User not found');
@@ -187,6 +198,7 @@ export class VendorService {
             ...(user.photographerBusinessDetails && { photographerBusinessDetails: user.photographerBusinessDetails }),
             ...(user.cateringBusinessDetails && { cateringBusinessDetails: user.cateringBusinessDetails }),
             ...(user.venueBusinessDetails && { venueBusinessDetails: user.venueBusinessDetails }),
+            ...(user.cakeBusinessDetails && { cakeBusinessDetails: user.cakeBusinessDetails}),
         };
 
         return businessDetails;
@@ -203,14 +215,16 @@ export class VendorService {
         const userObjToReturn = {
             ...user,
             BusinessDetails: user && user.photographerBusinessDetails
-                ? user.photographerBusinessDetails :
-                user?.cateringBusinessDetails ?
-                    user.cateringBusinessDetails :
-                    user?.venueBusinessDetails ?
-                        user.venueBusinessDetails :
-                        user?.salonBusinessDetails ?
-                            user.salonBusinessDetails :
-                            undefined
+                    ? user.photographerBusinessDetails :
+                     user?.cateringBusinessDetails ?
+                     user.cateringBusinessDetails :
+                     user?.venueBusinessDetails ?
+                     user.venueBusinessDetails :
+                     user?.salonBusinessDetails ?
+                     user.salonBusinessDetails :
+                     user?.cakeBusinessDetails ?
+                     user.cakeBusinessDetails :
+                     undefined
         }
         if (!user) throw new NotFoundException('User not found');
         return userObjToReturn;

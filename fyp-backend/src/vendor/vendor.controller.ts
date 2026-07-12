@@ -4,6 +4,7 @@ import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
+import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
 import { User } from 'src/auth/schemas/user.schema';
 import { CreatePackagesDto } from './dto/create-package.dto';
@@ -47,7 +48,9 @@ export class VendorController {
             CreatePhotographerBusinessDetailsDto |
             CreateSalonBusinessDetailsDto |
             CreateVenueBusinessDetailsDto |
-            CreateCateringBusinessDetailsDto) {
+            CreateCateringBusinessDetailsDto |
+            CreateCakeBusinessDetailsDto
+        ) {
         this.logger.log(userId, "buisnessDetails");
         return await this.vendorService.createBuisnessDetails(userId, dto);
     }

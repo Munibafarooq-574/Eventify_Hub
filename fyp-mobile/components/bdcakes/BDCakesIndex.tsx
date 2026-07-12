@@ -1,3 +1,6 @@
+import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
+import { getSecureData } from "@/store";
+import { Alert } from "react-native";
 import { FontAwesome5 } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -15,17 +18,22 @@ const DELIVERY_OPTIONS = [
     { label: 'No-Delivery', icon: 'store' },
 ];
 
+const DOWN_PAYMENT_TYPES = ['PERCENTAGE', 'FIXED AMOUNT'] as const;
+type DownPaymentType = typeof DOWN_PAYMENT_TYPES[number] | "";
+
 const CakeBusinessDetailsScreen: React.FC = () => {
     // Multi-select: vendor can offer more than one cake type / delivery option
     const [selectedCakeTypes, setSelectedCakeTypes] = useState<string[]>([]);
     const [deliveryOptions, setDeliveryOptions] = useState<string[]>([]);
 
     const [deliveryToHome, setDeliveryToHome] = useState<string | null>(null);
-    const [downPaymentType, setDownPaymentType] = useState<string>("");
+    const [downPaymentType, setDownPaymentType] = useState<DownPaymentType>("");
     const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
     const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null>(null);
-
+    const [minimumPrice, setMinimumPrice] = useState("");
+    const [description, setDescription] = useState("");
+    const [additionalInfo, setAdditionalInfo] = useState("");
     const toggleCakeType = (label: string) => {
         setSelectedCakeTypes((prev) =>
             prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -37,6 +45,65 @@ const CakeBusinessDetailsScreen: React.FC = () => {
             prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
         );
     };
+
+    const submit = async () => {
+
+    if (
+        selectedCakeTypes.length === 0 ||
+        !minimumPrice ||
+        deliveryOptions.length === 0 ||
+        deliveryToHome === null ||
+        !description ||
+        !downPaymentType ||
+        !downPayment ||
+        covidCompliant === null ||
+        cancellationPolicy === null
+    ) {
+        Alert.alert("Error", "Please fill all required fields.");
+        return;
+    }
+
+    try {
+
+        const user = JSON.parse(await getSecureData("user") || "");
+
+        await postCakeBusinessDetails(user._id, {
+
+            cakeTypes: selectedCakeTypes,
+
+            minimumPrice: Number(minimumPrice),
+
+            deliveryOptions,
+
+            deliveryToHome: deliveryToHome === "YES",
+
+            description,
+
+            additionalInfo,
+
+            downPaymentType,
+
+            downPayment: Number(downPayment),
+
+            covidCompliant,
+
+            cancellationPolicy,
+
+        });
+
+        Alert.alert("Success", "Business Details Saved");
+
+        router.push("/packages");
+
+    } catch (error) {
+
+        console.log(error);
+
+        Alert.alert("Error", "Something went wrong.");
+
+    }
+
+};
 
     return (
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -100,6 +167,8 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                         keyboardType="numeric"
                         placeholder="Enter price"
                         placeholderTextColor="#B99DAF"
+                        value={minimumPrice}
+                        onChangeText={setMinimumPrice}
                     />
                 </View>
             </View>
@@ -164,6 +233,8 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     multiline
                     placeholder="Describe your cake offerings..."
                     placeholderTextColor="#B99DAF"
+                    value={description}
+                    onChangeText={setDescription}
                 />
             </View>
 
@@ -175,6 +246,8 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     multiline
                     placeholder="Add any special notes..."
                     placeholderTextColor="#B99DAF"
+                    value={additionalInfo}
+                    onChangeText={setAdditionalInfo}
                 />
             </View>
 
@@ -187,7 +260,7 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                             key={option}
                             activeOpacity={0.85}
                             style={[styles.pill, downPaymentType === option && styles.pillSelected]}
-                            onPress={() => setDownPaymentType(option)}
+                            onPress={() => setDownPaymentType(option as DownPaymentType)}
                         >
                             <Text style={[styles.pillText, downPaymentType === option && styles.pillTextSelected]}>
                                 {option}
@@ -260,7 +333,7 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     style={styles.saveButton}
                     activeOpacity={0.9}
                     onPress={() => {
-                        //  submit();
+                         submit();
                     }}>
                     <Text style={styles.buttonText}>Save & Continue</Text>
                     <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
