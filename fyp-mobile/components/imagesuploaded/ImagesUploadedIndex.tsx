@@ -90,240 +90,480 @@ const ImageUploadScreen: React.FC = () => {
     };
 
     return (
-        <View style={styles.container}>
-            {/* Header Section */}
-            <Text style={styles.header}>Images</Text>
-            <Text style={styles.subHeader}>Upload images{"\n"}You can upload up to 30 images</Text>
-            <Text style={styles.subHeader}>The first picture will be set as your cover photo*</Text>
+    <View style={styles.container}>
 
-            {/* Upload Card */}
-            <TouchableOpacity style={styles.uploadCard} onPress={handleFileUpload}>
-                {/* Placeholder Icon */}
-                <View style={styles.iconContainer}>
-                    <Text style={styles.icon}>📷</Text>
-                </View>
-                {/* Upload Text */}
-                <Text style={styles.uploadText}>Tap to select images{"\n"}or drag and drop a file here</Text>
-                {/* Choose File Button */}
-                <TouchableOpacity style={styles.chooseFileButton} onPress={handleFileUpload}>
-                    <Text style={styles.chooseFileButtonText}>Choose File</Text>
-                </TouchableOpacity>
+        {/* Header */}
+<View style={styles.headerContainer}>
+
+    <Text style={styles.header}>
+        Upload Images
+    </Text>
+
+
+    <Text style={styles.subHeader}>
+        Showcase your services with beautiful photos
+        {"\n"}
+        and attract more customers.
+    </Text>
+
+
+    <View style={styles.limitBadge}>
+        <Text style={styles.coverText}>
+            ✨ Upload up to 30 images
+        </Text>
+    </View>
+
+
+</View>
+
+
+        {/* Upload Box */}
+        <TouchableOpacity
+            style={styles.uploadCard}
+            onPress={handleFileUpload}
+            activeOpacity={0.8}
+        >
+
+            <View style={styles.iconCircle}>
+                <Text style={styles.icon}>📷</Text>
+            </View>
+
+
+            <Text style={styles.uploadTitle}>
+                Add your service images
+            </Text>
+
+            <Text style={styles.uploadText}>
+                Upload up to 30 images
+                {"\n"}
+                High quality photos attract more customers
+            </Text>
+
+
+            <TouchableOpacity
+                style={styles.chooseFileButton}
+                onPress={handleFileUpload}
+            >
+                <Text style={styles.chooseFileButtonText}>
+                    Choose Photos
+                </Text>
             </TouchableOpacity>
 
-            {/* Photos Section */}
-            <View style={styles.photosSection}>
+        </TouchableOpacity>
+
+
+
+        {/* Images Preview */}
+        {images.length > 0 && (
+            <View style={styles.photosWrapper}>
+
+                <Text style={styles.sectionTitle}>
+                    Selected Photos ({images.length}/30)
+                </Text>
+
+
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    style={styles.photosScroll}
                 >
-                    {images.map((imgUri, index) => (
-                        <View key={index} style={styles.imageContainer}>
-                            <TouchableOpacity onPress={() => setSelectedImage(imgUri)}>
-                                <Image source={{ uri: imgUri }} style={styles.photo} />
+
+                    {images.map((imgUri,index)=>(
+                        <View 
+                            key={index}
+                            style={styles.imageContainer}
+                        >
+
+                            <TouchableOpacity
+                                onPress={()=>setSelectedImage(imgUri)}
+                            >
+                                <Image
+                                    source={{uri:imgUri}}
+                                    style={styles.photo}
+                                />
                             </TouchableOpacity>
+
+
                             <TouchableOpacity
                                 style={styles.deleteButton}
-                                onPress={() => handleDeleteImage(index)}
+                                onPress={()=>handleDeleteImage(index)}
                             >
-                                <Text style={styles.deleteButtonText}>X</Text>
+                                <Text style={styles.deleteButtonText}>
+                                    ×
+                                </Text>
                             </TouchableOpacity>
+
+
+                            {index===0 && (
+                                <View style={styles.coverBadge}>
+                                    <Text style={styles.coverBadgeText}>
+                                        Cover
+                                    </Text>
+                                </View>
+                            )}
+
                         </View>
                     ))}
+
                 </ScrollView>
-            </View>
 
-            {/* Footer Buttons */}
-            <View style={styles.footer}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.buttonBack}>
-                    <Text style={styles.buttonText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.saveButton, (uploading || images.length === 0) && styles.disabledButton]}
-                    onPress={handleSaveAndContinue}
-                    disabled={uploading || images.length === 0}
-                >
-                    <Text style={styles.saveButtonText}>
-                        {uploading ? "Uploading..." : "Save & Continue"}
-                    </Text>
-                </TouchableOpacity>
             </View>
+        )}
 
-            {/* Modal to view selected image */}
-            <Modal
-                visible={!!selectedImage}
-                transparent
-                onRequestClose={() => setSelectedImage(null)}
+
+
+        {/* Footer */}
+        <View style={styles.footer}>
+
+            <TouchableOpacity
+                onPress={()=>navigation.goBack()}
+                style={styles.buttonBack}
             >
-                <View style={styles.modalBackground}>
-                    <View style={styles.modalContent}>
-                        {selectedImage && (
-                            <Image
-                                source={{ uri: selectedImage }}
-                                style={styles.enlargedImage}
-                                resizeMode="contain"
-                            />
-                        )}
-                        <TouchableOpacity
-                            onPress={() => setSelectedImage(null)}
-                            style={styles.closeButton}
-                        >
-                            <Text style={styles.closeButtonText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+                <Text style={styles.backText}>
+                    Back
+                </Text>
+            </TouchableOpacity>
+
+
+
+            <TouchableOpacity
+                style={[
+                    styles.saveButton,
+                    (uploading || images.length===0)
+                    && styles.disabledButton
+                ]}
+                disabled={uploading || images.length===0}
+                onPress={handleSaveAndContinue}
+            >
+
+                <Text style={styles.saveButtonText}>
+                    {uploading 
+                    ? "Uploading..."
+                    :"Save & Continue"}
+                </Text>
+
+            </TouchableOpacity>
+
         </View>
-    );
+
+
+
+
+        {/* Image Modal */}
+        <Modal
+            visible={!!selectedImage}
+            transparent
+            onRequestClose={()=>setSelectedImage(null)}
+        >
+
+            <View style={styles.modalBackground}>
+
+                <View style={styles.modalContent}>
+
+                    {selectedImage && (
+                        <Image
+                            source={{uri:selectedImage}}
+                            style={styles.enlargedImage}
+                            resizeMode="contain"
+                        />
+                    )}
+
+
+                    <TouchableOpacity
+                        onPress={()=>setSelectedImage(null)}
+                        style={styles.closeButton}
+                    >
+                        <Text style={styles.closeButtonText}>
+                            Close
+                        </Text>
+                    </TouchableOpacity>
+
+
+                </View>
+
+            </View>
+
+        </Modal>
+
+
+    </View>
+);
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#F8E9F0",
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-        paddingTop: 70,
-    },
-    header: {
-        fontSize: 24,
-        fontWeight: "bold",
-        marginBottom: 10,
-        color: "#000",
-    },
-    subHeader: {
-        fontSize: 14,
-        color: "#6A6A6A",
-        marginBottom: 20,
-    },
-    uploadCard: {
-        backgroundColor: "#FFFFFF",
-        borderRadius: 10,
-        padding: 20,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: "#D3A4D4",
-        marginVertical: 30,
-    },
-    iconContainer: {
-        marginBottom: 10,
-    },
-    icon: {
-        fontSize: 40,
-        color: "#C4C4C4",
-    },
-    uploadText: {
-        fontSize: 14,
-        color: "#6A6A6A",
-        textAlign: "center",
-        marginBottom: 20,
-    },
-    chooseFileButton: {
-        backgroundColor: "#780C60",
-        borderRadius: 20,
-        paddingVertical: 10,
-        paddingHorizontal: 30,
-    },
-    chooseFileButtonText: {
-        color: "#FFFFFF",
-        fontSize: 14,
-        fontWeight: "bold",
-    },
-    footer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 20,
-    },
-    buttonBack: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-        borderColor: "#780C60",
-        borderWidth: 1,
-        borderRadius: 10,
-        paddingVertical: 15,
-        marginRight: 10,
-        alignItems: "center",
-    },
-    buttonText: {
-        fontSize: 16,
-        fontWeight: "bold",
-        color: "#780C60",
-    },
-    saveButton: {
-        flex: 1,
-        backgroundColor: "#780C60",
-        borderRadius: 10,
-        paddingVertical: 15,
-        alignItems: "center",
-        marginLeft: 10,
-    },
-    disabledButton: {
-        backgroundColor: "#A467A6",
-    },
-    saveButtonText: {
-        color: "#FFFFFF",
-        fontWeight: "bold",
-    },
-    photosSection: {
-        padding: 16,
-        paddingBottom: 30,
-    },
-    photosScroll: {
-        flexDirection: 'row',
-    },
-    imageContainer: {
-        position: 'relative',
-        marginRight: 8,
-    },
-    photo: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-    },
-    deleteButton: {
-        position: 'absolute',
-        top: 5,
-        right: 5,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        borderRadius: 15,
-        width: 25,
-        height: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    modalBackground: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        width: '90%',
-        backgroundColor: '#fff',
-        borderRadius: 10,
-        padding: 10,
-        alignItems: 'center',
-    },
-    enlargedImage: {
-        width: '100%',
-        height: 300,
-        marginBottom: 20,
-    },
-    closeButton: {
-        backgroundColor: '#780C60',
-        borderRadius: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-    },
-    closeButtonText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
+
+container:{
+    flex:1,
+    backgroundColor:"#FDF5FA",
+    paddingHorizontal:20,
+    paddingTop:65,
+},
+
+
+headerContainer:{
+    alignItems:"center",
+    marginBottom:25,
+},
+
+
+header:{
+    fontSize:30,
+    fontWeight:"800",
+    color:"#780C60",
+    marginBottom:10,
+    textAlign:"center",
+},
+
+
+subHeader:{
+    fontSize:15,
+    color:"#666",
+    lineHeight:22,
+    textAlign:"center",
+    paddingHorizontal:10,
+},
+
+
+limitBadge:{
+    marginTop:15,
+    backgroundColor:"#F9E7F3",
+    paddingHorizontal:18,
+    paddingVertical:8,
+    borderRadius:20,
+},
+
+
+coverText:{
+    fontSize:14,
+    color:"#780C60",
+    fontWeight:"600",
+},
+
+
+
+uploadCard:{
+    backgroundColor:"#fff",
+    borderRadius:22,
+    paddingVertical:30,
+    alignItems:"center",
+    borderWidth:1.5,
+    borderColor:"#D9A5CF",
+    borderStyle:"dashed",
+    elevation:4,
+},
+
+
+
+iconCircle:{
+    height:75,
+    width:75,
+    borderRadius:40,
+    backgroundColor:"#F8E1F1",
+    justifyContent:"center",
+    alignItems:"center",
+    marginBottom:15,
+},
+
+
+icon:{
+    fontSize:38,
+},
+
+
+
+uploadTitle:{
+    fontSize:18,
+    fontWeight:"700",
+    color:"#2B1025",
+},
+
+
+uploadText:{
+    marginTop:8,
+    textAlign:"center",
+    color:"#777",
+    lineHeight:22,
+},
+
+
+
+chooseFileButton:{
+    marginTop:20,
+    backgroundColor:"#780C60",
+    paddingHorizontal:35,
+    paddingVertical:13,
+    borderRadius:30,
+},
+
+
+chooseFileButtonText:{
+    color:"#fff",
+    fontWeight:"700",
+},
+
+
+
+
+photosWrapper:{
+    marginTop:25,
+},
+
+
+sectionTitle:{
+    fontSize:16,
+    fontWeight:"700",
+    marginBottom:12,
+    color:"#2B1025",
+},
+
+
+
+imageContainer:{
+    marginRight:12,
+    position:"relative",
+},
+
+
+photo:{
+    width:105,
+    height:105,
+    borderRadius:18,
+},
+
+
+
+deleteButton:{
+    position:"absolute",
+    right:5,
+    top:5,
+    height:28,
+    width:28,
+    borderRadius:15,
+    backgroundColor:"#780C60",
+    justifyContent:"center",
+    alignItems:"center",
+},
+
+
+deleteButtonText:{
+    color:"#fff",
+    fontSize:18,
+    fontWeight:"bold",
+},
+
+
+
+coverBadge:{
+    position:"absolute",
+    bottom:5,
+    left:5,
+    backgroundColor:"#780C60",
+    paddingHorizontal:10,
+    paddingVertical:4,
+    borderRadius:10,
+},
+
+
+coverBadgeText:{
+    color:"#fff",
+    fontSize:11,
+    fontWeight:"700",
+},
+
+
+
+
+footer:{
+    flexDirection:"row",
+    position:"absolute",
+    bottom:30,
+    left:20,
+    right:20,
+},
+
+
+
+buttonBack:{
+    flex:1,
+    height:55,
+    borderRadius:15,
+    borderWidth:1,
+    borderColor:"#780C60",
+    justifyContent:"center",
+    alignItems:"center",
+    marginRight:10,
+    backgroundColor:"#fff",
+},
+
+
+backText:{
+    color:"#780C60",
+    fontWeight:"700",
+    fontSize:16,
+},
+
+
+
+saveButton:{
+    flex:1,
+    height:55,
+    borderRadius:15,
+    backgroundColor:"#780C60",
+    justifyContent:"center",
+    alignItems:"center",
+    marginLeft:10,
+},
+
+
+disabledButton:{
+    opacity:0.5,
+},
+
+
+saveButtonText:{
+    color:"#fff",
+    fontWeight:"700",
+    fontSize:16,
+},
+
+
+
+
+modalBackground:{
+    flex:1,
+    backgroundColor:"rgba(0,0,0,0.75)",
+    justifyContent:"center",
+    alignItems:"center",
+},
+
+
+modalContent:{
+    width:"90%",
+    backgroundColor:"#fff",
+    borderRadius:20,
+    padding:15,
+},
+
+
+enlargedImage:{
+    width:"100%",
+    height:350,
+},
+
+
+closeButton:{
+    backgroundColor:"#780C60",
+    padding:12,
+    borderRadius:15,
+    alignItems:"center",
+},
+
+
+closeButtonText:{
+    color:"#fff",
+    fontWeight:"700",
+},
+
+
 });
 
 export default ImageUploadScreen;
