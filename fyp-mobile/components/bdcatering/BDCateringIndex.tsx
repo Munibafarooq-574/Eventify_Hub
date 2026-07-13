@@ -386,6 +386,7 @@ i===2 && styles.dotAccent
   <TextInput
     style={styles.input}
     placeholder="e.g. Islamabad, Lahore, Karachi"
+    placeholderTextColor="#B8B8B8"
     value={cityCovered}
     onChangeText={setCityCovered}
   />
@@ -557,6 +558,7 @@ i===2 && styles.dotAccent
             style={styles.inputFlex}
             keyboardType="numeric"
             placeholder="Enter Minimum Price"
+            placeholderTextColor="#B8B8B8"
             value={minimumPrice}
             onChangeText={setMinimumPrice}
         />
@@ -583,6 +585,8 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder="Describe your catering service..."
+        placeholderTextColor="#B8B8B8"
+        
     />
 </View>
 
@@ -605,6 +609,7 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder="Any extra information..."
+        placeholderTextColor="#B8B8B8"
     />
 </View>
 {/* ============================
@@ -665,6 +670,7 @@ i===2 && styles.dotAccent
             style={styles.inputFlex}
             keyboardType="numeric"
             placeholder="Enter Down Payment"
+            placeholderTextColor="#B8B8B8"
             value={downPayment}
             onChangeText={setDownPayment}
         />
