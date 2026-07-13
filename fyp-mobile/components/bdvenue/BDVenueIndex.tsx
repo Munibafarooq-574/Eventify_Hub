@@ -13,57 +13,88 @@ import {
     View,
 } from "react-native";
 
+const VENUE_TYPES = [
+    { label: "HALL", icon: "landmark" },
+    { label: "OUTDOOR", icon: "tree" },
+    { label: "MARQUEE/BANQUET", icon: "warehouse" },
+];
+
+const CATERING_OPTIONS = [
+    { label: "INTERNAL", icon: "utensils" },
+    { label: "EXTERNAL", icon: "truck" },
+];
+
+const STAFF_GENDERS = [
+    { label: "MALE", icon: "male" },
+    { label: "FEMALE", icon: "female" },
+    { label: "TRANSGENDER", icon: "transgender-alt" },
+];
+
 const BusinessDetailsForm = () => {
-    // States
-    // const [venueType, setVenueType] = useState<string | null>(null);
-    // const [catering, setCatering] = useState<string | null>(null);
-    // const [parking, setParking] = useState<boolean | null>(null);
-    // const [staff, setStaff] = useState<string | null>(null);
-    // const [cancellationPolicy, setCancellationPolicy] = useState<string | null>(null);
-    // const [covidCompliant, setCovidCompliant] = useState<boolean | null>(null);
+    const [venueType, setVenueType] = useState<string | null>(null); // single select
+    const [expertise, setExpertise] = useState<string>("");
+    const [amenities, setAmenities] = useState<string>("");
+    const [maximumPeopleCapacity, setMaximumPeopleCapacity] = useState<string>("");
+    const [catering, setCatering] = useState<string[]>([]); // multi select
+    const [parking, setParking] = useState<"YES" | "NO" | null>(null);
+    const [staff, setStaff] = useState<string[]>([]); // multi select
+    const [minimumPrice, setMinimumPrice] = useState<string>("");
+    const [description, setDescription] = useState<string>("");
+    const [additionalInfo, setAdditionalInfo] = useState<string>("");
+    const [downPaymentType, setDownPaymentType] = useState<"PERCENTAGE" | "FIXED" | null>(null);
+    const [downPayment, setDownPayment] = useState<string>("");
+    const [cancellationPolicy, setCancellationPolicy] = useState<
+        "REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null
+    >(null);
+    const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
 
+    const toggleCatering = (label: string) => {
+        setCatering((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
 
-    const [expertise, setExpertise] = useState<string>(""); // Text input
-    const [amenities, setAmenities] = useState<string>(""); // Text input
-    const [maximumPeopleCapacity, setMaximumPeopleCapacity] = useState<number | undefined>(); // Optional number
-    const [catering, setCatering] = useState<string>(""); // Multiple selections ['INTERNAL', 'EXTERNAL']
-    const [parking, setParking] = useState<boolean>(false); // YES/NO boolean
-    const [staff, setStaff] = useState<string>(""); // Multiple selections ['MALE', 'FEMALE', 'TRANSGENDER']
-    const [minimumPrice, setMinimumPrice] = useState<number | undefined>(); // Optional number
-    const [description, setDescription] = useState<string>(""); // Required text
-    const [additionalInfo, setAdditionalInfo] = useState<string | undefined>(""); // Optional text
-    const [downPaymentType, setDownPaymentType] = useState<"PERCENTAGE" | "FIXED">("PERCENTAGE"); // Dropdown
-    const [downPayment, setDownPayment] = useState<number>(0); // Numeric input
-    const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE">("REFUNDABLE"); // Dropdown
-    const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null); // YES/NO
-    const [venueType, setVenueType] = useState<string | null>(null);
+    const toggleStaff = (label: string) => {
+        setStaff((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
 
     const submit = async () => {
-        if (!expertise || !amenities || !maximumPeopleCapacity || !catering || !parking ||
-            !minimumPrice || !staff || !description
-            || !additionalInfo || !downPaymentType || !downPayment || !cancellationPolicy ||
-            !covidCompliant || !venueType) {
+        if (
+            !venueType ||
+            !expertise ||
+            !amenities ||
+            catering.length === 0 ||
+            parking === null ||
+            staff.length === 0 ||
+            !description ||
+            !downPaymentType ||
+            !downPayment ||
+            !cancellationPolicy ||
+            !covidCompliant
+        ) {
             Alert.alert("Error", "Please fill in all the required fields marked with *.");
             return;
         }
 
         try {
-            const user = JSON.parse(await getSecureData("user") || "");
+            const user = JSON.parse((await getSecureData("user")) || "");
             await postVenueBusinessDetails(user._id, {
                 typeOfVenue: venueType,
-                expertise: expertise,
-                amenities: amenities,
-                maximumPeopleCapacity: Number(),
-                catering: catering,
-                parking: true,
-                staff: staff,
-                minimumPrice: Number(minimumPrice),
-                description: String(description),
-                additionalInfo: String(additionalInfo),
-                downPaymentType: downPaymentType as 'PERCENTAGE' | 'FIXED',
+                expertise,
+                amenities,
+                maximumPeopleCapacity: maximumPeopleCapacity ? Number(maximumPeopleCapacity) : undefined,
+                catering,
+                parking: parking === "YES",
+                staff,
+                minimumPrice: minimumPrice ? Number(minimumPrice) : undefined,
+                description,
+                additionalInfo: additionalInfo || undefined,
+                downPaymentType,
                 downPayment: Number(downPayment),
-                cancellationPolicy: cancellationPolicy as 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE',
-                covidCompliant: covidCompliant as 'YES' | 'NO',
+                cancellationPolicy,
+                covidCompliant,
             });
             Alert.alert("Success", "Business details saved successfully!");
             router.push("/packages");
@@ -73,560 +104,591 @@ const BusinessDetailsForm = () => {
         }
     };
 
-
-
-    // Reusable Toggle Button Component
-    const ToggleButton = ({
-        options,
-        state,
-        setState,
-    }: {
-        options: string[];
-        state: string | null;
-        setState: (value: string) => void;
-    }) => (
-        <View style={styles.row}>
-            {options.map((option) => (
-                <TouchableOpacity
-                    key={option}
-                    style={[
-                        styles.toggleButton,
-                        state === option && styles.toggleButtonSelected,
-                    ]}
-                    onPress={() => setState(option)}
-                >
-                    <Text
-                        style={[
-                            styles.toggleButtonText,
-                            state === option && styles.toggleButtonTextSelected,
-                        ]}
-                    >
-                        {option}
-                    </Text>
-                </TouchableOpacity>
-            ))}
-        </View>
-    );
-
-    // Reusable Yes/No Buttons
-    const YesNoButtons = ({
-        label,
-        state,
-        setState,
-    }: {
-        label: string;
-        state: boolean | null;
-        setState: (value: boolean) => void;
-    }) => (
-        <View style={styles.section}>
-            <Text style={styles.label}>{label}</Text>
-            <View style={styles.row}>
-                <TouchableOpacity
-                    style={[
-                        styles.toggleButton,
-                        state === true && styles.toggleButtonSelected,
-                    ]}
-                    onPress={() => setState(true)}
-                >
-                    <Text
-                        style={[
-                            styles.toggleButtonText,
-                            state === true && styles.toggleButtonTextSelected,
-                        ]}
-                    >
-                        YES
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[
-                        styles.toggleButton,
-                        state === false && styles.toggleButtonSelected,
-                    ]}
-                    onPress={() => setState(false)}
-                >
-                    <Text
-                        style={[
-                            styles.toggleButtonText,
-                            state === false && styles.toggleButtonTextSelected,
-                        ]}
-                    >
-                        NO
-                    </Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
-
     return (
-        <ScrollView style={styles.container}>
-            <Text style={styles.header}>Business Details</Text>
-            <Text style={styles.subText}>
-                Want to start your business with us? Enter your following info
-                details
-            </Text>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={styles.headerWrap}>
+                <View style={styles.headerIconBadge}>
+                    <FontAwesome5 name="building" size={22} color="#780C60" />
+                </View>
+                <Text style={styles.header}>Business Details</Text>
+                <Text style={styles.subHeader}>
+                    Want to start your venue business with us? Enter your following info details
+                </Text>
+                <View style={styles.dotsRow}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <View key={i} style={[styles.dot, i === 1 && styles.dotAccent]} />
+                    ))}
+                </View>
+            </View>
 
-            {/* Venue Type */}
-            <Text style={styles.label}>Venue Type</Text>
-            <View style={styles.staffContainer}>
-                {[
-                    { label: "Hall".toUpperCase(), icon: "landmark" }, // FontAwesome5 icon for hall
-                    { label: "Outdoor".toUpperCase(), icon: "tree" }, // FontAwesome5 icon for outdoor
-                    { label: "Marquee/Banquet".toUpperCase(), icon: "warehouse" },
-                ].map((staff) => (
-                    <TouchableOpacity
-                        key={staff.label}
-                        style={[
-                            styles.staffOption,
-                            venueType === staff.label && styles.staffSelected,
-                        ]}
-                        onPress={() => setVenueType(staff.label)}
-                    >
-                        <FontAwesome5 name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                venueType === staff.label && styles.staffSelectedIcon,
-                            ]} />
-
-                        {/* <Icon
-                            name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                selectedStaff === staff.label && styles.staffSelectedIcon,
-                            ]}
-                        /> */}
-                        <Text
-                            style={[
-                                styles.staffText,
-                                venueType === staff.label && styles.staffSelectedText,
-                            ]}
-                        >
-                            {staff.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Venue Type - single select */}
+            <View style={styles.card}>
+                <SectionTitle icon="landmark" title="Venue Type" required />
+                <View style={styles.chipContainer}>
+                    {VENUE_TYPES.map((type) => {
+                        const isSelected = venueType === type.label;
+                        return (
+                            <TouchableOpacity
+                                key={type.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => setVenueType(type.label)}
+                            >
+                                <FontAwesome5
+                                    name={type.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {type.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
             </View>
 
             {/* Expertise */}
-            <Text style={styles.label}>Expertise*</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter expertise"
-                value={expertise} // Bind the expertise state
-                onChangeText={(text) => setExpertise(text)} // Update expertise state on change
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="star" title="Expertise" required />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter expertise"
+                    placeholderTextColor="#B99DAF"
+                    value={expertise}
+                    onChangeText={setExpertise}
+                />
+            </View>
 
             {/* Amenities */}
-            <Text style={styles.label}>Amenities*</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter amenities"
-                value={amenities} // Bind the amenities state
-                onChangeText={(text) => setAmenities(text)} // Update amenities state on change
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="concierge-bell" title="Amenities" required />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter amenities"
+                    placeholderTextColor="#B99DAF"
+                    value={amenities}
+                    onChangeText={setAmenities}
+                />
+            </View>
 
             {/* Maximum People Capacity */}
-            <Text style={styles.label}>Maximum People Capacity</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter maximum people capacity"
-                keyboardType="numeric"
-                value={maximumPeopleCapacity?.toString() || ""} // Bind the state as a string
-                onChangeText={(text) =>
-                    setMaximumPeopleCapacity(text ? parseInt(text, 10) : undefined) // Convert input to number
-                }
-            />
-
-            {/* Catering */}
-            <Text style={styles.label}>Catering*</Text>
-            <View style={styles.covidContainer}>
-                {["INTERNAL".toUpperCase(), "EXTERNAL".toUpperCase()].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            catering.includes(option) && styles.covidSelected, // Fix: Use includes
-                        ]}
-                        onPress={() => {
-                            setCatering(option);
-                        }}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                catering.includes(option) && styles.covidSelectedText, // Fix: Use includes
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.card}>
+                <SectionTitle icon="users" title="Maximum People Capacity" />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter maximum people capacity"
+                    placeholderTextColor="#B99DAF"
+                    keyboardType="numeric"
+                    value={maximumPeopleCapacity}
+                    onChangeText={setMaximumPeopleCapacity}
+                />
             </View>
 
-            {/* Parking */}
-            <Text style={styles.label}>Parking*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            parking === (option === "YES") && styles.covidSelected,
-                        ]}
-                        onPress={() => setParking((option === "YES"))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                parking === (option === "YES") && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Catering - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="utensils" title="Catering" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {CATERING_OPTIONS.map((option) => {
+                        const isSelected = catering.includes(option.label);
+                        return (
+                            <TouchableOpacity
+                                key={option.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleCatering(option.label)}
+                            >
+                                <FontAwesome5
+                                    name={option.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {option.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
             </View>
 
-            {/* Staff */}
-            <Text style={styles.label}>Staff</Text>
-            <View style={styles.staffContainer}>
-                {[
-                    { label: "MALE", icon: "male" },
-                    { label: "FEMALE", icon: "female" },
-                    { label: "TRANSGENDER", icon: "transgender-alt" },
-                ].map((stafff) => (
-                    <TouchableOpacity
-                        key={stafff.label}
-                        style={[
-                            styles.staffOption,
-                            staff.includes(stafff.label) && styles.staffSelected, // Use .includes() to check selection
-                        ]}
-                        onPress={() => {
-                            setStaff(stafff.label);
-                        }}
-                    >
-                        <FontAwesome5
-                            name={stafff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                staff.includes(stafff.label) && styles.staffSelectedIcon, // Use .includes() to check selection
-                            ]}
-                        />
-                        <Text
-                            style={[
-                                styles.staffText,
-                                staff.includes(stafff.label) && styles.staffSelectedText, // Use .includes() to check selection
-                            ]}
+            {/* Parking - single select */}
+            <View style={styles.card}>
+                <SectionTitle icon="parking" title="Parking" required />
+                <View style={styles.pillRow}>
+                    {["YES", "NO"].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, parking === option && styles.pillSelected]}
+                            onPress={() => setParking(option as "YES" | "NO")}
                         >
-                            {stafff.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text style={[styles.pillText, parking === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
 
+            {/* Staff - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="user-friends" title="Staff" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {STAFF_GENDERS.map((option) => {
+                        const isSelected = staff.includes(option.label);
+                        return (
+                            <TouchableOpacity
+                                key={option.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleStaff(option.label)}
+                            >
+                                <FontAwesome5
+                                    name={option.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {option.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
 
             {/* Minimum Price */}
-            <Text style={styles.label}>Minimum Price</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter minimum price"
-                keyboardType="numeric"
-                value={minimumPrice?.toString() || ""} // Bind the state as a string
-                onChangeText={(text) =>
-                    setMinimumPrice(text ? parseInt(text, 10) : undefined) // Convert input to number
-                }
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="tag" title="Minimum Price" />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        keyboardType="numeric"
+                        placeholder="Enter price"
+                        placeholderTextColor="#B99DAF"
+                        value={minimumPrice}
+                        onChangeText={setMinimumPrice}
+                    />
+                </View>
+            </View>
 
             {/* Description */}
-            <Text style={styles.label}>Description *</Text>
-            <TextInput
-                style={styles.textArea}
-                placeholder="Enter description"
-                multiline
-                value={description} // Bind the state
-                onChangeText={(text) => setDescription(text)} // Update state on input
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="align-left" title="Description" required />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Enter description"
+                    placeholderTextColor="#B99DAF"
+                    value={description}
+                    onChangeText={setDescription}
+                />
+            </View>
 
             {/* Additional Info */}
-            <Text style={styles.label}>Additional Info</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter additional information"
-                value={additionalInfo || ""} // Bind the state (handles undefined)
-                onChangeText={(text) => setAdditionalInfo(text || undefined)} // Update state (handles empty string)
-            />
+            <View style={styles.card}>
+                <SectionTitle icon="sticky-note" title="Additional Info" />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Add any special notes..."
+                    placeholderTextColor="#B99DAF"
+                    value={additionalInfo}
+                    onChangeText={setAdditionalInfo}
+                />
+            </View>
 
             {/* Down Payment Type */}
-            <Text style={styles.label}>Down Payment Type*</Text>
-            <View style={styles.covidContainer}>
-                {["PERCENTAGE", "FIXED"].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            downPaymentType === option && styles.covidSelected, // Highlight selected option
-                        ]}
-                        onPress={() => setDownPaymentType(option as "PERCENTAGE" | "FIXED")}
-
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                downPaymentType === option && styles.covidSelectedText, // Style selected text
-                            ]}
+            <View style={styles.card}>
+                <SectionTitle icon="money-bill-wave" title="Down Payment Type" required />
+                <View style={styles.pillRow}>
+                    {["PERCENTAGE", "FIXED"].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, downPaymentType === option && styles.pillSelected]}
+                            onPress={() => setDownPaymentType(option as "PERCENTAGE" | "FIXED")}
                         >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text
+                                style={[styles.pillText, downPaymentType === option && styles.pillTextSelected]}
+                            >
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
 
             {/* Down Payment */}
-            <Text style={styles.label}>Down Payment *</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Down Payment"
-                keyboardType="numeric"
-                value={downPayment?.toString() || ""} // Convert number to string for display
-                onChangeText={(text) =>
-                    setDownPayment(text ? parseInt(text, 10) || 0 : 0) // Default to 0
-                }
+            <View style={styles.card}>
+                <SectionTitle icon="wallet" title="Down Payment" required />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        placeholder="Enter Down Payment"
+                        placeholderTextColor="#B99DAF"
+                        keyboardType="numeric"
+                        value={downPayment}
+                        onChangeText={setDownPayment}
+                    />
+                </View>
+            </View>
 
-            />
+            {/* Covid Compliant */}
+            <View style={styles.card}>
+                <SectionTitle icon="shield-virus" title="Covid Compliant" required />
+                <View style={styles.pillRow}>
+                    {["YES", "NO"].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, covidCompliant === option && styles.pillSelected]}
+                            onPress={() => setCovidCompliant(option as "YES" | "NO")}
+                        >
+                            <Text
+                                style={[styles.pillText, covidCompliant === option && styles.pillTextSelected]}
+                            >
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
 
-
-
-            {/* Refund Policy */}
-            <Text style={styles.label}>Cancellation Policy*</Text>
-            <View style={styles.covidContainer}>
-                {['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'].map(
-                    (policy) => (
+            {/* Cancellation Policy */}
+            <View style={styles.card}>
+                <SectionTitle icon="undo-alt" title="Cancellation Policy" required />
+                <View style={styles.pillRowWrap}>
+                    {(["REFUNDABLE", "NON-REFUNDABLE", "PARTIALLY REFUNDABLE"] as const).map((policy) => (
                         <TouchableOpacity
                             key={policy}
-                            style={[
-                                styles.covidOption,
-                                cancellationPolicy === policy && styles.covidSelected,
-                            ]}
-                            onPress={() => setCancellationPolicy(policy as 'REFUNDABLE' || 'NON-REFUNDABLE' || 'PARTIALLY REFUNDABLE')}
+                            activeOpacity={0.85}
+                            style={[styles.pill, cancellationPolicy === policy && styles.pillSelected]}
+                            onPress={() => setCancellationPolicy(policy)}
                         >
                             <Text
                                 style={[
-                                    styles.covidText,
-                                    cancellationPolicy === policy && styles.covidSelectedText,
+                                    styles.pillText,
+                                    cancellationPolicy === policy && styles.pillTextSelected,
                                 ]}
                             >
                                 {policy}
                             </Text>
                         </TouchableOpacity>
-                    )
-                )}
+                    ))}
+                </View>
             </View>
-
-            {/* Covid Compliant */}
-            <Text style={styles.label}>Covid Compliant*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            covidCompliant === option && styles.covidSelected, // Compare directly to the option string
-                        ]}
-                        onPress={() => setCovidCompliant(option as "YES" || "NO")} // Set the option string directly
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                covidCompliant === option && styles.covidSelectedText, // Compare directly to the option string
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
 
             {/* Buttons */}
             <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={() => {
-                        submit();
-                    }}>
+                <TouchableOpacity style={styles.saveButton} activeOpacity={0.9} onPress={submit}>
                     <Text style={styles.buttonText}>Save & Continue</Text>
+                    <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>
+
+            <View style={{ height: 30 }} />
         </ScrollView>
     );
 };
 
+// Small reusable section title with icon + optional required marker
+const SectionTitle: React.FC<{ icon: string; title: string; required?: boolean }> = ({
+    icon,
+    title,
+    required,
+}) => (
+    <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionIconWrap}>
+            <FontAwesome5 name={icon} size={12} color="#780C60" />
+        </View>
+        <Text style={styles.label}>
+            {title}
+            {required ? <Text style={styles.requiredStar}> *</Text> : null}
+        </Text>
+    </View>
+);
+
 export default BusinessDetailsForm;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, backgroundColor: '#F8E9F0', paddingTop: 70, },
-    header: { fontSize: 24, fontWeight: "bold", marginBottom: 10 },
-    subText: { color: "#333", marginBottom: 20 },
-    label: {
+    container: {
+        padding: 20,
+        backgroundColor: "#FDF4F8",
+        flexGrow: 1,
+        paddingTop: 65,
+        paddingBottom: 40,
+    },
+
+    // Header
+    headerWrap: {
+        alignItems: "center",
+        marginBottom: 24,
+    },
+    headerIconBadge: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: "#F4D8EC",
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    header: {
+        fontSize: 24,
+        fontWeight: "800",
+        color: "#2A1B26",
+        textAlign: "center",
+    },
+    subHeader: {
         fontSize: 14,
-        fontWeight: 'bold',
-        marginVertical: 8,
+        color: "#8A7A85",
+        marginTop: 8,
+        textAlign: "center",
+        lineHeight: 20,
+        maxWidth: 300,
     },
-    input: {
-        borderBottomWidth: 1,
-        borderColor: "#ccc",
-        padding: 8,
-        marginBottom: 10,
+    dotsRow: {
+        flexDirection: "row",
+        marginTop: 16,
+        gap: 6,
     },
-    textArea: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: "#F0D3E6",
     },
-    row: { flexDirection: "row", gap: 10, marginVertical: 10 },
-    toggleButton: {
-        flex: 1,
-        padding: 10,
-        borderWidth: 1,
-        borderColor: "#B085A6",
+    dotAccent: {
+        backgroundColor: "#780C60",
+        width: 18,
+    },
+
+    // Card wrapper for each section
+    card: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 14,
+        shadowColor: "#780C60",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+
+    sectionTitleRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 4,
+    },
+    sectionIconWrap: {
+        width: 26,
+        height: 26,
         borderRadius: 8,
         backgroundColor: "#FBEFF7",
+        justifyContent: "center",
         alignItems: "center",
+        marginRight: 8,
     },
-    toggleButtonSelected: {
+    label: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#2A1B26",
+    },
+    requiredStar: {
+        color: "#C0396F",
+        fontWeight: "700",
+    },
+    hint: {
+        fontSize: 11,
+        color: "#B199AB",
+        marginLeft: 34,
+        marginBottom: 10,
+    },
+
+    // Inputs
+    input: {
+        borderWidth: 1.5,
+        borderColor: "#F0DCEA",
+        borderRadius: 12,
+        fontSize: 14,
+        color: "#2A1B26",
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: "#FEFBFD",
+    },
+    textArea: {
+        minHeight: 70,
+        textAlignVertical: "top",
+    },
+    inputRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1.5,
+        borderColor: "#F0DCEA",
+        borderRadius: 12,
+        backgroundColor: "#FEFBFD",
+        paddingHorizontal: 12,
+    },
+    currencyPrefix: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#780C60",
+        marginRight: 6,
+    },
+    inputFlex: {
+        flex: 1,
+        fontSize: 14,
+        color: "#2A1B26",
+        paddingVertical: 10,
+    },
+
+    // Multi-select chips (Venue Type / Catering / Staff)
+    chipContainer: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    chip: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1.5,
+        borderColor: "#F0DCEA",
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        backgroundColor: "#FEFBFD",
+        position: "relative",
+    },
+    chipSelected: {
         backgroundColor: "#780C60",
         borderColor: "#780C60",
     },
-    toggleButtonText: {
+    chipIcon: {
         color: "#780C60",
-        fontWeight: "600",
+        marginRight: 8,
     },
-    toggleButtonTextSelected: {
-        color: "#FFF",
+    chipIconSelected: {
+        color: "#FFFFFF",
     },
+    chipText: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: "#780C60",
+        letterSpacing: 0.3,
+    },
+    chipTextSelected: {
+        color: "#FFFFFF",
+    },
+    checkBadge: {
+        position: "absolute",
+        top: -6,
+        right: -6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#FFFFFF",
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#F0DCEA",
+    },
+
+    // Single-select pills (Yes/No, payment type, cancellation policy, covid)
+    pillRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+    pillRowWrap: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    pill: {
+        borderWidth: 1.5,
+        borderColor: "#F0DCEA",
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        backgroundColor: "#FEFBFD",
+    },
+    pillSelected: {
+        backgroundColor: "#780C60",
+        borderColor: "#780C60",
+    },
+    pillText: {
+        fontSize: 11,
+        fontWeight: "700",
+        color: "#780C60",
+        letterSpacing: 0.3,
+    },
+    pillTextSelected: {
+        color: "#FFFFFF",
+    },
+
+    // Bottom buttons
     buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginTop: 10,
+        gap: 12,
     },
     backButton: {
         flex: 1,
-        marginRight: 10,
-        borderWidth: 1,
-        borderColor: '#780C60',
-        borderRadius: 8,
-        paddingVertical: 12,
-        alignItems: 'center',
-        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: "#780C60",
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: "center",
+        backgroundColor: "#fff",
     },
     backButtonText: {
-        color: '#780C60',
-        fontWeight: '600',
-    },
-    saveButton: {
-        flex: 1,
-        backgroundColor: "#780C60",
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    buttonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
+        color: "#780C60",
+        fontWeight: "700",
         fontSize: 14,
     },
-    section: { marginBottom: 20 },
-    covidContainer: {
-        // flexDirection: 'row',
-        // justifyContent: 'space-between',
-        // marginBottom: 16,
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
+    saveButton: {
+        flex: 1.4,
+        flexDirection: "row",
+        backgroundColor: "#780C60",
+        paddingVertical: 14,
+        justifyContent: "center",
+        alignItems: "center",
+        borderRadius: 14,
+        shadowColor: "#780C60",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
     },
-    covidOption: {
-        // padding: 10,
-        // borderWidth: 1,
-        // borderColor: '#B3A3A3',
-        // borderRadius: 8,
-        // flex: 1,
-        // alignItems: 'center',
-        // marginHorizontal: 4,
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-    covidSelected: {
-        // backgroundColor: '#FBEFF7',
-        // borderColor: '#800080',
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-    covidText: {
-        // fontSize: 14,
-        // color: '#666',
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-    covidSelectedText: {
-        // color: "#780C60",
-        // fontWeight: 'bold',
-        color: '#FFF', // White color for selected text
-    },
-    staffContainer: {
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-
-    staffOption: {
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-
-    staffSelected: {
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-
-    staffIcon: {
-        color: '#780C60', // Default icon color
-        fontSize: 20,
-        marginRight: 2, // Space between icon and text
-    },
-
-    staffSelectedIcon: {
-        color: '#FFF', // White color for selected icon
-    },
-
-    staffText: {
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-
-    staffSelectedText: {
-        color: '#FFF', // White color for selected text
+    buttonText: {
+        color: "#FFF",
+        fontWeight: "700",
+        fontSize: 14,
     },
 });

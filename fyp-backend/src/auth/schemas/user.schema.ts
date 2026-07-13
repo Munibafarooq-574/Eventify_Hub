@@ -1,3 +1,4 @@
+//fyp-backend/src/auth/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { ContactDetails, ContactDetailsSchema } from './contact-details.schema';
@@ -181,19 +182,21 @@ export class VenueBusinessDetails extends BusinessDetails {
   maximumPeopleCapacity: number;
 
   @Prop({
-    type: String,
+    type: [String],
     enum: ['INTERNAL', 'EXTERNAL'],
+    default: [],
   })
-  catering: string;
+  catering: string[];               // <-- now multi-select
 
   @Prop({ type: Boolean, required: true })
   parking: boolean;
 
   @Prop({
-    type: String,
+    type: [String],
     enum: ['MALE', 'FEMALE', 'TRANSGENDER'],
+    default: [],
   })
-  staff: string;
+  staff: string[];                  // <-- now multi-select
 
   @Prop()
   minimumPrice: number;
