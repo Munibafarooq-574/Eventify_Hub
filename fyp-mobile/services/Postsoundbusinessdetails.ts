@@ -5,7 +5,7 @@ export default async function postSoundBusinessDetails(
     userId: string,
     soundBusinessDetails: CreateSoundBusinessDetailsDto
 ) {
-    const url = `https://eventify-hub.onrender.com/vendor/sound/buisnessDetails?userId=${userId}`;
+    const url = `https://eventify-hub.onrender.com/vendor/buisnessDetails?userId=${userId}`;
     const config: AxiosRequestConfig = {
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
