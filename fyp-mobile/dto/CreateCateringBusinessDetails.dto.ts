@@ -26,8 +26,8 @@ export interface CreateCateringBusinessDetailsDto {
 
     travelsToClientHome: boolean;
 
-    // Multiple Cities
-    cityCovered: string[];
+    // Cities
+    cityCovered: string;
 
     // Multiple Staff Types
     staff: string[];

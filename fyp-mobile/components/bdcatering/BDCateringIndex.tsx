@@ -22,14 +22,6 @@ const EXPERTISE_TYPES = [
   { label: "BUFFET", icon: "hamburger" },
 ];
 
-const CITY_OPTIONS = [
-  "Islamabad",
-  "Rawalpindi",
-  "Lahore",
-  "Karachi",
-  "Peshawar",
-  "Faisalabad",
-];
 
 const STAFF_GENDERS = [
   { label: "MALE", icon: "male" },
@@ -75,7 +67,7 @@ const BusinessDetailsForm = () => {
 const [travelsToClientHome, setTravelsToClientHome] =
   useState<"YES" | "NO" | null>(null);
 
-const [selectedCities, setSelectedCities] = useState<string[]>([]);
+const [cityCovered, setCityCovered] = useState("");
 const [staffGender, setStaffGender] = useState<string[]>([]);
 
 const [foodTesting, setFoodTesting] = useState(false);
@@ -112,13 +104,6 @@ const [covidCompliant, setCovidCompliant] =
   );
 };
 
-const toggleCity = (city: string) => {
-  setSelectedCities((prev) =>
-    prev.includes(city)
-      ? prev.filter((i) => i !== city)
-      : [...prev, city]
-  );
-};
 
 const toggleStaff = (staff: string) => {
   setStaffGender((prev) =>
@@ -158,7 +143,7 @@ const submit = async () => {
 
     if (
         expertise.length === 0 ||
-        selectedCities.length === 0 ||
+        !cityCovered.trim() ||
         staffGender.length === 0 ||
         !minimumPrice ||
         !description ||
@@ -190,7 +175,7 @@ const submit = async () => {
                 travelsToClientHome:
                     travelsToClientHome === "YES",
 
-                cityCovered: selectedCities,
+                cityCovered: cityCovered,
 
                 staff: staffGender,
 
@@ -384,60 +369,26 @@ i===2 && styles.dotAccent
 </View>
 
 {/* ============================
-        Cities
+        Cities Covered
 ============================= */}
 
 <View style={styles.card}>
-    <SectionTitle
-        icon="map-marker-alt"
-        title="Cities Covered"
-        required
-    />
+  <SectionTitle
+    icon="map-marker-alt"
+    title="Cities Covered"
+    required
+  />
 
-    <Text style={styles.hint}>
-        Select multiple cities
-    </Text>
+  <Text style={styles.hint}>
+    Enter the cities you serve
+  </Text>
 
-    <View style={styles.chipContainer}>
-        {CITY_OPTIONS.map((city) => {
-            const selected =
-                selectedCities.includes(city);
-
-            return (
-                <TouchableOpacity
-                    key={city}
-                    style={[
-                        styles.chip,
-                        selected &&
-                            styles.chipSelected,
-                    ]}
-                    onPress={() =>
-                        toggleCity(city)
-                    }
-                >
-                    <FontAwesome5
-                        name="map-marker-alt"
-                        size={14}
-                        style={[
-                            styles.chipIcon,
-                            selected &&
-                                styles.chipIconSelected,
-                        ]}
-                    />
-
-                    <Text
-                        style={[
-                            styles.chipText,
-                            selected &&
-                                styles.chipTextSelected,
-                        ]}
-                    >
-                        {city}
-                    </Text>
-                </TouchableOpacity>
-            );
-        })}
-    </View>
+  <TextInput
+    style={styles.input}
+    placeholder="e.g. Islamabad, Lahore, Karachi"
+    value={cityCovered}
+    onChangeText={setCityCovered}
+  />
 </View>
 
 {/* ============================

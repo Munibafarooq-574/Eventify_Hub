@@ -102,7 +102,6 @@ export const SalonBusinessDetailsSchema = SchemaFactory.createForClass(
 );
 
 @Schema()
-@Schema()
 export class CateringBusinessDetails extends BusinessDetails {
 
   @Prop({
@@ -122,11 +121,8 @@ export class CateringBusinessDetails extends BusinessDetails {
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({
-    type: [String],
-    default: [],
-  })
-  cityCovered: string[];
+  @Prop({ required: true })
+    cityCovered: string;
 
   @Prop({
     type: [String],
