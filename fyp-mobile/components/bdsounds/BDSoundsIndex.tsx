@@ -1,9 +1,8 @@
-// import React, { useState } from "react";
-import postCateringBusinessDetails from '@/services/postCateringBusinessDetails';
+import postSoundBusinessDetails from "@/services/Postsoundbusinessdetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -14,51 +13,95 @@ import {
     View,
 } from "react-native";
 
-const BusinessDetailsForm = () => {
-    const [foodTesting, setFoodTesting] = useState<boolean>(false);
-    const [decoration, setDecoration] = useState<boolean>(false);
-    const [soundSystem, setSoundSystem] = useState<boolean>(false);
-    const [seatingArrangement, setSeatingArrangement] = useState<boolean>(false);
-    const [waiters, setWaiters] = useState<boolean>(false);
-    const [cutlery, setCutlery] = useState<boolean>(false);
+const SOUND_TYPES = [
+    { label: 'WEDDING DJ', icon: 'ring' },
+    { label: 'PARTY DJ', icon: 'glass-cheers' },
+    { label: 'CORPORATE', icon: 'briefcase' },
+    { label: 'LIVE BAND', icon: 'guitar' },
+];
+
+const EQUIPMENT_TYPES = [
+    { label: 'SPEAKERS', icon: 'volume-up' },
+    { label: 'MICROPHONE', icon: 'microphone' },
+    { label: 'LIGHTING', icon: 'lightbulb' },
+    { label: 'DJ CONSOLE', icon: 'sliders-h' },
+    { label: 'PROJECTOR', icon: 'video' },
+];
+
+const STAFF_GENDERS = [
+    { label: 'MALE', icon: 'male' },
+    { label: 'FEMALE', icon: 'female' },
+    { label: 'TRANSGENDER', icon: 'transgender-alt' },
+];
+
+const BDSoundIndex = () => {
+    // Multi-select: vendor can offer more than one sound/DJ type, equipment, or staff gender
+    const [soundType, setSoundType] = useState<string[]>([]);
+    const [equipmentProvided, setEquipmentProvided] = useState<string[]>([]);
+    const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
+    const [cityCovered, setCityCovered] = useState<string>("");
+    const [staffGender, setStaffGender] = useState<string[]>([]);
+    const [minimumPrice, setMinimumPrice] = useState<string>("");
+    const [description, setDescription] = useState<string>("");
+    const [additionalInfo, setAdditionalInfo] = useState<string>("");
+    const [downPaymentType, setDownPaymentType] = useState<"PERCENTAGE" | "FIXED" | null>(null);
+    const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
     const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null>(null);
-    const [staffGender, setStaffGender] = useState<string>("");
-    const [travelsToClientHome, setTravelsToClientHome] = useState<boolean>(false);
-    const [description, setDescription] = useState<string>("");
-    const [downPaymentType, setDownPaymentType] = useState<string>("");
-    const [downPayment, setDownPayment] = useState<string>("");
-    const [expertise, setExpertise] = useState<string>("");
-    const [selectedCity, setSelectedCity] = useState<string>("");
-    const [additionalInfo, setAdditionalInfo] = useState<string | undefined>(""); // Optional text
+
+    const toggleSoundType = (label: string) => {
+        setSoundType((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
+
+    const toggleEquipment = (label: string) => {
+        setEquipmentProvided((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
+
+    const toggleStaffGender = (label: string) => {
+        setStaffGender((prev) =>
+            prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+        );
+    };
 
     const submit = async () => {
-        if (!foodTesting || !decoration || !soundSystem || !seatingArrangement || !waiters || !cutlery || !covidCompliant ||
-            !cancellationPolicy || !staffGender || !travelsToClientHome || !additionalInfo) {
-            Alert.alert("Error", "Please fill in all the required fields marked with *.");
+        if (
+            soundType.length === 0 ||
+            equipmentProvided.length === 0 ||
+            travelsToClientHome === null ||
+            !cityCovered ||
+            staffGender.length === 0 ||
+            !minimumPrice ||
+            !description ||
+            !downPaymentType ||
+            !downPayment ||
+            !covidCompliant ||
+            !cancellationPolicy
+        ) {
+            Alert.alert("Error", "Please fill in all required fields marked with *.");
             return;
         }
 
+        const travel = travelsToClientHome === "YES" ? true : false;
+
         try {
             const user = JSON.parse(await getSecureData("user") || "");
-            await postCateringBusinessDetails(user._id, {
-                expertise,
-                travelsToClientHome: true,
-                cityCovered: selectedCity,
-                staff: staffGender,
-                provideFoodTesting: true,
-                provideDecoration: true,
-                provideSoundSystem: true,
-                provideSeatingArrangement: true,
-                provideWaiters: true,
-                provideCutleryAndPlates: true,
-                minimumPrice: Number(),
+            await postSoundBusinessDetails(user._id, {
+                soundType,
+                equipmentProvided,
+                travelsToClientHome: travel,
+                cityCovered,
+                staffGender,
+                minimumPrice: Number(minimumPrice),
                 description,
-                additionalInfo: String(),
-                downPaymentType: downPaymentType as 'PERCENTAGE' | 'FIXED',
-                downPayment: Number(),
-                cancellationPolicy: cancellationPolicy as 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE',
-                covidCompliant: covidCompliant as 'YES' | 'NO',
+                additionalInfo: additionalInfo || undefined,
+                downPaymentType,
+                downPayment: Number(downPayment),
+                covidCompliant,
+                cancellationPolicy,
             });
             Alert.alert("Success", "Business details saved successfully!");
             router.push("/packages");
@@ -68,499 +111,560 @@ const BusinessDetailsForm = () => {
         }
     };
 
-    const renderYesNoButtons = (
-        question: string,
-        state: string | null,
-        setState: React.Dispatch<React.SetStateAction<string | null>>
-    ) => (
-        <View>
-            <Text style={styles.question}>{question}</Text>
-            <View style={styles.row}>
-                {["YES", "NO"].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.button,
-                            state === option && styles.selectedButton,
-                        ]}
-                        onPress={() => setState(option)}
-                    >
-                        <Text
-                            style={[
-                                styles.buttonText,
-                                state === option && styles.selectedButtonText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-    );
-
     return (
-        <ScrollView style={styles.container}>
-            <Text style={styles.header}>Business Details</Text>
-            <Text style={styles.subText}>
-                Want to start your business with us? Enter your following info details
-            </Text>
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-            {/* Expertise */}
-            <Text style={styles.label}>Expertise*</Text>
-            <TextInput style={styles.input} placeholder="Enter expertise" />
+            {/* Header */}
+            <View style={styles.headerWrap}>
+                <View style={styles.headerIconBadge}>
+                    <FontAwesome5 name="music" size={22} color="#780C60" />
+                </View>
+                <Text style={styles.header}>Business Details</Text>
+                <Text style={styles.subHeader}>
+                    Want to start your DJ/Sound business with us? Enter your following info details
+                </Text>
+                <View style={styles.dotsRow}>
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <View key={i} style={[styles.dot, i === 2 && styles.dotAccent]} />
+                    ))}
+                </View>
+            </View>
 
-            {/* Travels to Client Home
-            <Text style={styles.label}>Travels to Client Home*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            travelsToClientHome === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setTravelsToClientHome((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                travelsToClientHome === (option === 'YES') && styles.covidSelectedText,
-                            ]}
+            {/* Sound/DJ Type - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="music" title="Sound/DJ Type" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {SOUND_TYPES.map((type) => {
+                        const isSelected = soundType.includes(type.label);
+                        return (
+                            <TouchableOpacity
+                                key={type.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleSoundType(type.label)}
+                            >
+                                <FontAwesome5
+                                    name={type.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {type.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* Equipment Provided - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="sliders-h" title="Equipment Provided" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {EQUIPMENT_TYPES.map((eq) => {
+                        const isSelected = equipmentProvided.includes(eq.label);
+                        return (
+                            <TouchableOpacity
+                                key={eq.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleEquipment(eq.label)}
+                            >
+                                <FontAwesome5
+                                    name={eq.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {eq.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* Travels to Client Home - single select */}
+            <View style={styles.card}>
+                <SectionTitle icon="route" title="Travels to Client Home" required />
+                <View style={styles.pillRow}>
+                    {['YES', 'NO'].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, travelsToClientHome === option && styles.pillSelected]}
+                            onPress={() => setTravelsToClientHome(option as "YES" | "NO")}
                         >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View> */}
+                            <Text style={[styles.pillText, travelsToClientHome === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
 
             {/* City Covered */}
-            <Text style={styles.label}>City Covered*</Text>
-            <TextInput style={styles.input} placeholder="Select Cities" />
-
-            {/* Staff */}
-            <Text style={styles.label}>Staff</Text>
-            <View style={styles.staffContainer}>
-                {[
-                    { label: 'MALE', icon: 'male' },
-                    { label: 'FEMALE', icon: 'female' },
-                    { label: 'TRANSGENDER', icon: 'transgender-alt' },
-                ].map((staff) => (
-                    <TouchableOpacity
-                        key={staff.label}
-                        style={[
-                            styles.staffOption,
-                            staffGender === staff.label && styles.staffSelected,
-                        ]}
-                        onPress={() => setStaffGender(staff.label)}
-                    >
-                        <FontAwesome5 name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                staffGender === staff.label && styles.staffSelectedIcon,
-                            ]} />
-
-                        {/* <Icon
-                            name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                selectedStaff === staff.label && styles.staffSelectedIcon,
-                            ]}
-                        /> */}
-                        <Text
-                            style={[
-                                styles.staffText,
-                                staffGender === staff.label && styles.staffSelectedText,
-                            ]}
-                        >
-                            {staff.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.card}>
+                <SectionTitle icon="map-marker-alt" title="City Covered" required />
+                <TextInput
+                    style={styles.input}
+                    placeholder="Select Cities"
+                    placeholderTextColor="#B99DAF"
+                    value={cityCovered}
+                    onChangeText={setCityCovered}
+                />
             </View>
 
-            {/* Additional Yes/No Questions */}
-            {/* {renderYesNoButtons("Do you provide food testing?", foodTesting, setFoodTesting)}
-            {renderYesNoButtons("Do you provide decoration?", decoration, setDecoration)}
-            {renderYesNoButtons("Do you provide sound system?", soundSystem, setSoundSystem)}
-            {renderYesNoButtons(
-                "Do you provide seating arrangement?",
-                seatingArrangement,
-                setSeatingArrangement
-            )}
-            {renderYesNoButtons("Do you provide waiters/bairay?", waiters, setWaiters)}
-            {renderYesNoButtons(
-                "Do you provide cutlery and plates?",
-                cutlery,
-                setCutlery
-            )} */}
-            {/* "Do you provide a microphone?" */}
-            <Text style={styles.label}>Do you provide a microphone?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            foodTesting === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setFoodTesting(option === 'YES')}
-
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                foodTesting === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Do you provide sound system? */}
-            <Text style={styles.label}>Do you provide sound system?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            soundSystem === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setSoundSystem((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                soundSystem === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-
-            {/* Do you provide music playlist customization? */}
-            <Text style={styles.label}>Do you provide music playlist customization?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            cutlery === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setCutlery((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                cutlery === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            {/* Staff - multi select */}
+            <View style={styles.card}>
+                <SectionTitle icon="users" title="Staff" required />
+                <Text style={styles.hint}>Select all that apply</Text>
+                <View style={styles.chipContainer}>
+                    {STAFF_GENDERS.map((staff) => {
+                        const isSelected = staffGender.includes(staff.label);
+                        return (
+                            <TouchableOpacity
+                                key={staff.label}
+                                activeOpacity={0.85}
+                                style={[styles.chip, isSelected && styles.chipSelected]}
+                                onPress={() => toggleStaffGender(staff.label)}
+                            >
+                                <FontAwesome5
+                                    name={staff.icon}
+                                    size={16}
+                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
+                                    {staff.label}
+                                </Text>
+                                {isSelected && (
+                                    <View style={styles.checkBadge}>
+                                        <FontAwesome5 name="check" size={8} color="#780C60" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
             </View>
 
             {/* Minimum Price */}
-            <Text style={styles.label}>Minimum Price</Text>
-            <TextInput style={styles.input} keyboardType="numeric" />
-
-            {/* Description */}
-            <Text style={styles.label}>Description *</Text>
-            <TextInput style={styles.textArea} multiline placeholder="Enter description" />
-
-            {/* Down Payment Type */}
-
-            <Text style={styles.label}>Down Payment Type*</Text>
-            <View style={styles.covidContainer}>
-                {['PERCENTAGE', 'FIXED AMOUNT'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            downPaymentType === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setDownPaymentType(option)}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                downPaymentType === option && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={styles.card}>
+                <SectionTitle icon="tag" title="Minimum Price" />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        keyboardType="numeric"
+                        placeholder="Enter price"
+                        placeholderTextColor="#B99DAF"
+                        value={minimumPrice}
+                        onChangeText={setMinimumPrice}
+                    />
+                </View>
             </View>
 
+            {/* Description */}
+            <View style={styles.card}>
+                <SectionTitle icon="align-left" title="Description" required />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Enter Description"
+                    placeholderTextColor="#B99DAF"
+                    value={description}
+                    onChangeText={setDescription}
+                />
+            </View>
 
-            {/* Down Payment */}
-            <Text style={styles.label}>Down Payment *</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Down Payment"
-                keyboardType="numeric"
-                value={downPayment}
-                onChangeText={setDownPayment}
-            />
+            {/* Additional Info */}
+            <View style={styles.card}>
+                <SectionTitle icon="sticky-note" title="Additional Info" />
+                <TextInput
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder="Add any special notes..."
+                    placeholderTextColor="#B99DAF"
+                    value={additionalInfo}
+                    onChangeText={setAdditionalInfo}
+                />
+            </View>
 
-            {/* Refund Policy */}
-            <Text style={styles.label}>Cancellation Policy*</Text>
-            <View style={styles.covidContainer}>
-                {['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'].map(
-                    (policy) => (
+            {/* Down Payment Type */}
+            <View style={styles.card}>
+                <SectionTitle icon="money-bill-wave" title="Down Payment Type" required />
+                <View style={styles.pillRow}>
+                    {['PERCENTAGE', 'FIXED'].map((option) => (
                         <TouchableOpacity
-                            key={policy}
-                            style={[
-                                styles.covidOption,
-                                cancellationPolicy === policy && styles.covidSelected,
-                            ]}
-                            onPress={() => setCancellationPolicy(policy as 'REFUNDABLE' || 'NON-REFUNDABLE' || 'PARTIALLY REFUNDABLE')}
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, downPaymentType === option && styles.pillSelected]}
+                            onPress={() => setDownPaymentType(option as "PERCENTAGE" | "FIXED")}
                         >
-                            <Text
-                                style={[
-                                    styles.covidText,
-                                    cancellationPolicy === policy && styles.covidSelectedText,
-                                ]}
-                            >
-                                {policy}
+                            <Text style={[styles.pillText, downPaymentType === option && styles.pillTextSelected]}>
+                                {option}
                             </Text>
                         </TouchableOpacity>
-                    )
-                )}
+                    ))}
+                </View>
+            </View>
+
+            {/* Down Payment */}
+            <View style={styles.card}>
+                <SectionTitle icon="wallet" title="Down Payment" required />
+                <View style={styles.inputRow}>
+                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <TextInput
+                        style={styles.inputFlex}
+                        placeholder="Enter Down Payment"
+                        placeholderTextColor="#B99DAF"
+                        keyboardType="numeric"
+                        value={downPayment}
+                        onChangeText={setDownPayment}
+                    />
+                </View>
             </View>
 
             {/* Covid Compliant */}
-            <Text style={styles.label}>Covid Compliant*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            covidCompliant === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setCovidCompliant(option as "YES" || "NO")}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                covidCompliant === option && styles.covidSelectedText,
-                            ]}
+            <View style={styles.card}>
+                <SectionTitle icon="shield-virus" title="Covid Compliant" required />
+                <View style={styles.pillRow}>
+                    {['YES', 'NO'].map((option) => (
+                        <TouchableOpacity
+                            key={option}
+                            activeOpacity={0.85}
+                            style={[styles.pill, covidCompliant === option && styles.pillSelected]}
+                            onPress={() => setCovidCompliant(option as "YES" | "NO")}
                         >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                            <Text style={[styles.pillText, covidCompliant === option && styles.pillTextSelected]}>
+                                {option}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Refund Policy */}
+            <View style={styles.card}>
+                <SectionTitle icon="undo-alt" title="Refund Policy" required />
+                <View style={styles.pillRowWrap}>
+                    {(['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'] as const).map((policy) => (
+                        <TouchableOpacity
+                            key={policy}
+                            activeOpacity={0.85}
+                            style={[styles.pill, cancellationPolicy === policy && styles.pillSelected]}
+                            onPress={() => setCancellationPolicy(policy)}
+                        >
+                            <Text style={[styles.pillText, cancellationPolicy === policy && styles.pillTextSelected]}>
+                                {policy}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
 
             {/* Buttons */}
             <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.85}>
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.saveButton}
+                    activeOpacity={0.9}
                     onPress={() => {
                         submit();
                     }}>
                     <Text style={styles.buttonText}>Save & Continue</Text>
+                    <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>
+
+            <View style={{ height: 30 }} />
         </ScrollView>
     );
 };
 
-export default BusinessDetailsForm;
+// Small reusable section title with icon + optional required marker
+const SectionTitle: React.FC<{ icon: string; title: string; required?: boolean }> = ({ icon, title, required }) => (
+    <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionIconWrap}>
+            <FontAwesome5 name={icon} size={12} color="#780C60" />
+        </View>
+        <Text style={styles.label}>
+            {title}
+            {required ? <Text style={styles.requiredStar}> *</Text> : null}
+        </Text>
+    </View>
+);
+
+export default BDSoundIndex;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8E9F0', padding: 20, paddingTop: 70, },
-    header: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-    subText: { color: "#333", marginBottom: 15 },
+    container: {
+        padding: 20,
+        backgroundColor: '#FDF4F8',
+        flexGrow: 1,
+        paddingTop: 65,
+        paddingBottom: 40,
+    },
 
-    question: { fontSize: 14, marginVertical: 8, fontWeight: "500" },
+    // Header
+    headerWrap: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    headerIconBadge: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: '#F4D8EC',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    header: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#2A1B26',
+        textAlign: 'center',
+    },
+    subHeader: {
+        fontSize: 14,
+        color: '#8A7A85',
+        marginTop: 8,
+        textAlign: 'center',
+        lineHeight: 20,
+        maxWidth: 300,
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        marginTop: 16,
+        gap: 6,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#F0D3E6',
+    },
+    dotAccent: {
+        backgroundColor: '#780C60',
+        width: 18,
+    },
+
+    // Card wrapper for each section
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 14,
+        shadowColor: '#780C60',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+
+    sectionTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    sectionIconWrap: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: '#FBEFF7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 8,
+    },
     label: {
         fontSize: 14,
-        fontWeight: 'bold',
-        marginVertical: 8,
+        fontWeight: '700',
+        color: '#2A1B26',
     },
-    input: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
+    requiredStar: {
+        color: '#C0396F',
+        fontWeight: '700',
     },
-    textArea: {
-        //     backgroundColor: "#fff",
-        //     borderWidth: 1,
-        //     borderColor: "#C97BAA",
-        //     borderRadius: 5,
-        //     padding: 10,
-        //   //  height: 80,
-        //     //textAlignVertical: "top",
-        //     marginBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
-    },
-    row: { flexDirection: "row", marginBottom: 10, gap: 10 },
-    button: {
-        borderWidth: 1,
-        borderColor: "#C97BAA",
-        borderRadius: 5,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-    },
-    selectedButton: {
-        backgroundColor: "#C97BAA",
+    hint: {
+        fontSize: 11,
+        color: '#B199AB',
+        marginLeft: 34,
+        marginBottom: 10,
     },
 
-    selectedButtonText: { color: "#fff" },
-    footer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 20,
+    // Inputs
+    input: {
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        fontSize: 14,
+        color: '#2A1B26',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: '#FEFBFD',
     },
-    secondaryButton: {
-        backgroundColor: "#E0D4DB",
-        padding: 10,
-        borderRadius: 5,
+    textArea: {
+        minHeight: 70,
+        textAlignVertical: 'top',
     },
-    primaryButton: {
-        backgroundColor: "#6D2057",
-        padding: 10,
-        borderRadius: 5,
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        backgroundColor: '#FEFBFD',
+        paddingHorizontal: 12,
     },
-    footerText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
+    currencyPrefix: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#780C60',
+        marginRight: 6,
+    },
+    inputFlex: {
+        flex: 1,
+        fontSize: 14,
+        color: '#2A1B26',
+        paddingVertical: 10,
+    },
+
+    // Multi-select chips (Sound Type / Equipment / Staff)
+    chipContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        backgroundColor: '#FEFBFD',
+        position: 'relative',
+    },
+    chipSelected: {
+        backgroundColor: '#780C60',
+        borderColor: '#780C60',
+    },
+    chipIcon: {
+        color: '#780C60',
+        marginRight: 8,
+    },
+    chipIconSelected: {
+        color: '#FFFFFF',
+    },
+    chipText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#780C60',
+        letterSpacing: 0.3,
+    },
+    chipTextSelected: {
+        color: '#FFFFFF',
+    },
+    checkBadge: {
+        position: 'absolute',
+        top: -6,
+        right: -6,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F0DCEA',
+    },
+
+    // Single-select pills (Yes/No, payment type, cancellation policy, covid)
+    pillRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    pillRowWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+    },
+    pill: {
+        borderWidth: 1.5,
+        borderColor: '#F0DCEA',
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        backgroundColor: '#FEFBFD',
+    },
+    pillSelected: {
+        backgroundColor: '#780C60',
+        borderColor: '#780C60',
+    },
+    pillText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#780C60',
+        letterSpacing: 0.3,
+    },
+    pillTextSelected: {
+        color: '#FFFFFF',
+    },
+
+    // Bottom buttons
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 20,
+        marginTop: 10,
+        gap: 12,
     },
     backButton: {
         flex: 1,
-        marginRight: 10,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#780C60',
-        borderRadius: 8,
-        paddingVertical: 12,
+        borderRadius: 14,
+        paddingVertical: 14,
         alignItems: 'center',
         backgroundColor: '#fff',
     },
     backButtonText: {
         color: '#780C60',
-        fontWeight: '600',
+        fontWeight: '700',
+        fontSize: 14,
     },
     saveButton: {
-        flex: 1,
-        backgroundColor: "#780C60",
-        paddingVertical: 12,
+        flex: 1.4,
+        flexDirection: 'row',
+        backgroundColor: '#780C60',
+        paddingVertical: 14,
+        justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 8,
+        borderRadius: 14,
+        shadowColor: '#780C60',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 6,
     },
     buttonText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontWeight: '700',
         fontSize: 14,
     },
-    covidContainer: {
-        // flexDirection: 'row',
-        // justifyContent: 'space-between',
-        // marginBottom: 16,
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-    covidOption: {
-        // padding: 10,
-        // borderWidth: 1,
-        // borderColor: '#B3A3A3',
-        // borderRadius: 8,
-        // flex: 1,
-        // alignItems: 'center',
-        // marginHorizontal: 4,
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-    covidSelected: {
-        // backgroundColor: '#FBEFF7',
-        // borderColor: '#800080',
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-    covidText: {
-        // fontSize: 14,
-        // color: '#666',
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-    covidSelectedText: {
-        // color: "#780C60",
-        // fontWeight: 'bold',
-        color: '#FFF', // White color for selected text
-    },
-    staffContainer: {
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-
-    staffOption: {
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-
-    staffSelected: {
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-
-    staffIcon: {
-        color: '#780C60', // Default icon color
-        fontSize: 20,
-        marginRight: 2, // Space between icon and text
-    },
-
-    staffSelectedIcon: {
-        color: '#FFF', // White color for selected icon
-    },
-
-    staffText: {
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-
-    staffSelectedText: {
-        color: '#FFF', // White color for selected text
-    },
-
 });

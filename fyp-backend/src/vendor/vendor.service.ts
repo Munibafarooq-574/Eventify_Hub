@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails } from '../auth/schemas/user.schema';
+import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails, SoundBusinessDetails } from '../auth/schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
@@ -9,6 +9,7 @@ import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-detai
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
 import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
+import { CreateSoundBusinessDetailsDto } from './dto/Create-sound-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { Category } from 'src/auth/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
@@ -61,7 +62,8 @@ export class VendorService {
                         { cateringBusinessDetails: { $exists: true, $ne: null } },
                         { photographerBusinessDetails: { $exists: true, $ne: null } },
                         { cakeBusinessDetails: { $exists: true, $ne: null } },
-                        { mehndiBusinessDetails: { $exists: true, $ne: null } }
+                        { mehndiBusinessDetails: { $exists: true, $ne: null } },
+                        { soundBusinessDetails: { $exists: true, $ne: null } }
                     ]
                 }
             },
@@ -88,7 +90,13 @@ export class VendorService {
                                                         $cond: [
                                                             { $ifNull: ['$cakeBusinessDetails', false] },
                                                             '$cakeBusinessDetails',
-                                                            '$mehndiBusinessDetails'
+                                                            {
+                                                                $cond: [
+                                                                    { $ifNull: ['$mehndiBusinessDetails', false] },
+                                                                    '$mehndiBusinessDetails',
+                                                                    '$soundBusinessDetails'
+                                                                ]
+                                                            }
                                                         ]
                                                     }
                                                 ]
@@ -109,7 +117,8 @@ export class VendorService {
                     cateringBusinessDetails: 0,
                     photographerBusinessDetails: 0,
                     cakeBusinessDetails: 0,
-                    mehndiBusinessDetails: 0
+                    mehndiBusinessDetails: 0,
+                    soundBusinessDetails: 0
                 }
             }
         ];
@@ -152,7 +161,8 @@ export class VendorService {
             CreateVenueBusinessDetailsDto |
             CreateCateringBusinessDetailsDto |
             CreateCakeBusinessDetailsDto |
-            CreateMehndiBusinessDetailsDto,
+            CreateMehndiBusinessDetailsDto |
+            CreateSoundBusinessDetailsDto,
     ): Promise<User> {
         const user = await this.userModel.findById(userId).populate('buisnessCategory').exec();
         if (!user) {
@@ -176,6 +186,8 @@ export class VendorService {
             user.mehndiBusinessDetails = { ...dto } as unknown as MehndiBusinessDetails;
         } else if (categoryName === "cakes") {
            user.cakeBusinessDetails = { ...dto } as unknown as CakeBusinessDetails;
+       } else if (categoryName === "sound" || categoryName === "sounds" || categoryName === "dj") {
+           user.soundBusinessDetails = { ...dto } as unknown as SoundBusinessDetails;
        }
         else {
             console.log("No Buisness Category", category);
@@ -203,7 +215,7 @@ export class VendorService {
 
     async getBusinessDetails(userId: string) {
         const user = await this.userModel.findById(userId).select(
-            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails mehndiBusinessDetails',
+            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails mehndiBusinessDetails soundBusinessDetails',
         );
 
         if (!user) throw new NotFoundException('User not found');
@@ -216,6 +228,7 @@ export class VendorService {
             ...(user.venueBusinessDetails && { venueBusinessDetails: user.venueBusinessDetails }),
             ...(user.cakeBusinessDetails && { cakeBusinessDetails: user.cakeBusinessDetails}),
             ...(user.mehndiBusinessDetails && { mehndiBusinessDetails: user.mehndiBusinessDetails}),
+            ...(user.soundBusinessDetails && { soundBusinessDetails: user.soundBusinessDetails}),
         };
 
         return businessDetails;
@@ -243,6 +256,8 @@ export class VendorService {
                      user.cakeBusinessDetails :
                      user?.mehndiBusinessDetails ?
                      user.mehndiBusinessDetails :
+                     user?.soundBusinessDetails ?
+                     user.soundBusinessDetails :
                      undefined
         }
         if (!user) throw new NotFoundException('User not found');
@@ -302,7 +317,12 @@ export class VendorService {
                                                     {
                                                         $cond: [
                                                             { $ifNull: ['$cakeBusinessDetails', false] }, '$cakeBusinessDetails',
-                                                            '$mehndiBusinessDetails'
+                                                            {
+                                                                $cond: [
+                                                                    { $ifNull: ['$mehndiBusinessDetails', false] }, '$mehndiBusinessDetails',
+                                                                    '$soundBusinessDetails'
+                                                                ]
+                                                            }
                                                         ]
                                                     }
                                                 ]
@@ -322,7 +342,8 @@ export class VendorService {
                     cateringBusinessDetails: 0,
                     photographerBusinessDetails: 0,
                     cakeBusinessDetails: 0,
-                    mehndiBusinessDetails: 0
+                    mehndiBusinessDetails: 0,
+                    soundBusinessDetails: 0
                 }
             }
         ];
