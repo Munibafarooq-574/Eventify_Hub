@@ -93,22 +93,30 @@ export class VendorController {
     }
 
     @Post('image')
-    @UseInterceptors(FilesInterceptor('files', 10)) // accepts up to 10 files
-    async uploadImages(@Query('userId') userId: string, @UploadedFiles() files: Express.Multer.File[]) {
-        if (!files || files.length === 0) {
-            throw new HttpException('No files provided', HttpStatus.BAD_REQUEST);
-        }
-
-        const urls = await this.fileUploadService.uploadMultipleFiles(files);
-
-        // Optionally, you can associate these URLs with the user in your service
-        await this.vendorService.associateImagesWithUser(userId, urls);
-
-        return {
-            message: 'Images uploaded successfully',
-            urls: urls,
-        };
+@UseInterceptors(
+    FilesInterceptor('files', 50, {
+        limits: {
+            fileSize: 10 * 1024 * 1024, // 10MB per image
+        },
+    }),
+)
+async uploadImages(
+    @Query('userId') userId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+) {
+    if (!files || files.length === 0) {
+        throw new HttpException('No files provided', HttpStatus.BAD_REQUEST);
     }
+
+    const urls = await this.fileUploadService.uploadMultipleFiles(files);
+
+    await this.vendorService.associateImagesWithUser(userId, urls);
+
+    return {
+        message: 'Images uploaded successfully',
+        urls,
+    };
+}
 
     @Patch('package/:id')
     async updatePackage(

@@ -10,13 +10,17 @@ import axios from 'axios';
  * @returns {Promise<string[]>} - Returns an array of URLs of the uploaded images.
  * @throws Will throw an error if the upload fails.
  */
-export async function uploadMultipleImages(userId: string, imageUris: string[]): Promise<string[]> {
-    const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`; // Replace with your actual backend URL
 
-    // Create a new FormData instance
+
+export async function uploadMultipleImages(
+    userId: string,
+    imageUris: string[]
+): Promise<string[]> {
+
+    const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`;
+
     const formData = new FormData();
 
-    // Append each image to the FormData instance
     imageUris.forEach((uri, index) => {
         const uriParts = uri.split('.');
         const fileType = uriParts[uriParts.length - 1].toLowerCase();
@@ -25,23 +29,23 @@ export async function uploadMultipleImages(userId: string, imageUris: string[]):
             uri,
             name: `photo_${index}.${fileType}`,
             type: `image/${fileType}`,
-        });
+        } as any);
     });
 
     try {
         const response = await axios.post(url, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
         });
 
-        // Assuming the backend returns { message: string, urls: string[] }
-        if (response.data && response.data.urls) {
-            // Construct the full URLs if necessary
-            const uploadedUrls = response.data.urls.map((url: any) => `https://eventify-hub.onrender.com${url}`); // Adjust based on your backend configuration
-            return uploadedUrls;
-        } else {
-            throw new Error('Upload failed: No URLs returned');
-        }
+        return response.data.urls;
+
     } catch (error: any) {
-        console.error('Error uploading images:', error.response?.data || error.message);
+        console.error(
+            "Upload error:",
+            error.response?.data || error.message
+        );
         throw error;
     }
 }
