@@ -10,42 +10,198 @@ export class BusinessDetails extends Document {
 
 export const BusinessDetailsSchema = SchemaFactory.createForClass(BusinessDetails);
 
+// ==========================================
+// Photographer Business Details Schema
+// ==========================================
+
 @Schema()
 export class PhotographerBusinessDetails extends BusinessDetails {
-  @Prop({ required: true })
+
+  // ===============================
+  // Photography Services
+  // ===============================
+
+  @Prop({
+    type: [String],
+    enum: [
+      'WEDDING',
+      'PRE-WEDDING',
+      'ENGAGEMENT',
+      'BIRTHDAY',
+      'CORPORATE',
+      'CINEMATIC',
+    ],
+    default: [],
+  })
+  photographyTypes: string[];
+
+  // ===============================
+  // Equipment
+  // ===============================
+
+  @Prop({
+    type: [String],
+    enum: [
+      'DSLR',
+      'DRONE',
+      '4K VIDEO',
+      'LIGHTING',
+      'GIMBAL',
+    ],
+    default: [],
+  })
+  equipment: string[];
+
+  // ===============================
+  // Editing Services
+  // ===============================
+
+  @Prop({
+    type: [String],
+    enum: [
+      'PHOTO EDITING',
+      'VIDEO EDITING',
+      'ALBUM DESIGN',
+      'REELS',
+    ],
+    default: [],
+  })
+  editingServices: string[];
+
+  // ===============================
+  // Photography Team
+  // ===============================
+
+  @Prop({
+    type: [String],
+    enum: ['MALE', 'FEMALE', 'TRANSGENDER'],
+    default: [],
+  })
+  staffGender: string[];
+
+  // ===============================
+  // Photography Style
+  // ===============================
+
+  @Prop({
+    type: [String],
+    enum: [
+      'TRADITIONAL',
+      'CANDID',
+      'CINEMATIC',
+      'DOCUMENTARY',
+    ],
+    default: [],
+  })
+  photoStyle: string[];
+
+  // ===============================
+  // Travels To Client
+  // ===============================
+
+  @Prop({
+    type: Boolean,
+    required: true,
+  })
+  travelsToClientHome: boolean;
+
+  // ===============================
+  // Delivery Time
+  // ===============================
+
+  @Prop({
+    enum: [
+      '2 DAYS',
+      '5 DAYS',
+      '1 WEEK',
+      '2 WEEKS',
+    ],
+    required: true,
+  })
+  deliveryTime: string;
+
+  // ===============================
+  // City Covered
+  // ===============================
+
+  @Prop({
+    required: true,
+  })
   cityCovered: string;
 
-  @Prop({ type: String, enum: ['MALE', 'FEMALE', 'TRANSGENDER'] })
-  staff: string;
+  // ===============================
+  // Starting Price
+  // ===============================
 
-  @Prop()
+  @Prop({
+    required: true,
+  })
   minimumPrice: number;
 
-  @Prop({ required: true })
+  // ===============================
+  // Description
+  // ===============================
+
+  @Prop({
+    required: true,
+  })
   description: string;
+
+  // ===============================
+  // Additional Information
+  // ===============================
 
   @Prop()
   additionalInfo?: string;
 
-  @Prop({ enum: ['PERCENTAGE', 'FIXED'], default: 'PERCENTAGE' })
-  downPaymentType: string;
-
-  @Prop({ required: true })
-  downPayment: number;
-
-  @Prop({ enum: ['YES', 'NO'], required: true })
-  covidCompliant: string;
+  // ===============================
+  // Down Payment Type
+  // ===============================
 
   @Prop({
-    enum: ['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'],
+    enum: ['PERCENTAGE', 'FIXED'],
+    default: 'PERCENTAGE',
+  })
+  downPaymentType: string;
+
+  // ===============================
+  // Down Payment
+  // ===============================
+
+  @Prop({
+    required: true,
+  })
+  downPayment: number;
+
+  // ===============================
+  // Covid Safety
+  // ===============================
+
+  @Prop({
+    enum: ['YES', 'NO'],
+    required: true,
+  })
+  covidCompliant: string;
+
+  // ===============================
+  // Refund Policy
+  // ===============================
+
+  @Prop({
+    enum: [
+      'REFUNDABLE',
+      'NON-REFUNDABLE',
+      'PARTIALLY REFUNDABLE',
+    ],
     required: true,
   })
   covidRefundPolicy: string;
 }
 
-export const PhotographerBusinessDetailsSchema = SchemaFactory.createForClass(
-  PhotographerBusinessDetails,
-);
+export const PhotographerBusinessDetailsSchema =
+  SchemaFactory.createForClass(
+    PhotographerBusinessDetails,
+  );
 
 @Schema()
 export class SalonBusinessDetails extends BusinessDetails {
