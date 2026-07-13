@@ -29,7 +29,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class CreatePhotographyBusinessDetailsDto {
+export class CreatePhotographerBusinessDetailsDto  {
 
   // ===============================
   // Photography Services
