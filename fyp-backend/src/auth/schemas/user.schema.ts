@@ -102,35 +102,55 @@ export const SalonBusinessDetailsSchema = SchemaFactory.createForClass(
 );
 
 @Schema()
+@Schema()
 export class CateringBusinessDetails extends BusinessDetails {
-  @Prop({ required: true })
-  expertise: string;
+
+  @Prop({
+    type: [String],
+    enum: [
+      'WEDDING',
+      'ENGAGEMENT',
+      'BIRTHDAY',
+      'CORPORATE',
+      'BBQ',
+      'BUFFET',
+    ],
+    default: [],
+  })
+  expertise: string[];
 
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({ required: true })
-  cityCovered: string;
+  @Prop({
+    type: [String],
+    default: [],
+  })
+  cityCovered: string[];
 
-  @Prop({ type: String, enum: ['MALE', 'FEMALE', 'TRANSGENDER'] })
-  staff: string;
+  @Prop({
+    type: [String],
+    enum: ['MALE', 'FEMALE', 'TRANSGENDER'],
+    default: [],
+  })
+  staff: string[];
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideFoodTesting: boolean;
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideDecoration: boolean;
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideSoundSystem: boolean;
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideSeatingArrangement: boolean;
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideWaiters: boolean;
 
-  @Prop({ type: Boolean, default: false })
+  @Prop({ default: false })
   provideCutleryAndPlates: boolean;
 
   @Prop()
@@ -142,22 +162,31 @@ export class CateringBusinessDetails extends BusinessDetails {
   @Prop()
   additionalInfo?: string;
 
-  @Prop({ enum: ['PERCENTAGE', 'FIXED'], default: 'PERCENTAGE' })
+  @Prop({
+    enum: ['PERCENTAGE', 'FIXED'],
+    default: 'PERCENTAGE',
+  })
   downPaymentType: string;
 
   @Prop({ required: true })
   downPayment: number;
 
   @Prop({
-    enum: ['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'],
+    enum: [
+      'REFUNDABLE',
+      'NON-REFUNDABLE',
+      'PARTIALLY REFUNDABLE',
+    ],
     required: true,
   })
   cancellationPolicy: string;
 
-  @Prop({ enum: ['YES', 'NO'], required: true })
+  @Prop({
+    enum: ['YES', 'NO'],
+    required: true,
+  })
   covidCompliant: string;
 }
-
 // Repeat similarly for CateringBusinessDetails and VenueBusinessDetails
 export const CateringBusinessDetailsSchema = SchemaFactory.createForClass(
   CateringBusinessDetails,

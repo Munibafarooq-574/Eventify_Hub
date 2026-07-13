@@ -1,642 +1,1119 @@
-import postCateringBusinessDetails from '@/services/postCateringBusinessDetails';
+import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
+const EXPERTISE_TYPES = [
+  { label: "WEDDING", icon: "glass-cheers" },
+  { label: "ENGAGEMENT", icon: "ring" },
+  { label: "BIRTHDAY", icon: "birthday-cake" },
+  { label: "CORPORATE", icon: "briefcase" },
+  { label: "BBQ", icon: "utensils" },
+  { label: "BUFFET", icon: "hamburger" },
+];
+
+const CITY_OPTIONS = [
+  "Islamabad",
+  "Rawalpindi",
+  "Lahore",
+  "Karachi",
+  "Peshawar",
+  "Faisalabad",
+];
+
+const STAFF_GENDERS = [
+  { label: "MALE", icon: "male" },
+  { label: "FEMALE", icon: "female" },
+  { label: "TRANSGENDER", icon: "transgender-alt" },
+];
+
+const SERVICES = [
+  {
+    key: "foodTesting",
+    title: "Food Testing",
+    icon: "flask",
+  },
+  {
+    key: "soundSystem",
+    title: "Sound System",
+    icon: "volume-up",
+  },
+  {
+    key: "decoration",
+    title: "Decoration",
+    icon: "palette",
+  },
+  {
+    key: "seatingArrangement",
+    title: "Seating",
+    icon: "chair",
+  },
+  {
+    key: "waiters",
+    title: "Waiters",
+    icon: "user-tie",
+  },
+  {
+    key: "cutlery",
+    title: "Cutlery",
+    icon: "utensils",
+  },
+];
+
 const BusinessDetailsForm = () => {
-    const [expertise, setExpertise] = useState('');
-    const [travelsToClientHome, setTravelsToClientHome] = useState(false);
-    const [selectedCity, setSelectedCity] = useState('');
-    const [staffGender, setStaffGender] = useState('');
+    const [expertise, setExpertise] = useState<string[]>([]);
+const [travelsToClientHome, setTravelsToClientHome] =
+  useState<"YES" | "NO" | null>(null);
 
-    const [foodTesting, setFoodTesting] = useState(false);
-    const [soundSystem, setSoundSystem] = useState(false);
-    const [decoration, setDecoration] = useState(false);
-    const [seatingArrangement, setSeatingArrangement] = useState(false);
-    const [waiters, setWaiters] = useState(false);
-    const [cutlery, setCutlery] = useState(false);
+const [selectedCities, setSelectedCities] = useState<string[]>([]);
+const [staffGender, setStaffGender] = useState<string[]>([]);
 
-    const [minimumPrice, setMinimumPrice] = useState('');
-    const [description, setDescription] = useState('');
-    const [downPaymentType, setDownPaymentType] = useState('');
-    const [downPayment, setDownPayment] = useState('');
-    const [cancellationPolicy, setCancellationPolicy] = useState('');
-    const [covidCompliant, setCovidCompliant] = useState('');
+const [foodTesting, setFoodTesting] = useState(false);
+const [soundSystem, setSoundSystem] = useState(false);
+const [decoration, setDecoration] = useState(false);
+const [seatingArrangement, setSeatingArrangement] = useState(false);
+const [waiters, setWaiters] = useState(false);
+const [cutlery, setCutlery] = useState(false);
 
-    const submit = async () => {
-        console.log(foodTesting, decoration, soundSystem, seatingArrangement, waiters, cutlery, covidCompliant,
-             cancellationPolicy, staffGender, travelsToClientHome);
-        // if (!foodTesting || !decoration || !soundSystem || !seatingArrangement || !waiters || !cutlery || !covidCompliant ||
-        //     !cancellationPolicy || !staffGender || !travelsToClientHome || parseFloat(downPayment) === 0) {
-        //     Alert.alert("Error", "Please fill in all the required fields marked with *.");
-        //     return;
-        // }
+const [minimumPrice, setMinimumPrice] = useState("");
+const [description, setDescription] = useState("");
+const [additionalInfo, setAdditionalInfo] = useState("");
 
-        try {
+const [downPaymentType, setDownPaymentType] =
+  useState<"PERCENTAGE" | "FIXED" | null>(null);
 
-            const user = JSON.parse(await getSecureData("user") || "");
-            // console.log(user);
-            await postCateringBusinessDetails(user._id, {
+const [downPayment, setDownPayment] = useState("");
+
+const [cancellationPolicy, setCancellationPolicy] =
+  useState<
+    | "REFUNDABLE"
+    | "NON-REFUNDABLE"
+    | "PARTIALLY REFUNDABLE"
+    | null
+  >(null);
+
+const [covidCompliant, setCovidCompliant] =
+  useState<"YES" | "NO" | null>(null);
+  const toggleExpertise = (item: string) => {
+  setExpertise((prev) =>
+    prev.includes(item)
+      ? prev.filter((i) => i !== item)
+      : [...prev, item]
+  );
+};
+
+const toggleCity = (city: string) => {
+  setSelectedCities((prev) =>
+    prev.includes(city)
+      ? prev.filter((i) => i !== city)
+      : [...prev, city]
+  );
+};
+
+const toggleStaff = (staff: string) => {
+  setStaffGender((prev) =>
+    prev.includes(staff)
+      ? prev.filter((i) => i !== staff)
+      : [...prev, staff]
+  );
+};
+const SectionTitle = ({
+  icon,
+  title,
+  required,
+}: {
+  icon: string;
+  title: string;
+  required?: boolean;
+}) => (
+  <View style={styles.sectionTitleRow}>
+    <View style={styles.sectionIconWrap}>
+      <FontAwesome5
+        name={icon}
+        size={12}
+        color="#780C60"
+      />
+    </View>
+
+    <Text style={styles.label}>
+      {title}
+      {required && (
+        <Text style={styles.requiredStar}> *</Text>
+      )}
+    </Text>
+  </View>
+);
+
+const submit = async () => {
+
+    if (
+        expertise.length === 0 ||
+        selectedCities.length === 0 ||
+        staffGender.length === 0 ||
+        !minimumPrice ||
+        !description ||
+        !downPaymentType ||
+        !downPayment ||
+        !covidCompliant ||
+        !cancellationPolicy ||
+        travelsToClientHome === null
+    ) {
+        Alert.alert(
+            "Error",
+            "Please complete all required fields."
+        );
+        return;
+    }
+
+    try {
+
+        const user = JSON.parse(
+            (await getSecureData("user")) || ""
+        );
+
+        await postCateringBusinessDetails(
+            user._id,
+            {
+
                 expertise,
-                travelsToClientHome: true,
-                cityCovered: selectedCity,
+
+                travelsToClientHome:
+                    travelsToClientHome === "YES",
+
+                cityCovered: selectedCities,
+
                 staff: staffGender,
-                provideFoodTesting: true,
-                provideDecoration: true,
-                provideSoundSystem: true,
-                provideSeatingArrangement: true,
-                provideWaiters: true,
-                provideCutleryAndPlates: true,
-                minimumPrice: Number(minimumPrice),
+
+                provideFoodTesting:
+                    foodTesting,
+
+                provideDecoration:
+                    decoration,
+
+                provideSoundSystem:
+                    soundSystem,
+
+                provideSeatingArrangement:
+                    seatingArrangement,
+
+                provideWaiters:
+                    waiters,
+
+                provideCutleryAndPlates:
+                    cutlery,
+
+                minimumPrice:
+                    Number(minimumPrice),
+
                 description,
-                additionalInfo: String(),
-                downPaymentType: downPaymentType as 'PERCENTAGE' | 'FIXED',
-                downPayment: Number(),
-                cancellationPolicy: cancellationPolicy as 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE',
-                covidCompliant: covidCompliant as 'YES' | 'NO',
-            });
-            Alert.alert("Success", "Business details saved successfully!");
-            router.push("/packages");
-        } catch (error) {
-            console.error("Error:", error);
-            Alert.alert("Error", "Something went wrong. Please try again.");
-        }
-    };
 
-    const renderYesNoButtons = (
-        question: string,
-        state: string | null,
-        setState: React.Dispatch<React.SetStateAction<string | null>>
-    ) => (
-        <View>
-            <Text style={styles.question}>{question}</Text>
-            <View style={styles.row}>
-                {["YES", "NO"].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.button,
-                            state === option && styles.selectedButton,
-                        ]}
-                        onPress={() => setState(option)}
-                    >
-                        <Text
-                            style={[
-                                styles.buttonText,
-                                state === option && styles.selectedButtonText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-        </View>
-    );
+                additionalInfo,
 
-    return (
-        <ScrollView style={styles.container}>
-            <Text style={styles.header}>Business Details</Text>
-            <Text style={styles.subText}>
-                Want to start your business with us? Enter your following info details
-            </Text>
+                downPaymentType,
 
-            {/* Expertise */}
-            <Text style={styles.label}>Expertise*</Text>
-            <TextInput style={styles.input} onChangeText={(text) => { setExpertise(text) }} placeholder="Enter expertise" />
+                downPayment:
+                    Number(downPayment),
 
-            {/* Travels to Client Home */}
-            <Text style={styles.label}>Travels to Client Home*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            travelsToClientHome === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setTravelsToClientHome((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                travelsToClientHome === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+                cancellationPolicy,
 
-            {/* City Covered */}
-            <Text style={styles.label}>City Covered*</Text>
-            <TextInput style={styles.input} onChangeText={(text) => { setSelectedCity(text) }} placeholder="Select Cities" />
+                covidCompliant,
 
-            {/* Staff */}
-            <Text style={styles.label}>Staff</Text>
-            <View style={styles.staffContainer}>
-                {[
-                    { label: 'MALE', icon: 'male' },
-                    { label: 'FEMALE', icon: 'female' },
-                    { label: 'TRANSGENDER', icon: 'transgender-alt' },
-                ].map((staff) => (
-                    <TouchableOpacity
-                        key={staff.label}
-                        style={[
-                            styles.staffOption,
-                            staffGender === staff.label && styles.staffSelected,
-                        ]}
-                        onPress={() => setStaffGender(staff.label)}
-                    >
-                        <FontAwesome5 name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                staffGender === staff.label && styles.staffSelectedIcon,
-                            ]} />
+            }
+        );
 
-                        {/* <Icon
-                            name={staff.icon}
-                            size={20}
-                            style={[
-                                styles.staffIcon,
-                                selectedStaff === staff.label && styles.staffSelectedIcon,
-                            ]}
-                        /> */}
-                        <Text
-                            style={[
-                                styles.staffText,
-                                staffGender === staff.label && styles.staffSelectedText,
-                            ]}
-                        >
-                            {staff.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+        Alert.alert(
+            "Success",
+            "Business details saved successfully!"
+        );
 
-            {/* Additional Yes/No Questions */}
-            {/* {renderYesNoButtons("Do you provide food testing?", foodTesting, setFoodTesting)}
-            {renderYesNoButtons("Do you provide decoration?", decoration, setDecoration)}
-            {renderYesNoButtons("Do you provide sound system?", soundSystem, setSoundSystem)}
-            {renderYesNoButtons(
-                "Do you provide seating arrangement?",
-                seatingArrangement,
-                setSeatingArrangement
-            )}
-            {renderYesNoButtons("Do you provide waiters/bairay?", waiters, setWaiters)}
-            {renderYesNoButtons(
-                "Do you provide cutlery and plates?",
-                cutlery,
-                setCutlery
-            )} */}
-            {/* "Do you provide food testing?" */}
-            <Text style={styles.label}>Do you provide food testing?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            foodTesting === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setFoodTesting(option === 'YES')}
+        router.push("/packages");
 
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                foodTesting === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+    } catch (err) {
 
-            {/* Do you provide sound system? */}
-            <Text style={styles.label}>Do you provide sound system?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            soundSystem === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setSoundSystem((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                soundSystem === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+        console.log(err);
 
-            {/* Do you provide decoration? */}
-            <Text style={styles.label}>Do you provide decoration?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            decoration === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setDecoration((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                decoration === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+        Alert.alert(
+            "Error",
+            "Something went wrong."
+        );
 
-            {/* Do you provide seating arrangement? */}
-            <Text style={styles.label}>Do you provide seating arrangement?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            seatingArrangement === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setSeatingArrangement((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                seatingArrangement === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+    }
 
-            {/* Do you provide waiters/bairay? */}
-            <Text style={styles.label}>Do you provide waiters/bairay?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            waiters === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setWaiters((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                waiters === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Do you provide cutlery and plates? */}
-            <Text style={styles.label}>Do you provide cutlery and plates?</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            cutlery === (option === 'YES') && styles.covidSelected,
-                        ]}
-                        onPress={() => setCutlery((option === 'YES'))}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                cutlery === (option === 'YES') && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Minimum Price */}
-            <Text style={styles.label}>Minimum Price</Text>
-            <TextInput style={styles.input} onChangeText={(text) => { setMinimumPrice(text) }} keyboardType="numeric" />
-
-            {/* Description */}
-            <Text style={styles.label}>Description *</Text>
-            <TextInput style={styles.textArea} onChangeText={(text) => { setDescription(text) }} multiline placeholder="Enter description" />
-
-            {/* Down Payment Type */}
-
-            <Text style={styles.label}>Down Payment Type*</Text>
-            <View style={styles.covidContainer}>
-                {['PERCENTAGE', 'FIXED'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            downPaymentType === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setDownPaymentType(option)}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                downPaymentType === option && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+};
 
 
-            {/* Down Payment */}
-            <Text style={styles.label}>Down Payment *</Text>
-            <TextInput
-                style={styles.input}
-                placeholder="Enter Down Payment"
-                keyboardType="numeric"
-                value={downPayment}
-                onChangeText={setDownPayment}
-            />
+return ( 
+    <ScrollView
+  contentContainerStyle={styles.container}
+  showsVerticalScrollIndicator={false}
+>
 
-            {/* Refund Policy */}
-            <Text style={styles.label}>Cancellation Policy*</Text>
-            <View style={styles.covidContainer}>
-                {['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'].map(
-                    (policy) => (
-                        <TouchableOpacity
-                            key={policy}
-                            style={[
-                                styles.covidOption,
-                                cancellationPolicy === policy && styles.covidSelected,
-                            ]}
-                            onPress={() => setCancellationPolicy(policy as 'REFUNDABLE' || 'NON-REFUNDABLE' || 'PARTIALLY REFUNDABLE')}
-                        >
-                            <Text
-                                style={[
-                                    styles.covidText,
-                                    cancellationPolicy === policy && styles.covidSelectedText,
-                                ]}
-                            >
-                                {policy}
-                            </Text>
-                        </TouchableOpacity>
-                    )
-                )}
-            </View>
+<View style={styles.headerWrap}>
 
-            {/* Covid Compliant */}
-            <Text style={styles.label}>Covid Compliant*</Text>
-            <View style={styles.covidContainer}>
-                {['YES', 'NO'].map((option) => (
-                    <TouchableOpacity
-                        key={option}
-                        style={[
-                            styles.covidOption,
-                            covidCompliant === option && styles.covidSelected,
-                        ]}
-                        onPress={() => setCovidCompliant(option as "YES" || "NO")}
-                    >
-                        <Text
-                            style={[
-                                styles.covidText,
-                                covidCompliant === option && styles.covidSelectedText,
-                            ]}
-                        >
-                            {option}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+<View style={styles.headerIconBadge}>
+<FontAwesome5
+name="utensils"
+size={22}
+color="#780C60"
+/>
+</View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backButtonText}>Back</Text>
-                </TouchableOpacity>
+<Text style={styles.header}>
+Catering Business
+</Text>
+
+<Text style={styles.subHeader}>
+Tell customers about your catering services.
+Select everything you provide.
+</Text>
+
+<View style={styles.dotsRow}>
+{[0,1,2,3,4].map((i)=>(
+<View
+key={i}
+style={[
+styles.dot,
+i===2 && styles.dotAccent
+]}
+/>
+))}
+</View>
+
+</View>
+{/* ============================
+        Expertise
+============================= */}
+<View style={styles.card}>
+    <SectionTitle
+        icon="utensils"
+        title="Expertise"
+        required
+    />
+
+    <Text style={styles.hint}>
+        Select all services you provide
+    </Text>
+
+    <View style={styles.chipContainer}>
+        {EXPERTISE_TYPES.map((item) => {
+            const selected = expertise.includes(item.label);
+
+            return (
                 <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={() => {
-                        submit();
-                    }}>
-                    <Text style={styles.buttonText}>Save & Continue</Text>
+                    key={item.label}
+                    activeOpacity={0.85}
+                    style={[
+                        styles.chip,
+                        selected && styles.chipSelected,
+                    ]}
+                    onPress={() => toggleExpertise(item.label)}
+                >
+                    <FontAwesome5
+                        name={item.icon}
+                        size={16}
+                        style={[
+                            styles.chipIcon,
+                            selected &&
+                                styles.chipIconSelected,
+                        ]}
+                    />
+
+                    <Text
+                        style={[
+                            styles.chipText,
+                            selected &&
+                                styles.chipTextSelected,
+                        ]}
+                    >
+                        {item.label}
+                    </Text>
                 </TouchableOpacity>
-            </View>
-        </ScrollView>
-    );
+            );
+        })}
+    </View>
+</View>
+
+{/* ============================
+        Travels
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="route"
+        title="Travels to Client Home"
+        required
+    />
+
+    <View style={styles.pillRow}>
+        {["YES", "NO"].map((option) => (
+            <TouchableOpacity
+                key={option}
+                style={[
+                    styles.pill,
+                    travelsToClientHome === option &&
+                        styles.pillSelected,
+                ]}
+                onPress={() =>
+                    setTravelsToClientHome(
+                        option as "YES" | "NO"
+                    )
+                }
+            >
+                <Text
+                    style={[
+                        styles.pillText,
+                        travelsToClientHome === option &&
+                            styles.pillTextSelected,
+                    ]}
+                >
+                    {option}
+                </Text>
+            </TouchableOpacity>
+        ))}
+    </View>
+</View>
+
+{/* ============================
+        Cities
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="map-marker-alt"
+        title="Cities Covered"
+        required
+    />
+
+    <Text style={styles.hint}>
+        Select multiple cities
+    </Text>
+
+    <View style={styles.chipContainer}>
+        {CITY_OPTIONS.map((city) => {
+            const selected =
+                selectedCities.includes(city);
+
+            return (
+                <TouchableOpacity
+                    key={city}
+                    style={[
+                        styles.chip,
+                        selected &&
+                            styles.chipSelected,
+                    ]}
+                    onPress={() =>
+                        toggleCity(city)
+                    }
+                >
+                    <FontAwesome5
+                        name="map-marker-alt"
+                        size={14}
+                        style={[
+                            styles.chipIcon,
+                            selected &&
+                                styles.chipIconSelected,
+                        ]}
+                    />
+
+                    <Text
+                        style={[
+                            styles.chipText,
+                            selected &&
+                                styles.chipTextSelected,
+                        ]}
+                    >
+                        {city}
+                    </Text>
+                </TouchableOpacity>
+            );
+        })}
+    </View>
+</View>
+
+{/* ============================
+        Staff
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="users"
+        title="Available Staff"
+        required
+    />
+
+    <Text style={styles.hint}>
+        Select all that apply
+    </Text>
+
+    <View style={styles.chipContainer}>
+        {STAFF_GENDERS.map((staff) => {
+            const selected =
+                staffGender.includes(staff.label);
+
+            return (
+                <TouchableOpacity
+                    key={staff.label}
+                    style={[
+                        styles.chip,
+                        selected &&
+                            styles.chipSelected,
+                    ]}
+                    onPress={() =>
+                        toggleStaff(staff.label)
+                    }
+                >
+                    <FontAwesome5
+                        name={staff.icon}
+                        size={16}
+                        style={[
+                            styles.chipIcon,
+                            selected &&
+                                styles.chipIconSelected,
+                        ]}
+                    />
+
+                    <Text
+                        style={[
+                            styles.chipText,
+                            selected &&
+                                styles.chipTextSelected,
+                        ]}
+                    >
+                        {staff.label}
+                    </Text>
+                </TouchableOpacity>
+            );
+        })}
+    </View>
+</View>
+
+{/* ============================
+        Catering Services
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="concierge-bell"
+        title="Services Included"
+        required
+    />
+
+    <View style={styles.chipContainer}>
+
+        {SERVICES.map((service) => {
+
+            const value =
+                ({
+                    foodTesting,
+                    soundSystem,
+                    decoration,
+                    seatingArrangement,
+                    waiters,
+                    cutlery,
+                } as any)[service.key];
+
+            return (
+                <TouchableOpacity
+                    key={service.key}
+                    style={[
+                        styles.chip,
+                        value &&
+                            styles.chipSelected,
+                    ]}
+                    onPress={() => {
+
+                        switch (service.key) {
+
+                            case "foodTesting":
+                                setFoodTesting(!foodTesting);
+                                break;
+
+                            case "soundSystem":
+                                setSoundSystem(!soundSystem);
+                                break;
+
+                            case "decoration":
+                                setDecoration(!decoration);
+                                break;
+
+                            case "seatingArrangement":
+                                setSeatingArrangement(
+                                    !seatingArrangement
+                                );
+                                break;
+
+                            case "waiters":
+                                setWaiters(!waiters);
+                                break;
+
+                            case "cutlery":
+                                setCutlery(!cutlery);
+                                break;
+                        }
+                    }}
+                >
+                    <FontAwesome5
+                        name={service.icon}
+                        size={15}
+                        style={[
+                            styles.chipIcon,
+                            value &&
+                                styles.chipIconSelected,
+                        ]}
+                    />
+
+                    <Text
+                        style={[
+                            styles.chipText,
+                            value &&
+                                styles.chipTextSelected,
+                        ]}
+                    >
+                        {service.title}
+                    </Text>
+                </TouchableOpacity>
+            );
+        })}
+    </View>
+</View>
+
+{/* ============================
+        Minimum Price
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="tag"
+        title="Minimum Price"
+    />
+
+    <View style={styles.inputRow}>
+        <Text style={styles.currencyPrefix}>
+            Rs.
+        </Text>
+
+        <TextInput
+            style={styles.inputFlex}
+            keyboardType="numeric"
+            placeholder="Enter Minimum Price"
+            value={minimumPrice}
+            onChangeText={setMinimumPrice}
+        />
+    </View>
+</View>
+
+{/* ============================
+        Description
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="align-left"
+        title="Description"
+        required
+    />
+
+    <TextInput
+        multiline
+        value={description}
+        onChangeText={setDescription}
+        style={[
+            styles.input,
+            styles.textArea,
+        ]}
+        placeholder="Describe your catering service..."
+    />
+</View>
+
+{/* ============================
+        Additional Info
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="sticky-note"
+        title="Additional Info"
+    />
+
+    <TextInput
+        multiline
+        value={additionalInfo}
+        onChangeText={setAdditionalInfo}
+        style={[
+            styles.input,
+            styles.textArea,
+        ]}
+        placeholder="Any extra information..."
+    />
+</View>
+{/* ============================
+        Down Payment Type
+============================= */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="money-bill-wave"
+        title="Down Payment Type"
+        required
+    />
+
+    <View style={styles.pillRow}>
+        {["PERCENTAGE", "FIXED"].map((option) => (
+            <TouchableOpacity
+                key={option}
+                style={[
+                    styles.pill,
+                    downPaymentType === option &&
+                        styles.pillSelected,
+                ]}
+                onPress={() =>
+                    setDownPaymentType(
+                        option as "PERCENTAGE" | "FIXED"
+                    )
+                }
+            >
+                <Text
+                    style={[
+                        styles.pillText,
+                        downPaymentType === option &&
+                            styles.pillTextSelected,
+                    ]}
+                >
+                    {option}
+                </Text>
+            </TouchableOpacity>
+        ))}
+    </View>
+</View>
+
+{/* Down Payment */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="wallet"
+        title="Down Payment"
+        required
+    />
+
+    <View style={styles.inputRow}>
+        <Text style={styles.currencyPrefix}>
+            Rs.
+        </Text>
+
+        <TextInput
+            style={styles.inputFlex}
+            keyboardType="numeric"
+            placeholder="Enter Down Payment"
+            value={downPayment}
+            onChangeText={setDownPayment}
+        />
+    </View>
+</View>
+
+{/* Covid */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="shield-virus"
+        title="Covid Compliant"
+        required
+    />
+
+    <View style={styles.pillRow}>
+        {["YES", "NO"].map((option) => (
+            <TouchableOpacity
+                key={option}
+                style={[
+                    styles.pill,
+                    covidCompliant === option &&
+                        styles.pillSelected,
+                ]}
+                onPress={() =>
+                    setCovidCompliant(
+                        option as "YES" | "NO"
+                    )
+                }
+            >
+                <Text
+                    style={[
+                        styles.pillText,
+                        covidCompliant === option &&
+                            styles.pillTextSelected,
+                    ]}
+                >
+                    {option}
+                </Text>
+            </TouchableOpacity>
+        ))}
+    </View>
+</View>
+
+{/* Cancellation */}
+
+<View style={styles.card}>
+    <SectionTitle
+        icon="undo-alt"
+        title="Cancellation Policy"
+        required
+    />
+
+    <View style={styles.pillRowWrap}>
+        {[
+            "REFUNDABLE",
+            "NON-REFUNDABLE",
+            "PARTIALLY REFUNDABLE",
+        ].map((policy) => (
+            <TouchableOpacity
+                key={policy}
+                style={[
+                    styles.pill,
+                    cancellationPolicy === policy &&
+                        styles.pillSelected,
+                ]}
+                onPress={() =>
+                    setCancellationPolicy(
+                        policy as any
+                    )
+                }
+            >
+                <Text
+                    style={[
+                        styles.pillText,
+                        cancellationPolicy ===
+                            policy &&
+                            styles.pillTextSelected,
+                    ]}
+                >
+                    {policy}
+                </Text>
+            </TouchableOpacity>
+        ))}
+    </View>
+</View>
+
+{/* Buttons */}
+
+<View style={styles.buttonContainer}>
+    <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+    >
+        <Text style={styles.backButtonText}>
+            Back
+        </Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+        style={styles.saveButton}
+        onPress={submit}
+    >
+        <Text style={styles.buttonText}>
+            Save & Continue
+        </Text>
+
+        <FontAwesome5
+            name="arrow-right"
+            size={13}
+            color="#FFF"
+            style={{ marginLeft: 8 }}
+        />
+    </TouchableOpacity>
+</View>
+
+<View style={{ height: 40 }} />
+</ScrollView>
+);
 };
 
 export default BusinessDetailsForm;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8E9F0', padding: 20, paddingTop: 70, },
-    header: { fontSize: 20, fontWeight: "bold", marginBottom: 10 },
-    subText: { color: "#333", marginBottom: 15 },
+  container: {
+    padding: 20,
+    backgroundColor: "#FDF4F8",
+    flexGrow: 1,
+    paddingTop: 65,
+    paddingBottom: 40,
+  },
 
-    question: { fontSize: 14, marginVertical: 8, fontWeight: "500" },
-    label: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginVertical: 8,
-    },
-    input: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
-    },
-    textArea: {
-        //     backgroundColor: "#fff",
-        //     borderWidth: 1,
-        //     borderColor: "#C97BAA",
-        //     borderRadius: 5,
-        //     padding: 10,
-        //   //  height: 80,
-        //     //textAlignVertical: "top",
-        //     marginBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#B3A3A3',
-        fontSize: 14,
-        paddingVertical: 5,
-        marginBottom: 16,
-    },
-    row: { flexDirection: "row", marginBottom: 10, gap: 10 },
-    button: {
-        borderWidth: 1,
-        borderColor: "#C97BAA",
-        borderRadius: 5,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-    },
-    selectedButton: {
-        backgroundColor: "#C97BAA",
-    },
+  /* Header */
 
-    selectedButtonText: { color: "#fff" },
-    footer: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 20,
-    },
-    secondaryButton: {
-        backgroundColor: "#E0D4DB",
-        padding: 10,
-        borderRadius: 5,
-    },
-    primaryButton: {
-        backgroundColor: "#6D2057",
-        padding: 10,
-        borderRadius: 5,
-    },
-    footerText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
-    buttonContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 20,
-    },
-    backButton: {
-        flex: 1,
-        marginRight: 10,
-        borderWidth: 1,
-        borderColor: '#780C60',
-        borderRadius: 8,
-        paddingVertical: 12,
-        alignItems: 'center',
-        backgroundColor: '#fff',
-    },
-    backButtonText: {
-        color: '#780C60',
-        fontWeight: '600',
-    },
-    saveButton: {
-        flex: 1,
-        backgroundColor: "#780C60",
-        paddingVertical: 12,
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    buttonText: {
-        color: '#FFF',
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
-    covidContainer: {
-        // flexDirection: 'row',
-        // justifyContent: 'space-between',
-        // marginBottom: 16,
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
-    covidOption: {
-        // padding: 10,
-        // borderWidth: 1,
-        // borderColor: '#B3A3A3',
-        // borderRadius: 8,
-        // flex: 1,
-        // alignItems: 'center',
-        // marginHorizontal: 4,
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
-    covidSelected: {
-        // backgroundColor: '#FBEFF7',
-        // borderColor: '#800080',
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
-    covidText: {
-        // fontSize: 14,
-        // color: '#666',
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
-    covidSelectedText: {
-        // color: "#780C60",
-        // fontWeight: 'bold',
-        color: '#FFF', // White color for selected text
-    },
-    staffContainer: {
-        flexDirection: 'row', // Align items horizontally
-        //justifyContent: 'space-between', // Add spacing between items
-        marginBottom: 16,
-    },
+  headerWrap: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
 
-    staffOption: {
-        flexDirection: 'row', // Align icon and text horizontally
-        alignItems: 'center', // Center items vertically
-        borderWidth: 2,
-        borderColor: '#B085A6', // Light purple border
-        borderRadius: 10, // Rounded corners
-        paddingVertical: 10, // Vertical padding
-        paddingHorizontal: 12, // Horizontal padding to allow space around text
-        backgroundColor: '#FBEFF7', // Light background color
-        marginHorizontal: 5, // Space between boxes
-    },
+  headerIconBadge: {
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    backgroundColor: "#F4D8EC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
 
-    staffSelected: {
-        backgroundColor: '#780C60', // Selected box background color
-        borderColor: '#780C60',
-    },
+  header: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#2A1B26",
+  },
 
-    staffIcon: {
-        color: '#780C60', // Default icon color
-        fontSize: 20,
-        marginRight: 2, // Space between icon and text
-    },
+  subHeader: {
+    fontSize: 14,
+    color: "#8A7A85",
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+  },
 
-    staffSelectedIcon: {
-        color: '#FFF', // White color for selected icon
-    },
+  dotsRow: {
+    flexDirection: "row",
+    marginTop: 16,
+    gap: 6,
+  },
 
-    staffText: {
-        fontSize: 8,
-        color: '#780C60', // Default text color
-        fontWeight: '600',
-    },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F0D3E6",
+  },
 
-    staffSelectedText: {
-        color: '#FFF', // White color for selected text
-    },
+  dotAccent: {
+    width: 18,
+    backgroundColor: "#780C60",
+  },
 
+  /* Cards */
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+
+    shadowColor: "#780C60",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  sectionIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#FBEFF7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  label: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2A1B26",
+  },
+
+  requiredStar: {
+    color: "#D63384",
+  },
+
+  hint: {
+    color: "#A18A97",
+    fontSize: 12,
+    marginBottom: 12,
+    marginLeft: 38,
+  },
+
+  /* Chips */
+
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEFBFD",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#F0DCEA",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+
+  chipSelected: {
+    backgroundColor: "#780C60",
+    borderColor: "#780C60",
+  },
+
+  chipIcon: {
+    color: "#780C60",
+    marginRight: 8,
+  },
+
+  chipIconSelected: {
+    color: "#FFFFFF",
+  },
+
+  chipText: {
+    color: "#780C60",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  chipTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  /* Pills */
+
+  pillRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  pillRowWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  pill: {
+    borderWidth: 1.5,
+    borderColor: "#F0DCEA",
+    backgroundColor: "#FEFBFD",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+
+  pillSelected: {
+    backgroundColor: "#780C60",
+    borderColor: "#780C60",
+  },
+
+  pillText: {
+    color: "#780C60",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  pillTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  /* Inputs */
+
+  input: {
+    borderWidth: 1.5,
+    borderColor: "#F0DCEA",
+    borderRadius: 12,
+    backgroundColor: "#FEFBFD",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#2A1B26",
+  },
+
+  textArea: {
+    minHeight: 90,
+    textAlignVertical: "top",
+  },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#F0DCEA",
+    borderRadius: 12,
+    backgroundColor: "#FEFBFD",
+    paddingHorizontal: 12,
+  },
+
+  currencyPrefix: {
+    color: "#780C60",
+    fontWeight: "700",
+    fontSize: 14,
+    marginRight: 6,
+  },
+
+  inputFlex: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: "#2A1B26",
+  },
+
+  /* Buttons */
+
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+  },
+
+  backButton: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#780C60",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+
+  backButtonText: {
+    color: "#780C60",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  saveButton: {
+    flex: 1.4,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#780C60",
+    borderRadius: 14,
+    paddingVertical: 14,
+
+    shadowColor: "#780C60",
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+
+  buttonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
 });
