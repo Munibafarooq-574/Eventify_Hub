@@ -95,7 +95,7 @@ const ReviewScreen = () => {
         {/* <View style={styles.row}> */}
         <Text style={styles.name}>{vendorData.contactDetails.brandName}</Text>
         <Text style={styles.subTitle}>
-          Staff: {vendorData?.photographerBusinessDetails?.staff || "N/A"}
+        Staff: {vendorData?.photographerBusinessDetails?.staffGender?.join(", ")|| "N/A" }
         </Text>
         <Text style={styles.city}>
           City: {vendorData.contactDetails.city}
@@ -107,7 +107,7 @@ const ReviewScreen = () => {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Pricing</Text>
         <View testID="pricing-table" style={styles.table}>
-          {" "}
+      
           {/* ✅ Add testID */}
           <View style={styles.tableRow}>
             <Text style={[styles.tableHeader, styles.flex1]}>

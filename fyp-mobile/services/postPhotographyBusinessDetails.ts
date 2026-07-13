@@ -1,8 +1,8 @@
 
-import { CreatePhotographerBusinessDetailsDto } from "@/dto/CreatePhotographyBusinessDetails.dto";
+import { PhotographyBusinessDetailsDto } from "@/dto/CreatePhotographyBusinessDetails.dto";
 import axios, { AxiosRequestConfig } from "axios";
 
-export default async function postPhotographyBusinessDetails(userId: string, photographyBusinessDetails: CreatePhotographerBusinessDetailsDto) {
+export default async function postPhotographyBusinessDetails(userId: string, photographyBusinessDetails: PhotographyBusinessDetailsDto) {
     const url = `https://eventify-hub.onrender.com/vendor/buisnessDetails?userId=${userId}`;
     const config: AxiosRequestConfig = {
         maxBodyLength: Infinity,
