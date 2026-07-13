@@ -9,7 +9,7 @@ import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-detai
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
 import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
-import { CreateSoundBusinessDetailsDto } from './dto/Create-sound-business-details.dto';
+import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { Category } from 'src/auth/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
@@ -186,7 +186,7 @@ export class VendorService {
             user.mehndiBusinessDetails = { ...dto } as unknown as MehndiBusinessDetails;
         } else if (categoryName === "cakes") {
            user.cakeBusinessDetails = { ...dto } as unknown as CakeBusinessDetails;
-       } else if (categoryName === "sound" || categoryName === "sounds" || categoryName === "dj") {
+       } else if (categoryName === "dj & sound" || categoryName === "sound" || categoryName === "sounds" || categoryName === "dj") {
            user.soundBusinessDetails = { ...dto } as unknown as SoundBusinessDetails;
        }
         else {
