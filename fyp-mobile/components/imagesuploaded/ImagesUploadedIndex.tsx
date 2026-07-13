@@ -82,8 +82,13 @@ const ImageUploadScreen: React.FC = () => {
             // // Navigate to the next screen   
             // navigation.navigate("/VendorReview"); // Adjust the route name as per your navigation setup
         } catch (error: any) {
-            console.error("Failed to create contact details:", error.response?.data || error.message);
-            Alert.alert('Upload Error', 'Failed to upload contact details. Please try again.');
+            console.error("Failed to upload images:", error?.response?.status, error?.response?.data || error?.message || error);
+            Alert.alert(
+                'Upload Error',
+                error?.response?.data?.message
+                    ? String(error.response.data.message)
+                    : 'Failed to upload images. Please check your internet connection and try again.'
+            );
         } finally {
             setUploading(false);
         }
