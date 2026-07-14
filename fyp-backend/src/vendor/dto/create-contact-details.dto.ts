@@ -1,3 +1,5 @@
+//fyp-backend/src/vendor/dto/create-contact-details.dto.ts
+
 export class CreateContactDetailsDto {
     brandName: string;
     brandLogo?: string;

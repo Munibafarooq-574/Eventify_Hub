@@ -584,12 +584,17 @@ i===2 && styles.dotAccent
             styles.input,
             styles.textArea,
         ]}
-        placeholder="Describe your catering service..."
+        placeholder={`Example:
+    • Wedding Catering
+    • Buffet & BBQ Setup
+    • Customized Menu
+    • Live Cooking Stations
+    • Professional Staff
+    • Complete Event Food Management`}
         placeholderTextColor="#B8B8B8"
         
     />
 </View>
-
 {/* ============================
         Additional Info
 ============================= */}
@@ -608,7 +613,13 @@ i===2 && styles.dotAccent
             styles.input,
             styles.textArea,
         ]}
-        placeholder="Any extra information..."
+        placeholder={`Example:
+    • Free Food Tasting Available
+    • Travel Charges Apply Outside City
+    • Minimum Booking: 100 Guests
+    • Advance Booking Recommended
+    • Extra Charges for Late-Night Events
+    • Customized Menu Available on Request`}
         placeholderTextColor="#B8B8B8"
     />
 </View>
@@ -662,19 +673,23 @@ i===2 && styles.dotAccent
     />
 
     <View style={styles.inputRow}>
-        <Text style={styles.currencyPrefix}>
-            Rs.
-        </Text>
+  <Text style={styles.currencyPrefix}>
+    {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+  </Text>
 
-        <TextInput
-            style={styles.inputFlex}
-            keyboardType="numeric"
-            placeholder="Enter Down Payment"
-            placeholderTextColor="#B8B8B8"
-            value={downPayment}
-            onChangeText={setDownPayment}
-        />
-    </View>
+  <TextInput
+    style={styles.inputFlex}
+    keyboardType="numeric"
+    placeholder={
+      downPaymentType === "PERCENTAGE"
+        ? "Enter Percentage (e.g. 20)"
+        : "Enter Amount (e.g. 50000)"
+    }
+    placeholderTextColor="#B8B8B8"
+    value={downPayment}
+    onChangeText={setDownPayment}
+  />
+</View>
 </View>
 
 {/* Covid */}

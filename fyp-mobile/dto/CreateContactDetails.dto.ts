@@ -1,3 +1,4 @@
+//fyp-mobile/dto/CreateContactDetails.dto.ts
 export interface CreateContactDetailsDto {
     brandName: string;
     brandLogo: string;
