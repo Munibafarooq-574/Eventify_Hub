@@ -123,18 +123,33 @@ export class AuthService {
   }
 
   async updateUser(updateDto: UpdateUserProfileDto): Promise<User> {
-    console.log(updateDto);
-    const updatedUser = await this.userModel.findByIdAndUpdate(updateDto.userId, {
-      name: updateDto.name,
-      email: updateDto.email,
-      address: updateDto.address,
-      phone_number: updateDto.phoneNumber
-    }, { new: true });
-    if (!updatedUser) {
-      throw new NotFoundException('User not found');
-    }
-    return updatedUser;
+  console.log(updateDto);
+
+  const updateData: any = {
+    name: updateDto.name,
+    email: updateDto.email,
+    address: updateDto.address,
+    phone_number: updateDto.phoneNumber,
+  };
+
+  // Update brand logo
+  if (updateDto.contactDetails?.brandLogo) {
+    updateData["contactDetails.brandLogo"] =
+      updateDto.contactDetails.brandLogo;
   }
+
+  const updatedUser = await this.userModel.findByIdAndUpdate(
+    updateDto.userId,
+    updateData,
+    { new: true }
+  );
+
+  if (!updatedUser) {
+    throw new NotFoundException("User not found");
+  }
+
+  return updatedUser;
+}
 
   async searchUsers(keyword: string): Promise<User[]> {
     return this.userModel.find({

@@ -5,6 +5,13 @@ interface UpdateProfileDto {
   email?: string;
   phoneNumber?: string;
   address?: string;
+
+  contactDetails?: {
+    brandLogo?: string;
+    address?: string;
+    [key: string]: any;
+  };
+
   userId: string;
 }
 

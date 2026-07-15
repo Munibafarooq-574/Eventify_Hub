@@ -3,9 +3,20 @@ import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    FlatList,
+    Image,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { io } from 'socket.io-client';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
+
+const PRIMARY = "#780C60";
+const PRIMARY_LIGHT = "#F8E9F0";
 
 const MessagesScreen: React.FC = () => {
     const [conversations, setConversations] = useState<any[]>([]);
@@ -62,14 +73,25 @@ const MessagesScreen: React.FC = () => {
         <TouchableOpacity
             key={item.chatId}
             style={styles.messageContainer}
+            activeOpacity={0.7}
             onPress={() => handleConversationClick(item.chatId)}
         >
-            {/* <Image source={{ uri: item.avatar }} style={styles.avatar} />*/}
-            <Image source={{ uri: "https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg" }} style={styles.avatar} />
+            <View style={styles.avatarWrap}>
+                {/* <Image source={{ uri: item.avatar }} style={styles.avatar} />*/}
+                <Image source={{ uri: "https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg" }} style={styles.avatar} />
+            </View>
 
             <View style={styles.textContainer}>
-                <Text style={styles.title}>{item.participants[0].name}</Text>
-                <Text style={styles.subtitle}>{item.lastMessage ? item.lastMessage.message : "No Message"}</Text>
+                <Text style={styles.title} numberOfLines={1}>{item.participants[0].name}</Text>
+                <Text
+                    style={[
+                        styles.subtitle,
+                        item.unreadCount > 0 && styles.subtitleUnread,
+                    ]}
+                    numberOfLines={1}
+                >
+                    {item.lastMessage ? item.lastMessage.message : "No Message"}
+                </Text>
             </View>
             <View style={styles.rightContainer}>
                 <Text style={styles.time}>{item.lastMessage ? new Date(item.lastMessage.timestamp).toDateString() : ""}</Text>
@@ -86,13 +108,17 @@ const MessagesScreen: React.FC = () => {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="#800080" />
+                <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.back()}>
+                    <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Messages</Text>
-                <TouchableOpacity>
-                    <Ionicons name="settings-outline" size={24} color="#800080" />
-                </TouchableOpacity>
+
+                <View style={styles.headerTitleWrap}>
+                    <Text style={styles.headerTitle}>Messages</Text>
+                    <Text style={styles.headerSubtitle}>
+                        {conversations.length} {conversations.length === 1 ? "conversation" : "conversations"}
+                    </Text>
+                </View>
+
             </View>
 
             {/* Messages List */}
@@ -101,6 +127,18 @@ const MessagesScreen: React.FC = () => {
                 renderItem={renderMessage}
                 keyExtractor={(item) => item.chatId}
                 contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIconCircle}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={34} color={PRIMARY} />
+                        </View>
+                        <Text style={styles.emptyTitle}>No conversations yet</Text>
+                        <Text style={styles.emptySubtitle}>
+                            Your chats with clients will show up here once they message you
+                        </Text>
+                    </View>
+                }
             />
 
             <BottomNavigationFinal />
@@ -111,81 +149,152 @@ const MessagesScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8E9F0',
-        paddingTop: 50,
+        backgroundColor: PRIMARY_LIGHT,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 40,
-        paddingBottom: 16,
+        justifyContent: 'flex-start',
+        backgroundColor: PRIMARY,
+        paddingHorizontal: 18,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingBottom: 22,
+        borderBottomLeftRadius: 26,
+        borderBottomRightRadius: 26,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 6,
+        marginBottom: 8,
     },
+    headerIconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    marginRight: 40,
+},
     headerTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#000',
+        fontSize: 19,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.75)',
+        marginTop: 2,
     },
     list: {
         paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 110,
+        flexGrow: 1,
     },
     messageContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#FFFFFF',
         paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EEE',
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        marginBottom: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    avatarWrap: {
+        marginRight: 14,
+        borderRadius: 28,
+        padding: 2,
+        borderWidth: 1.5,
+        borderColor: PRIMARY_LIGHT,
     },
     avatar: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        marginRight: 16,
     },
     textContainer: {
         flex: 1,
+        paddingRight: 8,
     },
     title: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
+        fontWeight: '700',
+        color: '#1A1A1A',
     },
     subtitle: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 2,
+        fontSize: 13,
+        color: '#8A8A8A',
+        marginTop: 3,
+    },
+    subtitleUnread: {
+        color: '#3A3A3A',
+        fontWeight: '600',
     },
     rightContainer: {
         alignItems: 'flex-end',
     },
     time: {
-        fontSize: 12,
-        color: '#666',
+        fontSize: 11,
+        color: '#B0B0B0',
+        fontWeight: '500',
     },
     unreadBadge: {
-        backgroundColor: '#800080',
+        backgroundColor: PRIMARY,
         borderRadius: 12,
+        minWidth: 20,
+        height: 20,
         paddingHorizontal: 6,
-        paddingVertical: 2,
-        marginTop: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 6,
     },
     unreadText: {
         color: '#FFF',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 'bold',
     },
-    bottomNavigation: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
+    emptyState: {
         alignItems: 'center',
-        height: 80,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
+        justifyContent: 'center',
+        paddingTop: 80,
+        paddingHorizontal: 30,
+    },
+    emptyIconCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginBottom: 4,
+    },
+    emptySubtitle: {
+        fontSize: 12,
+        color: '#8A8A8A',
+        textAlign: 'center',
+        lineHeight: 18,
     },
 });
 

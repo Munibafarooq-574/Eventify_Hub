@@ -41,6 +41,16 @@ export class VendorController {
         return await this.vendorService.createContactDetails(userId, createContactDetailsDto, file);
     }
 
+    @Patch('contactDetails')
+@UseInterceptors(FileInterceptor('file'))
+async updateContactDetails(
+  @Query('userId') userId: string,
+  @Body() dto: CreateContactDetailsDto,
+  @UploadedFile() file: Express.Multer.File,
+): Promise<User> {
+  return await this.vendorService.updateContactDetails(userId, dto, file);
+}
+
     @Post('buisnessDetails')
     async createPhotographerBuisnessDetails(
         @Query("userId") userId: string,

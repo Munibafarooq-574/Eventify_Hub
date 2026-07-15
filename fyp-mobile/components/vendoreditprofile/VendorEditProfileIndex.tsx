@@ -8,6 +8,7 @@ import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 import { useGlobalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Image,
   ScrollView,
@@ -30,6 +31,7 @@ const EditProfileScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [address, setAddress] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const [refundPolicy, setRefundPolicy] = useState<string>("");
@@ -76,6 +78,7 @@ const EditProfileScreen: React.FC = () => {
         setEmail(user.email || '');
         setPhoneNumber(user.phoneNumber || user.phone || user.phone_number || '');
         setAddress(user.contactDetails.address || '');
+        setAvatar(user?.contactDetails?.brandLogo || '');
         setSelectedStaff(user[objectLiteral]?.staff || '');
         setRefundPolicy(user[objectLiteral]?.refundPolicy || '');
         setDescription(user[objectLiteral]?.description || '');
@@ -86,6 +89,27 @@ const EditProfileScreen: React.FC = () => {
       console.error('Failed to fetch user data:', error);
     }
   };
+
+  const pickImage = async () => {
+  const permission =
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    alert("Please allow photo access.");
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+  });
+
+  if (!result.canceled) {
+    setAvatar(result.assets[0].uri);
+  }
+};
 
   const saveUserDetails = async () => {
     try {
@@ -103,18 +127,17 @@ const EditProfileScreen: React.FC = () => {
       }
 
       const updateData = {
-        name,
-        email,
-        phoneNumber,
-        address,
-        userId,
-        // photographerBusinessDetails: {
-        //   staff: selectedStaff,
-        //   refundPolicy,
-        //   description,
-        //   citiesCovered,
-        // }
-      };
+  name,
+  email,
+  phoneNumber,
+  address,
+  userId,
+
+  contactDetails: {
+    ...user.contactDetails,
+    brandLogo: avatar,
+  },
+};
 
       const updatedUser = await patchUpdateProfile(userId, updateData);
       await saveSecureData('user', JSON.stringify(updatedUser));
@@ -155,15 +178,30 @@ const EditProfileScreen: React.FC = () => {
         {/* Avatar card */}
         <View style={styles.avatarCard}>
           <View style={styles.avatarRing}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {name ? name.charAt(0).toUpperCase() : "N/A"}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.avatarEditBadge}>
-              <Ionicons name="camera" size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+  {avatar ? (
+    <Image
+      source={{ uri: avatar }}
+      style={styles.avatar}
+    />
+  ) : (
+    <View style={styles.avatar}>
+      <Text style={styles.avatarText}>
+        {name ? name.charAt(0).toUpperCase() : "N/A"}
+      </Text>
+    </View>
+  )}
+
+      <TouchableOpacity
+       style={styles.avatarEditBadge}
+        onPress={pickImage}
+        >
+           <Ionicons
+          name="camera"
+          size={14}
+         color="#FFFFFF"
+         />
+      </TouchableOpacity>
+        </View>
           <Text style={styles.avatarName} numberOfLines={1}>
             {name || 'Your name'}
           </Text>

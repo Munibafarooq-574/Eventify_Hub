@@ -24,6 +24,7 @@ const AccountScreen: React.FC = () => {
   const [isModalVisible, setModalVisible] = useState(false);
 
   const [username, setUsername] = useState(""); // State for username
+  const [avatar, setAvatar] = useState("");
   const [email, setEmail] = useState("");
 
   useEffect(() => {
@@ -31,11 +32,15 @@ const AccountScreen: React.FC = () => {
   }, []);
 
   const fetchUserDetails = async () => {
-    const storedUser = (await getSecureData("user")) || "Guest"; // Retrieve user data
-    const parsedUser = JSON.parse(storedUser);
-    setUsername(parsedUser.name);
-    setEmail(parsedUser.email); // Set the email fetched from the stored data
-  };
+  const storedUser = (await getSecureData("user")) || "Guest";
+  const parsedUser = JSON.parse(storedUser);
+
+  setUsername(parsedUser.name);
+  setEmail(parsedUser.email);
+
+  // Dashboard wali DP
+  setAvatar(parsedUser?.contactDetails?.brandLogo || "");
+};
 
   const handleMenuPress = (menuTitle: string) => {
     switch (menuTitle) {
@@ -143,10 +148,19 @@ const AccountScreen: React.FC = () => {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarRing}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{avatarInitial}</Text>
-            </View>
+          {avatar ? (
+        <Image
+         source={{ uri: avatar }}
+          style={styles.avatar}
+           />
+           ) : (
+         <View style={styles.avatar}>
+         <Text style={styles.avatarText}>
+          {avatarInitial}
+          </Text>
           </View>
+           )}
+           </View>
 
           <View style={styles.textContainer}>
             <Text style={styles.profileName} numberOfLines={1}>
@@ -319,13 +333,14 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   avatar: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    backgroundColor: PRIMARY,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  width: 74,
+  height: 74,
+  borderRadius: 37,
+  backgroundColor: PRIMARY,
+  justifyContent: 'center',
+  alignItems: 'center',
+  overflow: 'hidden',
+},
   avatarText: {
     color: '#fff',
     fontSize: 34,

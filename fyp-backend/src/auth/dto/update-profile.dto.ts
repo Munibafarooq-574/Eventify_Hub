@@ -1,5 +1,3 @@
-import { IsOptional, IsString, IsEmail } from "class-validator";
-
 export class UpdateUserProfileDto {
     @IsOptional()
     @IsString()
@@ -16,6 +14,12 @@ export class UpdateUserProfileDto {
     @IsOptional()
     @IsString()
     address?: string;
+
+    @IsOptional()
+    contactDetails?: {
+        brandLogo?: string;
+        address?: string;
+    };
 
     @IsString()
     userId: string;

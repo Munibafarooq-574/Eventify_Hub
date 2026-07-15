@@ -153,6 +153,33 @@ export class VendorService {
         return await user.save();
     }
 
+    async updateContactDetails(
+  userId: string,
+  dto: CreateContactDetailsDto,
+  file: Express.Multer.File,
+): Promise<User> {
+
+  const user = await this.userModel.findById(userId);
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  let logo = user.contactDetails?.brandLogo || "";
+
+  if (file) {
+    const uploaded = await this.fileUploadService.uploadFile(file);
+    logo = uploaded?.Location || logo;
+  }
+
+  user.contactDetails = {
+    ...user.contactDetails,
+    ...dto,
+    brandLogo: logo,
+  };
+
+  return await user.save();
+}
    async createBuisnessDetails(
         userId: string,
         dto:
