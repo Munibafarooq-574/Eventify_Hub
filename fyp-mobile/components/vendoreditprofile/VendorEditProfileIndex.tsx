@@ -19,6 +19,10 @@ import {
   View,
 } from 'react-native';
 
+const PRIMARY = "#780C60";
+const PRIMARY_LIGHT = "#F8E9F0";
+const ACCENT = "#B84B9A";
+
 const EditProfileScreen: React.FC = () => {
   const router = useRouter();
 
@@ -123,16 +127,22 @@ const EditProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.container} testID="screen-container">
-      <StatusBar backgroundColor="#F8E9F0" barStyle="dark-content" />
+      <StatusBar backgroundColor={PRIMARY_LIGHT} barStyle="dark-content" />
 
-      {/* Header */}
+      {/* Plain header, no colored bar */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backButton}>{"<"} Back</Text>
+        <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color={PRIMARY} />
         </TouchableOpacity>
-        <Text style={styles.title}>Edit Profile</Text>
-        <TouchableOpacity onPress={saveUserDetails}>
-          <Text style={styles.saveButton}>SAVE</Text>
+
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerSubtitle}>Keep your details up to date</Text>
+        </View>
+
+        <TouchableOpacity style={styles.saveBtn} onPress={saveUserDetails}>
+          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+          <Text style={styles.saveButtonText}>SAVE</Text>
         </TouchableOpacity>
       </View>
 
@@ -140,155 +150,195 @@ const EditProfileScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {name ? name.charAt(0).toUpperCase() : "N/A"}
-            </Text>
+        {/* Avatar card */}
+        <View style={styles.avatarCard}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {name ? name.charAt(0).toUpperCase() : "N/A"}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.avatarEditBadge}>
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
+          <Text style={styles.avatarName} numberOfLines={1}>
+            {name || 'Your name'}
+          </Text>
+          <Text style={styles.avatarEmail} numberOfLines={1}>
+            {email}
+          </Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your name"
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
+        {/* Section title */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+        </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>E-mail</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Country</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Pakistan"
-              placeholderTextColor="#000000"
-              editable={false}
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputContainer, { flex: 0.3 }]}>
-              <Text style={styles.label}>+92</Text>
-              <View style={[styles.input, styles.flagContainer]}>
-                <Image
-                  source={{
-                    uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Flag_of_Pakistan.svg/1024px-Flag_of_Pakistan.svg.png",
-                  }}
-                  style={styles.flagIcon}
+        {/* Form card */}
+        <View style={styles.formCard}>
+          <View style={styles.formAccentBar} />
+          <View style={styles.formInner}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Name</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="person-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your name"
+                  placeholderTextColor="#B0B0B0"
+                  value={name}
+                  onChangeText={setName}
                 />
               </View>
             </View>
-            <View
-              style={[styles.inputContainer, { flex: 0.7, marginLeft: 10 }]}
-            >
-              <Text style={styles.label}>Phone Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter phone number"
-                keyboardType="phone-pad"
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-              />
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>E-mail</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="mail-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#B0B0B0"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Address (Optional)</Text>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Country</Text>
+              <View style={[styles.inputRow, styles.inputRowDisabled]}>
+                <Ionicons name="flag-outline" size={16} color="#9B9B9B" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.inputDisabled]}
+                  placeholder="Pakistan"
+                  placeholderTextColor="#666"
+                  editable={false}
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputContainer, { flex: 0.32 }]}>
+                <Text style={styles.label}>Code</Text>
+                <View style={[styles.inputRow, styles.flagRow]}>
+                  <Image
+                    source={{
+                      uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Flag_of_Pakistan.svg/1024px-Flag_of_Pakistan.svg.png",
+                    }}
+                    style={styles.flagIcon}
+                  />
+                  <Text style={styles.codeText}>+92</Text>
+                </View>
+              </View>
+              <View style={[styles.inputContainer, { flex: 0.68, marginLeft: 10 }]}>
+                <Text style={styles.label}>Phone Number</Text>
+                <View style={styles.inputRow}>
+                  <Ionicons name="call-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter phone number"
+                    placeholderTextColor="#B0B0B0"
+                    keyboardType="phone-pad"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Address (Optional)</Text>
+              <View style={styles.inputRow}>
+                <Ionicons name="location-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                <TextInput
+                  testID="input-address" //add test id
+                  style={styles.input}
+                  placeholder="Enter your address"
+                  placeholderTextColor="#B0B0B0"
+                  value={address}
+                  onChangeText={setAddress}
+                />
+              </View>
+            </View>
+
+            {/* <Text style={styles.label}>Cities Covered</Text>
             <TextInput
-              testID="input-address" //add test id
               style={styles.input}
-              placeholder="Enter your address"
-              value={address}
-              onChangeText={setAddress}
+              placeholder="Enter cities you cover"
+              value={citiesCovered}
+              onChangeText={setCitiesCovered}
             />
-          </View>
-
-          {/* <Text style={styles.label}>Cities Covered</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter cities you cover"
-            value={citiesCovered}
-            onChangeText={setCitiesCovered}
-          />
 
 
 
 
-          <Text style={styles.label}>Staff</Text>
-          <View style={styles.staffContainer}>
-            {[
-              { label: "MALE", icon: "male" },
-              { label: "FEMALE", icon: "female" },
-              { label: "TRANSGENDER", icon: "transgender-alt" },
-            ].map((staff) => (
-              <TouchableOpacity
-                key={staff.label}
-                style={[
-                  styles.staffOption,
-                  selectedStaff === staff.label && styles.staffSelected,
-                ]}
-                onPress={() => setSelectedStaff(staff.label)}
-              >
-                <FontAwesome5
-                  name={staff.icon}
-                  size={20}
-                  style={[
-                    styles.staffIcon,
-                    selectedStaff === staff.label && styles.staffSelectedIcon,
-                  ]} />
-                <Text
-                  style={[
-                    styles.staffText,
-                    selectedStaff === staff.label && styles.staffSelectedText,
-                  ]}
-                >
-                  {staff.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Refund Policy*</Text>
-          <View style={styles.covidContainer}>
-            {["REFUNDABLE", "NON-REFUNDABLE", "PARTIALLY REFUNDABLE"].map(
-              (policy) => (
+            <Text style={styles.label}>Staff</Text>
+            <View style={styles.staffContainer}>
+              {[
+                { label: "MALE", icon: "male" },
+                { label: "FEMALE", icon: "female" },
+                { label: "TRANSGENDER", icon: "transgender-alt" },
+              ].map((staff) => (
                 <TouchableOpacity
-                  key={policy}
+                  key={staff.label}
                   style={[
-                    styles.covidOption,
-                    refundPolicy === policy && styles.covidSelected,
+                    styles.staffOption,
+                    selectedStaff === staff.label && styles.staffSelected,
                   ]}
-                  onPress={() => setRefundPolicy(policy)}
+                  onPress={() => setSelectedStaff(staff.label)}
                 >
+                  <FontAwesome5
+                    name={staff.icon}
+                    size={20}
+                    style={[
+                      styles.staffIcon,
+                      selectedStaff === staff.label && styles.staffSelectedIcon,
+                    ]} />
                   <Text
                     style={[
-                      styles.covidText,
-                      refundPolicy === policy && styles.covidSelectedText,
+                      styles.staffText,
+                      selectedStaff === staff.label && styles.staffSelectedText,
                     ]}
                   >
-                    {policy}
+                    {staff.label}
                   </Text>
                 </TouchableOpacity>
-              )
-            )}
-          </View>  */}
+              ))}
+            </View>
 
+            <Text style={styles.label}>Refund Policy*</Text>
+            <View style={styles.covidContainer}>
+              {["REFUNDABLE", "NON-REFUNDABLE", "PARTIALLY REFUNDABLE"].map(
+                (policy) => (
+                  <TouchableOpacity
+                    key={policy}
+                    style={[
+                      styles.covidOption,
+                      refundPolicy === policy && styles.covidSelected,
+                    ]}
+                    onPress={() => setRefundPolicy(policy)}
+                  >
+                    <Text
+                      style={[
+                        styles.covidText,
+                        refundPolicy === policy && styles.covidSelectedText,
+                      ]}
+                    >
+                      {policy}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>  */}
+
+          </View>
         </View>
       </ScrollView>
 
@@ -301,72 +351,210 @@ const EditProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8E9F0',
-    paddingTop: 50,
+    backgroundColor: PRIMARY_LIGHT,
   },
+
+  // Plain header — no colored bar
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 60,
+    paddingBottom: 16,
+    paddingHorizontal: 18,
+  },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  backButton: {
-    color: '#780C60',
-    fontSize: 16,
+  headerTitleWrap: {
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A1A1A',
   },
-  saveButton: {
-    color: 'green',
-    fontSize: 16,
+  headerSubtitle: {
+    fontSize: 11,
+    color: '#8A8A8A',
+    marginTop: 2,
   },
+  saveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
   content: {
-    //flexGrow: 1,
-    padding: 20,
-    paddingBottom: 160,
+    paddingHorizontal: 16,
+    paddingBottom: 130,
   },
-  avatarContainer: {
+
+  // Avatar card
+  avatarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     alignItems: 'center',
-    marginBottom: 30,
+    paddingVertical: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  avatarRing: {
+    width: 106,
+    height: 106,
+    borderRadius: 53,
+    borderWidth: 2,
+    borderColor: PRIMARY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 3,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#780C60',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     color: '#fff',
-    fontSize: 60,
+    fontSize: 42,
     fontWeight: 'bold',
   },
-  form: {
-    marginBottom: 20,
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
+  avatarName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginTop: 12,
+  },
+  avatarEmail: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    marginTop: 2,
+  },
+
+  // Section title
+  sectionRow: {
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+
+  // Form card
+  formCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  formAccentBar: {
+    width: 4,
+    backgroundColor: ACCENT,
+  },
+  formInner: {
+    flex: 1,
+    padding: 16,
+  },
+
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   inputContainer: {
-    marginBottom: 15,
+    marginBottom: 14,
     flex: 1,
   },
   label: {
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A8A8A',
+    marginBottom: 6,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECECEC',
+    borderRadius: 12,
+    backgroundColor: PRIMARY_LIGHT,
+    paddingHorizontal: 12,
+  },
+  inputRowDisabled: {
+    backgroundColor: '#F2F2F2',
+  },
+  inputIcon: {
+    marginRight: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 10,
-    padding: 10,
-    backgroundColor: '#fff',
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#1A1A1A',
   },
+  inputDisabled: {
+    color: '#6E6E6E',
+  },
+  flagRow: {
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  flagIcon: {
+    width: 24,
+    height: 16,
+    resizeMode: 'contain',
+    marginRight: 6,
+  },
+  codeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+
   bottomNavigation: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -385,7 +573,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    backgroundColor: '#780C60',
+    backgroundColor: PRIMARY,
     width: 30,
     height: 30,
     borderRadius: 25,
@@ -402,139 +590,84 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#000000',
   },
-  flagContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 40,
-    width: 50,
-  },
-  flagIcon: {
-    width: 30,
-    height: 20,
-    resizeMode: 'contain',
-  },
-  // homeButtonIconContainer: {
-  //   backgroundColor: '#780C60',
-  //   width: 40,
-  //   height: 40,
-  //   borderRadius: 20,
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  //   marginBottom: 5,
-  // },
-  // homeButton: {
-  //   // Optional additional styling
-  // },
   homeButtonIconContainer: {
-    backgroundColor: '#780C60',
-    width: 55,   // bigger than 30
-    height: 55,  // bigger than 30
-    borderRadius: 27.5, // half of width/height for perfect circle
+    backgroundColor: PRIMARY,
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 5,
   },
-
-  // Increase size of home button's icon image
   homeButtonIconImage: {
-    width: 55,  // bigger than 37
-    height: 55, // bigger than 37
-    marginBottom: 0, // remove bottom margin if you want it more centered vertically
+    width: 55,
+    height: 55,
+    marginBottom: 0,
   },
-
   homeButton: {
-    transform: [{ translateY: -20 }], // move it more upward (from -10 to -15)
-
+    transform: [{ translateY: -20 }],
   },
   staffContainer: {
-    flexDirection: 'row', // Align items horizontally
-    //justifyContent: 'space-between', // Add spacing between items
+    flexDirection: 'row',
     marginBottom: 16,
   },
-
   staffOption: {
-    flexDirection: 'row', // Align icon and text horizontally
-    alignItems: 'center', // Center items vertically
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#B085A6', // Light purple border
-    borderRadius: 10, // Rounded corners
-    paddingVertical: 10, // Vertical padding
-    paddingHorizontal: 12, // Horizontal padding to allow space around text
-    backgroundColor: '#FBEFF7', // Light background color
-    marginHorizontal: 5, // Space between boxes
+    borderColor: '#B085A6',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#FBEFF7',
+    marginHorizontal: 5,
   },
-
   staffSelected: {
-    backgroundColor: '#780C60', // Selected box background color
-    borderColor: '#780C60',
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
   },
-
   staffIcon: {
-    color: '#780C60', // Default icon color
+    color: PRIMARY,
     fontSize: 20,
-    marginRight: 2, // Space between icon and text
+    marginRight: 2,
   },
-
   staffSelectedIcon: {
-    color: '#FFF', // White color for selected icon
+    color: '#FFF',
   },
-
   staffText: {
     fontSize: 8,
-    color: '#780C60', // Default text color
+    color: PRIMARY,
     fontWeight: '600',
   },
-
   staffSelectedText: {
-    color: '#FFF', // White color for selected text
+    color: '#FFF',
   },
   covidContainer: {
-    // flexDirection: 'row',
-    // justifyContent: 'space-between',
-    // marginBottom: 16,
-    flexDirection: 'row', // Align items horizontally
-    //justifyContent: 'space-between', // Add spacing between items
+    flexDirection: 'row',
     marginBottom: 16,
   },
   covidOption: {
-    // padding: 10,
-    // borderWidth: 1,
-    // borderColor: '#B3A3A3',
-    // borderRadius: 8,
-    // flex: 1,
-    // alignItems: 'center',
-    // marginHorizontal: 4,
-    flexDirection: 'row', // Align icon and text horizontally
-    alignItems: 'center', // Center items vertically
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#B085A6', // Light purple border
-    borderRadius: 10, // Rounded corners
-    paddingVertical: 10, // Vertical padding
-    paddingHorizontal: 12, // Horizontal padding to allow space around text
-    backgroundColor: '#FBEFF7', // Light background color
-    marginHorizontal: 5, // Space between boxes
+    borderColor: '#B085A6',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#FBEFF7',
+    marginHorizontal: 5,
   },
   covidSelected: {
-    // backgroundColor: '#FBEFF7',
-    // borderColor: '#800080',
-    backgroundColor: '#780C60', // Selected box background color
-    borderColor: '#780C60',
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
   },
   covidText: {
-    // fontSize: 14,
-    // color: '#666',
     fontSize: 8,
-    color: '#780C60', // Default text color
+    color: PRIMARY,
     fontWeight: '600',
   },
   covidSelectedText: {
-    // color: "#780C60",
-    // fontWeight: 'bold',
-    color: '#FFF', // White color for selected text
+    color: '#FFF',
   },
 });
 

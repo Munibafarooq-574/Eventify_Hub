@@ -6,7 +6,7 @@ import { getSecureData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Dimensions, FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 // Order interface
@@ -21,6 +21,24 @@ interface Order {
 }
 
 const { width } = Dimensions.get('window');
+
+// Same theme as MyEventsScreen
+const PRIMARY = "#780C60";
+const PRIMARY_LIGHT = "#F8E9F0";
+const ACCENT = "#B84B9A";
+
+   const getCardColor = (label: string) => {
+    switch (label) {
+        case "Orders":
+            return "#C79AE8";
+        case "Processing":
+            return "#4A84BD";
+        case "Completed":
+            return "#63BE63";
+        default:
+            return PRIMARY;
+    }
+};
 
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
@@ -102,12 +120,20 @@ const OrderSummary = () => {
             <View style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.push('/vendordashboard')}>
-                        <Ionicons name="arrow-back" size={24} color="#333" />
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/vendordashboard')}>
+                        <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Order Summary</Text>
-                    <TouchableOpacity onPress={() => router.push('/vendornotifications')}>
-                        <Ionicons name="notifications-outline" size={24} color="#000" />
+
+                    <View style={styles.headerTitleWrap}>
+                        <Text style={styles.title}>Order Summary</Text>
+                        <Text style={styles.headerSubtitle}>
+                            {orderStats.totalOrders} total {orderStats.totalOrders === 1 ? "order" : "orders"}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/vendornotifications')}>
+                        <Ionicons name="notifications-outline" size={22} color="#FFFFFF" />
+                        <View style={styles.notificationDot} />
                     </TouchableOpacity>
                 </View>
 
@@ -121,7 +147,7 @@ const OrderSummary = () => {
                         <SummaryCard
                             label="Orders"
                             value={orderStats.totalOrders}
-                            color="#D6A7E3"
+                            icon="cart-outline"
                             isActive={selectedFilter === "All"}
                         />
                     </TouchableOpacity>
@@ -134,7 +160,7 @@ const OrderSummary = () => {
                         <SummaryCard
                             label="Processing"
                             value={orderStats.processing}
-                            color="#337AB7"
+                            icon="hourglass-outline"
                             isActive={selectedFilter === "Processing"}
                         />
                     </TouchableOpacity>
@@ -147,7 +173,7 @@ const OrderSummary = () => {
                         <SummaryCard
                             label="Completed"
                             value={orderStats.completed}
-                            color="#5CB85C"
+                            icon="checkmark-done-outline"
                             isActive={selectedFilter === "Completed"}
                         />
                     </TouchableOpacity>
@@ -159,21 +185,63 @@ const OrderSummary = () => {
                     contentContainerStyle={styles.ordersListContent}
                     data={filteredOrders}
                     keyExtractor={(item) => item._id}
+                    showsVerticalScrollIndicator={false}
+                    ListHeaderComponent={
+                        <Text style={styles.sectionTitle}>
+                            {selectedFilter === "All" ? "All Orders" : `${selectedFilter} Orders`}
+                        </Text>
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <View style={styles.emptyIconCircle}>
+                                <Ionicons name="receipt-outline" size={34} color={PRIMARY} />
+                            </View>
+                            <Text style={styles.emptyTitle}>No orders found</Text>
+                            <Text style={styles.emptySubtitle}>
+                                Orders matching this filter will show up here
+                            </Text>
+                        </View>
+                    }
                     renderItem={({ item }) => (
                         <View key={item._id} style={styles.orderCard}>
                             <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
                             <View style={styles.orderInfo}>
-                                <Text style={styles.eventTitle}>Event: <Text style={styles.bold}>{item.eventName}</Text></Text>
-                                <Text>Name: <Text style={styles.bold}>{item.organizerId.name}</Text></Text>
-                                <Text>Date: {new Date(item.eventDate).toDateString()}</Text>
-                                <Text>Package: {item.vendorOrders.map((orderName: any) => orderName.serviceName)}</Text>
-                                <Text>Price: {item.totalAmount}</Text>
-                                <Text>Status: {item.status}</Text>
+                                <View style={styles.orderCardHeader}>
+                                    <View style={styles.eventIconWrap}>
+                                        <Ionicons name="calendar" size={18} color={PRIMARY} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.eventTitle} numberOfLines={1}>{item.eventName}</Text>
+                                        <Text style={styles.orderName}>{item.organizerId.name}</Text>
+                                    </View>
+                                    <View style={styles.statusBadge}>
+                                        <Text style={styles.statusBadgeText}>{item.status}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.detailsBlock}>
+                                    <View style={styles.detailRow}>
+                                        <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
+                                        <Text style={styles.detailText}>{new Date(item.eventDate).toDateString()}</Text>
+                                    </View>
+                                    <View style={styles.detailRow}>
+                                        <Ionicons name="pricetags-outline" size={14} color="#8A8A8A" />
+                                        <Text style={styles.detailText} numberOfLines={1}>
+                                            {item.vendorOrders.map((orderName: any) => orderName.serviceName).join(", ")}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.detailRow}>
+                                        <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+                                        <Text style={styles.detailText}>Rs. {item.totalAmount}</Text>
+                                    </View>
+                                </View>
+
                                 <View style={styles.actionButtons}>
                                     {
                                         item.status !== "cancelled"
                                             ?
                                             <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item._id)}>
+                                                <Ionicons name="close-circle-outline" size={14} color="#fff" />
                                                 <Text style={styles.buttonText}>Delete</Text>
                                             </TouchableOpacity>
                                             :
@@ -186,17 +254,20 @@ const OrderSummary = () => {
                                             item.status === "pending"
                                                 ?
                                                 <TouchableOpacity style={styles.completeButton} onPress={() => mark(item._id, "confirmed")}>
-                                                    <Text style={styles.buttonText}>Mark As Processing</Text>
+                                                    <Ionicons name="time-outline" size={14} color="#fff" />
+                                                    <Text style={styles.buttonText}>Mark Processing</Text>
                                                 </TouchableOpacity>
                                                 :
                                                 <TouchableOpacity style={styles.completeButton} onPress={() => mark(item._id, "completed")}>
-                                                    <Text style={styles.buttonText}>Mark As Completed</Text>
+                                                    <Ionicons name="checkmark-outline" size={14} color="#fff" />
+                                                    <Text style={styles.buttonText}>Mark Completed</Text>
                                                 </TouchableOpacity>
                                             :
                                             <></>
                                     }
 
                                     <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId._id)}>
+                                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
                                         <Text style={styles.buttonText}>Message</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -213,22 +284,31 @@ const OrderSummary = () => {
 const SummaryCard = ({
     label,
     value,
-    color,
+    icon,
     isActive = false
 }: {
     label: string,
     value: number,
-    color: string,
+    icon: keyof typeof Ionicons.glyphMap,
     isActive?: boolean
 }) => (
-    <View style={[
+    <View
+    style={[
         styles.summaryCard,
-        { backgroundColor: color },
-        isActive && styles.activeSummaryCard
-    ]}>
-        <Ionicons name="cart-outline" size={20} color="white" />
-        <Text style={styles.summaryValue}>{value}</Text>
-        <Text style={styles.summaryLabel}>{label}</Text>
+        {
+            backgroundColor: getCardColor(label),
+            borderColor: getCardColor(label),
+        },
+        isActive && {
+            transform: [{ scale: 1.05 }],
+        },
+    ]}
+>
+        <View style={styles.summaryIconWrap}>
+            <Ionicons name={icon} size={20} color={isActive ? PRIMARY : "#FFFFFF"} />
+        </View>
+        <Text style={[styles.summaryValue, isActive && styles.summaryValueActive]}>{value}</Text>
+        <Text style={[styles.summaryLabel, isActive && styles.summaryLabelActive]}>{label}</Text>
         {isActive && <View style={styles.activeIndicator} />}
     </View>
 );
@@ -236,155 +316,282 @@ const SummaryCard = ({
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#F8E9F0",
+        backgroundColor: PRIMARY,
     },
     container: {
-        flex: 1,
-        paddingHorizontal: 15,
-        paddingTop: 50,
-        paddingBottom: 80,
-    },
+    flex: 1,
+    backgroundColor: PRIMARY_LIGHT,
+    paddingBottom: 80,
+},
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 20
+        backgroundColor: PRIMARY,
+        paddingHorizontal: 18,
+        paddingTop: Platform.OS === "ios" ? 16 : 30,
+        paddingBottom: 22,
+        borderBottomLeftRadius: 26,
+        borderBottomRightRadius: 26,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 6,
+        marginBottom: 18,
     },
-    iconImage: {
-        width: 37,
-        height: 37,
-        marginBottom: 5,
+    headerIconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "rgba(255,255,255,0.15)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    notificationDot: {
+        position: "absolute",
+        top: 8,
+        right: 9,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#FF5A5F",
+        borderWidth: 1.5,
+        borderColor: PRIMARY,
+    },
+    headerTitleWrap: {
+        alignItems: "center",
     },
     title: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#000"
+        fontSize: 19,
+        fontWeight: "800",
+        color: "#FFFFFF",
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: "rgba(255,255,255,0.75)",
+        marginTop: 2,
     },
     summaryContainer: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginBottom: 20
+        marginBottom: 18,
+        paddingHorizontal: 15,
     },
     summaryCardWrapper: {
         flex: 1,
         marginHorizontal: 5,
     },
     summaryCard: {
-        padding: 15,
-        borderRadius: 10,
+        padding: 14,
+        borderRadius: 16,
         alignItems: "center",
-        elevation: 2,
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1.5,
+        borderColor: "#F0DDEA",
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
     },
-    activeSummaryCard: {
-        transform: [{ scale: 1.05 }],
+    /*activeSummaryCard: {
+        backgroundColor: PRIMARY,
+        borderColor: PRIMARY,
+        transform: [{ scale: 1.04 }],
         shadowOpacity: 0.2,
-        shadowRadius: 5,
-        elevation: 4,
-    },
+        shadowRadius: 8,
+        elevation: 5,
+    },*/
+    summaryIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+},
     activeIndicator: {
-        position: 'absolute',
-        bottom: -2,
-        height: 3,
-        width: '50%',
-        backgroundColor: '#FFF',
-        borderRadius: 3,
-    },
+    position: "absolute",
+    bottom: -1,
+    height: 4,
+    width: "38%",
+    backgroundColor: "#FFF",
+    borderRadius: 5,
+},
     summaryValue: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "white"
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+},
+    summaryValueActive: {
+        color: "#FFFFFF",
     },
+    
     summaryLabel: {
-        fontSize: 9,
-        color: "white"
+    fontSize: 12,
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginTop: 3,
+},
+
+    summaryLabelActive: {
+        color: "rgba(255,255,255,0.85)",
     },
     ordersList: {
         flex: 1,
     },
     ordersListContent: {
-        paddingBottom: 20,
+        paddingBottom: 30,
+        paddingHorizontal: 15,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: "800",
+        color: "#1A1A1A",
+        marginBottom: 12,
     },
     orderCard: {
         flexDirection: "row",
         backgroundColor: "white",
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 2
+        padding: 14,
+        borderRadius: 16,
+        marginBottom: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 8,
+        elevation: 2,
     },
     statusIndicator: {
-        width: 15,
-        height: 15,
-        borderRadius: 10,
-        marginRight: 15
+        width: 4,
+        alignSelf: "stretch",
+        borderRadius: 4,
+        marginRight: 12,
     },
     orderInfo: {
         flex: 1
     },
+    orderCardHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 10,
+    },
+    eventIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: PRIMARY_LIGHT,
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 10,
+    },
     eventTitle: {
-        fontWeight: "bold"
+        fontSize: 15,
+        fontWeight: "800",
+        color: "#1A1A1A",
+    },
+    orderName: {
+        fontSize: 12,
+        color: "#8A8A8A",
+        marginTop: 1,
+    },
+    statusBadge: {
+        backgroundColor: PRIMARY_LIGHT,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    statusBadgeText: {
+        fontSize: 10,
+        fontWeight: "700",
+        color: PRIMARY,
+        textTransform: "capitalize",
     },
     bold: {
         fontWeight: "bold"
     },
+    detailsBlock: {
+        backgroundColor: PRIMARY_LIGHT,
+        borderRadius: 12,
+        padding: 10,
+        marginBottom: 10,
+    },
+    detailRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 4,
+    },
+    detailText: {
+        marginLeft: 6,
+        fontSize: 12,
+        color: "#4A4A4A",
+        flexShrink: 1,
+    },
     actionButtons: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 10
+        flexWrap: "wrap",
+        gap: 8,
     },
     deleteButton: {
-        backgroundColor: "#A00",
-        padding: 5,
-        borderRadius: 5
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#D9534F",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
     },
     completeButton: {
-        backgroundColor: "#007BFF",
-        padding: 5,
-        borderRadius: 5
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#337AB7",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
     },
     messageButton: {
-        backgroundColor: "#4CAF50",
-        padding: 5,
-        borderRadius: 5
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        backgroundColor: "#5CB85C",
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
     },
     buttonText: {
         color: "white",
-        fontSize: 12
+        fontSize: 11,
+        fontWeight: "700",
     },
-    bottomNavigation: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
+    emptyState: {
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 50,
+        paddingHorizontal: 30,
+    },
+    emptyIconCircle: {
+        width: 70,
         height: 70,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
-        width: width,
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingBottom: 10,
+        borderRadius: 35,
+        backgroundColor: PRIMARY_LIGHT,
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 14,
     },
-    navItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        flex: 1,
+    emptyTitle: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#1A1A1A",
+        marginBottom: 4,
     },
-    iconContainer: {
-        backgroundColor: '#780C60',
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 5,
+    emptySubtitle: {
+        fontSize: 12,
+        color: "#8A8A8A",
+        textAlign: "center",
+        lineHeight: 18,
     },
 });
 

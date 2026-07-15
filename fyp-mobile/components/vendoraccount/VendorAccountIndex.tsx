@@ -1,5 +1,3 @@
-
-
 import { deleteSecureData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,6 +14,10 @@ import {
   View,
 } from 'react-native';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
+
+const PRIMARY = "#780C60";
+const PRIMARY_LIGHT = "#F8E9F0";
+const ACCENT = "#B84B9A";
 
 const AccountScreen: React.FC = () => {
   const router = useRouter();
@@ -77,11 +79,6 @@ const AccountScreen: React.FC = () => {
       .catch((err) => console.error('An error occurred', err));
   };
 
-  // const confirmLogout = () => {
-  //   setModalVisible(false);
-  //   console.log('Signing out...');
-  //   router.push('/account');
-  // };
   const confirmLogout = async () => {
     setModalVisible(false);
     try {
@@ -94,17 +91,38 @@ const AccountScreen: React.FC = () => {
     router.push('/intro'); // Navigate to login/intro page
   };
 
-
   const cancelLogout = () => {
     setModalVisible(false);
   };
 
+  // Each menu option now carries its own icon + a short subtitle so the
+  // cards read like the event cards on MyEventsScreen.
   const menuOptions = [
-    { title: 'Edit Profile' },
-   // { title: 'Notifications' },
-    { title: 'Frequently Asked Questions' },
-    { title: 'Contact Us' },
-    { title: 'Sign Out' },
+    {
+      title: 'Edit Profile',
+      subtitle: 'Update your name, photo & details',
+      icon: 'person-outline' as const,
+      danger: false,
+    },
+    // { title: 'Notifications' },
+    {
+      title: 'Frequently Asked Questions',
+      subtitle: 'Get quick answers to common queries',
+      icon: 'help-circle-outline' as const,
+      danger: false,
+    },
+    {
+      title: 'Contact Us',
+      subtitle: "We're here if you need any help",
+      icon: 'chatbubble-ellipses-outline' as const,
+      danger: false,
+    },
+    {
+      title: 'Sign Out',
+      subtitle: 'Log out of your vendor account',
+      icon: 'log-out-outline' as const,
+      danger: true,
+    },
   ];
 
   // Get the first letter of the username for the avatar
@@ -112,28 +130,86 @@ const AccountScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Profile Section */}
-        <View style={styles.profileContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarInitial}</Text>
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Simple, uncolored header (no gradient/solid bar) */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Account</Text>
+          <Text style={styles.headerSubtitle}>Manage your profile & preferences</Text>
+        </View>
+
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{avatarInitial}</Text>
+            </View>
           </View>
+
           <View style={styles.textContainer}>
-            <Text style={styles.profileName}>{username}</Text>
-            <Text style={styles.profileEmail}>{email}</Text>
+            <Text style={styles.profileName} numberOfLines={1}>
+              {username || 'Guest'}
+            </Text>
+            <Text style={styles.profileEmail} numberOfLines={1}>
+              {email}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.editBadge}
+              onPress={() => handleMenuPress('Edit Profile')}
+            >
+              <Ionicons name="create-outline" size={13} color={PRIMARY} />
+              <Text style={styles.editBadgeText}>Edit Profile</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Menu Options */}
-        <View style={styles.menuContainer}>
+        {/* Section Title */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+        </View>
+
+        {/* Menu Options as cards */}
+        <View style={styles.menuList}>
           {menuOptions.map((option, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.menuOption}
+              style={styles.menuCard}
+              activeOpacity={0.75}
               onPress={() => handleMenuPress(option.title)}
             >
-              <Text style={styles.menuText}>{option.title}</Text>
-              <Text style={styles.arrow}>{">"}</Text>
+              <View style={styles.menuAccentBar} />
+
+              <View
+                style={[
+                  styles.menuIconWrap,
+                  option.danger && styles.menuIconWrapDanger,
+                ]}
+              >
+                <Ionicons
+                  name={option.icon}
+                  size={20}
+                  color={option.danger ? '#D64545' : PRIMARY}
+                />
+              </View>
+
+              <View style={styles.menuDetails}>
+                <Text
+                  style={[
+                    styles.menuText,
+                    option.danger && styles.menuTextDanger,
+                  ]}
+                >
+                  {option.title}
+                </Text>
+                <Text style={styles.menuSubtitle} numberOfLines={1}>
+                  {option.subtitle}
+                </Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color="#C6C6C6" />
             </TouchableOpacity>
           ))}
         </View>
@@ -162,6 +238,9 @@ const AccountScreen: React.FC = () => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="log-out-outline" size={28} color="#D64545" />
+            </View>
             <Text style={styles.modalTitle}>Confirm Logout</Text>
             <Text style={styles.modalMessage}>
               Are you sure you want to log out?
@@ -174,22 +253,12 @@ const AccountScreen: React.FC = () => {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              {/* <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => {
-                  confirmLogout();
-                  router.push("/intro"); // Navigate to /intro
-                }}
-              >
-                <Text style={styles.confirmButtonText}>Log Out</Text>
-              </TouchableOpacity> */}
               <TouchableOpacity
                 style={styles.confirmButton}
                 onPress={confirmLogout}
               >
                 <Text style={styles.confirmButtonText}>Log Out</Text>
               </TouchableOpacity>
-
             </View>
           </View>
         </View>
@@ -201,118 +270,182 @@ const AccountScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8E9F0',
+    backgroundColor: PRIMARY_LIGHT,
   },
-  content: {
+  listContent: {
     flexGrow: 1,
-    paddingBottom: 80,
+    paddingHorizontal: 16,
+    paddingBottom: 110,
   },
-  profileContainer: {
+
+  // Plain header, no colored bar
+  header: {
+    marginTop: 60,
+    marginBottom: 18,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#8A8A8A',
+    marginTop: 2,
+  },
+
+  // Profile card
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
-    paddingHorizontal: 20,
-    marginTop: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  avatarRing: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 2,
+    borderColor: PRIMARY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 3,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#780C60',
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     color: '#fff',
-    fontSize: 60,
+    fontSize: 34,
     fontWeight: 'bold',
   },
   textContainer: {
-    marginLeft: 20,
+    marginLeft: 16,
     flex: 1,
   },
   profileName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A1A1A',
   },
   profileEmail: {
-    fontSize: 14,
-    color: '#848484',
-    marginTop: 5,
+    fontSize: 13,
+    color: '#8A8A8A',
+    marginTop: 3,
   },
-  menuContainer: {
-    backgroundColor: '#F8E9F0',
-    borderRadius: 15,
-    marginHorizontal: 20,
-    paddingVertical: 10,
-  },
-  menuOption: {
+  editBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    alignSelf: 'flex-start',
+    backgroundColor: PRIMARY_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  editBadgeText: {
+    color: PRIMARY,
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+
+  // Section title
+  sectionRow: {
+    marginTop: 22,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+
+  // Menu cards (styled like event cards)
+  menuList: {
+    gap: 12,
+  },
+  menuCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  menuAccentBar: {
+    width: 4,
+    alignSelf: 'stretch',
+    backgroundColor: ACCENT,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  menuIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: PRIMARY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  menuIconWrapDanger: {
+    backgroundColor: '#FCEAEA',
+  },
+  menuDetails: {
+    flex: 1,
   },
   menuText: {
-    fontSize: 16,
-    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A1A1A',
   },
-  arrow: {
-    fontSize: 16,
-    color: '#848484',
+  menuTextDanger: {
+    color: '#D64545',
   },
+  menuSubtitle: {
+    fontSize: 12,
+    color: '#9B9B9B',
+    marginTop: 3,
+  },
+
+  // Terms
   termsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 20,
+    marginTop: 26,
+    marginBottom: 10,
   },
   termsText: {
-    fontSize: 14,
-    color: '#780C60',
+    fontSize: 13,
+    color: PRIMARY,
     marginHorizontal: 5,
+    fontWeight: '600',
   },
   separator: {
-    fontSize: 14,
-    color: '#848484',
+    fontSize: 13,
+    color: '#B8B8B8',
   },
-  bottomNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    height: 80,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconContainer: {
-    backgroundColor: '#780C60',
-    width: 30,
-    height: 30,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  iconImage: {
-    width: 37,
-    height: 37,
-    marginBottom: 5,
-  },
-  navText: {
-    fontSize: 10,
-    color: '#000000',
-  },
+
+  // Modal
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -320,19 +453,30 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
+    width: '82%',
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
+    padding: 24,
+    borderRadius: 18,
     alignItems: 'center',
+  },
+  modalIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FCEAEA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontWeight: '800',
+    marginBottom: 6,
+    color: '#1A1A1A',
   },
   modalMessage: {
-    fontSize: 14,
+    fontSize: 13,
+    color: '#8A8A8A',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -340,53 +484,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    gap: 12,
   },
   cancelButton: {
     flex: 1,
-    marginRight: 10,
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#E0E0E0',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F0F0F0',
     alignItems: 'center',
   },
   confirmButton: {
     flex: 1,
-    marginLeft: 10,
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#780C60',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#000',
+    color: '#333',
+    fontWeight: '700',
   },
   confirmButtonText: {
     color: '#fff',
-  },
-  homeButtonIconContainer: {
-    backgroundColor: '#780C60',
-    width: 55,   // bigger than 30
-    height: 55,  // bigger than 30
-    borderRadius: 27.5, // half of width/height for perfect circle
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-
-  // Increase size of home button's icon image
-  homeButtonIconImage: {
-    width: 55,  // bigger than 37
-    height: 55, // bigger than 37
-    marginBottom: 0, // remove bottom margin if you want it more centered vertically
-  },
-
-  homeButton: {
-    transform: [{ translateY: -20 }], // move it more upward (from -10 to -15)
-
+    fontWeight: '700',
   },
 });
 
 export default AccountScreen;
-function fetchUserDetails() {
-  throw new Error('Function not implemented.');
-}
