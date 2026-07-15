@@ -1,4 +1,3 @@
-
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +7,14 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
+const PRIMARY = '#7B2869';
+const PRIMARY_LIGHT = '#9F4F8E';
+const PRIMARY_SOFT = '#F3E4EF';
+const BG = '#FAF6F9';
+const CARD = '#FFFFFF';
+const TEXT_DARK = '#221A20';
+const TEXT_MUTED = '#8A7C86';
+const BORDER = '#EFE0EB';
 
 const PhotographerDetailsScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
@@ -62,9 +69,9 @@ const PhotographerDetailsScreen: React.FC = () => {
                 <ActivityIndicator
                     testID="loading-indicator" //add test id
                     size="large"
-                    color="#7B2869"
+                    color={PRIMARY}
                 />
-                <Text>Loading vendor details...</Text>
+                <Text style={styles.loadingText}>Loading vendor details...</Text>
             </View>
         );
     }
@@ -72,6 +79,7 @@ const PhotographerDetailsScreen: React.FC = () => {
     if (!vendorData) {
         return (
             <View testID="error-message" style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={42} color="#D64545" style={{ marginBottom: 10 }} />
                 <Text style={styles.errorText}>
                     Failed to load vendor details. Please try again.
                 </Text>
@@ -80,53 +88,38 @@ const PhotographerDetailsScreen: React.FC = () => {
     }
 
     return (
-        <ScrollView style={styles.container}>
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             <Toast />
-            {/* Header
-         Add test Id */}
-            {/* <View style={styles.header}>
-        <TouchableOpacity testID="back-button" onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Photographer Details</Text>
-      </View> */}
 
+            {/* Cover Image with floating header */}
+            <View style={styles.coverWrapper}>
+                <Image
+                    testID="vendor-cover-image"
+                    source={{
+                        uri: vendorData?.contactDetails?.brandLogo
+                            ? `${vendorData.contactDetails.brandLogo}`
+                            : "https://via.placeholder.com/600x300",
+                    }}
+                    style={styles.coverImage}
+                />
+                <View style={styles.coverOverlay} />
 
-            <View style={styles.header}>
-                {/* Back button */}
-                <TouchableOpacity testID="back-button" onPress={() => router.back()}>
-                    <Text style={styles.backText}>Back</Text>
-                </TouchableOpacity>
+                {/* Floating Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        testID="back-button"
+                        onPress={() => router.back()}
+                        style={styles.backIconButton}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                    </TouchableOpacity>
 
-                {/* Title */}
-                <Text style={styles.title}>{vendorData.name}</Text>
+                    <Text style={styles.title} numberOfLines={1}>{vendorData.name}</Text>
 
-                {/* Cart Icon */}
-                {/* <TouchableOpacity
-                    onPress={() => router.push('/cartmanagment')}
-                    style={styles.cartIconButton}
-                >
-                    <Ionicons name="cart-outline" size={24} color="#7B2869" />
-                </TouchableOpacity> */}
+                    <View style={styles.headerSpacer} />
+                </View>
             </View>
-
-
-
-
-
-
-            {/* Cover Image */}
-            <Image
-                testID="vendor-cover-image"
-                source={{
-                    uri: vendorData?.contactDetails?.brandLogo
-                        ? `${vendorData.contactDetails.brandLogo}`
-                        : "https://via.placeholder.com/600x300",
-                }}
-                style={styles.coverImage}
-            />
-
-
 
             {/* Tab Navigation */}
             <View style={styles.tabContainer}>
@@ -144,6 +137,7 @@ const PhotographerDetailsScreen: React.FC = () => {
                         onPress={() =>
                             setActiveTab(tab as "Details" | "Packages" | "Reviews")
                         }
+                        activeOpacity={0.8}
                     >
                         <Text
                             style={[
@@ -156,31 +150,39 @@ const PhotographerDetailsScreen: React.FC = () => {
                     </TouchableOpacity>
                 ))}
             </View>
+
             {activeTab === "Details" && (
                 <View style={styles.detailsContainer}>
-                    {/* Top Row: Name and Price 
-             add test id */}
-                    <View style={styles.rowContainer}>
-                        <Text testID="vendor-name" style={styles.name}>
-                            {vendorData.name}
-                        </Text>
-                        <View style={styles.priceContainer}>
-                            <Text testID="vendor-price" style={styles.price}>
-                                Starting Price: Rs.
-                                {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
+
+                    {/* Name + Price Card */}
+                    <View style={styles.card}>
+                        <View style={styles.rowContainer}>
+                            <Text testID="vendor-name" style={styles.name}>
+                                {vendorData.name}
                             </Text>
-                            <Text style={styles.perHead}>Per head</Text>
+                            <View style={styles.priceBadge}>
+                                <Text testID="vendor-price" style={styles.price}>
+                                    Rs. {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
+                                </Text>
+                                
+                            </View>
+                        </View>
+
+                        <View style={styles.addressRow}>
+                            <Ionicons name="location-outline" size={16} color={TEXT_MUTED} />
+                            <Text testID="vendor-address" style={styles.address}>
+                                {vendorData.contactDetails.officialAddress}
+                            </Text>
                         </View>
                     </View>
-                    {/*add test id */}
-                    <Text testID="vendor-address" style={styles.address}>
-                        {vendorData.contactDetails.officialAddress}
-                    </Text>
 
                     {/* Photos Section */}
-                    <View style={styles.photosSection}>
+                    <View style={[styles.card, styles.photosSection]}>
                         <View style={styles.sectionTitleRow}>
-                            <Text style={styles.sectionTitle}>Photos</Text>
+                            <View style={styles.sectionTitleWithIcon}>
+                                <Ionicons name="images-outline" size={18} color={PRIMARY} />
+                                <Text style={styles.sectionTitle}>Photos</Text>
+                            </View>
                             <TouchableOpacity
                                 testID="see-all-photos"
                                 onPress={() =>
@@ -189,14 +191,15 @@ const PhotographerDetailsScreen: React.FC = () => {
                                         params: { vendorId: vendorData._id },
                                     })
                                 }
+                                activeOpacity={0.7}
                             >
                                 <Text style={styles.seeAllLink}>See All</Text>
                             </TouchableOpacity>
-
                         </View>
                         <ScrollView
                             testID="scroll-view"
                             horizontal
+                            showsHorizontalScrollIndicator={false}
                             style={styles.photoContainer}
                         >
                             {vendorData.images.map((image: string, index: number) => (
@@ -210,37 +213,79 @@ const PhotographerDetailsScreen: React.FC = () => {
                             ))}
                         </ScrollView>
                     </View>
-                    <View style={styles.detailsHeader}>
-                        <Text style={styles.sectionTitle}>Details</Text>
-                        <TouchableOpacity onPress={() => router.push('/vendoreditprofile')}>
-                            <Text style={styles.editLink}>Edit</Text>
-                        </TouchableOpacity>
+
+                    {/* Business Details Card */}
+                    <View style={styles.card}>
+                        <View style={styles.detailsHeader}>
+                            <View style={styles.sectionTitleWithIcon}>
+                                <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
+                                <Text style={styles.sectionTitle}>Details</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => router.push('/vendoreditprofile')} activeOpacity={0.7}>
+                                <View style={styles.editPill}>
+                                    <Ionicons name="pencil-outline" size={12} color={PRIMARY} />
+                                    <Text style={styles.editLink}>Edit</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.detailBlock}>
+                            <View style={styles.detailLabelRow}>
+                                <Ionicons name="people-outline" size={15} color={TEXT_MUTED} />
+                                <Text style={styles.detailLabel}>Staff</Text>
+                            </View>
+                            <Text style={styles.detailValue}>
+                        {vendorData?.venueBusinessDetails?.staff?.join(', ') || "N/A"}
+                            </Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.detailBlock}>
+                            <View style={styles.detailLabelRow}>
+                                <Ionicons name="shield-checkmark-outline" size={15} color={TEXT_MUTED} />
+                                <Text style={styles.detailLabel}>Cancellation Policy</Text>
+                            </View>
+                            <Text style={styles.detailValue}>
+    {vendorData?.venueBusinessDetails?.cancellationPolicy || "N/A"}
+</Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.detailBlock}>
+                            <View style={styles.detailLabelRow}>
+                                <Ionicons name="map-outline" size={15} color={TEXT_MUTED} />
+                                <Text style={styles.detailLabel}>Cities Covered</Text>
+                            </View>
+                            <Text style={styles.detailValue}>
+                                {vendorData?.BusinessDetails?.cityCovered || "N/A"}
+                            </Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.detailBlock}>
+                            <View style={styles.detailLabelRow}>
+                                <Ionicons name="document-text-outline" size={15} color={TEXT_MUTED} />
+                                <Text style={styles.detailLabel}>Description</Text>
+                            </View>
+                            <Text style={styles.detailValue}>
+                                {vendorData?.BusinessDetails?.description || "N/A"}
+                            </Text>
+                        </View>
                     </View>
-                    <Text style={styles.detailLabel}>Staff</Text>
-
-                    <Text style={styles.detailValue}>
-                        {vendorData?.BusinessDetails?.staff || "N/A"}
-                    </Text>
-                    <Text style={styles.detailLabel}>Cancellation Policy</Text>
-                    <Text style={styles.detailValue}>
-                        {vendorData?.BusinessDetails?.covidRefundPolicy || "N/A"}
-                    </Text>
-                    <Text style={styles.detailLabel}>Cities Covered</Text>
-                    <Text style={styles.detailValue}>
-                        {vendorData?.BusinessDetails?.cityCovered || "N/A"}
-                    </Text>
-
-                    <Text style={styles.detailLabel}>Description</Text>
-
-                    <Text style={styles.detailValue}>
-                        {vendorData?.BusinessDetails?.description || "N/A"}
-                    </Text>
                 </View>
             )}
 
             {activeTab === "Packages" && (
-                <>
-                    <View style={styles.packageTabContainer}>
+                <View style={styles.detailsContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.packageTabContainer}
+                        contentContainerStyle={{ paddingRight: 8 }}
+                    >
                         {vendorData.packages.map((pkg: any) => (
                             <TouchableOpacity
                                 key={pkg._id}
@@ -249,6 +294,7 @@ const PhotographerDetailsScreen: React.FC = () => {
                                     activePackage === pkg._id && styles.activePackageTab,
                                 ]}
                                 onPress={() => setActivePackage(pkg._id)}
+                                activeOpacity={0.8}
                             >
                                 <Text
                                     style={[
@@ -264,40 +310,35 @@ const PhotographerDetailsScreen: React.FC = () => {
                         <TouchableOpacity
                             style={styles.packageTab}
                             onPress={() => setActivePackage(null)} // deselect packages
+                            activeOpacity={0.8}
                         >
                             <Text style={styles.packageTabText}>📩 Contact for custom packages</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
 
                     {/* Package Details */}
                     {vendorData.packages
                         .filter((pkg: any) => pkg._id === activePackage)
                         .map((pkg: any) => (
-                            <View key={pkg._id} style={styles.packageDetails}>
-                                <Text style={styles.sectionTitle}>Services</Text>
+                            <View key={pkg._id} style={[styles.card, styles.packageDetails]}>
+                                <View style={styles.sectionTitleWithIcon}>
+                                    <Ionicons name="briefcase-outline" size={18} color={PRIMARY} />
+                                    <Text style={styles.sectionTitle}>Services</Text>
+                                </View>
                                 <Text
                                     testID="package-services"
                                     style={styles.packageDetailItem}
                                 >
                                     {pkg.services}
                                 </Text>
-                                <Text testID="package-price" style={styles.priceText}>
-                                    Price: Rs.{pkg.price}/-
-                                </Text>
-                                {/* <TouchableOpacity
-                                    testID={`add-to-cart-${pkg._id}`}
-                                    style={styles.cartButton}
-                                    onPress={() => handleAddToCart(pkg)}
-                                >
-                                    <Text style={styles.cartButtonText}>Add to Cart</Text>
-                                </TouchableOpacity> */}
-                                {/* <TouchableOpacity
-                                    testID={`edit-package-${pkg._id}`}
-                                    style={styles.cartButton}
-                                    onPress={() => console.log("Edit pressed for package:", pkg._id)} // Or navigate to edit screen
-                                >
-                                    <Text style={styles.cartButtonText}>Edit</Text>
-                                </TouchableOpacity> */}
+
+                                <View style={styles.priceRow}>
+                                    <Ionicons name="cash-outline" size={18} color={PRIMARY} />
+                                    <Text testID="package-price" style={styles.priceText}>
+                                        Rs. {pkg.price}/-
+                                    </Text>
+                                </View>
+
                                 <TouchableOpacity
                                     testID={`edit-package-${pkg._id}`}
                                     style={styles.cartButton}
@@ -307,50 +348,48 @@ const PhotographerDetailsScreen: React.FC = () => {
                                             params: { packageId: pkg._id },
                                         });
                                     }}
+                                    activeOpacity={0.85}
                                 >
+                                    <Ionicons name="create-outline" size={14} color="#FFFFFF" />
                                     <Text style={styles.cartButtonText}>Edit</Text>
                                 </TouchableOpacity>
-
-
-
                             </View>
                         ))}
-
-                    {/* <Calendar
-                        testID="calendar-component"
-                        onDayPress={(day: { dateString: string }) =>
-                            console.log("Selected day:", day.dateString)
-                        }
-                        minDate={new Date().toISOString().split("T")[0]} // Disables past dates
-                        markedDates={{
-                            "2024-12-03": { selected: true, selectedColor: "#7B2869" },
-                        }}
-                        theme={{
-                            selectedDayBackgroundColor: "#7B2869",
-                            todayTextColor: "#7B2869",
-                        }}
-                    /> */}
-
-
-                </>
+                </View>
             )}
+
             {activeTab === "Reviews" && (
                 <View style={styles.tabContent}>
                     {/* Eventify Reviews */}
                     {activeReviewTab === "Eventify" && (
                         <View>
+                            {reviews.length === 0 && (
+                                <View style={styles.emptyReviews}>
+                                    <Ionicons name="chatbubble-ellipses-outline" size={30} color={TEXT_MUTED} />
+                                    <Text style={styles.emptyReviewsText}>No reviews yet</Text>
+                                </View>
+                            )}
                             {reviews.map((review, index) => (
                                 <View key={index} style={styles.eventifyReview}>
-                                    <Text style={styles.reviewerName}>{review.reviewerName || 'Anonymous'}</Text>
-                                    <Text style={styles.reviewDate}>{new Date(review.createdAt).toDateString()}</Text>
+                                    <View style={styles.reviewTopRow}>
+                                        <View style={styles.avatarCircle}>
+                                            <Text style={styles.avatarInitial}>
+                                                {(review.reviewerName || 'A').charAt(0).toUpperCase()}
+                                            </Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.reviewerName}>{review.reviewerName || 'Anonymous'}</Text>
+                                            <Text style={styles.reviewDate}>{new Date(review.createdAt).toDateString()}</Text>
+                                        </View>
+                                    </View>
                                     <Text style={styles.reviewText}>{review.reviewText}</Text>
-                                    <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                                    <View style={{ flexDirection: 'row', marginTop: 8 }}>
                                         {[1, 2, 3, 4, 5].map((star) => (
                                             <Ionicons
                                                 key={star}
                                                 name={review.rating >= star ? 'star' : 'star-outline'}
                                                 size={16}
-                                                color="#FFD700"
+                                                color="#FFC107"
                                             />
                                         ))}
                                     </View>
@@ -361,8 +400,7 @@ const PhotographerDetailsScreen: React.FC = () => {
                 </View>
             )}
 
-            {/* Contact Button */}
-            {/* s */}
+            <View style={{ height: 24 }} />
         </ScrollView>
     );
 };
@@ -370,452 +408,371 @@ const PhotographerDetailsScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8EAF2',
-        paddingTop: 50,
+        backgroundColor: BG,
+    },
+    coverWrapper: {
+        width: '100%',
+        height: 230,
+        position: 'relative',
+        backgroundColor: '#000',
+    },
+    coverImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    coverOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 90,
+        backgroundColor: 'rgba(0,0,0,0.28)',
     },
     header: {
+        position: 'absolute',
+        top: 44,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        paddingHorizontal: 14,
     },
-    backText: {
-        fontSize: 16,
-        color: '#000',
+    backIconButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerSpacer: {
+        width: 38,
     },
     title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        textAlign: 'center',
         flex: 1,
-    },
-    mainImage: {
-        width: '100%',
-        height: 200,
-        resizeMode: 'cover',
+        fontSize: 17,
+        fontWeight: '700',
+        textAlign: 'center',
+        color: '#FFFFFF',
+        marginHorizontal: 8,
     },
     tabContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
+        backgroundColor: CARD,
+        marginHorizontal: 16,
+        marginTop: -22,
+        borderRadius: 16,
+        padding: 4,
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
+        zIndex: 5,
     },
     tab: {
-        paddingVertical: 8,
+        paddingVertical: 10,
         flex: 1,
         alignItems: 'center',
+        borderRadius: 12,
     },
     activeTab: {
-        borderBottomWidth: 2,
-        borderBottomColor: '#7B2869',
+        backgroundColor: PRIMARY_SOFT,
     },
     tabText: {
-        fontSize: 16,
-        color: '#7A7A7A',
+        fontSize: 14,
+        fontWeight: '600',
+        color: TEXT_MUTED,
     },
     activeTabText: {
-        color: '#7B2869',
-        fontWeight: 'bold',
-    },
-    // detailsContainer: {
-    //     padding: 16,
-    // },
-    // name: {
-    //     fontSize: 20,
-    //     fontWeight: 'bold',
-    // },
-    address: {
-        fontSize: 14,
-        color: '#7A7A7A',
-        marginVertical: 8,
-    },
-    // price: {
-    //     fontSize: 18,
-    //     fontWeight: 'bold',
-    //     color: '#000',
-    // },
-    description: {
-        fontSize: 14,
-        marginVertical: 8,
-    },
-    staff: {
-        fontSize: 14,
-        marginVertical: 8,
-    },
-    packageTabContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
-        paddingBottom: 8,
-    },
-    packageTab: {
-        flex: 1,
-        paddingVertical: 8,
-        paddingHorizontal: 4,
-        alignItems: 'center',
-        marginHorizontal: 2,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        backgroundColor: '#F8EAF2',
-    },
-    activePackageTab: {
-        backgroundColor: '#9F4F8E',
-        borderColor: '#7B2869',
-    },
-    packageTabText: {
-        fontSize: 11,
-        fontWeight: 'bold',
-        color: '#7A7A7A',
-        textAlign: 'center',
-    },
-    activePackageTabText: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-    },
-    packageDetails: {
-        padding: 16,
-    },
-    packageDetailItem: {
-        fontSize: 14,
-        marginVertical: 2,
-        color: '#7A7A7A',
-    },
-    priceText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#7B2869',
-        textAlign: 'right',
-        marginVertical: 8,
-    },
-    contactButton: {
-        backgroundColor: '#7B2869',
-        padding: 16,
-        margin: 16,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    contactButtonText: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    errorText: {
-        fontSize: 16,
-        color: 'red',
-    },
-    // sectionTitle: {
-    //     fontSize: 18,
-    //     fontWeight: 'bold',
-    //     marginBottom: 8,
-    // },
-    tabContent: {
-        padding: 16,
-    },
-    detailItem: {
-        fontSize: 14,
-        marginBottom: 8,
-    },
-    // detailLabel: {
-    //     fontWeight: 'bold',
-    // },
-    // detailsContainer: {
-    //     padding: 16,
-    //     //  backgroundColor: '#FDF6FA', // Light background color
-    // },
-    // sectionTitle: {
-    //     fontSize: 18,
-    //     fontWeight: 'bold',
-    //     marginBottom: 12,
-    //     color: '#000',
-    // },
-    // detailLabel: {
-    //     fontSize: 14,
-    //     fontWeight: 'bold',
-    //     marginTop: 8,
-    //     color: '#333',
-    // },
-    // detailValue: {
-    //     fontSize: 14,
-    //     marginTop: 4,
-    //     marginBottom: 8,
-    //     color: '#555',
-    // },
-    // perHead: {
-    //     fontSize: 14,
-    //     color: '#7A7A7A',
-    // },
-    rowContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    priceContainer: {
-        alignItems: 'flex-end',
-    },
-    name: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    price: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000',
-    },
-    perHead: {
-        fontSize: 14,
-        color: '#7A7A7A',
-        marginTop: 2,
+        color: PRIMARY,
+        fontWeight: '700',
     },
     detailsContainer: {
         padding: 16,
-        //  backgroundColor: '#FDF6FA',
+        gap: 14,
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginTop: 12,
-        marginBottom: 8,
-        color: '#333',
+    card: {
+        backgroundColor: CARD,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 14,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: BORDER,
     },
-    detailLabel: {
+    rowContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    priceBadge: {
+        backgroundColor: PRIMARY_SOFT,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+        alignItems: 'flex-end',
+    },
+    name: {
+        fontSize: 21,
+        fontWeight: '800',
+        color: TEXT_DARK,
+        flex: 1,
+        marginRight: 10,
+    },
+    price: {
         fontSize: 14,
-        fontWeight: 'bold',
-        color: '#000',
-        marginTop: 8,
+        fontWeight: '800',
+        color: PRIMARY,
     },
-    detailValue: {
-        fontSize: 14,
-        color: '#777',
-        marginBottom: 4,
+    perHead: {
+        fontSize: 11,
+        color: TEXT_MUTED,
+        marginTop: 2,
+    },
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 10,
+    },
+    address: {
+        fontSize: 13,
+        color: TEXT_MUTED,
+        flex: 1,
     },
     photosSection: {
-        padding: 16,
-    },
-
-    photosScroll: {
-        flexDirection: 'row',
-    },
-    photo: {
-        width: 100,
-        height: 100,
-        borderRadius: 8,
-        marginRight: 8,
-    },
-    reviewTabContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 16,
-    },
-    reviewTab: {
-        flex: 1,
-        paddingVertical: 8,
-        alignItems: 'center',
-    },
-    activeReviewTab: {
-        borderBottomWidth: 2,
-        borderBottomColor: '#7B2869',
-    },
-    reviewTabText: {
-        fontSize: 16,
-        color: '#7A7A7A',
-    },
-    activeReviewTabText: {
-        color: '#7B2869',
-        fontWeight: 'bold',
-    },
-    eventifyReview: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        borderRadius: 8,
-        marginVertical: 8,
-    },
-    reviewerName: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    reviewDate: {
-        fontSize: 12,
-        color: '#7A7A7A',
-        marginBottom: 8,
-    },
-    reviewText: {
-        fontSize: 14,
-        color: '#000',
-    },
-    showMoreButton: {
-        backgroundColor: '#E0E0E0',
-        padding: 8,
-        borderRadius: 4,
-        alignItems: 'center',
-        marginVertical: 8,
-    },
-    showMoreButtonText: {
-        fontSize: 14,
-        color: '#7B2869',
-        fontWeight: 'bold',
-    },
-    googleReviewStats: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    reviewNote: {
-        fontSize: 12,
-        color: '#7A7A7A',
-        marginBottom: 8,
-    },
-    ratingsBreakdown: {
-        marginVertical: 16,
-    },
-    ratingRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    ratingText: {
-        fontSize: 12,
-        color: '#7A7A7A',
-        flex: 1,
-    },
-    ratingBar: {
-        flex: 4,
-        height: 8,
-        backgroundColor: '#E0E0E0',
-        marginHorizontal: 8,
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    filledRatingBar: {
-        height: '100%',
-        backgroundColor: '#FFC107',
-    },
-    ratingCount: {
-        fontSize: 12,
-        color: '#7A7A7A',
-        flex: 1,
-    },
-    googleReview: {
-        backgroundColor: '#FFF',
-        padding: 16,
-        borderRadius: 8,
-        marginVertical: 8,
-    },
-    photoContainer: {
-        flexDirection: 'row',
-    },
-    cartButton: {
-        marginTop: 8,
-        alignSelf: 'flex-end', // Makes button width fit content
-        paddingVertical: 6,
-        paddingHorizontal: 16,
-        backgroundColor: '#7B2869',
-        borderRadius: 20, // pill shape
-    },
-    cartButtonText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    headerCenter: {
-        flex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    cartIconContainer: {
-        position: 'absolute',
-        right: -40, // adjust as needed
-        padding: 4,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    cartIconButton: {
-        padding: 4,
-    },
-    labelWithIcon: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 0
-    },
-    editIcon: {
-        fontSize: 16,
-        marginLeft: 8,
-        color: '#7B2869',
+        paddingBottom: 12,
     },
     sectionTitleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginTop: 12,
-        marginBottom: 8,
+        marginBottom: 10,
     },
-
-    editButton: {
-        backgroundColor: '#7B2869',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
+    sectionTitleWithIcon: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: TEXT_DARK,
+    },
+    seeAllLink: {
+        fontSize: 12,
+        color: PRIMARY,
+        fontWeight: '700',
+    },
+    photoContainer: {
+        flexDirection: 'row',
+    },
+    photo: {
+        width: 104,
+        height: 104,
         borderRadius: 12,
-    },
-
-    editButtonText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: 'bold',
+        marginRight: 10,
+        backgroundColor: '#EEE',
     },
     detailsHeader: {
         flexDirection: 'row',
-        alignItems: 'baseline', // 🔥 aligns "Edit" with text baseline
-        marginTop: 12,
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 8,
+    },
+    editPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: PRIMARY_SOFT,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+    },
+    editLink: {
+        fontSize: 12,
+        color: PRIMARY,
+        fontWeight: '700',
+    },
+    detailBlock: {
+        paddingVertical: 8,
+    },
+    detailLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    detailLabel: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: TEXT_DARK,
+    },
+    detailValue: {
+        fontSize: 13,
+        color: TEXT_MUTED,
+        marginTop: 4,
+        lineHeight: 19,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: BORDER,
+    },
+    packageTabContainer: {
+        flexDirection: 'row',
+        marginBottom: 14,
+    },
+    packageTab: {
+        paddingVertical: 9,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+        marginRight: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: BORDER,
+        backgroundColor: CARD,
+    },
+    activePackageTab: {
+        backgroundColor: PRIMARY_LIGHT,
+        borderColor: PRIMARY,
+    },
+    packageTabText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: TEXT_MUTED,
+        textAlign: 'center',
+    },
+    activePackageTabText: {
+        color: '#FFFFFF',
+    },
+    packageDetails: {
+        marginTop: 2,
+    },
+    packageDetailItem: {
+        fontSize: 13,
+        marginTop: 6,
+        marginBottom: 6,
+        color: TEXT_MUTED,
+        lineHeight: 19,
+    },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 6,
+        marginTop: 6,
+        marginBottom: 4,
+    },
+    priceText: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: PRIMARY,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: BG,
+        gap: 10,
+    },
+    loadingText: {
+        color: TEXT_MUTED,
+        fontSize: 13,
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: BG,
+        padding: 24,
+    },
+    errorText: {
+        fontSize: 15,
+        color: '#D64545',
+        textAlign: 'center',
+        fontWeight: '600',
+    },
+    tabContent: {
+        padding: 16,
+    },
+    eventifyReview: {
+        backgroundColor: CARD,
+        padding: 16,
+        borderRadius: 16,
+        marginVertical: 8,
+        borderWidth: 1,
+        borderColor: BORDER,
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 1,
+    },
+    reviewTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 8,
+    },
+    avatarCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: PRIMARY_SOFT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarInitial: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: PRIMARY,
+    },
+    reviewerName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: TEXT_DARK,
+    },
+    reviewDate: {
+        fontSize: 11,
+        color: TEXT_MUTED,
+        marginTop: 1,
+    },
+    reviewText: {
+        fontSize: 13,
+        color: TEXT_DARK,
+        lineHeight: 19,
+    },
+    emptyReviews: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
         gap: 8,
     },
-
-    editLink: {
-        fontSize: 11, // Slightly smaller than sectionTitle
-        color: '#000',
-        textDecorationLine: 'underline',
-        paddingBottom: 2, // Fine-tuning vertical position if needed
+    emptyReviewsText: {
+        color: TEXT_MUTED,
+        fontSize: 13,
     },
-    coverImage: {
-        width: '100%',
-        height: 230,
-        resizeMode: 'cover', // Makes it behave like a banner
-        backgroundColor: '#fff', // Optional: fallback background
+    cartButton: {
+        marginTop: 10,
+        alignSelf: 'flex-end',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 18,
+        backgroundColor: PRIMARY,
+        borderRadius: 20,
     },
-
-
-
-    seeAllLink: {
+    cartButtonText: {
+        color: '#FFFFFF',
         fontSize: 12,
-        color: '#000',
-        textDecorationLine: 'underline',
-        fontWeight: '600',
-        alignItems: 'baseline',
+        fontWeight: '700',
     },
-
-
-
 });
 
 export default PhotographerDetailsScreen;
