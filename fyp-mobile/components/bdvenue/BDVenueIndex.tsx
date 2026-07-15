@@ -198,16 +198,25 @@ const BusinessDetailsForm = () => {
             </View>
 
             {/* Amenities */}
-            <View style={styles.card}>
-                <SectionTitle icon="concierge-bell" title="Amenities" required />
+            {/* Amenities */}
+<View style={styles.card}>
+    <SectionTitle icon="concierge-bell" title="Amenities" required />
+
                 <TextInput
-                    style={styles.input}
-                    placeholder="Enter amenities"
-                    placeholderTextColor="#B99DAF"
-                    value={amenities}
-                    onChangeText={setAmenities}
-                />
-            </View>
+                style={[styles.input, styles.textArea]}
+                multiline
+                placeholder={`e.g.
+     - Air Conditioning
+     - Bridal Room
+     - Sound System
+     - LED Lighting
+     - Free Wi-Fi
+     - Valet Parking`}
+                placeholderTextColor="#B99DAF"
+                value={amenities}
+                onChangeText={setAmenities}
+            />
+        </View>
 
             {/* Maximum People Capacity */}
             <View style={styles.card}>

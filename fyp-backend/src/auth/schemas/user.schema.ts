@@ -347,11 +347,11 @@ export const CateringBusinessDetailsSchema = SchemaFactory.createForClass(
 @Schema()
 export class VenueBusinessDetails extends BusinessDetails {
   @Prop({
-    type: String,
-    enum: ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET'],
-    required: true,
-  })
-  typeOfVenue: string[];
+  type: [String],
+  enum: ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET'],
+  default: [],
+})
+typeOfVenue: string[];
 
   @Prop({ required: true })
   expertise: string;
