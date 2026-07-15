@@ -18,7 +18,7 @@
 
 //fyp-mobile/dto/CreateVenueBusinessDetails.dto.ts
 export interface CreateVenueBusinessDetailsDto {
-    typeOfVenue: string;
+    typeOfVenue: string[]; 
     expertise: string;
     amenities: string;
     maximumPeopleCapacity?: number;

@@ -19,7 +19,7 @@
 
     //fyp-backend/src/vendor/dto/create-venue-business-details.dto.ts
     export class CreateVenueBusinessDetailsDto {
-    typeOfVenue: string; // ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET']
+    typeOfVenue: string[]; // ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET']
     expertise: string;
     amenities: string;
     maximumPeopleCapacity?: number;

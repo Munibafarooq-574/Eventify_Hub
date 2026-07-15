@@ -351,7 +351,7 @@ export class VenueBusinessDetails extends BusinessDetails {
     enum: ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET'],
     required: true,
   })
-  typeOfVenue: string;
+  typeOfVenue: string[];
 
   @Prop({ required: true })
   expertise: string;

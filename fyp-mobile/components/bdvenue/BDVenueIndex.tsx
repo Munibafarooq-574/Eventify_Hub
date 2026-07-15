@@ -31,7 +31,7 @@ const STAFF_GENDERS = [
 ];
 
 const BusinessDetailsForm = () => {
-    const [venueType, setVenueType] = useState<string | null>(null); // single select
+    const [venueType, setVenueType] = useState<string[]>([]);
     const [expertise, setExpertise] = useState<string>("");
     const [amenities, setAmenities] = useState<string>("");
     const [maximumPeopleCapacity, setMaximumPeopleCapacity] = useState<string>("");
@@ -48,6 +48,13 @@ const BusinessDetailsForm = () => {
     >(null);
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
 
+    const toggleVenueType = (label: string) => {
+    setVenueType((prev) =>
+        prev.includes(label)
+            ? prev.filter((item) => item !== label)
+            : [...prev, label]
+    );
+};
     const toggleCatering = (label: string) => {
         setCatering((prev) =>
             prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -62,7 +69,7 @@ const BusinessDetailsForm = () => {
 
     const submit = async () => {
         if (
-            !venueType ||
+            venueType.length === 0 ||
             !expertise ||
             !amenities ||
             catering.length === 0 ||
@@ -122,44 +129,68 @@ const BusinessDetailsForm = () => {
                 </View>
             </View>
 
-            {/* Venue Type - single select */}
+            {/* Venue Type - multi select */}
             <View style={styles.card}>
-                <SectionTitle icon="landmark" title="Venue Type" required />
-                <View style={styles.chipContainer}>
-                    {VENUE_TYPES.map((type) => {
-                        const isSelected = venueType === type.label;
-                        return (
-                            <TouchableOpacity
-                                key={type.label}
-                                activeOpacity={0.85}
-                                style={[styles.chip, isSelected && styles.chipSelected]}
-                                onPress={() => setVenueType(type.label)}
-                            >
-                                <FontAwesome5
-                                    name={type.icon}
-                                    size={16}
-                                    style={[styles.chipIcon, isSelected && styles.chipIconSelected]}
-                                />
-                                <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-                                    {type.label}
-                                </Text>
-                                {isSelected && (
-                                    <View style={styles.checkBadge}>
-                                        <FontAwesome5 name="check" size={8} color="#780C60" />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            </View>
+    <SectionTitle icon="landmark" title="Venue Type" required />
+    <Text style={styles.hint}>Select all that apply</Text>
+
+    <View style={styles.chipContainer}>
+        {VENUE_TYPES.map((type) => {
+            const isSelected = venueType.includes(type.label);
+
+            return (
+                <TouchableOpacity
+                    key={type.label}
+                    activeOpacity={0.85}
+                    style={[styles.chip, isSelected && styles.chipSelected]}
+                    onPress={() => toggleVenueType(type.label)}
+                >
+                    <FontAwesome5
+                        name={type.icon}
+                        size={16}
+                        style={[
+                            styles.chipIcon,
+                            isSelected && styles.chipIconSelected,
+                        ]}
+                    />
+
+                    <Text
+                        style={[
+                            styles.chipText,
+                            isSelected && styles.chipTextSelected,
+                        ]}
+                    >
+                        {type.label}
+                    </Text>
+
+                    {isSelected && (
+                        <View style={styles.checkBadge}>
+                            <FontAwesome5
+                                name="check"
+                                size={8}
+                                color="#780C60"
+                            />
+                        </View>
+                    )}
+                </TouchableOpacity>
+            );
+        })}
+    </View>
+</View>
 
             {/* Expertise */}
-            <View style={styles.card}>
-                <SectionTitle icon="star" title="Expertise" required />
+           <View style={styles.card}>
+    <SectionTitle icon="star" title="Expertise" required />
+
                 <TextInput
-                    style={styles.input}
-                    placeholder="Enter expertise"
+                    style={[styles.input, styles.textArea]}
+                    multiline
+                    placeholder={`e.g.
+                    - Weddings & Receptions
+                    - Corporate Events
+                    - Birthday Parties
+                    - Mehndi & Barat
+                    - Conferences & Seminars`}
                     placeholderTextColor="#B99DAF"
                     value={expertise}
                     onChangeText={setExpertise}
@@ -298,7 +329,12 @@ const BusinessDetailsForm = () => {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Enter description"
+                    placeholder={`e.g.
+                    • Spacious wedding venue
+                    • Capacity: 500 guests
+                    • Elegant lighting
+                    • Stage & sound setup
+                    • Generator backup`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -311,7 +347,12 @@ const BusinessDetailsForm = () => {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Add any special notes..."
+                    placeholder={`e.g.
+                    - Free parking for 50 cars
+                    - In-house sound system
+                    - Generator backup available
+                    - Bridal room available
+                    - Wheelchair accessible`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -341,19 +382,31 @@ const BusinessDetailsForm = () => {
 
             {/* Down Payment */}
             <View style={styles.card}>
-                <SectionTitle icon="wallet" title="Down Payment" required />
-                <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
-                    <TextInput
-                        style={styles.inputFlex}
-                        placeholder="Enter Down Payment"
-                        placeholderTextColor="#B99DAF"
-                        keyboardType="numeric"
-                        value={downPayment}
-                        onChangeText={setDownPayment}
-                    />
-                </View>
-            </View>
+    <SectionTitle icon="wallet" title="Down Payment" required />
+
+    <View style={styles.inputRow}>
+        {downPaymentType === "FIXED" && (
+            <Text style={styles.currencyPrefix}>Rs.</Text>
+        )}
+
+        <TextInput
+            style={styles.inputFlex}
+            keyboardType="numeric"
+            placeholder={
+                downPaymentType === "PERCENTAGE"
+                    ? "e.g. 20"
+                    : "Enter amount"
+            }
+            placeholderTextColor="#B99DAF"
+            value={downPayment}
+            onChangeText={setDownPayment}
+        />
+
+        {downPaymentType === "PERCENTAGE" && (
+            <Text style={styles.currencySuffix}>%</Text>
+        )}
+    </View>
+</View>
 
             {/* Covid Compliant */}
             <View style={styles.card}>
@@ -561,6 +614,12 @@ const styles = StyleSheet.create({
         color: "#780C60",
         marginRight: 6,
     },
+    currencySuffix: {
+            fontSize: 14,
+            fontWeight: "700",
+            color: "#780C60",
+            marginLeft: 6,
+        },
     inputFlex: {
         flex: 1,
         fontSize: 14,
