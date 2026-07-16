@@ -1,8 +1,10 @@
 import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import patchBusinessDetails from "@/services/patchBusinessDetails";
 import {
   Alert,
   ScrollView,
@@ -63,6 +65,7 @@ const SERVICES = [
 ];
 
 const BusinessDetailsForm = () => {
+    const { edit, userId } = useLocalSearchParams();
     const [expertise, setExpertise] = useState<string[]>([]);
 const [travelsToClientHome, setTravelsToClientHome] =
   useState<"YES" | "NO" | null>(null);
@@ -96,6 +99,41 @@ const [cancellationPolicy, setCancellationPolicy] =
 
 const [covidCompliant, setCovidCompliant] =
   useState<"YES" | "NO" | null>(null);
+  useEffect(() => {
+  if (edit !== "true") return;
+
+  const loadData = async () => {
+    try {
+      const res = await axios.get(
+        `https://eventify-hub.onrender.com/vendor?userId=${userId}`
+      );
+
+      const data = res.data.cateringBusinessDetails;
+
+      setExpertise(data.expertise || []);
+      setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
+      setCityCovered(data.cityCovered || "");
+      setStaffGender(data.staff || []);
+      setFoodTesting(!!data.provideFoodTesting);
+      setSoundSystem(!!data.provideSoundSystem);
+      setDecoration(!!data.provideDecoration);
+      setSeatingArrangement(!!data.provideSeatingArrangement);
+      setWaiters(!!data.provideWaiters);
+      setCutlery(!!data.provideCutleryAndPlates);
+      setMinimumPrice(data.minimumPrice?.toString() || "");
+      setDescription(data.description || "");
+      setAdditionalInfo(data.additionalInfo || "");
+      setDownPaymentType(data.downPaymentType || null);
+      setDownPayment(data.downPayment?.toString() || "");
+      setCancellationPolicy(data.cancellationPolicy || null);
+      setCovidCompliant(data.covidCompliant || null);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  loadData();
+}, []);
   const toggleExpertise = (item: string) => {
   setExpertise((prev) =>
     prev.includes(item)
@@ -166,62 +204,45 @@ const submit = async () => {
             (await getSecureData("user")) || ""
         );
 
-        await postCateringBusinessDetails(
-            user._id,
-            {
+        const dto = {
+  expertise,
+  travelsToClientHome: travelsToClientHome === "YES",
+  cityCovered,
+  staff: staffGender,
+  provideFoodTesting: foodTesting,
+  provideDecoration: decoration,
+  provideSoundSystem: soundSystem,
+  provideSeatingArrangement: seatingArrangement,
+  provideWaiters: waiters,
+  provideCutleryAndPlates: cutlery,
+  minimumPrice: Number(minimumPrice),
+  description,
+  additionalInfo,
+  downPaymentType,
+  downPayment: Number(downPayment),
+  cancellationPolicy,
+  covidCompliant,
+};
 
-                expertise,
+if (edit === "true") {
+  await patchBusinessDetails(user._id, dto);
 
-                travelsToClientHome:
-                    travelsToClientHome === "YES",
+  Alert.alert(
+    "Success",
+    "Business details updated successfully!"
+  );
 
-                cityCovered: cityCovered,
+  router.back();
+} else {
+  await postCateringBusinessDetails(user._id, dto);
 
-                staff: staffGender,
+  Alert.alert(
+    "Success",
+    "Business details saved successfully!"
+  );
 
-                provideFoodTesting:
-                    foodTesting,
-
-                provideDecoration:
-                    decoration,
-
-                provideSoundSystem:
-                    soundSystem,
-
-                provideSeatingArrangement:
-                    seatingArrangement,
-
-                provideWaiters:
-                    waiters,
-
-                provideCutleryAndPlates:
-                    cutlery,
-
-                minimumPrice:
-                    Number(minimumPrice),
-
-                description,
-
-                additionalInfo,
-
-                downPaymentType,
-
-                downPayment:
-                    Number(downPayment),
-
-                cancellationPolicy,
-
-                covidCompliant,
-
-            }
-        );
-
-        Alert.alert(
-            "Success",
-            "Business details saved successfully!"
-        );
-
-        router.push("/packages");
+  router.push("/packages");
+}
 
     } catch (err) {
 
@@ -790,8 +811,10 @@ i===2 && styles.dotAccent
         onPress={submit}
     >
         <Text style={styles.buttonText}>
-            Save & Continue
-        </Text>
+    {edit === "true"
+        ? "Update Details"
+        : "Save & Continue"}
+</Text>
 
         <FontAwesome5
             name="arrow-right"

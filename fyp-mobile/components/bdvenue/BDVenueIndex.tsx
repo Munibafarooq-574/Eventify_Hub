@@ -546,7 +546,11 @@ console.log("USER ID PARAM:", userId);
                     <Text style={styles.backButtonText}>Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveButton} activeOpacity={0.9} onPress={submit}>
-                    <Text style={styles.buttonText}>Save & Continue</Text>
+                    <Text style={styles.buttonText}>
+    {edit === "true"
+        ? "Update Details"
+        : "Save & Continue"}
+</Text>
                     <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>

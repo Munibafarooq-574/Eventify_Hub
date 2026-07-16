@@ -440,7 +440,11 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     onPress={() => {
                          submit();
                     }}>
-                    <Text style={styles.buttonText}>Save & Continue</Text>
+                    <Text style={styles.buttonText}>
+    {edit === "true"
+        ? "Update Details"
+        : "Save & Continue"}
+</Text>
                     <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>

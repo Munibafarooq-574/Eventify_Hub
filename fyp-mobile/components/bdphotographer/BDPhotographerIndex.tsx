@@ -1,8 +1,10 @@
 import postPhotographyBusinessDetails from "@/services/postPhotographyBusinessDetails";
+import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Alert,
   ScrollView,
@@ -77,7 +79,7 @@ const SectionTitle = ({
 );
 
 const BusinessDetailsScreen = () => {
-
+  const { edit, userId } = useLocalSearchParams();
   // ==========================
   // Multi Select States
   // ==========================
@@ -125,6 +127,41 @@ const BusinessDetailsScreen = () => {
 
   const [downPayment, setDownPayment] = useState("");
 
+  useEffect(() => {
+  if (edit !== "true") return;
+
+  const loadData = async () => {
+    try {
+      const res = await axios.get(
+        `https://eventify-hub.onrender.com/vendor?userId=${userId}`
+      );
+
+      const data = res.data.photographerBusinessDetails;
+
+      setPhotographyTypes(data.photographyTypes || []);
+      setEquipment(data.equipment || []);
+      setEditingServices(data.editingServices || []);
+      setStaffGender(data.staffGender || []);
+      setPhotoStyle(data.photoStyle || []);
+      setTravelsToClientHome(
+        data.travelsToClientHome ? "YES" : "NO"
+      );
+      setDeliveryTime(data.deliveryTime || "");
+      setCityCovered(data.cityCovered || "");
+      setMinimumPrice(data.minimumPrice?.toString() || "");
+      setDescription(data.description || "");
+      setAdditionalInfo(data.additionalInfo || "");
+      setDownPaymentType(data.downPaymentType || null);
+      setDownPayment(data.downPayment?.toString() || "");
+      setCovidCompliant(data.covidCompliant || null);
+      setRefundPolicy(data.covidRefundPolicy || null);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  loadData();
+}, [edit, userId]);
   // ==========================
   // Toggle Functions
   // ==========================
@@ -204,47 +241,46 @@ const BusinessDetailsScreen = () => {
 
       const user = JSON.parse(await getSecureData("user") || "");
 
-      await postPhotographyBusinessDetails(user._id, {
+      const dto = {
+  photographyTypes,
+  equipment,
+  editingServices,
+  staffGender,
+  photoStyle,
+  travelsToClientHome: travelsToClientHome === "YES",
+  deliveryTime,
+  cityCovered,
+  minimumPrice: Number(minimumPrice),
+  description,
+  additionalInfo,
+  downPaymentType,
+  downPayment: Number(downPayment),
+  covidCompliant,
+  covidRefundPolicy: refundPolicy,
+};
 
-        photographyTypes,
+if (edit === "true") {
 
-        equipment,
+  await patchBusinessDetails(user._id, dto);
 
-        editingServices,
+  Alert.alert(
+    "Success",
+    "Business Details Updated Successfully."
+  );
 
-        staffGender,
+  router.back();
 
-        photoStyle,
+} else {
 
-        travelsToClientHome:
-          travelsToClientHome === "YES",
+  await postPhotographyBusinessDetails(user._id, dto);
 
-        deliveryTime,
+  Alert.alert(
+    "Success",
+    "Business Details Saved Successfully."
+  );
 
-        cityCovered,
-
-        minimumPrice: Number(minimumPrice),
-
-        description,
-
-        additionalInfo,
-
-        downPaymentType,
-
-        downPayment: Number(downPayment),
-
-        covidCompliant,
-
-        covidRefundPolicy: refundPolicy,
-
-      });
-
-      Alert.alert(
-        "Success",
-        "Business Details Saved Successfully."
-      );
-
-      router.push("/packages");
+  router.push("/packages");
+}
 
     } catch (error) {
 
@@ -1360,8 +1396,10 @@ const BusinessDetailsScreen = () => {
     >
 
         <Text style={styles.buttonText}>
-            Save & Continue
-        </Text>
+    {edit === "true"
+        ? "Update Details"
+        : "Save & Continue"}
+</Text>
 
         <FontAwesome5
             name="arrow-right"

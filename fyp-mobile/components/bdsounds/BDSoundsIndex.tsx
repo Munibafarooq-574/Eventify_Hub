@@ -1,8 +1,10 @@
 import postSoundBusinessDetails from "@/services/Postsoundbusinessdetails";
+import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import axios from "axios";
+import React, { useEffect, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -35,6 +37,7 @@ const STAFF_GENDERS = [
 ];
 
 const BDSoundIndex = () => {
+    const { edit, userId } = useLocalSearchParams();
     // Multi-select: vendor can offer more than one sound/DJ type, equipment, or staff gender
     const [soundType, setSoundType] = useState<string[]>([]);
     const [equipmentProvided, setEquipmentProvided] = useState<string[]>([]);
@@ -48,6 +51,37 @@ const BDSoundIndex = () => {
     const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
     const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null>(null);
+
+    useEffect(() => {
+  if (edit !== "true") return;
+
+  const loadData = async () => {
+    try {
+      const res = await axios.get(
+        `https://eventify-hub.onrender.com/vendor?userId=${userId}`
+      );
+
+      const data = res.data.soundBusinessDetails;
+
+      setSoundType(data.soundType || []);
+      setEquipmentProvided(data.equipmentProvided || []);
+      setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
+      setCityCovered(data.cityCovered || "");
+      setStaffGender(data.staffGender || []);
+      setMinimumPrice(data.minimumPrice?.toString() || "");
+      setDescription(data.description || "");
+      setAdditionalInfo(data.additionalInfo || "");
+      setDownPaymentType(data.downPaymentType || null);
+      setDownPayment(data.downPayment?.toString() || "");
+      setCovidCompliant(data.covidCompliant || null);
+      setCancellationPolicy(data.cancellationPolicy || null);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  loadData();
+}, []);
 
     const toggleSoundType = (label: string) => {
         setSoundType((prev) =>
@@ -89,22 +123,40 @@ const BDSoundIndex = () => {
 
         try {
             const user = JSON.parse(await getSecureData("user") || "");
-            await postSoundBusinessDetails(user._id, {
-                soundType,
-                equipmentProvided,
-                travelsToClientHome: travel,
-                cityCovered,
-                staffGender,
-                minimumPrice: Number(minimumPrice),
-                description,
-                additionalInfo: additionalInfo || undefined,
-                downPaymentType,
-                downPayment: Number(downPayment),
-                covidCompliant,
-                cancellationPolicy,
-            });
-            Alert.alert("Success", "Business details saved successfully!");
-            router.push("/packages");
+            const dto = {
+    soundType,
+    equipmentProvided,
+    travelsToClientHome: travel,
+    cityCovered,
+    staffGender,
+    minimumPrice: Number(minimumPrice),
+    description,
+    additionalInfo: additionalInfo || undefined,
+    downPaymentType,
+    downPayment: Number(downPayment),
+    covidCompliant,
+    cancellationPolicy,
+};
+
+if (edit === "true") {
+    await patchBusinessDetails(user._id, dto);
+
+    Alert.alert(
+        "Success",
+        "Business details updated successfully!"
+    );
+
+    router.back();
+} else {
+    await postSoundBusinessDetails(user._id, dto);
+
+    Alert.alert(
+        "Success",
+        "Business details saved successfully!"
+    );
+
+    router.push("/packages");
+}
         } catch (error) {
             console.error("Error:", error);
             Alert.alert("Error", "Something went wrong. Please try again.");
@@ -386,7 +438,11 @@ const BDSoundIndex = () => {
                     onPress={() => {
                         submit();
                     }}>
-                    <Text style={styles.buttonText}>Save & Continue</Text>
+                    <Text style={styles.buttonText}>
+    {edit === "true"
+        ? "Update Details"
+        : "Save & Continue"}
+</Text>
                     <FontAwesome5 name="arrow-right" size={13} color="#FFF" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
             </View>

@@ -26,6 +26,18 @@ const VendorProfileDetailsScreen: React.FC = () => {
 
     const [reviews, setReviews] = useState<any[]>([]);
 
+
+    const getBusinessDetailsRoute = () => {
+    if (vendorData?.photographerBusinessDetails) return "/bdphotographer";
+    if (vendorData?.salonBusinessDetails) return "/bdsalon";
+    if (vendorData?.venueBusinessDetails) return "/bdvenue";
+    if (vendorData?.cateringBusinessDetails) return "/bdcatering";
+    if (vendorData?.cakeBusinessDetails) return "/bdcakes";
+    if (vendorData?.mehndiBusinessDetails) return "/bdmehndi";
+    if (vendorData?.soundBusinessDetails) return "/bdsounds";
+
+    return "/bdvenue"; // fallback
+};
     const fetchReviews = async () => {
         try {
             const data = await getVendorReviews(vendorData._id);
@@ -75,6 +87,25 @@ const VendorProfileDetailsScreen: React.FC = () => {
             </View>
         );
     }
+
+    const businessDetails =
+    vendorData?.photographerBusinessDetails ||
+    vendorData?.salonBusinessDetails ||
+    vendorData?.venueBusinessDetails ||
+    vendorData?.cateringBusinessDetails ||
+    vendorData?.cakeBusinessDetails ||
+    vendorData?.mehndiBusinessDetails ||
+    vendorData?.soundBusinessDetails;
+
+const category =
+    vendorData?.photographerBusinessDetails ? "photographer" :
+    vendorData?.salonBusinessDetails ? "salon" :
+    vendorData?.venueBusinessDetails ? "venue" :
+    vendorData?.cateringBusinessDetails ? "catering" :
+    vendorData?.cakeBusinessDetails ? "cake" :
+    vendorData?.mehndiBusinessDetails ? "mehndi" :
+    vendorData?.soundBusinessDetails ? "sound" :
+    "";
     // add test id 
     if (!vendorData) {
         return (
@@ -162,7 +193,7 @@ const VendorProfileDetailsScreen: React.FC = () => {
                             </Text>
                             <View style={styles.priceBadge}>
                                 <Text testID="vendor-price" style={styles.price}>
-                                    Rs. {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
+                                    Rs. {businessDetails?.minimumPrice || "N/A"}/-
                                 </Text>
                                 
                             </View>
@@ -221,70 +252,292 @@ const VendorProfileDetailsScreen: React.FC = () => {
                                 <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
                                 <Text style={styles.sectionTitle}>Details</Text>
                             </View>
-                            <TouchableOpacity
-  onPress={() =>
-    router.push({
-      pathname: "/bdvenue",
-      params: {
-        edit: "true",
-        userId: vendorData._id,
-      },
-    })
-  }
-  activeOpacity={0.7}
+                           <TouchableOpacity
+    onPress={() =>
+        router.push({
+            pathname: getBusinessDetailsRoute() as any,
+            params: {
+                edit: "true",
+                userId: vendorData._id,
+            },
+        })
+    }
+    activeOpacity={0.7}
 >
-                                <View style={styles.editPill}>
-                                    <Ionicons name="pencil-outline" size={12} color={PRIMARY} />
-                                    <Text style={styles.editLink}>Edit</Text>
-                                </View>
-                            </TouchableOpacity>
-                        </View>
+    <View style={styles.editPill}>
+        <Ionicons name="pencil-outline" size={12} color={PRIMARY} />
+        <Text style={styles.editLink}>Edit</Text>
+    </View>
+</TouchableOpacity>
+ </View>
 
-                        <View style={styles.detailBlock}>
-                            <View style={styles.detailLabelRow}>
-                                <Ionicons name="people-outline" size={15} color={TEXT_MUTED} />
-                                <Text style={styles.detailLabel}>Staff</Text>
-                            </View>
-                            <Text style={styles.detailValue}>
-                        {vendorData?.venueBusinessDetails?.staff?.join(', ') || "N/A"}
-                            </Text>
-                        </View>
+                      {category === "cake" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Cake Types</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cakeTypes?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Delivery Options</Text>
+      <Text style={styles.detailValue}>{businessDetails?.deliveryOptions?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Delivery To Home</Text>
+      <Text style={styles.detailValue}>{businessDetails?.deliveryToHome ? "YES" : "NO"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Expertise</Text>
+      <Text style={styles.detailValue}>{businessDetails?.expertise || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.divider} />
+{category === "catering" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Expertise</Text>
+      <Text style={styles.detailValue}>{businessDetails?.expertise?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staff?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Travels To Client Home</Text>
+      <Text style={styles.detailValue}>{businessDetails?.travelsToClientHome ? "YES" : "NO"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Services Provided</Text>
+      <Text style={styles.detailValue}>
+        {[
+          businessDetails?.provideFoodTesting && "Food Testing",
+          businessDetails?.provideDecoration && "Decoration",
+          businessDetails?.provideSoundSystem && "Sound System",
+          businessDetails?.provideSeatingArrangement && "Seating",
+          businessDetails?.provideWaiters && "Waiters",
+          businessDetails?.provideCutleryAndPlates && "Cutlery & Plates",
+        ].filter(Boolean).join(", ") || "N/A"}
+      </Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.detailBlock}>
-                            <View style={styles.detailLabelRow}>
-                                <Ionicons name="shield-checkmark-outline" size={15} color={TEXT_MUTED} />
-                                <Text style={styles.detailLabel}>Cancellation Policy</Text>
-                            </View>
-                            <Text style={styles.detailValue}>
-                    {vendorData?.venueBusinessDetails?.cancellationPolicy || "N/A"}
-                            </Text>
-                        </View>
+{category === "mehndi" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Mehndi Type</Text>
+      <Text style={styles.detailValue}>{businessDetails?.mehndiType?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff Gender</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staffGender?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Travels To Client Home</Text>
+      <Text style={styles.detailValue}>{businessDetails?.travelsToClientHome ? "YES" : "NO"}</Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.divider} />
+{category === "photographer" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Photography Types</Text>
+      <Text style={styles.detailValue}>{businessDetails?.photographyTypes?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Equipment</Text>
+      <Text style={styles.detailValue}>{businessDetails?.equipment?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Editing Services</Text>
+      <Text style={styles.detailValue}>{businessDetails?.editingServices?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Photo Style</Text>
+      <Text style={styles.detailValue}>{businessDetails?.photoStyle?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff Gender</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staffGender?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Delivery Time</Text>
+      <Text style={styles.detailValue}>{businessDetails?.deliveryTime || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Refund Policy</Text>
+      <Text style={styles.detailValue}>{businessDetails?.covidRefundPolicy || "N/A"}</Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.detailBlock}>
-                            <View style={styles.detailLabelRow}>
-                                <Ionicons name="map-outline" size={15} color={TEXT_MUTED} />
-                                <Text style={styles.detailLabel}>Cities Covered</Text>
-                            </View>
-                            <Text style={styles.detailValue}>
-                                {vendorData?.BusinessDetails?.cityCovered || "N/A"}
-                            </Text>
-                        </View>
+{category === "salon" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Type</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staffType || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Expertise</Text>
+      <Text style={styles.detailValue}>{businessDetails?.expertise || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff Gender</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staffGender?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Travels To Client Home</Text>
+      <Text style={styles.detailValue}>{businessDetails?.travelsToClientHome ? "YES" : "NO"}</Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.divider} />
+{category === "sound" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Sound/DJ Type</Text>
+      <Text style={styles.detailValue}>{businessDetails?.soundType?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Equipment Provided</Text>
+      <Text style={styles.detailValue}>{businessDetails?.equipmentProvided?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff Gender</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staffGender?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>City Covered</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cityCovered || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Travels To Client Home</Text>
+      <Text style={styles.detailValue}>{businessDetails?.travelsToClientHome ? "YES" : "NO"}</Text>
+    </View>
+  </>
+)}
 
-                        <View style={styles.detailBlock}>
-                            <View style={styles.detailLabelRow}>
-                                <Ionicons name="document-text-outline" size={15} color={TEXT_MUTED} />
-                                <Text style={styles.detailLabel}>Description</Text>
-                            </View>
-                            <Text style={styles.detailValue}>
-                                {vendorData?.BusinessDetails?.description || "N/A"}
-                            </Text>
-                        </View>
+{category === "venue" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Venue Type</Text>
+      <Text style={styles.detailValue}>{businessDetails?.typeOfVenue?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Expertise</Text>
+      <Text style={styles.detailValue}>{businessDetails?.expertise || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Amenities</Text>
+      <Text style={styles.detailValue}>{businessDetails?.amenities || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Max People Capacity</Text>
+      <Text style={styles.detailValue}>{businessDetails?.maximumPeopleCapacity ?? "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Catering</Text>
+      <Text style={styles.detailValue}>{businessDetails?.catering?.join(", ") || "N/A"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Parking</Text>
+      <Text style={styles.detailValue}>{businessDetails?.parking ? "YES" : "NO"}</Text>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Staff</Text>
+      <Text style={styles.detailValue}>{businessDetails?.staff?.join(", ") || "N/A"}</Text>
+    </View>
+  </>
+)}
+
+{/* Common fields for ALL categories */}
+<View style={styles.divider} />
+<View style={styles.detailBlock}>
+  <Text style={styles.detailLabel}>Cancellation Policy</Text>
+  <Text style={styles.detailValue}>{businessDetails?.cancellationPolicy || "N/A"}</Text>
+</View>
+<View style={styles.divider} />
+<View style={styles.detailBlock}>
+  <Text style={styles.detailLabel}>Down Payment</Text>
+  <Text style={styles.detailValue}>
+    {businessDetails?.downPaymentType ? `${businessDetails.downPaymentType} - ${businessDetails.downPayment ?? "N/A"}` : "N/A"}
+  </Text>
+</View>
+<View style={styles.divider} />
+<View style={styles.detailBlock}>
+  <Text style={styles.detailLabel}>COVID Compliant</Text>
+  <Text style={styles.detailValue}>{businessDetails?.covidCompliant || "N/A"}</Text>
+</View>
+<View style={styles.divider} />
+<View style={styles.detailBlock}>
+  <Text style={styles.detailLabel}>Description</Text>
+  <Text style={styles.detailValue}>{businessDetails?.description || "N/A"}</Text>
+</View>
+<View style={styles.divider} />
+<View style={styles.detailBlock}>
+  <Text style={styles.detailLabel}>Additional Notes</Text>
+  <Text style={styles.detailValue}>{businessDetails?.additionalInfo || "N/A"}</Text>
+</View>
                     </View>
                 </View>
             )}
