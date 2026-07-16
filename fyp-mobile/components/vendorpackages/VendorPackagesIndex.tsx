@@ -1,12 +1,10 @@
-
-
 import deletePackage from '@/services/deletePackage';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons'; // For icons
 import { useRoute } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 
@@ -65,13 +63,17 @@ const PackageScreen = () => {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={24} color="#000" />
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    style={styles.headerIconButton}
+                    activeOpacity={0.75}
+                >
+                    <Ionicons name="arrow-back" size={22} color="#780C60" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{packageDetails ? packageDetails.packageName : ""}</Text>
-                <TouchableOpacity>
-                    <Ionicons name="notifications-outline" size={24} color="#000" />
-                </TouchableOpacity>
+
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                    {packageDetails ? packageDetails.packageName : "Package"}
+                </Text>
             </View>
 
             {/* Buttons */}
@@ -79,15 +81,12 @@ const PackageScreen = () => {
                 <TouchableOpacity
                     style={styles.deleteButton}
                     onPress={() => setModalVisible(true)} // Open modal on delete
+                    activeOpacity={0.85}
                 >
+                    <Ionicons name="trash-outline" size={16} color="#fff" />
                     <Text style={styles.deleteText}>Delete</Text>
                 </TouchableOpacity>
-                {/* <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => router.push('/editpackage')}
-                >
-                    <Text style={styles.editText}>Edit ✎</Text>
-                </TouchableOpacity> */}
+
                 <TouchableOpacity
                     style={styles.editButton}
                     onPress={() =>
@@ -96,60 +95,61 @@ const PackageScreen = () => {
                             params: { packageId: packageDetails?._id },
                         })
                     }
+                    activeOpacity={0.85}
                 >
-                    <Text style={styles.editText}>Edit ✎</Text>
+                    <Ionicons name="pencil-outline" size={16} color="#780C60" />
+                    <Text style={styles.editText}>Edit</Text>
                 </TouchableOpacity>
-
-
             </View>
 
             {/* Content */}
-            {/* <View style={styles.content}>
-                <Text style={styles.sectionHeader}>Deliverables</Text>
-                <Text style={styles.sectionText}>
-                    Including Photography Videography Master Video + Highlights Couple Photoshoot Family shoot One digital
-                    album One Videographer & One Photographer
-                </Text>
-
-                <Text style={styles.sectionHeader}>Photography</Text>
-                <Text style={styles.sectionText}>Photo albums (80 photos)</Text>
-
-                <Text style={styles.sectionHeader}>Team</Text>
-                <Text style={styles.sectionText}>1 photographer{'\n'}1 Videographer</Text>
-
-                <Text style={styles.sectionHeader}>Videography</Text>
-                <Text style={styles.sectionText}>
-                    Couple video highlights (Upto 2 mins){'\n'}Event video highlights (Upto 4 mins){'\n'}Full Video Events
-                </Text>
-
-                <Text style={styles.priceText}>Rs. 50,000/-</Text>
-            </View> */}
-
             <View style={styles.content}>
                 {packageDetails ? (
-                    <>
-                        <Text style={styles.sectionHeader}>Package Name</Text>
-                        <Text style={styles.sectionText}>{packageDetails.packageName}</Text>
+                    <View style={styles.card}>
 
-                        <Text style={styles.sectionHeader}>Price</Text>
-                        <Text style={styles.sectionText}>Rs. {packageDetails.price || 'N/A'}</Text>
+                        <View style={styles.priceHero}>
+                            <Text style={styles.priceHeroLabel}>Package Price</Text>
+                            <Text style={styles.priceHeroValue}>
+                                Rs. {packageDetails.price || 'N/A'}
+                            </Text>
+                        </View>
 
-                        <Text style={styles.sectionHeader}>Services</Text>
-                        <Text style={styles.sectionText}>{packageDetails.services || 'N/A'}</Text>
-                    </>
+                        <View style={styles.infoRow}>
+                            <View style={styles.infoIconCircle}>
+                                <Ionicons name="pricetag-outline" size={16} color="#780C60" />
+                            </View>
+                            <View style={styles.infoTextWrapper}>
+                                <Text style={styles.sectionHeader}>Package Name</Text>
+                                <Text style={styles.sectionText}>{packageDetails.packageName}</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.infoRow}>
+                            <View style={styles.infoIconCircle}>
+                                <Ionicons name="list-outline" size={16} color="#780C60" />
+                            </View>
+                            <View style={styles.infoTextWrapper}>
+                                <Text style={styles.sectionHeader}>Services</Text>
+                                <Text style={styles.sectionText}>{packageDetails.services || 'N/A'}</Text>
+                            </View>
+                        </View>
+
+                    </View>
                 ) : (
-                    <Text style={styles.sectionText}>Loading package details...</Text>
+                    <View style={styles.loadingBox}>
+                        <Text style={styles.sectionText}>Loading package details...</Text>
+                    </View>
                 )}
             </View>
-
-
 
 
             {/* Bottom Navigation */}
 
             <BottomNavigationFinal />
 
-            {/* Logout Confirmation Modal */}
+            {/* Delete Confirmation Modal */}
             <Modal
                 animationType="slide"
                 transparent={true}
@@ -158,20 +158,27 @@ const PackageScreen = () => {
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
+
+                        <View style={styles.modalIconCircle}>
+                            <Ionicons name="trash-outline" size={26} color="#D9534F" />
+                        </View>
+
                         <Text style={styles.modalTitle}>Confirm Delete</Text>
                         <Text style={styles.modalMessage}>
-                            Are you sure you want to delete this package?
+                            Are you sure you want to delete this package? This action cannot be undone.
                         </Text>
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={styles.cancelButton}
                                 onPress={cancelLogout}
+                                activeOpacity={0.8}
                             >
                                 <Text style={styles.cancelButtonText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.confirmButton}
                                 onPress={confirmLogout}
+                                activeOpacity={0.85}
                             >
                                 <Text style={styles.confirmButtonText}>Delete</Text>
                             </TouchableOpacity>
@@ -186,7 +193,7 @@ const PackageScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8E9F0',
+        backgroundColor: '#FDF5FB',
         paddingTop: 70,
     },
     header: {
@@ -195,51 +202,158 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
     },
+    headerIconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+
+        shadowColor: '#780C60',
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
+    },
     headerTitle: {
-        color: '#000',
-        fontSize: 24,
-        fontWeight: 'bold',
+        color: '#3D1633',
+        fontSize: 20,
+        fontWeight: '800',
+        flex: 1,
+        textAlign: 'center',
+        marginHorizontal: 10,
     },
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginVertical: 10,
+        marginVertical: 16,
         paddingHorizontal: 20,
     },
     deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#D9534F',
-        paddingVertical: 8,
+        paddingVertical: 9,
         paddingHorizontal: 16,
-        borderRadius: 8,
+        borderRadius: 30,
         marginRight: 10,
+
+        shadowColor: '#D9534F',
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
     },
     editButton: {
-        backgroundColor: '#B3A394',
-        paddingVertical: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3D9EC',
+        paddingVertical: 9,
         paddingHorizontal: 16,
-        borderRadius: 8,
+        borderRadius: 30,
+        borderWidth: 1,
+        borderColor: '#E9C1DE',
     },
     deleteText: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontWeight: '700',
+        fontSize: 13,
+        marginLeft: 6,
     },
     editText: {
-        color: '#2d0539',
-        fontWeight: 'bold',
+        color: '#780C60',
+        fontWeight: '700',
+        fontSize: 13,
+        marginLeft: 6,
     },
     content: {
         padding: 20,
+        paddingTop: 0,
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#F1D5E8',
+
+        shadowColor: '#780C60',
+        shadowOpacity: 0.1,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 5,
+    },
+    priceHero: {
+        backgroundColor: '#780C60',
+        borderRadius: 18,
+        paddingVertical: 18,
+        alignItems: 'center',
+        marginBottom: 18,
+
+        shadowColor: '#780C60',
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+    },
+    priceHeroLabel: {
+        color: '#EAC8DE',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+        marginBottom: 6,
+    },
+    priceHeroValue: {
+        color: '#fff',
+        fontSize: 30,
+        fontWeight: '800',
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 4,
+    },
+    infoIconCircle: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#F9E7F3',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+        marginTop: 2,
+    },
+    infoTextWrapper: {
+        flex: 1,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#F3E4EE',
+        marginVertical: 14,
     },
     sectionHeader: {
-        color: '#000',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginTop: 10,
+        color: '#8A7A85',
+        fontSize: 12,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
+        marginBottom: 4,
     },
     sectionText: {
-        color: '#000',
-        fontSize: 14,
-        marginTop: 4,
+        color: '#2E2130',
+        fontSize: 15,
+        lineHeight: 21,
+        fontWeight: '500',
+    },
+    loadingBox: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 30,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#F1D5E8',
     },
     priceText: {
         color: '#000',
@@ -251,24 +365,36 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(61, 22, 51, 0.5)',
     },
     modalContent: {
-        width: '80%',
+        width: '82%',
         backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
+        padding: 24,
+        borderRadius: 22,
         alignItems: 'center',
+    },
+    modalIconCircle: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: '#FBEAEA',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 14,
     },
     modalTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 10,
+        fontWeight: '800',
+        color: '#3D1633',
+        marginBottom: 8,
     },
     modalMessage: {
-        fontSize: 14,
+        fontSize: 13.5,
+        color: '#7A6874',
         textAlign: 'center',
-        marginBottom: 20,
+        marginBottom: 22,
+        lineHeight: 19,
     },
     modalButtons: {
         flexDirection: 'row',
@@ -278,24 +404,32 @@ const styles = StyleSheet.create({
     cancelButton: {
         flex: 1,
         marginRight: 10,
-        padding: 10,
-        borderRadius: 5,
-        backgroundColor: '#E0E0E0',
+        paddingVertical: 12,
+        borderRadius: 14,
+        backgroundColor: '#F2EEF1',
         alignItems: 'center',
     },
     confirmButton: {
         flex: 1,
         marginLeft: 10,
-        padding: 10,
-        borderRadius: 5,
+        paddingVertical: 12,
+        borderRadius: 14,
         backgroundColor: '#D9534F',
         alignItems: 'center',
+
+        shadowColor: '#D9534F',
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
     },
     cancelButtonText: {
-        color: '#000',
+        color: '#3D1633',
+        fontWeight: '700',
     },
     confirmButtonText: {
         color: '#fff',
+        fontWeight: '700',
     },
     footer: {
         position: 'absolute',
@@ -317,8 +451,7 @@ const styles = StyleSheet.create({
     },
 
     homeButton: {
-        // marginBottom: 30, // Moves the Home button slightly upward
-        transform: [{ translateY: -10 }], // Alternatively, use translateY to lift it
+        transform: [{ translateY: -10 }],
     },
     bottomNavigation: {
         flexDirection: 'row',

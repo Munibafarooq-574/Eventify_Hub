@@ -548,126 +548,260 @@ const category =
             )}
 
             {activeTab === "Packages" && (
-                <View style={styles.detailsContainer}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.packageTabContainer}
-                        contentContainerStyle={{ paddingRight: 8 }}
+    <View style={styles.detailsContainer}>
+
+        {/* Package Selector Cards */}
+        <Text style={styles.packagesSectionTitle}>Choose a Package</Text>
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.packageTabContainer}
+            contentContainerStyle={{ paddingRight: 8 }}
+        >
+            {vendorData.packages.map((pkg: any, idx: number) => {
+                const isActive = activePackage === pkg._id;
+                return (
+                    <TouchableOpacity
+                        key={pkg._id}
+                        style={[styles.packageCard, isActive && styles.activePackageCard]}
+                        onPress={() => setActivePackage(pkg._id)}
+                        activeOpacity={0.85}
                     >
-                        {vendorData.packages.map((pkg: any) => (
-                            <TouchableOpacity
-                                key={pkg._id}
-                                style={[
-                                    styles.packageTab,
-                                    activePackage === pkg._id && styles.activePackageTab,
-                                ]}
-                                onPress={() => setActivePackage(pkg._id)}
-                                activeOpacity={0.8}
-                            >
-                                <Text
-                                    style={[
-                                        styles.packageTabText,
-                                        activePackage === pkg._id && styles.activePackageTabText,
-                                    ]}
-                                >
-                                    {pkg.packageName}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-
-                        <TouchableOpacity
-                            style={styles.packageTab}
-                            onPress={() => setActivePackage(null)} // deselect packages
-                            activeOpacity={0.8}
+                        <View style={[styles.packageCardIconWrap, isActive && styles.packageCardIconWrapActive]}>
+                            <Ionicons
+                                name="gift-outline"
+                                size={18}
+                                color={isActive ? '#FFFFFF' : PRIMARY}
+                            />
+                        </View>
+                        <Text
+                            style={[styles.packageCardName, isActive && styles.packageCardNameActive]}
+                            numberOfLines={1}
                         >
-                            <Text style={styles.packageTabText}>📩 Contact for custom packages</Text>
-                        </TouchableOpacity>
-                    </ScrollView>
-
-                    {/* Package Details */}
-                    {vendorData.packages
-                        .filter((pkg: any) => pkg._id === activePackage)
-                        .map((pkg: any) => (
-                            <View key={pkg._id} style={[styles.card, styles.packageDetails]}>
-                                <View style={styles.sectionTitleWithIcon}>
-                                    <Ionicons name="briefcase-outline" size={18} color={PRIMARY} />
-                                    <Text style={styles.sectionTitle}>Services</Text>
-                                </View>
-                                <Text
-                                    testID="package-services"
-                                    style={styles.packageDetailItem}
-                                >
-                                    {pkg.services}
-                                </Text>
-
-                                <View style={styles.priceRow}>
-                                    <Ionicons name="cash-outline" size={18} color={PRIMARY} />
-                                    <Text testID="package-price" style={styles.priceText}>
-                                        Rs. {pkg.price}/-
-                                    </Text>
-                                </View>
-
-                                <TouchableOpacity
-                                    testID={`edit-package-${pkg._id}`}
-                                    style={styles.cartButton}
-                                    onPress={() => {
-                                        router.push({
-                                            pathname: '/vendorpackages',
-                                            params: { packageId: pkg._id },
-                                        });
-                                    }}
-                                    activeOpacity={0.85}
-                                >
-                                    <Ionicons name="create-outline" size={14} color="#FFFFFF" />
-                                    <Text style={styles.cartButtonText}>Edit</Text>
-                                </TouchableOpacity>
+                            {pkg.packageName}
+                        </Text>
+                        <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
+                            Rs. {pkg.price}/-
+                        </Text>
+                        {isActive && (
+                            <View style={styles.activeDot}>
+                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
                             </View>
-                        ))}
+                        )}
+                    </TouchableOpacity>
+                );
+            })}
+
+            {/* Custom Package CTA */}
+            <TouchableOpacity
+                style={[styles.customPackageCard, activePackage === null && styles.customPackageCardActive]}
+                onPress={() => setActivePackage(null)}
+                activeOpacity={0.85}
+            >
+                <View style={styles.customPackageIconWrap}>
+                    <Ionicons name="sparkles-outline" size={20} color={PRIMARY} />
                 </View>
-            )}
+                <Text style={styles.customPackageTitle}>Custom</Text>
+                <Text style={styles.customPackageSubtitle}>Build your own</Text>
+            </TouchableOpacity>
+        </ScrollView>
+
+        {/* Selected Package Details */}
+        {vendorData.packages
+            .filter((pkg: any) => pkg._id === activePackage)
+            .map((pkg: any) => (
+                <View key={pkg._id} style={[styles.card, styles.packageDetailsCreative]}>
+
+                    {/* Header strip */}
+                    <View style={styles.packageDetailsHeader}>
+                        <View style={styles.packageDetailsHeaderLeft}>
+                            <View style={styles.packageBadgeIcon}>
+                                <Ionicons name="briefcase-outline" size={20} color="#FFFFFF" />
+                            </View>
+                            <View>
+                                <Text style={styles.packageDetailsName}>{pkg.packageName}</Text>
+                                <Text style={styles.packageDetailsTag}>Package Details</Text>
+                            </View>
+                        </View>
+                        <TouchableOpacity
+                            testID={`edit-package-${pkg._id}`}
+                            style={styles.editIconButton}
+                            onPress={() => {
+                                router.push({
+                                    pathname: '/vendorpackages',
+                                    params: { packageId: pkg._id },
+                                });
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons name="create-outline" size={16} color={PRIMARY} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.packageDivider} />
+
+                    {/* Services */}
+                    <View style={styles.servicesBlock}>
+                        <View style={styles.sectionTitleWithIcon}>
+                            <Ionicons name="list-outline" size={16} color={PRIMARY} />
+                            <Text style={styles.servicesLabel}>What's Included</Text>
+                        </View>
+                        <Text testID="package-services" style={styles.packageDetailItem}>
+                            {pkg.services}
+                        </Text>
+                    </View>
+
+                    {/* Price footer */}
+                    <View style={styles.packagePriceFooter}>
+                        <View>
+                            <Text style={styles.priceFooterLabel}>Total Price</Text>
+                            <Text testID="package-price" style={styles.priceText}>
+                                Rs. {pkg.price}/-
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.cartButton}
+                            onPress={() => {
+                                router.push({
+                                    pathname: '/vendorpackages',
+                                    params: { packageId: pkg._id },
+                                });
+                            }}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="create-outline" size={14} color="#FFFFFF" />
+                            <Text style={styles.cartButtonText}>Edit Package</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            ))}
+
+        {/* Custom package selected state */}
+        {activePackage === null && (
+            <View style={[styles.card, styles.customPackagePanel]}>
+                <View style={styles.customPackagePanelIcon}>
+                    <Ionicons name="chatbubbles-outline" size={26} color={PRIMARY} />
+                </View>
+                <Text style={styles.customPackagePanelTitle}>Need something different?</Text>
+                <Text style={styles.customPackagePanelText}>
+                    Contact this vendor directly to discuss a custom package tailored to your event's needs and budget.
+                </Text>
+                <TouchableOpacity style={styles.customPackagePanelButton} activeOpacity={0.85}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={15} color="#FFFFFF" />
+                    <Text style={styles.customPackagePanelButtonText}>Contact Vendor</Text>
+                </TouchableOpacity>
+            </View>
+        )}
+    </View>
+)}
 
             {activeTab === "Reviews" && (
-                <View style={styles.tabContent}>
-                    {/* Eventify Reviews */}
-                    {activeReviewTab === "Eventify" && (
-                        <View>
-                            {reviews.length === 0 && (
-                                <View style={styles.emptyReviews}>
-                                    <Ionicons name="chatbubble-ellipses-outline" size={30} color={TEXT_MUTED} />
-                                    <Text style={styles.emptyReviewsText}>No reviews yet</Text>
-                                </View>
-                            )}
-                            {reviews.map((review, index) => (
-                                <View key={index} style={styles.eventifyReview}>
-                                    <View style={styles.reviewTopRow}>
-                                        <View style={styles.avatarCircle}>
-                                            <Text style={styles.avatarInitial}>
-                                                {(review.reviewerName || 'A').charAt(0).toUpperCase()}
-                                            </Text>
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.reviewerName}>{review.reviewerName || 'Anonymous'}</Text>
-                                            <Text style={styles.reviewDate}>{new Date(review.createdAt).toDateString()}</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={styles.reviewText}>{review.reviewText}</Text>
-                                    <View style={{ flexDirection: 'row', marginTop: 8 }}>
-                                        {[1, 2, 3, 4, 5].map((star) => (
+    <View style={styles.tabContent}>
+        {activeReviewTab === "Eventify" && (
+            <View>
+                {reviews.length === 0 ? (
+                    <View style={styles.emptyReviewsCreative}>
+                        <View style={styles.emptyReviewsIconWrap}>
+                            <Ionicons name="chatbubble-ellipses-outline" size={28} color={PRIMARY} />
+                        </View>
+                        <Text style={styles.emptyReviewsTitle}>No reviews yet</Text>
+                        <Text style={styles.emptyReviewsSubtext}>
+                            Be the first to share your experience with this vendor
+                        </Text>
+                    </View>
+                ) : (
+                    <>
+                        {/* Rating Summary Card */}
+                        <View style={styles.ratingSummaryCard}>
+                            <View style={styles.ratingSummaryLeft}>
+                                <Text style={styles.ratingBigNumber}>
+                                    {(
+                                        reviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
+                                        reviews.length
+                                    ).toFixed(1)}
+                                </Text>
+                                <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                                    {[1, 2, 3, 4, 5].map((star) => {
+                                        const avg =
+                                            reviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
+                                            reviews.length;
+                                        return (
                                             <Ionicons
                                                 key={star}
-                                                name={review.rating >= star ? 'star' : 'star-outline'}
-                                                size={16}
+                                                name={avg >= star ? 'star' : avg >= star - 0.5 ? 'star-half' : 'star-outline'}
+                                                size={14}
                                                 color="#FFC107"
                                             />
-                                        ))}
+                                        );
+                                    })}
+                                </View>
+                                <Text style={styles.ratingCountText}>
+                                    {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                                </Text>
+                            </View>
+
+                            <View style={styles.ratingSummaryDivider} />
+
+                            <View style={styles.ratingSummaryRight}>
+                                {[5, 4, 3, 2, 1].map((star) => {
+                                    const count = reviews.filter(
+                                        (r) => Math.round(r.rating) === star
+                                    ).length;
+                                    const pct = reviews.length ? (count / reviews.length) * 100 : 0;
+                                    return (
+                                        <View key={star} style={styles.ratingBarRow}>
+                                            <Text style={styles.ratingBarLabel}>{star}</Text>
+                                            <Ionicons name="star" size={10} color="#FFC107" />
+                                            <View style={styles.ratingBarTrack}>
+                                                <View
+                                                    style={[
+                                                        styles.ratingBarFill,
+                                                        { width: `${pct}%` },
+                                                    ]}
+                                                />
+                                            </View>
+                                            <Text style={styles.ratingBarCount}>{count}</Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        {/* Review Cards */}
+                        {reviews.map((review, index) => (
+                            <View key={index} style={styles.eventifyReviewCreative}>
+                                <View style={styles.reviewTopRow}>
+                                    <View style={styles.avatarCircleCreative}>
+                                        <Text style={styles.avatarInitial}>
+                                            {(review.reviewerName || 'A').charAt(0).toUpperCase()}
+                                        </Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.reviewerName}>
+                                            {review.reviewerName || 'Anonymous'}
+                                        </Text>
+                                        <Text style={styles.reviewDate}>
+                                            {new Date(review.createdAt).toDateString()}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.reviewRatingPill}>
+                                        <Ionicons name="star" size={12} color="#FFC107" />
+                                        <Text style={styles.reviewRatingPillText}>
+                                            {review.rating || 0}
+                                        </Text>
                                     </View>
                                 </View>
-                            ))}
-                        </View>
-                    )}
-                </View>
-            )}
+
+                                <View style={styles.reviewQuoteBar} />
+                                <Text style={styles.reviewTextCreative}>{review.reviewText}</Text>
+                            </View>
+                        ))}
+                    </>
+                )}
+            </View>
+        )}
+    </View>
+)}
 
             <View style={{ height: 24 }} />
         </ScrollView>
@@ -916,6 +1050,215 @@ const styles = StyleSheet.create({
         color: TEXT_MUTED,
         textAlign: 'center',
     },
+    packagesSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    marginBottom: 10,
+},
+packageCard: {
+    width: 128,
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    position: 'relative',
+},
+activePackageCard: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+},
+packageCardIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+},
+packageCardIconWrapActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+},
+packageCardName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 4,
+},
+packageCardNameActive: {
+    color: '#FFFFFF',
+},
+packageCardPrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+},
+packageCardPriceActive: {
+    color: 'rgba(255,255,255,0.85)',
+},
+activeDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+},
+customPackageCard: {
+    width: 128,
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: PRIMARY_LIGHT,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+},
+customPackageCardActive: {
+    borderStyle: 'solid',
+    backgroundColor: PRIMARY,
+},
+customPackageIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+},
+customPackageTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: PRIMARY,
+},
+customPackageSubtitle: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    marginTop: 2,
+},
+packageDetailsCreative: {
+    marginTop: 4,
+    padding: 0,
+    overflow: 'hidden',
+},
+packageDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+},
+packageDetailsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+},
+packageBadgeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+},
+packageDetailsName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_DARK,
+},
+packageDetailsTag: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    marginTop: 2,
+},
+editIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+},
+packageDivider: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginHorizontal: 16,
+},
+servicesBlock: {
+    padding: 16,
+},
+servicesLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEXT_DARK,
+},
+packagePriceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: PRIMARY_SOFT,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+},
+priceFooterLabel: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    marginBottom: 2,
+},
+customPackagePanel: {
+    alignItems: 'center',
+    paddingVertical: 28,
+},
+customPackagePanelIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+},
+customPackagePanelTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    marginBottom: 6,
+},
+customPackagePanelText: {
+    fontSize: 13,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+},
+customPackagePanelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+},
+customPackagePanelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+},
     activePackageTabText: {
         color: '#FFFFFF',
     },
@@ -1042,6 +1385,150 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
+      emptyReviewsCreative: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 30,
+},
+emptyReviewsIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+},
+emptyReviewsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: TEXT_DARK,
+    marginBottom: 6,
+},
+emptyReviewsSubtext: {
+    fontSize: 13,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    lineHeight: 19,
+},
+ratingSummaryCard: {
+    flexDirection: 'row',
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+},
+ratingSummaryLeft: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 16,
+    minWidth: 84,
+},
+ratingBigNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: PRIMARY,
+},
+ratingCountText: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    marginTop: 4,
+},
+ratingSummaryDivider: {
+    width: 1,
+    backgroundColor: BORDER,
+    marginRight: 16,
+},
+ratingSummaryRight: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
+},
+ratingBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+},
+ratingBarLabel: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    fontWeight: '600',
+    width: 8,
+},
+ratingBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: PRIMARY_SOFT,
+    overflow: 'hidden',
+},
+ratingBarFill: {
+    height: '100%',
+    backgroundColor: '#FFC107',
+    borderRadius: 3,
+},
+ratingBarCount: {
+    fontSize: 11,
+    color: TEXT_MUTED,
+    width: 16,
+    textAlign: 'right',
+},
+eventifyReviewCreative: {
+    backgroundColor: CARD,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+},
+avatarCircleCreative: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+},
+reviewRatingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: PRIMARY_SOFT,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+},
+reviewRatingPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: TEXT_DARK,
+},
+reviewQuoteBar: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: PRIMARY_LIGHT,
+    marginTop: 10,
+    marginBottom: 8,
+},
+reviewTextCreative: {
+    fontSize: 13,
+    color: TEXT_DARK,
+    lineHeight: 20,
+},
 });
 
 export default VendorProfileDetailsScreen;
