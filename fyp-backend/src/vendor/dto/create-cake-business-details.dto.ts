@@ -1,4 +1,4 @@
-// fyp-backend/src/vendor/dto/create-cake-business-details.dto.ts
+//fyp-backend/src/vendor/dto/create-cake-business-details.dto.ts
 import {
   IsArray,
   IsBoolean,
@@ -19,11 +19,10 @@ export class CreateCakeBusinessDetailsDto {
   minimumPrice: number;
 
   @IsString()
-  description: string;
+  expertise: string;
 
-  @IsOptional()
   @IsString()
-  additionalInfo?: string;
+  cityCovered: string;
 
   @IsBoolean()
   deliveryToHome: boolean;
@@ -31,6 +30,13 @@ export class CreateCakeBusinessDetailsDto {
   @IsArray()
   @IsString({ each: true })
   deliveryOptions: string[];
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
 
   @IsEnum(["PERCENTAGE", "FIXED AMOUNT"])
   downPaymentType: string;

@@ -1,9 +1,11 @@
 import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
+import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
 import { Alert } from "react-native";
 import { FontAwesome5 } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import axios from "axios";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
 const CAKE_TYPES = [
@@ -22,11 +24,21 @@ const DOWN_PAYMENT_TYPES = ['PERCENTAGE', 'FIXED AMOUNT'] as const;
 type DownPaymentType = typeof DOWN_PAYMENT_TYPES[number] | "";
 
 const CakeBusinessDetailsScreen: React.FC = () => {
+    const { edit, userId } = useLocalSearchParams();
+
+    useEffect(() => {
+        console.log("Route Params:");
+        console.log("edit =", edit);
+        console.log("userId =", userId);
+    }, [edit, userId]);
+
     // Multi-select: vendor can offer more than one cake type / delivery option
     const [selectedCakeTypes, setSelectedCakeTypes] = useState<string[]>([]);
     const [deliveryOptions, setDeliveryOptions] = useState<string[]>([]);
 
     const [deliveryToHome, setDeliveryToHome] = useState<string | null>(null);
+    const [expertise, setExpertise] = useState("");
+    const [cityCovered, setCityCovered] = useState("");
     const [downPaymentType, setDownPaymentType] = useState<DownPaymentType>("");
     const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
@@ -34,6 +46,7 @@ const CakeBusinessDetailsScreen: React.FC = () => {
     const [minimumPrice, setMinimumPrice] = useState("");
     const [description, setDescription] = useState("");
     const [additionalInfo, setAdditionalInfo] = useState("");
+
     const toggleCakeType = (label: string) => {
         setSelectedCakeTypes((prev) =>
             prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
@@ -46,64 +59,99 @@ const CakeBusinessDetailsScreen: React.FC = () => {
         );
     };
 
+    // Autofill existing data when editing
+    useEffect(() => {
+        if (edit !== "true") return;
+
+        const loadData = async () => {
+            try {
+                const res = await axios.get(
+                    `https://eventify-hub.onrender.com/vendor?userId=${userId}`
+                );
+
+                const data = res.data.cakeBusinessDetails;
+
+                setSelectedCakeTypes(data.cakeTypes || []);
+                setMinimumPrice(data.minimumPrice?.toString() || "");
+                setDeliveryOptions(data.deliveryOptions || []);
+                setDeliveryToHome(data.deliveryToHome ? "YES" : "NO");
+                setExpertise(data.expertise || "");
+                setCityCovered(data.cityCovered || "");
+                setDescription(data.description || "");
+                setAdditionalInfo(data.additionalInfo || "");
+                setDownPaymentType(data.downPaymentType || "");
+                setDownPayment(data.downPayment?.toString() || "");
+                setCovidCompliant(data.covidCompliant || null);
+                setCancellationPolicy(data.cancellationPolicy || null);
+            } catch (err) {
+                console.log(err);
+            }
+        };
+
+        loadData();
+    }, []);
+
     const submit = async () => {
+        console.log("EDIT PARAM:", edit);
+        console.log("USER ID PARAM:", userId);
 
-    if (
-        selectedCakeTypes.length === 0 ||
-        !minimumPrice ||
-        deliveryOptions.length === 0 ||
-        deliveryToHome === null ||
-        !description ||
-        !downPaymentType ||
-        !downPayment ||
-        covidCompliant === null ||
-        cancellationPolicy === null
-    ) {
-        Alert.alert("Error", "Please fill all required fields.");
-        return;
-    }
+        if (
+            selectedCakeTypes.length === 0 ||
+            !minimumPrice ||
+            deliveryOptions.length === 0 ||
+            deliveryToHome === null ||
+            !expertise ||
+            !cityCovered ||
+            !description ||
+            !downPaymentType ||
+            !downPayment ||
+            covidCompliant === null ||
+            cancellationPolicy === null
+        ) {
+            Alert.alert("Error", "Please fill all required fields.");
+            return;
+        }
 
-    try {
+        try {
+            const user = JSON.parse(await getSecureData("user") || "");
 
-        const user = JSON.parse(await getSecureData("user") || "");
+            const dto = {
+                cakeTypes: selectedCakeTypes,
+                minimumPrice: Number(minimumPrice),
+                deliveryOptions,
+                expertise,
+                cityCovered,
+                deliveryToHome: deliveryToHome === "YES",
+                description,
+                additionalInfo,
+                downPaymentType,
+                downPayment: Number(downPayment),
+                covidCompliant,
+                cancellationPolicy,
+            };
 
-        await postCakeBusinessDetails(user._id, {
+            if (edit === "true") {
+                console.log("PATCH API WILL BE CALLED");
 
-            cakeTypes: selectedCakeTypes,
+                await patchBusinessDetails(user._id, dto);
 
-            minimumPrice: Number(minimumPrice),
+                Alert.alert("Success", "Business details updated successfully!");
 
-            deliveryOptions,
+                router.back();
+            } else {
+                console.log("POST API WILL BE CALLED");
 
-            deliveryToHome: deliveryToHome === "YES",
+                await postCakeBusinessDetails(user._id, dto);
 
-            description,
+                Alert.alert("Success", "Business Details Saved");
 
-            additionalInfo,
-
-            downPaymentType,
-
-            downPayment: Number(downPayment),
-
-            covidCompliant,
-
-            cancellationPolicy,
-
-        });
-
-        Alert.alert("Success", "Business Details Saved");
-
-        router.push("/packages");
-
-    } catch (error) {
-
-        console.log(error);
-
-        Alert.alert("Error", "Something went wrong.");
-
-    }
-
-};
+                router.push("/packages");
+            }
+        } catch (error) {
+            console.log(error);
+            Alert.alert("Error", "Something went wrong.");
+        }
+    };
 
     return (
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -224,14 +272,59 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     ))}
                 </View>
             </View>
+            {/* Expertise */}
+             <View style={styles.card}>
+                <SectionTitle
+                    icon="award"
+                    title="Expertise"
+                    required
+                />
 
+                 <TextInput
+                      style={[styles.input, styles.textArea]}
+                      multiline
+                      placeholder={`Examples:
+              • Wedding Cakes
+              • Fondant Cakes
+              • Buttercream Cakes
+              • Floral Cake Designs
+              • 3-Tier Cakes
+              • Customized Theme Cakes`}
+                         placeholderTextColor="#B99DAF"
+                         value={expertise}
+                         onChangeText={setExpertise}
+                        />
+                    </View>
+
+            {/* City Covered */}
+            <View style={styles.card}>
+            <SectionTitle
+                icon="map-marker-alt"
+                title="City Covered"
+                required
+            />
+
+            <TextInput
+                style={styles.input}
+                placeholder="Example: Karachi, Lahore, Islamabad"
+                placeholderTextColor="#B99DAF"
+                value={cityCovered}
+                onChangeText={setCityCovered}
+            />
+        </View>
             {/* Cake Description */}
             <View style={styles.card}>
                 <SectionTitle icon="align-left" title="Cake Description" required />
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Describe your cake offerings..."
+                    placeholder={`Examples:
+• Customized wedding cakes
+• Birthday cakes
+• Premium fondant designs
+• Fresh cream cakes
+• Theme based cakes
+• Eggless cakes available`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -244,7 +337,13 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Add any special notes..."
+                    placeholder={`Examples:
+• Free tasting available
+• Advance booking required
+• Delivery charges may apply
+• Midnight delivery available
+• Premium packaging included
+• Freshly baked on order`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -274,10 +373,16 @@ const CakeBusinessDetailsScreen: React.FC = () => {
             <View style={styles.card}>
                 <SectionTitle icon="wallet" title="Down Payment" required />
                 <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <Text style={styles.currencyPrefix}>
+                  {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+                </Text>
                     <TextInput
                         style={styles.inputFlex}
-                        placeholder="Enter down payment"
+                        placeholder={
+                    downPaymentType === "PERCENTAGE"
+                        ? "Example: 30"
+                        : "Example: 5000"
+                }
                         placeholderTextColor="#B99DAF"
                         keyboardType="numeric"
                         value={downPayment}

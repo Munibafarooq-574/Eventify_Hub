@@ -412,19 +412,25 @@ export const VenueBusinessDetailsSchema = SchemaFactory.createForClass(
 export class CakeBusinessDetails extends BusinessDetails {
 
   @Prop({
-  type: [String],
-  default: [],
-})
-cakeTypes: string[];
+    type: [String],
+    default: [],
+  })
+  cakeTypes: string[];
 
   @Prop()
   minimumPrice: number;
 
+  @Prop()
+  expertise: string;
+
+  @Prop()
+  cityCovered: string;
+
   @Prop({
-  type: [String],
-  default: [],
-})
-deliveryOptions: string[];
+    type: [String],
+    default: [],
+  })
+  deliveryOptions: string[];
 
   @Prop()
   deliveryToHome: boolean;
@@ -449,7 +455,7 @@ deliveryOptions: string[];
 }
 
 export const CakeBusinessDetailsSchema =
-SchemaFactory.createForClass(CakeBusinessDetails);
+  SchemaFactory.createForClass(CakeBusinessDetails);
 
 @Schema()
 export class MehndiBusinessDetails extends BusinessDetails {
