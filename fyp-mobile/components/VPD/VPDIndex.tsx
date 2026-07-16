@@ -404,7 +404,7 @@ const category =
     </View>
     <View style={styles.divider} />
     <View style={styles.detailBlock}>
-      <Text style={styles.detailLabel}>Refund Policy</Text>
+      <Text style={styles.detailLabel}>Cancellation Policy</Text>
       <Text style={styles.detailValue}>{businessDetails?.covidRefundPolicy || "N/A"}</Text>
     </View>
   </>
@@ -511,11 +511,16 @@ const category =
 )}
 
 {/* Common fields for ALL categories */}
-<View style={styles.divider} />
-<View style={styles.detailBlock}>
-  <Text style={styles.detailLabel}>Cancellation Policy</Text>
-  <Text style={styles.detailValue}>{businessDetails?.cancellationPolicy || "N/A"}</Text>
-</View>
+{/* Common fields for ALL categories */}
+{category !== "photographer" && (
+  <>
+    <View style={styles.divider} />
+    <View style={styles.detailBlock}>
+      <Text style={styles.detailLabel}>Cancellation Policy</Text>
+      <Text style={styles.detailValue}>{businessDetails?.cancellationPolicy || "N/A"}</Text>
+    </View>
+  </>
+)}
 <View style={styles.divider} />
 <View style={styles.detailBlock}>
   <Text style={styles.detailLabel}>Down Payment</Text>

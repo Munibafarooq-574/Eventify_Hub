@@ -1307,7 +1307,7 @@ if (edit === "true") {
 
     <SectionTitle
         icon="undo-alt"
-        title="Refund Policy"
+        title="Cancellation Policy"
         required
     />
 

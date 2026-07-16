@@ -1,23 +1,5 @@
 //fyp-backend/src/vendor/dto/create-photographer-business-details.dto.ts
 
-/*export class CreatePhotographerBusinessDetailsDto {
-    cityCovered: string;
-    staff: string;
-    minimumPrice: number;
-    description: string;
-    additionalInfo?: string;
-    downPaymentType: 'PERCENTAGE' | 'FIXED';
-    downPayment: number;
-    covidCompliant: 'YES' | 'NO';
-    covidRefundPolicy: 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE';
-}
-*/
-
-// ==========================================
-// BACKEND DTO
-// Used in NestJS
-// Receives data from frontend
-// ==========================================
 
 import {
   IsArray,
