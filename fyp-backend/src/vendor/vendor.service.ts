@@ -223,7 +223,7 @@ export class VendorService {
         return await user.save();
     } 
 
-    async updateBusinessDetails(
+   async updateBusinessDetails(
     userId: string,
     dto:
         | CreatePhotographerBusinessDetailsDto
@@ -249,44 +249,50 @@ export class VendorService {
 
     if (categoryName === "venues") {
         user.venueBusinessDetails = {
-            ...user.venueBusinessDetails,
+            ...((user.venueBusinessDetails as any)?.toObject?.() ?? user.venueBusinessDetails),
             ...dto,
         } as VenueBusinessDetails;
+        user.markModified('venueBusinessDetails');
     }
 
     else if (categoryName === "caterings") {
         user.cateringBusinessDetails = {
-            ...user.cateringBusinessDetails,
+            ...((user.cateringBusinessDetails as any)?.toObject?.() ?? user.cateringBusinessDetails),
             ...dto,
         } as CateringBusinessDetails;
+        user.markModified('cateringBusinessDetails');
     }
 
     else if (categoryName === "photography") {
         user.photographerBusinessDetails = {
-            ...user.photographerBusinessDetails,
+            ...((user.photographerBusinessDetails as any)?.toObject?.() ?? user.photographerBusinessDetails),
             ...dto,
         } as PhotographerBusinessDetails;
+        user.markModified('photographerBusinessDetails');
     }
 
     else if (categoryName === "makeup") {
         user.salonBusinessDetails = {
-            ...user.salonBusinessDetails,
+            ...((user.salonBusinessDetails as any)?.toObject?.() ?? user.salonBusinessDetails),
             ...dto,
         } as SalonBusinessDetails;
+        user.markModified('salonBusinessDetails');
     }
 
     else if (categoryName === "cakes") {
         user.cakeBusinessDetails = {
-            ...user.cakeBusinessDetails,
+            ...((user.cakeBusinessDetails as any)?.toObject?.() ?? user.cakeBusinessDetails),
             ...dto,
         } as CakeBusinessDetails;
+        user.markModified('cakeBusinessDetails');
     }
 
     else if (categoryName === "mehndi") {
         user.mehndiBusinessDetails = {
-            ...user.mehndiBusinessDetails,
+            ...((user.mehndiBusinessDetails as any)?.toObject?.() ?? user.mehndiBusinessDetails),
             ...dto,
         } as MehndiBusinessDetails;
+        user.markModified('mehndiBusinessDetails');
     }
 
     else if (
@@ -296,9 +302,10 @@ export class VendorService {
         categoryName === "sounds"
     ) {
         user.soundBusinessDetails = {
-            ...user.soundBusinessDetails,
+            ...((user.soundBusinessDetails as any)?.toObject?.() ?? user.soundBusinessDetails),
             ...dto,
         } as SoundBusinessDetails;
+        user.markModified('soundBusinessDetails');
     }
 
     else {
