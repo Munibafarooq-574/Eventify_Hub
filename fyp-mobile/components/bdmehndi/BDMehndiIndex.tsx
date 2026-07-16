@@ -281,7 +281,11 @@ if (edit === "true") {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Enter Description"
+                    placeholder={`Example:
+            • Bridal Mehndi
+            • Arabic Mehndi
+            • Home Service Available
+            • Organic Mehndi Used`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -294,7 +298,10 @@ if (edit === "true") {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Add any special notes..."
+                    placeholder={`Example:
+        • Extra charges after 10 PM
+        • Travel charges outside city
+        • Booking required 2 days before`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -324,10 +331,16 @@ if (edit === "true") {
             <View style={styles.card}>
                 <SectionTitle icon="wallet" title="Down Payment" required />
                 <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
+                    <Text style={styles.currencyPrefix}>
+  {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+</Text>
                     <TextInput
                         style={styles.inputFlex}
-                        placeholder="Enter Down Payment"
+                        placeholder={
+  downPaymentType === "PERCENTAGE"
+    ? "Example: 20%"
+    : "Example: Rs. 3000"
+}
                         placeholderTextColor="#B99DAF"
                         keyboardType="numeric"
                         value={downPayment}
@@ -357,10 +370,10 @@ if (edit === "true") {
 
             {/* Refund Policy */}
             <View style={styles.card}>
-                <SectionTitle icon="undo-alt" title="Refund Policy" required />
+                <SectionTitle icon="undo-alt" title="Cancellation Policy" required />
                 <View style={styles.pillRowWrap}>
                     {(['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'] as const).map((policy) => (
-                        <TouchableOpacity
+                         <TouchableOpacity
                             key={policy}
                             activeOpacity={0.85}
                             style={[styles.pill, cancellationPolicy === policy && styles.pillSelected]}

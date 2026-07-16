@@ -208,43 +208,73 @@ const category =
                     </View>
 
                     {/* Photos Section */}
-                    <View style={[styles.card, styles.photosSection]}>
-                        <View style={styles.sectionTitleRow}>
-                            <View style={styles.sectionTitleWithIcon}>
-                                <Ionicons name="images-outline" size={18} color={PRIMARY} />
-                                <Text style={styles.sectionTitle}>Photos</Text>
-                            </View>
-                            <TouchableOpacity
-                                testID="see-all-photos"
-                                onPress={() =>
-                                    router.push({
-                                        pathname: '/vendorprofileimages',
-                                        params: { vendorId: vendorData._id },
-                                    })
-                                }
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.seeAllLink}>See All</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView
-                            testID="scroll-view"
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.photoContainer}
-                        >
-                            {vendorData.images.map((image: string, index: number) => (
-                                <Image
-                                    key={index}
-                                    source={{
-                                        uri: `${image}`,
-                                    }}
-                                    style={styles.photo}
-                                />
-                            ))}
-                        </ScrollView>
-                    </View>
+                    {/* Photos Section */}
+<View style={[styles.card, styles.photosSection]}>
+    <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionTitleWithIcon}>
+            <View style={styles.sectionIconCircle}>
+                <Ionicons name="images-outline" size={16} color={PRIMARY} />
+            </View>
+            <Text style={styles.sectionTitle}>Photos</Text>
+            {vendorData.images.length > 0 && (
+                <View style={styles.photoCountBadge}>
+                    <Text style={styles.photoCountText}>{vendorData.images.length}</Text>
+                </View>
+            )}
+        </View>
 
+        {vendorData.images.length > 0 && (
+            <TouchableOpacity
+                testID="see-all-photos"
+                onPress={() =>
+                    router.push({
+                        pathname: '/vendorprofileimages',
+                        params: { vendorId: vendorData._id },
+                    })
+                }
+                activeOpacity={0.7}
+                style={styles.seeAllButton}
+            >
+                <Text style={styles.seeAllLink}>See All</Text>
+                <Ionicons name="chevron-forward" size={14} color={PRIMARY} />
+            </TouchableOpacity>
+        )}
+    </View>
+
+    {vendorData.images.length > 0 ? (
+        <ScrollView
+            testID="scroll-view"
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.photoContainer}
+            contentContainerStyle={styles.photoContainerContent}
+        >
+            {vendorData.images.map((image: string, index: number) => (
+                <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                        router.push({
+                            pathname: '/vendorprofileimages',
+                            params: { vendorId: vendorData._id },
+                        })
+                    }
+                    style={styles.photoWrapper}
+                >
+                    <Image
+                        source={{ uri: `${image}` }}
+                        style={styles.photo}
+                    />
+                </TouchableOpacity>
+            ))}
+        </ScrollView>
+    ) : (
+        <View style={styles.noPhotosBox}>
+            <Ionicons name="image-outline" size={26} color="#C9A9BE" />
+            <Text style={styles.noPhotosText}>No photos added yet</Text>
+        </View>
+    )}
+</View>
                     {/* Business Details Card */}
                     <View style={styles.card}>
                         <View style={styles.detailsHeader}>
@@ -1528,6 +1558,63 @@ reviewTextCreative: {
     fontSize: 13,
     color: TEXT_DARK,
     lineHeight: 20,
+},
+
+sectionIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3D9EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+},
+photoCountBadge: {
+    backgroundColor: '#F3D9EC',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+},
+photoCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
+},
+seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+},
+photoContainerContent: {
+    paddingVertical: 4,
+    paddingRight: 8,
+},
+photoWrapper: {
+    marginRight: 10,
+    borderRadius: 16,
+    overflow: 'hidden',
+
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+},
+noPhotosBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    backgroundColor: '#FBF6FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1D5E8',
+    borderStyle: 'dashed',
+},
+noPhotosText: {
+    fontSize: 13,
+    color: '#8A7A85',
+    marginTop: 8,
+    fontWeight: '600',
 },
 });
 
