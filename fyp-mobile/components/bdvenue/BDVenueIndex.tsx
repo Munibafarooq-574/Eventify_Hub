@@ -36,6 +36,11 @@ const STAFF_GENDERS = [
 
 const BusinessDetailsForm = () => {
     const { edit, userId } = useLocalSearchParams();
+    useEffect(() => {
+    console.log("Route Params:");
+    console.log("edit =", edit);
+    console.log("userId =", userId);
+}, [edit, userId]);
     const [venueType, setVenueType] = useState<string[]>([]);
     const [expertise, setExpertise] = useState<string>("");
     const [amenities, setAmenities] = useState<string>("");
@@ -108,6 +113,8 @@ const BusinessDetailsForm = () => {
 }, []);
 
     const submit = async () => {
+        console.log("EDIT PARAM:", edit);
+console.log("USER ID PARAM:", userId);
         if (
             venueType.length === 0 ||
             !expertise ||
@@ -149,28 +156,32 @@ const BusinessDetailsForm = () => {
         covidCompliant,
     };
 
-    if (edit === "true") {
+  if (edit === "true") {
 
-        await patchBusinessDetails(user._id, dto);
+    console.log("PATCH API WILL BE CALLED");
 
-        Alert.alert(
-            "Success",
-            "Business details updated successfully!"
-        );
+    await patchBusinessDetails(user._id, dto);
 
-        router.back();
+    Alert.alert(
+        "Success",
+        "Business details updated successfully!"
+    );
 
-    } else {
+    router.back();
 
-        await postVenueBusinessDetails(user._id, dto);
+} else {
 
-        Alert.alert(
-            "Success",
-            "Business details saved successfully!"
-        );
+    console.log("POST API WILL BE CALLED");
 
-        router.push("/packages");
-    }
+    await postVenueBusinessDetails(user._id, dto);
+
+    Alert.alert(
+        "Success",
+        "Business details saved successfully!"
+    );
+
+    router.push("/packages");
+}
 
 } catch (error) {
     console.error("Error:", error);

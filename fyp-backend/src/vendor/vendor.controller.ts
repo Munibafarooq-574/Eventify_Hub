@@ -65,18 +65,21 @@ async updateContactDetails(
         return await this.vendorService.createBuisnessDetails(userId, dto);
     }
 
-                @Patch('buisnessDetails')
-            async updateBusinessDetails(
-            @Query('userId') userId: string,
-            @Body() dto:
-                | CreatePhotographerBusinessDetailsDto
-                | CreateSalonBusinessDetailsDto
-                | CreateVenueBusinessDetailsDto
-                | CreateCateringBusinessDetailsDto
-                | CreateCakeBusinessDetailsDto
-            ) {
-            return await this.vendorService.updateBusinessDetails(userId, dto);
-            }
+   @Patch('buisnessDetails')
+async updateBusinessDetails(
+  @Query('userId') userId: string,
+  @Body() dto:
+    | CreatePhotographerBusinessDetailsDto
+    | CreateSalonBusinessDetailsDto
+    | CreateVenueBusinessDetailsDto
+    | CreateCateringBusinessDetailsDto
+    | CreateCakeBusinessDetailsDto
+) {
+  console.log("PATCH USER ID:", userId);
+  console.log("PATCH DTO:", dto);
+
+  return await this.vendorService.updateBusinessDetails(userId, dto);
+}
 
     @Post('packages')
     async addPackages(

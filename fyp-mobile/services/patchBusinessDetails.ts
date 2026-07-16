@@ -15,7 +15,13 @@ export default async function patchBusinessDetails(
   };
 
   try {
+    console.log("PATCH DATA:", businessDetails);
+    console.log("USER ID:", userId);
+
     const response = await axios(config);
+
+    console.log("PATCH RESPONSE:", response.data);
+
     return response.data;
   } catch (error) {
     console.error("Error updating business details:", error);
