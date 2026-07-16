@@ -16,7 +16,7 @@ const TEXT_DARK = '#221A20';
 const TEXT_MUTED = '#8A7C86';
 const BORDER = '#EFE0EB';
 
-const PhotographerDetailsScreen: React.FC = () => {
+const VendorProfileDetailsScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
     const [activePackage, setActivePackage] = useState<number | null>(null);
     const [activeReviewTab, setActiveReviewTab] = useState<'Eventify' | 'Google'>('Eventify');
@@ -221,7 +221,18 @@ const PhotographerDetailsScreen: React.FC = () => {
                                 <Ionicons name="information-circle-outline" size={18} color={PRIMARY} />
                                 <Text style={styles.sectionTitle}>Details</Text>
                             </View>
-                            <TouchableOpacity onPress={() => router.push('/vendoreditprofile')} activeOpacity={0.7}>
+                            <TouchableOpacity
+  onPress={() =>
+    router.push({
+      pathname: "/bdvenue",
+      params: {
+        edit: "true",
+        userId: vendorData._id,
+      },
+    })
+  }
+  activeOpacity={0.7}
+>
                                 <View style={styles.editPill}>
                                     <Ionicons name="pencil-outline" size={12} color={PRIMARY} />
                                     <Text style={styles.editLink}>Edit</Text>
@@ -247,8 +258,8 @@ const PhotographerDetailsScreen: React.FC = () => {
                                 <Text style={styles.detailLabel}>Cancellation Policy</Text>
                             </View>
                             <Text style={styles.detailValue}>
-    {vendorData?.venueBusinessDetails?.cancellationPolicy || "N/A"}
-</Text>
+                    {vendorData?.venueBusinessDetails?.cancellationPolicy || "N/A"}
+                            </Text>
                         </View>
 
                         <View style={styles.divider} />
@@ -775,4 +786,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default PhotographerDetailsScreen;
+export default VendorProfileDetailsScreen;

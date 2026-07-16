@@ -1,4 +1,8 @@
 import postVenueBusinessDetails from "@/services/postVenueBusinessDetails";
+import patchBusinessDetails from "@/services/patchBusinessDetails";
+import { useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
+import axios from "axios";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -31,6 +35,7 @@ const STAFF_GENDERS = [
 ];
 
 const BusinessDetailsForm = () => {
+    const { edit, userId } = useLocalSearchParams();
     const [venueType, setVenueType] = useState<string[]>([]);
     const [expertise, setExpertise] = useState<string>("");
     const [amenities, setAmenities] = useState<string>("");
@@ -67,6 +72,41 @@ const BusinessDetailsForm = () => {
         );
     };
 
+    useEffect(() => {
+    if (edit !== "true") return;
+
+    const loadData = async () => {
+        try {
+            const res = await axios.get(
+                `https://eventify-hub.onrender.com/vendor?userId=${userId}`
+            );
+
+            const data = res.data.venueBusinessDetails;
+
+            setVenueType(data.typeOfVenue || []);
+            setExpertise(data.expertise || "");
+            setAmenities(data.amenities || "");
+            setMaximumPeopleCapacity(
+                data.maximumPeopleCapacity?.toString() || ""
+            );
+            setCatering(data.catering || []);
+            setParking(data.parking ? "YES" : "NO");
+            setStaff(data.staff || []);
+            setMinimumPrice(data.minimumPrice?.toString() || "");
+            setDescription(data.description || "");
+            setAdditionalInfo(data.additionalInfo || "");
+            setDownPaymentType(data.downPaymentType || null);
+            setDownPayment(data.downPayment?.toString() || "");
+            setCancellationPolicy(data.cancellationPolicy || null);
+            setCovidCompliant(data.covidCompliant || null);
+        } catch (err) {
+            console.log(err);
+        }
+    };
+
+    loadData();
+}, []);
+
     const submit = async () => {
         if (
             venueType.length === 0 ||
@@ -86,29 +126,56 @@ const BusinessDetailsForm = () => {
         }
 
         try {
-            const user = JSON.parse((await getSecureData("user")) || "");
-            await postVenueBusinessDetails(user._id, {
-                typeOfVenue: venueType,
-                expertise,
-                amenities,
-                maximumPeopleCapacity: maximumPeopleCapacity ? Number(maximumPeopleCapacity) : undefined,
-                catering,
-                parking: parking === "YES",
-                staff,
-                minimumPrice: minimumPrice ? Number(minimumPrice) : undefined,
-                description,
-                additionalInfo: additionalInfo || undefined,
-                downPaymentType,
-                downPayment: Number(downPayment),
-                cancellationPolicy,
-                covidCompliant,
-            });
-            Alert.alert("Success", "Business details saved successfully!");
-            router.push("/packages");
-        } catch (error) {
-            console.error("Error:", error);
-            Alert.alert("Error", "Something went wrong. Please try again.");
-        }
+    const user = JSON.parse((await getSecureData("user")) || "");
+
+    const dto = {
+        typeOfVenue: venueType,
+        expertise,
+        amenities,
+        maximumPeopleCapacity: maximumPeopleCapacity
+            ? Number(maximumPeopleCapacity)
+            : undefined,
+        catering,
+        parking: parking === "YES",
+        staff,
+        minimumPrice: minimumPrice
+            ? Number(minimumPrice)
+            : undefined,
+        description,
+        additionalInfo: additionalInfo || undefined,
+        downPaymentType,
+        downPayment: Number(downPayment),
+        cancellationPolicy,
+        covidCompliant,
+    };
+
+    if (edit === "true") {
+
+        await patchBusinessDetails(user._id, dto);
+
+        Alert.alert(
+            "Success",
+            "Business details updated successfully!"
+        );
+
+        router.back();
+
+    } else {
+
+        await postVenueBusinessDetails(user._id, dto);
+
+        Alert.alert(
+            "Success",
+            "Business details saved successfully!"
+        );
+
+        router.push("/packages");
+    }
+
+} catch (error) {
+    console.error("Error:", error);
+    Alert.alert("Error", "Something went wrong. Please try again.");
+}
     };
 
     return (

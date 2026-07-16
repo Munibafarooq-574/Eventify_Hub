@@ -223,7 +223,90 @@ export class VendorService {
         return await user.save();
     } 
 
-    
+    async updateBusinessDetails(
+    userId: string,
+    dto:
+        | CreatePhotographerBusinessDetailsDto
+        | CreateSalonBusinessDetailsDto
+        | CreateVenueBusinessDetailsDto
+        | CreateCateringBusinessDetailsDto
+        | CreateCakeBusinessDetailsDto
+        | CreateMehndiBusinessDetailsDto
+        | CreateSoundBusinessDetailsDto,
+): Promise<User> {
+
+    const user = await this.userModel
+        .findById(userId)
+        .populate('buisnessCategory')
+        .exec();
+
+    if (!user) {
+        throw new NotFoundException('User not found');
+    }
+
+    const category = user.buisnessCategory as Category;
+    const categoryName = category.name.trim().toLowerCase();
+
+    if (categoryName === "venues") {
+        user.venueBusinessDetails = {
+            ...user.venueBusinessDetails,
+            ...dto,
+        } as VenueBusinessDetails;
+    }
+
+    else if (categoryName === "caterings") {
+        user.cateringBusinessDetails = {
+            ...user.cateringBusinessDetails,
+            ...dto,
+        } as CateringBusinessDetails;
+    }
+
+    else if (categoryName === "photography") {
+        user.photographerBusinessDetails = {
+            ...user.photographerBusinessDetails,
+            ...dto,
+        } as PhotographerBusinessDetails;
+    }
+
+    else if (categoryName === "makeup") {
+        user.salonBusinessDetails = {
+            ...user.salonBusinessDetails,
+            ...dto,
+        } as SalonBusinessDetails;
+    }
+
+    else if (categoryName === "cakes") {
+        user.cakeBusinessDetails = {
+            ...user.cakeBusinessDetails,
+            ...dto,
+        } as CakeBusinessDetails;
+    }
+
+    else if (categoryName === "mehndi") {
+        user.mehndiBusinessDetails = {
+            ...user.mehndiBusinessDetails,
+            ...dto,
+        } as MehndiBusinessDetails;
+    }
+
+    else if (
+        categoryName === "dj & sound" ||
+        categoryName === "dj" ||
+        categoryName === "sound" ||
+        categoryName === "sounds"
+    ) {
+        user.soundBusinessDetails = {
+            ...user.soundBusinessDetails,
+            ...dto,
+        } as SoundBusinessDetails;
+    }
+
+    else {
+        throw new NotFoundException("Business Category not found");
+    }
+
+    return await user.save();
+}
 
     async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> {
         const user = await this.userModel.findById(userId);

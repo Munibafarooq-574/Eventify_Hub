@@ -1,3 +1,5 @@
+//fyp-mobile/components/vendoreditprofile/VendorEditProfileIndex.tsx
+
 import getAllCategories from '@/services/getAllCategories';
 import patchUpdateProfile from '@/services/patchUpdateProfile'; // import your API function
 import { getSecureData, saveSecureData } from '@/store';
