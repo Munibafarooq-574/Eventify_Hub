@@ -204,12 +204,19 @@ if (edit === "true") {
             <View style={styles.card}>
                 <SectionTitle icon="star" title="Expertise" required />
                 <TextInput
-                    style={styles.input}
-                    placeholder="Enter expertise"
-                    placeholderTextColor="#B99DAF"
-                    value={expertise}
-                    onChangeText={setExpertise}
-                />
+    style={[styles.input, styles.textArea]}
+    multiline
+    textAlignVertical="top"
+    placeholder={`Example:
+• Bridal Makeup
+• Party Makeup
+• HD Makeup
+• Airbrush Makeup
+• Hair Styling`}
+    placeholderTextColor="#B99DAF"
+    value={expertise}
+    onChangeText={setExpertise}
+/>
             </View>
 
             {/* Travels to Client Home - single select */}
@@ -298,7 +305,10 @@ if (edit === "true") {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Enter Description"
+                    placeholder={`Example:
+• Professional salon with 8+ years of experience.
+• Specialized in bridal and party makeup.
+• Premium products with hygienic services.`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -311,7 +321,12 @@ if (edit === "true") {
                 <TextInput
                     style={[styles.input, styles.textArea]}
                     multiline
-                    placeholder="Add any special notes..."
+                    placeholder={`Example:
+• Home service available
+• Advance booking required
+• Bridal packages available
+• Weekend appointments only
+• Travel charges may apply`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -319,39 +334,58 @@ if (edit === "true") {
             </View>
 
             {/* Down Payment Type */}
-            <View style={styles.card}>
-                <SectionTitle icon="money-bill-wave" title="Down Payment Type" required />
-                <View style={styles.pillRow}>
-                    {['PERCENTAGE', 'FIXED'].map((option) => (
-                        <TouchableOpacity
-                            key={option}
-                            activeOpacity={0.85}
-                            style={[styles.pill, downPaymentType === option && styles.pillSelected]}
-                            onPress={() => setDownPaymentType(option as "PERCENTAGE" | "FIXED")}
-                        >
-                            <Text style={[styles.pillText, downPaymentType === option && styles.pillTextSelected]}>
-                                {option}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
+<View style={styles.card}>
+    <SectionTitle icon="money-bill-wave" title="Down Payment Type" required />
+    <View style={styles.pillRow}>
+        {['PERCENTAGE', 'FIXED'].map((option) => (
+            <TouchableOpacity
+                key={option}
+                activeOpacity={0.85}
+                style={[
+                    styles.pill,
+                    downPaymentType === option && styles.pillSelected,
+                ]}
+                onPress={() =>
+                    setDownPaymentType(option as "PERCENTAGE" | "FIXED")
+                }
+            >
+                <Text
+                    style={[
+                        styles.pillText,
+                        downPaymentType === option &&
+                            styles.pillTextSelected,
+                    ]}
+                >
+                    {option}
+                </Text>
+            </TouchableOpacity>
+        ))}
+    </View>
+</View>
 
-            {/* Down Payment */}
-            <View style={styles.card}>
-                <SectionTitle icon="wallet" title="Down Payment" required />
-                <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
-                    <TextInput
-                        style={styles.inputFlex}
-                        placeholder="Enter Down Payment"
-                        placeholderTextColor="#B99DAF"
-                        keyboardType="numeric"
-                        value={downPayment}
-                        onChangeText={setDownPayment}
-                    />
-                </View>
-            </View>
+{/* Down Payment */}
+<View style={styles.card}>
+    <SectionTitle icon="wallet" title="Down Payment" required />
+
+    <View style={styles.inputRow}>
+        <Text style={styles.currencyPrefix}>
+            {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+        </Text>
+
+        <TextInput
+            style={styles.inputFlex}
+            keyboardType="numeric"
+            placeholder={
+                downPaymentType === "PERCENTAGE"
+                    ? "Example: 30% advance"
+                    : "Example: Rs. 5000 advance"
+            }
+            placeholderTextColor="#B99DAF"
+            value={downPayment}
+            onChangeText={setDownPayment}
+        />
+    </View>
+</View>
 
             {/* Covid Compliant */}
             <View style={styles.card}>
@@ -374,7 +408,7 @@ if (edit === "true") {
 
             {/* Refund Policy */}
             <View style={styles.card}>
-                <SectionTitle icon="undo-alt" title="Refund Policy" required />
+                <SectionTitle icon="undo-alt" title="Cancellation Policy" required />
                 <View style={styles.pillRowWrap}>
                     {(['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'] as const).map((policy) => (
                         <TouchableOpacity
