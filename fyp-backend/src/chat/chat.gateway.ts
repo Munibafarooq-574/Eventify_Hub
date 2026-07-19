@@ -18,7 +18,7 @@ import { ChatService } from './chat.service';
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
-    server: Server;
+server!: Server;
 
     private logger: Logger = new Logger('ChatGateway');
 
@@ -43,11 +43,21 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     // User sends a message
     @SubscribeMessage('sendMessage')
-    async handleMessage(client: Socket, payload: { user: string; chatId: string; content: string }) {
+    async handleMessage(client: Socket, payload: {
+    user: string;
+    receiverId: string;
+    chatId: string;
+    content: string;
+})    {
         this.logger.log(`Received message from ${payload.user}: ${payload.content} in chatId: ${payload.chatId}`);
 
         // Create and save the message in the database
-        const message = await this.chatService.createMessage(payload.chatId, payload.user, payload.content);
+        const message = await this.chatService.createMessage(
+    payload.chatId,
+    payload.user,
+    payload.receiverId,
+    payload.content,
+);
 
         // Emit message to all users in the same conversation
         this.server.to(payload.chatId).emit('newMessage', message); // Broadcast the new message to all clients in that conversation
@@ -55,12 +65,27 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     // User joins a conversation
     @SubscribeMessage('joinConversation')
-    handleJoinConversation(client: Socket, chatId: string) {
-        client.join(chatId); // Join the chat room for that conversation
-        this.logger.log(`Client ${client.id} joined chat room ${chatId}`);
+async handleJoinConversation(
+    client: Socket,
+    payload: {
+        chatId: string;
+        userId: string;
+    },
+) {
+        client.join(payload.chatId); // Join the chat room for that conversation
+        this.logger.log(
+    `Client ${client.id} joined chat room ${payload.chatId}`,
+);
 
         // Optionally, send existing messages to the user when they join
-        this.chatService.getMessagesForConversation(chatId).then((messages) => {
+      await this.chatService.markMessagesAsRead(
+    payload.chatId,
+    payload.userId,
+);
+
+this.chatService
+    .getMessagesForConversation(payload.chatId)
+    .then((messages) => {
             client.emit('previousMessages', messages);
         });
     }

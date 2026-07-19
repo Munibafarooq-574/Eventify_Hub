@@ -36,7 +36,7 @@ const ChatScreen: React.FC = () => {
 
         // Initialize WebSocket connection
         const socket = io("https://eventify-hub.onrender.com"); // Replace with your server URL
-        socket.emit("joinConversation", chatId); // Join the conversation room
+        socket.emit("joinConversation", { chatId, userId: loggedInUser._id }); 
 
         // Listen for incoming messages
         socket.on("newMessage", (newMessage) => {
@@ -58,11 +58,13 @@ const ChatScreen: React.FC = () => {
                 throw "user not found";
             }
             const userId = user._id; // Replace with actual userId
+            const receiverId = await getSecureData("receiverId");
             console.log("userId", userId, "chatId", chatId, "message", message);
 
             // Send the message via WebSocket to the server
             socketObj.emit("sendMessage", {
                 user: userId,
+                receiverId,
                 chatId,
                 content: message,
             });

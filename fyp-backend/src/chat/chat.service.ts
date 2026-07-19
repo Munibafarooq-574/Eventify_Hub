@@ -71,7 +71,22 @@ export class ChatService {
             ),
     );
 
-    return uniqueConversations as any;
+    const conversationsWithUnread = await Promise.all(
+    uniqueConversations.map(async (conversation: any) => {
+        const unreadCount = await this.messageModel.countDocuments({
+            chatId: conversation.chatId,
+            receiverId: userId,
+            isRead: false,
+        });
+
+        return {
+            ...conversation,
+            unreadCount,
+        };
+    }),
+);
+
+return conversationsWithUnread as any;
 }
 
     // Get all messages for a conversation (chatId)
@@ -83,8 +98,19 @@ export class ChatService {
     }
 
     // Create a new message for a conversation
-    async createMessage(chatId: string, senderId: string, content: string): Promise<Message> {
-        const message = new this.messageModel({ chatId, senderId, message: content, receiverId: senderId });
+   async createMessage(
+    chatId: string,
+    senderId: string,
+    receiverId: string,
+    content: string,
+): Promise<Message> {
+        const message = new this.messageModel({
+    chatId,
+    senderId,
+    receiverId,
+    message: content,
+    isRead: false,
+});
         await this.conversationModel.updateOne({ chatId, lastMessage: message });
         const conversationObj = await this.conversationModel.findOne({ chatId }).populate('participants');
         const otherUser = conversationObj?.participants.find(
@@ -104,6 +130,21 @@ export class ChatService {
     async getMessagesForConversation(chatId: string): Promise<Message[]> {
         return this.messageModel.find({ chatId }).sort({ timestamp: 1 }).exec();
     }
+
+    async markMessagesAsRead(chatId: string, userId: string) {
+    await this.messageModel.updateMany(
+        {
+            chatId,
+            receiverId: userId,
+            isRead: false,
+        },
+        {
+            $set: {
+                isRead: true,
+            },
+        },
+    );
+}
 
     async getUserPushToken(userId: string): Promise<string> {
         const user = await this.userModel.findById(userId).select('pushToken');

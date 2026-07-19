@@ -101,6 +101,7 @@ const MyEventsScreen = () => {
                         // Call backend to check for an existing conversation or create a new one
                         const { chatId } = await createConversation(user._id, vendor?.vendorId?._id);
                         await saveSecureData("chatId", chatId);
+                        await saveSecureData("receiverId", vendor?.vendorId?._id);
                         router.push(`/message`);
                         // Navigate to the conversation screen
                         // router.push(`/conversation/${chatId}`);

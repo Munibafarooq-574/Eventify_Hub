@@ -107,6 +107,7 @@ const OrderSummary = () => {
             // Call backend to check for an existing conversation or create a new one
             const { chatId } = await createConversation(user._id, vendorId);
             await saveSecureData("chatId", chatId);
+            await saveSecureData("receiverId", vendorId);
             router.push(`/message`);
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);
