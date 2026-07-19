@@ -1,4 +1,4 @@
-// src/chat/chat.service.ts
+// fyp-backend/src/chat/chat.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -49,18 +49,30 @@ export class ChatService {
 
     // Get all conversations for a user
     async getUserConversations(userId: string): Promise<Conversation[]> {
-        return this.conversationModel
-            .find({ participants: userId })
-            .populate({
-                path: 'participants',
-                match: { _id: { $ne: userId } }, // Exclude the participant with matching userId
-            })
-            .populate({
-                path: 'lastMessage', // Populate last message
-                select: 'message timestamp', // Select only the necessary fields (e.g., message text and timestamp)
-            })
-            .exec();
-    }
+    const conversations = await this.conversationModel
+        .find({ participants: userId })
+        .populate({
+            path: 'participants',
+            match: { _id: { $ne: userId } },
+        })
+        .populate({
+            path: 'lastMessage',
+            select: 'message timestamp',
+        })
+        .lean()
+        .exec();
+
+    // Remove duplicate chatIds
+    const uniqueConversations = conversations.filter(
+        (conversation, index, self) =>
+            index ===
+            self.findIndex(
+                (c) => c.chatId === conversation.chatId,
+            ),
+    );
+
+    return uniqueConversations as any;
+}
 
     // Get all messages for a conversation (chatId)
     async getConversationMessages(chatId: string): Promise<Message[]> {

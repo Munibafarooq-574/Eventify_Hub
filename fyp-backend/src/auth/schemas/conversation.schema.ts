@@ -6,8 +6,12 @@ import { Message } from './message.schema';
 
 @Schema()
 export class Conversation extends Document {
-    @Prop({ required: true })
-    chatId: string;  // Unique ID for the conversation (can be generated or mapped from participants)
+    @Prop({
+    required: true,
+    unique: true,
+    index: true,
+})
+chatId: string;   // Unique ID for the conversation (can be generated or mapped from participants)
 
     @Prop({ type: [Types.ObjectId], ref: 'User', required: true })
     participants: User[]; // List of participants (userId, vendorId)
@@ -20,3 +24,5 @@ export class Conversation extends Document {
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
+
+ConversationSchema.index({ chatId: 1 }, { unique: true });

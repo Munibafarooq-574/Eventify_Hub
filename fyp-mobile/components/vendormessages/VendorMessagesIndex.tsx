@@ -71,7 +71,7 @@ const MessagesScreen: React.FC = () => {
 
     const renderMessage = ({ item }: { item: typeof conversations[0] }) => (
         <TouchableOpacity
-            key={item.chatId}
+            //key={item.chatId}
             style={styles.messageContainer}
             activeOpacity={0.7}
             onPress={() => handleConversationClick(item.chatId)}
@@ -125,7 +125,8 @@ const MessagesScreen: React.FC = () => {
             <FlatList
                 data={conversations}
                 renderItem={renderMessage}
-                keyExtractor={(item) => item.chatId}
+                //keyExtractor={(item) => item.chatId}
+                keyExtractor={(item, index) => `${item.chatId}-${index}`}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
