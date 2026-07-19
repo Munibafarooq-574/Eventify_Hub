@@ -1,3 +1,4 @@
+//fyp-backend/src/messages/messages.controller.ts
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';

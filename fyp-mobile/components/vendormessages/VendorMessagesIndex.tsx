@@ -1,108 +1,245 @@
 import getConversationList from '@/services/getConversationList';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     FlatList,
     Image,
     Platform,
+    RefreshControl,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 
 const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
+const SOCKET_URL = 'https://eventify-hub.onrender.com';
+const DEFAULT_AVATAR =
+    "https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg";
+const UNREAD_OVERRIDES_KEY = "chatUnreadOverrides";
+
+// ---------- helpers ----------
+const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
+const getMsgTime = (m: any) => m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
+const getSenderId = (m: any) => {
+    const s = m?.senderId ?? m?.sender;
+    return typeof s === "object" && s !== null ? s._id : s;
+};
+
+const loadOverrides = async (): Promise<Record<string, number>> => {
+    try {
+        const raw = await getSecureData(UNREAD_OVERRIDES_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+};
+
+const persistOverrides = (map: Record<string, number>) => {
+    saveSecureData(UNREAD_OVERRIDES_KEY, JSON.stringify(map)).catch((e) =>
+        console.error("Failed to persist unread overrides", e)
+    );
+};
+
+// WhatsApp-style relative time for the conversation list ("10:45 AM" for
+// today, "Yesterday", weekday name for the last week, else a short date).
+const formatListTime = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    const sameDay = (a: Date, b: Date) =>
+        a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+    if (sameDay(d, now)) {
+        let h = d.getHours();
+        const m = d.getMinutes().toString().padStart(2, "0");
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12 || 12;
+        return `${h}:${m} ${ampm}`;
+    }
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "long" });
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+};
 
 const MessagesScreen: React.FC = () => {
     const [conversations, setConversations] = useState<any[]>([]);
-    const [socket, setSocket] = useState<any>(null);
-    // const [loggedIn]
+    const [loading, setLoading] = useState<boolean>(true);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
+    // Unread counts are tracked entirely on the client from this point on:
+    // seeded once from the backend's value the first time we see a chat,
+    // then incremented by exactly 1 per genuine incoming message and reset
+    // to 0 the moment the user opens that conversation. This is what makes
+    // the badge match "however many messages actually arrived" instead of
+    // being stuck at whatever fixed number the backend happens to send.
+    const [unreadOverrides, setUnreadOverrides] = useState<Record<string, number>>({});
+    const overridesRef = useRef<Record<string, number>>({});
+    const myUserIdRef = useRef<string>("");
+    const socketRef = useRef<Socket | null>(null);
+
+    const updateOverrides = useCallback((updater: (prev: Record<string, number>) => Record<string, number>) => {
+        setUnreadOverrides((prev) => {
+            const updated = updater(prev);
+            overridesRef.current = updated;
+            persistOverrides(updated);
+            return updated;
+        });
+    }, []);
+
+    const fetchConversations = useCallback(async (silent = false) => {
+        try {
+            if (!silent) setLoading(true);
+            const rawUser = await getSecureData("user");
+            const user = rawUser ? JSON.parse(rawUser) : null;
+            if (!user) throw new Error("user not found");
+            myUserIdRef.current = user._id;
+
+            const data = (await getConversationList(user._id)) || [];
+            setConversations(data);
+
+            // Seed the local override only for chats we haven't tracked yet,
+            // so we never stomp on a count the user already interacted with.
+            const stored = await loadOverrides();
+            const merged = { ...stored };
+            let changed = false;
+            data.forEach((c: any) => {
+                if (!(c.chatId in merged)) {
+                    merged[c.chatId] = Number(c.unreadCount) || 0;
+                    changed = true;
+                }
+            });
+            overridesRef.current = merged;
+            setUnreadOverrides(merged);
+            if (changed) persistOverrides(merged);
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, []);
 
     useEffect(() => {
-        // Establish socket connection to backend
-        const socketConnection = io('https://eventify-hub.onrender.com'); // Use the actual backend URL
-        setSocket(socketConnection);
+        const socketConnection = io(SOCKET_URL);
+        socketRef.current = socketConnection;
 
-        // Fetch conversation list from backend when component mounts
         fetchConversations();
 
-        // Listen for new messages
-        socketConnection.on('newMessage', (message) => {
-            // Update the conversations or show a notification for the new message
-            console.log('Received new message:', message);
-            // You can update the state of conversations here
+        socketConnection.on("newMessage", (incoming: any) => {
+            const chatId = incoming?.chatId;
+            if (!chatId) {
+                fetchConversations(true);
+                return;
+            }
+
+            // Move the affected conversation to the top with a live preview
+            // instead of waiting on a full list refetch for every message.
+            setConversations((prev) => {
+                const idx = prev.findIndex((c) => c.chatId === chatId);
+                if (idx === -1) {
+                    fetchConversations(true);
+                    return prev;
+                }
+                const updatedConvo = {
+                    ...prev[idx],
+                    lastMessage: { message: getMsgText(incoming), timestamp: getMsgTime(incoming) },
+                };
+                const rest = prev.filter((_, i) => i !== idx);
+                return [updatedConvo, ...rest];
+            });
+
+            const senderId = getSenderId(incoming);
+            if (senderId && senderId !== myUserIdRef.current) {
+                updateOverrides((prev) => ({ ...prev, [chatId]: (prev[chatId] || 0) + 1 }));
+            }
         });
 
-        // Cleanup on component unmount
         return () => {
             socketConnection.disconnect();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const fetchConversations = async () => {
-        try {
-            // Assuming you have an API endpoint to get conversations for the current user
-            const user = JSON.parse(await getSecureData("user") || "");
-            if (!user) {
-                throw "user not found";
-            }
-            const data = await getConversationList(user._id);
-            setConversations(data);
-        } catch (error) {
-            console.error('Error fetching conversations:', error);
+    // Refresh conversation list every time this screen regains focus (e.g.
+    // coming back from a chat) - unread overrides are merged, not overwritten.
+    useFocusEffect(
+        useCallback(() => {
+            fetchConversations(true);
+        }, [fetchConversations])
+    );
+
+    const handleRefresh = () => {
+        setRefreshing(true);
+        fetchConversations(true);
+    };
+
+    const handleConversationClick = async (item: any) => {
+        const participant = item.participants?.[0] || {};
+        await saveSecureData("chatId", item.chatId);
+        await saveSecureData("receiverId", participant._id || "");
+        await saveSecureData("receiverName", participant.name || "Conversation");
+        await saveSecureData("receiverAvatar", participant.avatar || "");
+
+        // Clear the badge immediately - the whole point of opening the chat.
+        updateOverrides((prev) => ({ ...prev, [item.chatId]: 0 }));
+
+        router.push(`/message`);
+        if (socketRef.current) {
+            socketRef.current.emit("joinConversation", {
+                chatId: item.chatId,
+                userId: myUserIdRef.current,
+            });
         }
     };
 
-    useEffect(() => {
-        console.log(conversations)
-    }, [conversations]);
+    const renderMessage = ({ item }: { item: typeof conversations[0] }) => {
+        const participant = item.participants?.[0] || {};
+        const unread = unreadOverrides[item.chatId] ?? Number(item.unreadCount) ?? 0;
 
-    const handleConversationClick = async (chatId: string) => {
-        // Navigate to the conversation detail screen (or load messages)
-        await saveSecureData("chatId", chatId);
-        router.push(`/message`);
-        socket.emit('joinConversation', chatId); // Join the conversation room
+        return (
+            <TouchableOpacity
+                style={styles.messageContainer}
+                activeOpacity={0.7}
+                onPress={() => handleConversationClick(item)}
+            >
+                <View style={styles.avatarWrap}>
+                    <Image source={{ uri: participant.avatar || DEFAULT_AVATAR }} style={styles.avatar} />
+                </View>
+
+                <View style={styles.textContainer}>
+                    <Text style={styles.title} numberOfLines={1}>{participant.name || "Unknown"}</Text>
+                    <Text
+                        style={[
+                            styles.subtitle,
+                            unread > 0 && styles.subtitleUnread,
+                        ]}
+                        numberOfLines={1}
+                    >
+                        {item.lastMessage ? getMsgText(item.lastMessage) : "No messages yet"}
+                    </Text>
+                </View>
+                <View style={styles.rightContainer}>
+                    <Text style={styles.time}>
+                        {item.lastMessage ? formatListTime(getMsgTime(item.lastMessage)) : ""}
+                    </Text>
+                    {unread > 0 && (
+                        <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadText}>{unread > 99 ? "99+" : unread}</Text>
+                        </View>
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
     };
-
-    const renderMessage = ({ item }: { item: typeof conversations[0] }) => (
-        <TouchableOpacity
-            //key={item.chatId}
-            style={styles.messageContainer}
-            activeOpacity={0.7}
-            onPress={() => handleConversationClick(item.chatId)}
-        >
-            <View style={styles.avatarWrap}>
-                {/* <Image source={{ uri: item.avatar }} style={styles.avatar} />*/}
-                <Image source={{ uri: "https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg" }} style={styles.avatar} />
-            </View>
-
-            <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={1}>{item.participants[0].name}</Text>
-                <Text
-                    style={[
-                        styles.subtitle,
-                        item.unreadCount > 0 && styles.subtitleUnread,
-                    ]}
-                    numberOfLines={1}
-                >
-                    {item.lastMessage ? item.lastMessage.message : "No Message"}
-                </Text>
-            </View>
-            <View style={styles.rightContainer}>
-                <Text style={styles.time}>{item.lastMessage ? new Date(item.lastMessage.timestamp).toDateString() : ""}</Text>
-                {item.unreadCount > 0 && (
-                    <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadText}>{item.unreadCount}</Text>
-                    </View>
-                )}
-            </View>
-        </TouchableOpacity>
-    );
 
     return (
         <View style={styles.container}>
@@ -118,27 +255,30 @@ const MessagesScreen: React.FC = () => {
                         {conversations.length} {conversations.length === 1 ? "conversation" : "conversations"}
                     </Text>
                 </View>
-
             </View>
 
             {/* Messages List */}
             <FlatList
                 data={conversations}
                 renderItem={renderMessage}
-                //keyExtractor={(item) => item.chatId}
                 keyExtractor={(item, index) => `${item.chatId}-${index}`}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={PRIMARY} colors={[PRIMARY]} />
+                }
                 ListEmptyComponent={
-                    <View style={styles.emptyState}>
-                        <View style={styles.emptyIconCircle}>
-                            <Ionicons name="chatbubble-ellipses-outline" size={34} color={PRIMARY} />
+                    !loading ? (
+                        <View style={styles.emptyState}>
+                            <View style={styles.emptyIconCircle}>
+                                <Ionicons name="chatbubble-ellipses-outline" size={34} color={PRIMARY} />
+                            </View>
+                            <Text style={styles.emptyTitle}>No conversations yet</Text>
+                            <Text style={styles.emptySubtitle}>
+                                Your chats with clients will show up here once they message you
+                            </Text>
                         </View>
-                        <Text style={styles.emptyTitle}>No conversations yet</Text>
-                        <Text style={styles.emptySubtitle}>
-                            Your chats with clients will show up here once they message you
-                        </Text>
-                    </View>
+                    ) : null
                 }
             />
 
@@ -178,10 +318,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitleWrap: {
-    flex: 1,
-    alignItems: 'center',
-    marginRight: 40,
-},
+        flex: 1,
+        alignItems: 'center',
+        marginRight: 40,
+    },
     headerTitle: {
         fontSize: 19,
         fontWeight: '800',

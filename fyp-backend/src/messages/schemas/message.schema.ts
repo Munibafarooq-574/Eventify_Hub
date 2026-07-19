@@ -1,3 +1,4 @@
+//fyp-backend/src/messages/schemas/message.schema.ts
 import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 

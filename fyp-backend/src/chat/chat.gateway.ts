@@ -32,9 +32,9 @@ server!: Server;
         this.logger.log(`Client connected: ${client.id}`);
 
         // Optionally, send existing conversations to the newly connected client
-        this.chatService.getUserConversations(client.id).then((conversations) => {
-            client.emit('conversationList', conversations);
-        });
+       // this.chatService.getUserConversations(client.id).then((conversations) => {
+          //  client.emit('conversationList', conversations);
+     //   });
     }
 
     handleDisconnect(client: Socket) {
@@ -64,7 +64,8 @@ server!: Server;
     }
 
     // User joins a conversation
-    @SubscribeMessage('joinConversation')
+    // User joins a conversation
+@SubscribeMessage('joinConversation')
 async handleJoinConversation(
     client: Socket,
     payload: {
@@ -72,21 +73,20 @@ async handleJoinConversation(
         userId: string;
     },
 ) {
-        client.join(payload.chatId); // Join the chat room for that conversation
-        this.logger.log(
-    `Client ${client.id} joined chat room ${payload.chatId}`,
-);
+    client.join(payload.chatId);
+    this.logger.log(`Client ${client.id} joined chat room ${payload.chatId}`);
 
-        // Optionally, send existing messages to the user when they join
-      await this.chatService.markMessagesAsRead(
-    payload.chatId,
-    payload.userId,
-);
+    // Mark messages as read for this user
+    await this.chatService.markMessagesAsRead(payload.chatId, payload.userId);
 
-this.chatService
-    .getMessagesForConversation(payload.chatId)
-    .then((messages) => {
+    // 🔵 NEW: tell everyone in the room that this user has seen the chat
+    // so the sender's grey double-tick can flip to blue.
+    this.server.to(payload.chatId).emit('messagesSeen', { chatId: payload.chatId });
+
+    this.chatService
+        .getMessagesForConversation(payload.chatId)
+        .then((messages) => {
             client.emit('previousMessages', messages);
         });
-    }
+}
 }

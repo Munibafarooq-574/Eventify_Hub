@@ -71,7 +71,7 @@ export class ChatService {
             ),
     );
 
-    const conversationsWithUnread = await Promise.all(
+   const conversationsWithUnread = await Promise.all(
     uniqueConversations.map(async (conversation: any) => {
         const unreadCount = await this.messageModel.countDocuments({
             chatId: conversation.chatId,
@@ -79,8 +79,16 @@ export class ChatService {
             isRead: false,
         });
 
+        // 🔵 NEW: User schema has no dedicated "avatar" field.
+        // Use coverImage first, fall back to the first uploaded image.
+        const participants = (conversation.participants || []).map((p: any) => ({
+            ...p,
+            avatar: p.coverImage || (p.images && p.images.length > 0 ? p.images[0] : ""),
+        }));
+
         return {
             ...conversation,
+            participants,
             unreadCount,
         };
     }),
@@ -98,33 +106,51 @@ return conversationsWithUnread as any;
     }
 
     // Create a new message for a conversation
-   async createMessage(
+    async createMessage(
     chatId: string,
     senderId: string,
     receiverId: string,
     content: string,
 ): Promise<Message> {
-        const message = new this.messageModel({
-    chatId,
-    senderId,
-    receiverId,
-    message: content,
-    isRead: false,
-});
-        await this.conversationModel.updateOne({ chatId, lastMessage: message });
-        const conversationObj = await this.conversationModel.findOne({ chatId }).populate('participants');
-        const otherUser = conversationObj?.participants.find(
-            x => x._id && !x._id.equals(senderId)
-        )
-        try {
-            console.log("Sending Push in messages");
-            // await this.sendPushNotification("New Message", content, message.senderId, "MESSAGE");
-            await this.sendPushNotification("New Message", content, otherUser?._id, "MESSAGE");
-        } catch (error) {
-            console.log("Sending Push in messages", error);
-        }
-        return message.save();
+    const message = new this.messageModel({
+        chatId,
+        senderId,
+        receiverId,
+        message: content,
+        isRead: false,
+    });
+
+    // Pehle message save karo
+    await message.save();
+
+    // Phir conversation ka lastMessage update karo
+    await this.conversationModel.updateOne(
+        { chatId },
+        { lastMessage: message._id },
+    );
+
+    const conversationObj = await this.conversationModel
+        .findOne({ chatId })
+        .populate('participants');
+
+    const otherUser = conversationObj?.participants.find(
+        x => x._id && !x._id.equals(senderId),
+    );
+
+    try {
+        console.log("Sending Push in messages");
+        await this.sendPushNotification(
+            "New Message",
+            content,
+            otherUser?._id,
+            "MESSAGE",
+        );
+    } catch (error) {
+        console.log("Sending Push in messages", error);
     }
+
+    return message;
+}
 
     // Get all messages for a conversation
     async getMessagesForConversation(chatId: string): Promise<Message[]> {
