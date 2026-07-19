@@ -14,42 +14,47 @@ const ChatScreen: React.FC = () => {
     const router = useRouter();
 
     useEffect(() => {
-        // Fetch the messages for the conversation when the component mounts
-        const fetchMessages = async () => {
-            try {
-                const user = JSON.parse(await getSecureData("user") || "");
-                if (!user) {
-                    throw "user not found";
-                }
-                setLoggedInUser(user);
-                const chatIdValue = await getSecureData("chatId") || "";
-                const messagesData = await getConversationMessages(chatIdValue); // API to fetch messages
-                console.log("messagesData", messagesData);
-                setChatId(chatIdValue);
-                setMessages(messagesData);
-            } catch (error) {
-                console.error("Error fetching messages:", error);
+    const socket = io("https://eventify-hub.onrender.com");
+
+    setSocketObj(socket);
+
+    socket.on("newMessage", (newMessage) => {
+        setMessages((prevMessages) => [newMessage, ...prevMessages]);
+    });
+
+    const fetchMessages = async () => {
+        try {
+            const user = JSON.parse(await getSecureData("user") || "");
+
+            if (!user) {
+                throw "user not found";
             }
-        };
 
-        fetchMessages();
+            setLoggedInUser(user);
 
-        // Initialize WebSocket connection
-        const socket = io("https://eventify-hub.onrender.com"); // Replace with your server URL
-        socket.emit("joinConversation", { chatId, userId: loggedInUser._id }); 
+            const chatIdValue = await getSecureData("chatId") || "";
 
-        // Listen for incoming messages
-        socket.on("newMessage", (newMessage) => {
-            setMessages((prevMessages) => [newMessage, ...prevMessages]);
-        });
+            setChatId(chatIdValue);
 
-        setSocketObj(socket);
+            const messagesData = await getConversationMessages(chatIdValue);
 
-        // Cleanup on component unmount
-        return () => {
-            socket.disconnect();
-        };
-    }, [chatId]);
+            setMessages(messagesData);
+
+            // Join socket room
+            socket.emit("joinConversation", chatIdValue);
+
+        } catch (error) {
+            console.error("Error fetching messages:", error);
+        }
+    };
+
+    fetchMessages();
+
+    return () => {
+        socket.off("newMessage");
+        socket.disconnect();
+    };
+}, []);
 
     const handleSendMessage = async () => {
         if (message.trim()) {
