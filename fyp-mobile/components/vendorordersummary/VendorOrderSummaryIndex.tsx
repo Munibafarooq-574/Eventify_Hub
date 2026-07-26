@@ -246,6 +246,12 @@ const OrderSummary = () => {
                     }
                     renderItem={({ item }) => {
                         const isExpanded = expandedOrderId === item._id;
+                        // Show only THIS vendor's earnings for the order, not the
+                        // organizer's full bill (which may include other vendors'
+                        // services on the same booking).
+                        const vendorTotal = Array.isArray(item.vendorOrders)
+                            ? item.vendorOrders.reduce((sum: number, s: any) => sum + (s.price || 0), 0)
+                            : item.totalAmount;
                         return (
                             <TouchableOpacity
                                 activeOpacity={0.85}
@@ -286,7 +292,7 @@ const OrderSummary = () => {
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>Rs. {item.totalAmount}</Text>
+                                            <Text style={styles.detailText}>Rs. {vendorTotal}</Text>
                                         </View>
 
                                         {/* Expanded order details - shown only when the card is tapped */}

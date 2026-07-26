@@ -284,6 +284,11 @@ const MyEventsScreen = () => {
                 renderItem={({ item }) => {
                     const id = item._id || item.id;
                     const isExpanded = expandedId === id;
+                    // Show only this vendor's own earnings, not the organizer's
+                    // full order total (which may span multiple vendors).
+                    const vendorTotal = Array.isArray(item.vendorOrders)
+                        ? item.vendorOrders.reduce((sum: number, s: any) => sum + (s.price || 0), 0)
+                        : item.totalAmount;
                     return (
                         <TouchableOpacity
                             style={styles.eventCard}
@@ -327,10 +332,10 @@ const MyEventsScreen = () => {
                                                 <Text style={styles.expandedText}>{item.organizerId.phone}</Text>
                                             </View>
                                         )}
-                                        {!!item.totalAmount && (
+                                        {!!vendorTotal && (
                                             <View style={styles.eventMeta}>
                                                 <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                <Text style={styles.expandedText}>Rs. {item.totalAmount}</Text>
+                                                <Text style={styles.expandedText}>Rs. {vendorTotal}</Text>
                                             </View>
                                         )}
                                         {!!item.status && (
@@ -347,7 +352,10 @@ const MyEventsScreen = () => {
                                                 {item.vendorOrders.map((s: any, idx: number) => (
                                                     <View key={idx} style={styles.eventMeta}>
                                                         <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
-                                                        <Text style={styles.expandedText}>{s.serviceName}</Text>
+                                                        <Text style={styles.expandedText}>
+                                                            {s.serviceName}
+                                                            {s.price != null ? ` - Rs. ${s.price}` : ""}
+                                                        </Text>
                                                     </View>
                                                 ))}
                                             </>
@@ -504,10 +512,10 @@ const styles = StyleSheet.create({
         width: 12,
         height: 12,
         borderRadius: 4,
-        backgroundColor: PRIMARY,
+        backgroundColor: ACCENT,
     },
     legendSwatchSelected: {
-        backgroundColor: ACCENT,
+        backgroundColor: PRIMARY,
         marginLeft: 12,
     },
     legendText: {
