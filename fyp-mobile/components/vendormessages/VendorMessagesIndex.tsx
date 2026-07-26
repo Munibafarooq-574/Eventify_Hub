@@ -194,10 +194,7 @@ const MessagesScreen: React.FC = () => {
 
         router.push(`/message`);
         if (socketRef.current) {
-            socketRef.current.emit("joinConversation", {
-                chatId: item.chatId,
-                userId: myUserIdRef.current,
-            });
+            socketRef.current.emit("joinConversation", { chatId: item.chatId, userId: myUserIdRef.current });
         }
     };
 

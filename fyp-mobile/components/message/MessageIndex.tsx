@@ -218,12 +218,16 @@ const ChatScreen: React.FC = () => {
       });
     });
 
-    // Ready for read-receipts once the backend adds them: when the other
-    // person opens the chat, it can emit { chatId } here and every one of
-    // OUR messages in that chat flips to a blue double tick automatically.
-    // Until the backend sends this event, ticks simply stay at "delivered".
-    socket.on("messagesSeen", (payload: { chatId?: string }) => {
+    // Read-receipts: when the OTHER person opens the chat, the backend
+    // emits { chatId, seenBy }. We only flip OUR sent messages to a blue
+    // tick when seenBy is the OTHER participant - NOT when it's ourselves.
+    // Without this check, simply re-opening your own chat (which also
+    // marks the other person's messages as seen on your side) would
+    // incorrectly blue-tick your own outgoing messages too.
+    socket.on("messagesSeen", (payload: { chatId?: string; seenBy?: string }) => {
       if (!isMounted || !payload?.chatId || payload.chatId !== chatIdRef.current) return;
+      if (!payload.seenBy || payload.seenBy === userRef.current?._id) return;
+
       setMessages((prev) =>
         prev.map((m) =>
           getSenderId(m) === userRef.current?._id && m.status === "delivered"
@@ -257,10 +261,7 @@ const ChatScreen: React.FC = () => {
         );
 
         if (socket.connected) {
-          socket.emit("joinConversation", {
-            chatId: chatIdValue,
-            userId: user._id,
-          });
+          socket.emit("joinConversation", { chatId: chatIdValue, userId: user._id });
         }
       } catch (error) {
         console.error("Error fetching messages:", error);
