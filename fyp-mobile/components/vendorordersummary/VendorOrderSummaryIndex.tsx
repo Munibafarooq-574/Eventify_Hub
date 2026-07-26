@@ -5,7 +5,7 @@ import patchUpdateOrderStatus from "@/services/patchUpdateOrderStatus";
 import { getSecureData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Dimensions, FlatList, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
@@ -27,7 +27,7 @@ const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
 const ACCENT = "#B84B9A";
 
-   const getCardColor = (label: string) => {
+const getCardColor = (label: string) => {
     switch (label) {
         case "Orders":
             return "#C79AE8";
@@ -40,25 +40,30 @@ const ACCENT = "#B84B9A";
     }
 };
 
+// Backend statuses that count as "Processing" in the UI.
+// Adjust here if your backend uses different status strings.
+const PROCESSING_STATUSES = ["pending", "confirmed"];
+const COMPLETED_STATUS = "completed";
+const CANCELLED_STATUS = "cancelled";
+
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
     const [selectedFilter, setSelectedFilter] = useState<"All" | "Processing" | "Completed">("All");
     const [orders, setOrders] = useState<any[]>([]);
-    const [orderStats, setOrderStats] = useState({ totalOrders: 0, processing: 0, completed: 0 });
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
     useEffect(() => {
-        // Fetch orders and stats on component mount
+        // Fetch orders on mount. Stats are derived live from `orders` below,
+        // so they always match the current list (no separate stale stats call needed).
         const fetchData = async () => {
             try {
                 const user = JSON.parse(await getSecureData("user") || "");
                 if (!user) {
                     throw "user not found";
                 }
-                const ordersData = await getVendorOrders("Vendor", user._id);  // Fetch all orders
-                const statsData = await getVendorOrderStats("Vendor", user._id);  // Fetch order stats
+                const ordersData = await getVendorOrders("Vendor", user._id); // Fetch all orders
                 console.log(ordersData);
-                setOrders(ordersData);
-                setOrderStats(statsData);
+                setOrders(ordersData || []);
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
@@ -66,19 +71,51 @@ const OrderSummary = () => {
         fetchData();
     }, []);
 
+    // Live-computed stats: recalculates automatically whenever `orders` changes
+    // (e.g. after Mark Processing / Mark Completed / Delete), so the numbers
+    // on the summary cards increment/decrement instantly.
+    const orderStats = useMemo(() => {
+        const nonCancelled = orders.filter((o) => o.status !== CANCELLED_STATUS);
+        const processing = orders.filter((o) => PROCESSING_STATUSES.includes(o.status)).length;
+        const completed = orders.filter((o) => o.status === COMPLETED_STATUS).length;
+        return {
+            totalOrders: nonCancelled.length,
+            processing,
+            completed,
+        };
+    }, [orders]);
+
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "Processing": return "#337AB7";
-            case "Completed": return "#5CB85C";
-            default: return "#999";
+            case "pending":
+            case "confirmed":
+                return "#337AB7";
+            case "completed":
+                return "#5CB85C";
+            case "cancelled":
+                return "#D9534F";
+            default:
+                return "#999";
         }
     };
 
-    const filteredOrders = selectedFilter === "All" ? orders : orders.filter(order => order.status !== "cancelled");
+    // Filter respects the selected summary card:
+    // - All -> everything except cancelled
+    // - Processing -> pending / confirmed orders only
+    // - Completed -> completed orders only
+    const filteredOrders = useMemo(() => {
+        return orders.filter((order) => {
+            if (order.status === CANCELLED_STATUS) return false;
+            if (selectedFilter === "All") return true;
+            if (selectedFilter === "Processing") return PROCESSING_STATUSES.includes(order.status);
+            if (selectedFilter === "Completed") return order.status === COMPLETED_STATUS;
+            return true;
+        });
+    }, [orders, selectedFilter]);
 
     const handleDelete = async (id: string) => {
         await patchUpdateOrderStatus(id, "cancelled");
-        setOrders(prevOrders => prevOrders.filter(order => order.orderId !== id));
+        setOrders(prevOrders => prevOrders.map(order => order._id === id ? { ...order, status: "cancelled" } : order));
         alert("Order Cancelled");
     };
 
@@ -86,7 +123,7 @@ const OrderSummary = () => {
         console.log(id);
         await patchUpdateOrderStatus(id, status);
         setOrders(prevOrders =>
-            prevOrders.map(order => order.orderId === id ? { ...order, status: status } : order)
+            prevOrders.map(order => order._id === id ? { ...order, status: status } : order)
         );
         alert("Order Updated");
     };
@@ -94,6 +131,10 @@ const OrderSummary = () => {
     // Handler for summary card clicks
     const handleSummaryCardClick = (filterType: "All" | "Processing" | "Completed") => {
         setSelectedFilter(filterType);
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedOrderId(prev => (prev === id ? null : id));
     };
 
     // Create or get existing conversation/chat
@@ -203,78 +244,127 @@ const OrderSummary = () => {
                             </Text>
                         </View>
                     }
-                    renderItem={({ item }) => (
-                        <View key={item._id} style={styles.orderCard}>
-                            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
-                            <View style={styles.orderInfo}>
-                                <View style={styles.orderCardHeader}>
-                                    <View style={styles.eventIconWrap}>
-                                        <Ionicons name="calendar" size={18} color={PRIMARY} />
+                    renderItem={({ item }) => {
+                        const isExpanded = expandedOrderId === item._id;
+                        return (
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={() => toggleExpand(item._id)}
+                                style={styles.orderCard}
+                            >
+                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
+                                <View style={styles.orderInfo}>
+                                    <View style={styles.orderCardHeader}>
+                                        <View style={styles.eventIconWrap}>
+                                            <Ionicons name="calendar" size={18} color={PRIMARY} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.eventTitle} numberOfLines={1}>{item.eventName}</Text>
+                                            <Text style={styles.orderName}>{item.organizerId?.name}</Text>
+                                        </View>
+                                        <View style={styles.statusBadge}>
+                                            <Text style={styles.statusBadgeText}>{item.status}</Text>
+                                        </View>
+                                        <Ionicons
+                                            name={isExpanded ? "chevron-up" : "chevron-down"}
+                                            size={18}
+                                            color="#8A8A8A"
+                                            style={{ marginLeft: 8 }}
+                                        />
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.eventTitle} numberOfLines={1}>{item.eventName}</Text>
-                                        <Text style={styles.orderName}>{item.organizerId.name}</Text>
-                                    </View>
-                                    <View style={styles.statusBadge}>
-                                        <Text style={styles.statusBadgeText}>{item.status}</Text>
-                                    </View>
-                                </View>
 
-                                <View style={styles.detailsBlock}>
-                                    <View style={styles.detailRow}>
-                                        <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
-                                        <Text style={styles.detailText}>{new Date(item.eventDate).toDateString()}</Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Ionicons name="pricetags-outline" size={14} color="#8A8A8A" />
-                                        <Text style={styles.detailText} numberOfLines={1}>
-                                            {item.vendorOrders.map((orderName: any) => orderName.serviceName).join(", ")}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.detailRow}>
-                                        <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                        <Text style={styles.detailText}>Rs. {item.totalAmount}</Text>
-                                    </View>
-                                </View>
+                                    <View style={styles.detailsBlock}>
+                                        <View style={styles.detailRow}>
+                                            <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
+                                            <Text style={styles.detailText}>{new Date(item.eventDate).toDateString()}</Text>
+                                        </View>
+                                        <View style={styles.detailRow}>
+                                            <Ionicons name="pricetags-outline" size={14} color="#8A8A8A" />
+                                            <Text style={styles.detailText} numberOfLines={isExpanded ? undefined : 1}>
+                                                {item.vendorOrders?.map((o: any) => o.serviceName).join(", ")}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.detailRow}>
+                                            <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+                                            <Text style={styles.detailText}>Rs. {item.totalAmount}</Text>
+                                        </View>
 
-                                <View style={styles.actionButtons}>
-                                    {
-                                        item.status !== "cancelled"
-                                            ?
-                                            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item._id)}>
+                                        {/* Expanded order details - shown only when the card is tapped */}
+                                        {isExpanded && (
+                                            <View style={styles.expandedBlock}>
+                                                <View style={styles.detailRow}>
+                                                    <Ionicons name="receipt-outline" size={14} color="#8A8A8A" />
+                                                    <Text style={styles.detailText}>Order ID: {item._id}</Text>
+                                                </View>
+                                                {item.organizerId?.email && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="mail-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>{item.organizerId.email}</Text>
+                                                    </View>
+                                                )}
+                                                {item.organizerId?.phone && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="call-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>{item.organizerId.phone}</Text>
+                                                    </View>
+                                                )}
+                                                <Text style={styles.expandedSubTitle}>Services</Text>
+                                                {item.vendorOrders?.map((service: any, idx: number) => (
+                                                    <View key={idx} style={styles.detailRow}>
+                                                        <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
+                                                        <Text style={styles.detailText}>
+                                                            {service.serviceName}
+                                                            {service.price ? ` - Rs. ${service.price}` : ""}
+                                                        </Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View style={styles.actionButtons}>
+                                        {item.status !== "cancelled" && (
+                                            <TouchableOpacity
+                                                style={styles.deleteButton}
+                                                onPress={() => handleDelete(item._id)}
+                                            >
                                                 <Ionicons name="close-circle-outline" size={14} color="#fff" />
                                                 <Text style={styles.buttonText}>Delete</Text>
                                             </TouchableOpacity>
-                                            :
-                                            <></>
-                                    }
+                                        )}
 
-                                    {
-                                        item.status !== "completed" && item.status !== "cancelled"
-                                            ?
-                                            item.status === "pending"
-                                                ?
-                                                <TouchableOpacity style={styles.completeButton} onPress={() => mark(item._id, "confirmed")}>
+                                        {item.status !== "completed" && item.status !== "cancelled" && (
+                                            item.status === "pending" ? (
+                                                <TouchableOpacity
+                                                    style={styles.completeButton}
+                                                    onPress={() => mark(item._id, "confirmed")}
+                                                >
                                                     <Ionicons name="time-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Processing</Text>
                                                 </TouchableOpacity>
-                                                :
-                                                <TouchableOpacity style={styles.completeButton} onPress={() => mark(item._id, "completed")}>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    style={styles.completeButton}
+                                                    onPress={() => mark(item._id, "completed")}
+                                                >
                                                     <Ionicons name="checkmark-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Completed</Text>
                                                 </TouchableOpacity>
-                                            :
-                                            <></>
-                                    }
+                                            )
+                                        )}
 
-                                    <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId._id)}>
-                                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
-                                        <Text style={styles.buttonText}>Message</Text>
-                                    </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.messageButton}
+                                            onPress={() => handleMessageButtonClick(item.organizerId?._id)}
+                                        >
+                                            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
+                                            <Text style={styles.buttonText}>Message</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
-                            </View>
-                        </View>
-                    )}
+                            </TouchableOpacity>
+                        );
+                    }}
                 />
             </View>
             <BottomNavigationFinal />
@@ -294,17 +384,17 @@ const SummaryCard = ({
     isActive?: boolean
 }) => (
     <View
-    style={[
-        styles.summaryCard,
-        {
-            backgroundColor: getCardColor(label),
-            borderColor: getCardColor(label),
-        },
-        isActive && {
-            transform: [{ scale: 1.05 }],
-        },
-    ]}
->
+        style={[
+            styles.summaryCard,
+            {
+                backgroundColor: getCardColor(label),
+                borderColor: getCardColor(label),
+            },
+            isActive && {
+                transform: [{ scale: 1.05 }],
+            },
+        ]}
+    >
         <View style={styles.summaryIconWrap}>
             <Ionicons name={icon} size={20} color={isActive ? PRIMARY : "#FFFFFF"} />
         </View>
@@ -320,10 +410,10 @@ const styles = StyleSheet.create({
         backgroundColor: PRIMARY,
     },
     container: {
-    flex: 1,
-    backgroundColor: PRIMARY_LIGHT,
-    paddingBottom: 80,
-},
+        flex: 1,
+        backgroundColor: PRIMARY_LIGHT,
+        paddingBottom: 80,
+    },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -396,47 +486,37 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 2,
     },
-    /*activeSummaryCard: {
-        backgroundColor: PRIMARY,
-        borderColor: PRIMARY,
-        transform: [{ scale: 1.04 }],
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
-    },*/
     summaryIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-},
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: "rgba(255,255,255,0.22)",
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 8,
+    },
     activeIndicator: {
-    position: "absolute",
-    bottom: -1,
-    height: 4,
-    width: "38%",
-    backgroundColor: "#FFF",
-    borderRadius: 5,
-},
+        position: "absolute",
+        bottom: -1,
+        height: 4,
+        width: "38%",
+        backgroundColor: "#FFF",
+        borderRadius: 5,
+    },
     summaryValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#FFFFFF",
-},
+        fontSize: 24,
+        fontWeight: "800",
+        color: "#FFFFFF",
+    },
     summaryValueActive: {
         color: "#FFFFFF",
     },
-    
     summaryLabel: {
-    fontSize: 12,
-    color: "#FFFFFF",
-    fontWeight: "600",
-    marginTop: 3,
-},
-
+        fontSize: 12,
+        color: "#FFFFFF",
+        fontWeight: "600",
+        marginTop: 3,
+    },
     summaryLabelActive: {
         color: "rgba(255,255,255,0.85)",
     },
@@ -529,6 +609,20 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: "#4A4A4A",
         flexShrink: 1,
+    },
+    expandedBlock: {
+        marginTop: 6,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: "rgba(120,12,96,0.12)",
+    },
+    expandedSubTitle: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: PRIMARY,
+        marginTop: 4,
+        marginBottom: 4,
+        textTransform: "uppercase",
     },
     actionButtons: {
         flexDirection: "row",

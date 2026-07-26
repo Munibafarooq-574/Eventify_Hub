@@ -2,11 +2,12 @@ import getVendorOrders from "@/services/getVendorOrders";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Dimensions,
     FlatList,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -19,23 +20,35 @@ const { width } = Dimensions.get('window');
 const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
 const ACCENT = "#B84B9A";
+const ACCENT_LIGHT = "#F0DDEA";
+
+type ViewMode = "day" | "upcoming" | "month" | "past";
+
+const FILTERS: { key: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { key: "day", label: "Selected Day", icon: "today-outline" },
+    { key: "upcoming", label: "Upcoming", icon: "arrow-forward-circle-outline" },
+    { key: "month", label: "This Month", icon: "calendar-outline" },
+    { key: "past", label: "Past", icon: "time-outline" },
+];
+
+const toKey = (d: string | Date) => new Date(d).toISOString().split('T')[0];
 
 const MyEventsScreen = () => {
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [orders, setOrders] = useState<any[]>([]);
-    const [events, setEvents] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<ViewMode>("day");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
-        // Fetch orders and stats on component mount
         const fetchData = async () => {
             try {
                 const user = JSON.parse(await getSecureData("user") || "");
                 if (!user) {
                     throw "user not found";
                 }
-                const ordersData = await getVendorOrders("Vendor", user._id);  // Fetch all orders
+                const ordersData = await getVendorOrders("Vendor", user._id);
                 console.log(ordersData);
-                setOrders(ordersData);
+                setOrders(ordersData || []);
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
@@ -43,38 +56,86 @@ const MyEventsScreen = () => {
         fetchData();
     }, []);
 
-    useEffect(() => {
-        if (selectedDate && orders.length > 0) {
-            const selected = new Date(selectedDate).toISOString().split('T')[0];
+    const todayKey = toKey(new Date());
 
-            const ordersArr = orders.filter(x => {
-                const eventDate = new Date(x.eventDate).toISOString().split('T')[0];
-                return eventDate === selected;
-            });
+    // ---- Mini dashboard stats (always visible, regardless of filter/day) ----
+    const stats = useMemo(() => {
+        const now = new Date();
+        const thisMonth = orders.filter((o) => {
+            const d = new Date(o.eventDate);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const upcoming = orders.filter((o) => toKey(o.eventDate) >= todayKey);
+        return {
+            total: orders.length,
+            thisMonth: thisMonth.length,
+            upcoming: upcoming.length,
+        };
+    }, [orders, todayKey]);
 
-            setEvents(ordersArr);
+    // ---- Events list, driven by the active filter chip ----
+    const events = useMemo(() => {
+        const now = new Date();
+        let list: any[] = [];
+
+        if (viewMode === "day") {
+            list = orders.filter((o) => toKey(o.eventDate) === selectedDate);
+        } else if (viewMode === "upcoming") {
+            list = orders
+                .filter((o) => toKey(o.eventDate) >= todayKey)
+                .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+        } else if (viewMode === "month") {
+            list = orders
+                .filter((o) => {
+                    const d = new Date(o.eventDate);
+                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                })
+                .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+        } else if (viewMode === "past") {
+            list = orders
+                .filter((o) => toKey(o.eventDate) < todayKey)
+                .sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
         }
-    }, [selectedDate, orders]);
 
-    // Build marked dates so days that actually have orders get a subtle dot,
-    // in addition to highlighting the currently selected day.
-    const markedDates = React.useMemo(() => {
+        return list;
+    }, [orders, viewMode, selectedDate, todayKey]);
+
+    // Event dates get a solid, high-contrast highlight using the calendar's
+    // own default day-cell size (no custom layout) — just a color change.
+    const markedDates = useMemo(() => {
         const marks: Record<string, any> = {};
 
         orders.forEach((o) => {
-            const key = new Date(o.eventDate).toISOString().split('T')[0];
+            const key = toKey(o.eventDate);
             marks[key] = {
-                ...(marks[key] || {}),
-                marked: true,
-                dotColor: ACCENT,
+                customStyles: {
+                    container: {
+                        backgroundColor: ACCENT,
+                        borderRadius: 8,
+                    },
+                    text: {
+                        color: "#FFFFFF",
+                        fontWeight: "800",
+                    },
+                },
             };
         });
 
+        // Selected date always wins visually, even if it's also an event date
+        // (gets a white ring so it's distinguishable from a plain event day).
         marks[selectedDate] = {
-            ...(marks[selectedDate] || {}),
-            selected: true,
-            selectedColor: PRIMARY,
-            selectedTextColor: "#FFFFFF",
+            customStyles: {
+                container: {
+                    backgroundColor: PRIMARY,
+                    borderRadius: 8,
+                    borderWidth: marks[selectedDate] ? 2 : 0,
+                    borderColor: "#FFFFFF",
+                },
+                text: {
+                    color: "#FFFFFF",
+                    fontWeight: "800",
+                },
+            },
         };
 
         return marks;
@@ -84,6 +145,14 @@ const MyEventsScreen = () => {
         month: 'long',
         year: 'numeric',
     });
+
+    const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
+
+    const listTitle =
+        viewMode === "day" ? new Date(selectedDate).toDateString() :
+        viewMode === "upcoming" ? "Upcoming Bookings" :
+        viewMode === "month" ? `Bookings in ${monthLabel}` :
+        "Past Bookings";
 
     return (
         <View style={styles.container}>
@@ -109,30 +178,46 @@ const MyEventsScreen = () => {
 
             <FlatList
                 data={events}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item._id || item.id}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContent}
                 ListHeaderComponent={
                     <>
+                        {/* Mini dashboard */}
+                        <View style={styles.statsRow}>
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{stats.total}</Text>
+                                <Text style={styles.statLabel}>Total</Text>
+                            </View>
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{stats.thisMonth}</Text>
+                                <Text style={styles.statLabel}>This Month</Text>
+                            </View>
+                            <View style={styles.statCard}>
+                                <Text style={styles.statValue}>{stats.upcoming}</Text>
+                                <Text style={styles.statLabel}>Upcoming</Text>
+                            </View>
+                        </View>
+
                         {/* Calendar Card */}
                         <View style={styles.calendarCard}>
                             <Calendar
                                 current={selectedDate}
                                 markedDates={markedDates}
-                                onDayPress={(day) => setSelectedDate(day.dateString)}
+                                markingType="custom"
+                                onDayPress={(day) => {
+                                    setSelectedDate(day.dateString);
+                                    setViewMode("day");
+                                }}
                                 enableSwipeMonths
                                 theme={{
                                     backgroundColor: "#FFFFFF",
                                     calendarBackground: "#FFFFFF",
                                     textSectionTitleColor: "#9B9B9B",
-                                    selectedDayBackgroundColor: PRIMARY,
-                                    selectedDayTextColor: "#FFFFFF",
                                     todayTextColor: PRIMARY,
                                     todayBackgroundColor: PRIMARY_LIGHT,
                                     dayTextColor: "#2D2D2D",
                                     textDisabledColor: "#D9D9D9",
-                                    dotColor: ACCENT,
-                                    selectedDotColor: "#FFFFFF",
                                     arrowColor: PRIMARY,
                                     monthTextColor: "#000000",
                                     textDayFontWeight: "500",
@@ -144,15 +229,49 @@ const MyEventsScreen = () => {
                                 }}
                                 style={styles.calendar}
                             />
+                            <View style={styles.legendRow}>
+                                <View style={styles.legendSwatch} />
+                                <Text style={styles.legendText}>Date with booking(s)</Text>
+                                <View style={[styles.legendSwatch, styles.legendSwatchSelected]} />
+                                <Text style={styles.legendText}>Selected</Text>
+                            </View>
                         </View>
+
+                        {/* Filter chips */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.filterRow}
+                        >
+                            {FILTERS.map((f) => {
+                                const active = viewMode === f.key;
+                                return (
+                                    <TouchableOpacity
+                                        key={f.key}
+                                        onPress={() => setViewMode(f.key)}
+                                        style={[styles.filterChip, active && styles.filterChipActive]}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons
+                                            name={f.icon}
+                                            size={14}
+                                            color={active ? "#FFFFFF" : PRIMARY}
+                                        />
+                                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                                            {f.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
 
                         {/* Section Title */}
                         <View style={styles.sectionRow}>
                             <View>
-                                <Text style={styles.sectionTitle}>{monthLabel}</Text>
-                                <Text style={styles.sectionSubtitle}>
-                                    {new Date(selectedDate).toDateString()}
-                                </Text>
+                                <Text style={styles.sectionTitle}>{listTitle}</Text>
+                                {viewMode === "day" && (
+                                    <Text style={styles.sectionSubtitle}>{monthLabel}</Text>
+                                )}
                             </View>
                             <View style={styles.countBadge}>
                                 <Text style={styles.countBadgeText}>
@@ -162,45 +281,101 @@ const MyEventsScreen = () => {
                         </View>
                     </>
                 }
-                renderItem={({ item }) => (
-                    <View style={styles.eventCard}>
-                        <View style={styles.eventAccentBar} />
+                renderItem={({ item }) => {
+                    const id = item._id || item.id;
+                    const isExpanded = expandedId === id;
+                    return (
+                        <TouchableOpacity
+                            style={styles.eventCard}
+                            activeOpacity={0.85}
+                            onPress={() => toggleExpand(id)}
+                        >
+                            <View style={styles.eventAccentBar} />
 
-                        <View style={styles.eventIconWrap}>
-                            <Ionicons name="calendar" size={22} color={PRIMARY} />
-                        </View>
-
-                        <View style={styles.eventDetails}>
-                            <Text style={styles.eventDate}>
-                                {new Date(item.eventDate).toDateString()}
-                            </Text>
-                            <Text style={styles.eventTitle} numberOfLines={1}>
-                                {item.eventName}
-                            </Text>
-
-                            <View style={styles.metaRow}>
-                                <View style={styles.eventMeta}>
-                                    <Ionicons name="time-outline" size={15} color={PRIMARY} />
-                                    <Text style={styles.eventText}>{item.eventTime}</Text>
-                                </View>
-                                <View style={styles.eventMeta}>
-                                    <Ionicons name="people-outline" size={15} color={PRIMARY} />
-                                    <Text style={styles.eventText}>{item.guests}</Text>
-                                </View>
+                            <View style={styles.eventIconWrap}>
+                                <Ionicons name="calendar" size={22} color={PRIMARY} />
                             </View>
-                        </View>
 
-                        <Ionicons name="chevron-forward" size={20} color="#C6C6C6" />
-                    </View>
-                )}
+                            <View style={styles.eventDetails}>
+                                <Text style={styles.eventDate}>
+                                    {new Date(item.eventDate).toDateString()}
+                                </Text>
+                                <Text style={styles.eventTitle} numberOfLines={1}>
+                                    {item.eventName}
+                                </Text>
+
+                                <View style={styles.metaRow}>
+                                    {!!item.guests && (
+                                        <View style={styles.eventMeta}>
+                                            <Ionicons name="people-outline" size={15} color={PRIMARY} />
+                                            <Text style={styles.eventText}>{item.guests}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {isExpanded && (
+                                    <View style={styles.expandedBlock}>
+                                        {!!item.organizerId?.name && (
+                                            <View style={styles.eventMeta}>
+                                                <Ionicons name="person-outline" size={14} color="#8A8A8A" />
+                                                <Text style={styles.expandedText}>{item.organizerId.name}</Text>
+                                            </View>
+                                        )}
+                                        {!!item.organizerId?.phone && (
+                                            <View style={styles.eventMeta}>
+                                                <Ionicons name="call-outline" size={14} color="#8A8A8A" />
+                                                <Text style={styles.expandedText}>{item.organizerId.phone}</Text>
+                                            </View>
+                                        )}
+                                        {!!item.totalAmount && (
+                                            <View style={styles.eventMeta}>
+                                                <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+                                                <Text style={styles.expandedText}>Rs. {item.totalAmount}</Text>
+                                            </View>
+                                        )}
+                                        {!!item.status && (
+                                            <View style={styles.eventMeta}>
+                                                <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
+                                                <Text style={[styles.expandedText, { textTransform: "capitalize" }]}>
+                                                    {item.status}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
+                                            <>
+                                                <Text style={styles.expandedSubTitle}>Services</Text>
+                                                {item.vendorOrders.map((s: any, idx: number) => (
+                                                    <View key={idx} style={styles.eventMeta}>
+                                                        <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
+                                                        <Text style={styles.expandedText}>{s.serviceName}</Text>
+                                                    </View>
+                                                ))}
+                                            </>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+
+                            <Ionicons
+                                name={isExpanded ? "chevron-up" : "chevron-forward"}
+                                size={20}
+                                color="#C6C6C6"
+                            />
+                        </TouchableOpacity>
+                    );
+                }}
                 ListEmptyComponent={
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIconCircle}>
                             <Ionicons name="calendar-outline" size={34} color={PRIMARY} />
                         </View>
-                        <Text style={styles.emptyTitle}>No events on this day</Text>
+                        <Text style={styles.emptyTitle}>
+                            {viewMode === "day" ? "No events on this day" : "No events found"}
+                        </Text>
                         <Text style={styles.emptySubtitle}>
-                            Select another date on the calendar to view your bookings
+                            {viewMode === "day"
+                                ? "Select another date on the calendar to view your bookings"
+                                : "Try a different filter or check back later"}
                         </Text>
                     </View>
                 }
@@ -270,10 +445,41 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 110,
     },
+    statsRow: {
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 18,
+        marginBottom: 6,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: "#FFFFFF",
+        borderRadius: 14,
+        paddingVertical: 12,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: "#F0DDEA",
+    },
+    statValue: {
+        fontSize: 20,
+        fontWeight: "800",
+        color: PRIMARY,
+    },
+    statLabel: {
+        fontSize: 11,
+        color: "#8A8A8A",
+        fontWeight: "600",
+        marginTop: 2,
+    },
     calendarCard: {
         backgroundColor: "#FFFFFF",
         borderRadius: 20,
-        marginTop: 18,
+        marginTop: 14,
         paddingVertical: 8,
         paddingHorizontal: 6,
         shadowColor: "#000",
@@ -285,6 +491,57 @@ const styles = StyleSheet.create({
     },
     calendar: {
         borderRadius: 16,
+    },
+    legendRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 10,
+        paddingBottom: 8,
+        paddingTop: 2,
+        gap: 6,
+    },
+    legendSwatch: {
+        width: 12,
+        height: 12,
+        borderRadius: 4,
+        backgroundColor: PRIMARY,
+    },
+    legendSwatchSelected: {
+        backgroundColor: ACCENT,
+        marginLeft: 12,
+    },
+    legendText: {
+        fontSize: 11,
+        color: "#8A8A8A",
+        fontWeight: "600",
+    },
+    filterRow: {
+        gap: 8,
+        marginTop: 16,
+        paddingRight: 8,
+    },
+    filterChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1.5,
+        borderColor: "#F0DDEA",
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+    },
+    filterChipActive: {
+        backgroundColor: PRIMARY,
+        borderColor: PRIMARY,
+    },
+    filterChipText: {
+        fontSize: 12,
+        fontWeight: "700",
+        color: PRIMARY,
+    },
+    filterChipTextActive: {
+        color: "#FFFFFF",
     },
     sectionRow: {
         flexDirection: "row",
@@ -366,12 +623,31 @@ const styles = StyleSheet.create({
     eventMeta: {
         flexDirection: "row",
         alignItems: "center",
+        marginTop: 6,
     },
     eventText: {
         marginLeft: 5,
         color: "#555",
         fontSize: 12,
         fontWeight: "500",
+    },
+    expandedBlock: {
+        marginTop: 6,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: "rgba(120,12,96,0.12)",
+    },
+    expandedText: {
+        marginLeft: 6,
+        fontSize: 12,
+        color: "#4A4A4A",
+    },
+    expandedSubTitle: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: PRIMARY,
+        marginTop: 6,
+        textTransform: "uppercase",
     },
     emptyState: {
         alignItems: "center",
