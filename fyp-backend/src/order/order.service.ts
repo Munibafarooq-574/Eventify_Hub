@@ -80,52 +80,70 @@ export class OrderService {
 
 
     async getOrders(
-        type: string,
-        userId: string,
-        status?: string,
-        limit = 10,
-        skip = 0,
-    ): Promise<Order[]> {
-        let userIdObj;
-        if (typeof userId === 'string') {
-            userIdObj = new Types.ObjectId(userId);  // Convert userId to ObjectId
-        }
-
-        const query: any = {
-            ...(status && { status }),  // Optional status filter
-        };
-
-        // Step 1: Fetch VendorOrders that match the vendorId
-        if (type === 'Vendor') {
-            const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
-
-            // Get the ObjectIds of matched VendorOrders
-            const vendorOrderIds = vendorOrders.map(order => order._id);
-
-            // Use the $in operator to query Orders with vendorOrders matching the vendorOrderIds
-            query.vendorOrders = { $in: vendorOrderIds };
-        } else if (type === 'Organizer') {
-            // Step 2: For 'Organizer', filter orders by organizerId
-            query.organizerId = userIdObj;  // Filter by organizerId
-        }
-
-        console.log('Final query:', query);  // Log the final query for debugging
-
-        // Step 3: Execute the query
-        return this.orderModel
-            .find(query)
-            .skip(skip)
-            .limit(limit)
-            .populate('organizerId')  // Populate organizer details
-            .populate({
-                path: 'vendorOrders',  // Populate vendorOrders subdocument
-                populate: {
-                    path: 'vendorId',  // Populate vendor details inside each vendorOrder
-                    model: 'User',  // Specify the 'Vendor' model to populate vendor info
-                },
-            })
-            .exec();
+    type: string,
+    userId: string,
+    status?: string,
+    limit = 10,
+    skip = 0,
+): Promise<Order[]> {
+    let userIdObj;
+    if (typeof userId === 'string') {
+        userIdObj = new Types.ObjectId(userId);  // Convert userId to ObjectId
     }
+
+    const query: any = {
+        ...(status && { status }),  // Optional status filter
+    };
+
+    // Step 1: Fetch VendorOrders that match the vendorId
+    if (type === 'Vendor') {
+        const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
+
+        // Get the ObjectIds of matched VendorOrders
+        const vendorOrderIds = vendorOrders.map(order => order._id);
+
+        // Use the $in operator to query Orders with vendorOrders matching the vendorOrderIds
+        query.vendorOrders = { $in: vendorOrderIds };
+    } else if (type === 'Organizer') {
+        // Step 2: For 'Organizer', filter orders by organizerId
+        query.organizerId = userIdObj;  // Filter by organizerId
+    }
+
+    console.log('Final query:', query);  // Log the final query for debugging
+
+    // Step 3: Execute the query
+    const orders = await this.orderModel
+        .find(query)
+        .skip(skip)
+        .limit(limit)
+        .populate('organizerId')  // Populate organizer details
+        .populate({
+            path: 'vendorOrders',  // Populate vendorOrders subdocument
+            populate: {
+                path: 'vendorId',  // Populate vendor details inside each vendorOrder
+                model: 'User',  // Specify the 'Vendor' model to populate vendor info
+            },
+        })
+        .exec();
+
+    // IMPORTANT: an Order can contain vendorOrders belonging to several different
+    // vendors (e.g. a cake vendor AND a makeup vendor on the same booking).
+    // populate('vendorOrders') pulls back the WHOLE array regardless of which
+    // vendor is asking, so we filter it down here to just this vendor's own
+    // service line-items before returning the data.
+    if (type === 'Vendor') {
+        return orders.map((order) => {
+            const plain: any = order.toObject ? order.toObject() : order;
+            plain.vendorOrders = (plain.vendorOrders || []).filter((vo: any) => {
+                const vendorIdOnItem = vo.vendorId?._id ?? vo.vendorId;
+                return vendorIdOnItem?.toString() === userId;
+            });
+            return plain;
+        });
+    }
+
+    return orders;
+}
 
 
     // Get order stats (pending, processing, completed) for Vendor or Organizer
