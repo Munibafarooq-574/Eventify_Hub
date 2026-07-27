@@ -604,22 +604,12 @@ const category =
     </Text>
 
     <TouchableOpacity
-        onPress={() =>
-            router.push({
-                pathname: '/vendorpackages',
-            })
-        }
-        style={styles.editPill}
-    >
-        <Ionicons
-            name="add-circle-outline"
-            size={14}
-            color={PRIMARY}
-        />
-        <Text style={styles.editLink}>
-            Add New
-        </Text>
-    </TouchableOpacity>
+    onPress={() => router.push({ pathname: '/vpdaddnewpackage' })} // ✅ naya route, purana /vendorpackages nahi
+    style={styles.editPill}
+>
+    <Ionicons name="add-circle-outline" size={14} color={PRIMARY} />
+    <Text style={styles.editLink}>Add New</Text>
+</TouchableOpacity>
 </View>
         <ScrollView
             horizontal

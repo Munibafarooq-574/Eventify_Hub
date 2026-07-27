@@ -7,15 +7,18 @@ import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
-
-
 const PackageScreen = () => {
     const [isModalVisible, setModalVisible] = useState(false);
     const [packageDetails, setPackageDetails] = useState<any>(null);
 
 
-    const route = useRoute();
-    const { packageId } = route.params as { packageId: string; vendorId: string };  // Get both packageId and vendorId from route params
+     const route = useRoute();
+
+const params = route.params as
+    | { packageId?: string }
+    | undefined;
+
+const packageId = params?.packageId;
 
     useEffect(() => {
         console.log("packageId", packageId)
@@ -43,6 +46,12 @@ const PackageScreen = () => {
     }, [packageDetails]);
 
     const confirmLogout = async () => {
+        if (!packageId) {
+            console.error('Package ID is missing');
+            setModalVisible(false);
+            return;
+        }
+
         setModalVisible(false);
         console.log('Deleting Package...');
         await deletePackage(packageId);
@@ -59,6 +68,19 @@ const PackageScreen = () => {
         setModalVisible(false);
     };
 
+    if (!packageId) {
+    return (
+        <View
+            style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+            }}
+        >
+            <Text>No package selected.</Text>
+        </View>
+    );
+}
     return (
         <View style={styles.container}>
             {/* Header */}
