@@ -2,8 +2,8 @@ import getVendorReviews from '@/services/getAllReviewsForVendor';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { router, useGlobalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useGlobalSearchParams, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -56,24 +56,34 @@ const VendorProfileDetailsScreen: React.FC = () => {
     }, [vendorData]);
 
 
-    useEffect(() => {
-        const fetchVendorDetails = async () => {
-            try {
-                const response = await axios.get(`https://eventify-hub.onrender.com/vendor?userId=${id}`);
-                setVendorData(response.data);
-                setActivePackage(response.data.packages?.[0]?._id || null); // Set the first package as active by default
-            } catch (error) {
-                console.error('Error fetching vendor data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        console.log("id", id);
+    const fetchVendorDetails = async () => {
+    try {
+        const response = await axios.get(
+            `https://eventify-hub.onrender.com/vendor?userId=${id}`
+        );
+
+        setVendorData(response.data);
+        setActivePackage(response.data.packages?.[0]?._id || null);
+    } catch (error) {
+        console.error("Error fetching vendor data:", error);
+    } finally {
+        setLoading(false);
+    }
+};
+    
+useEffect(() => {
+    if (id) {
+        fetchVendorDetails();
+    }
+}, [id]);
+
+useFocusEffect(
+    useCallback(() => {
         if (id) {
             fetchVendorDetails();
         }
-
-    }, [id]);
+    }, [id])
+);
 
     if (loading) {
         return (
@@ -581,7 +591,36 @@ const category =
     <View style={styles.detailsContainer}>
 
         {/* Package Selector Cards */}
-        <Text style={styles.packagesSectionTitle}>Choose a Package</Text>
+        <View
+    style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    }}
+>
+    <Text style={styles.packagesSectionTitle}>
+        Choose a Package
+    </Text>
+
+    <TouchableOpacity
+        onPress={() =>
+            router.push({
+                pathname: '/vendorpackages',
+            })
+        }
+        style={styles.editPill}
+    >
+        <Ionicons
+            name="add-circle-outline"
+            size={14}
+            color={PRIMARY}
+        />
+        <Text style={styles.editLink}>
+            Add New
+        </Text>
+    </TouchableOpacity>
+</View>
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

@@ -315,14 +315,25 @@ export class VendorService {
     return await user.save();
 }
 
-    async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> {
+   /* async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> {
         const user = await this.userModel.findById(userId);
         if (!user) throw new NotFoundException('User not found');
 
         user.packages = createPackagesDto.packages; // Replace the current packages
         await user.save();
         return user;
-    }
+    } */
+
+    async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> { 
+        const user = await this.userModel.findById(userId); 
+        if (!user) throw new NotFoundException('User not found'); // ✅ Existing packages ko preserve karo aur naye add karo
+         user.packages = [ 
+            ...(user.packages || []), 
+            ...createPackagesDto.packages, ]; 
+            user.markModified('packages'); 
+            await user.save(); 
+            return user; 
+        }
 
     async getContactDetails(userId: string) {
         const user = await this.userModel.findById(userId).select('contactDetails');

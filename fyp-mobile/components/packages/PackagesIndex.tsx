@@ -503,10 +503,6 @@ limitBadge: {
 
     },
 
-
-
-
-
     // Add Package Button
 
 
@@ -667,9 +663,6 @@ limitBadge: {
         elevation:6,
 
     },
-
-
-
     saveButtonText: {
 
         color:"#FFFFFF",
@@ -679,6 +672,5 @@ limitBadge: {
         fontWeight:"700",
 
     },
-
 
 });
