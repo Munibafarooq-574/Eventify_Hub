@@ -56,8 +56,8 @@ export class ChatService {
             match: { _id: { $ne: userId } },
         })
         .populate({
-            path: 'lastMessage',
-            select: 'message timestamp',
+        path: 'lastMessage',
+        select: 'message imageUrl timestamp',   // imageUrl add kar diya
         })
         .lean()
         .exec();
