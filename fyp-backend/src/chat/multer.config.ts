@@ -9,7 +9,7 @@ if (!existsSync(uploadPath)) {
 
 export const chatImageStorage = diskStorage({
     destination: uploadPath,
-    filename: (req, file, callback) => {
+    filename: (req: any, file: any, callback: any) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         callback(null, `${uniqueSuffix}${extname(file.originalname)}`);
     },
