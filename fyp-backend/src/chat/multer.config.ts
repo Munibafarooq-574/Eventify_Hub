@@ -15,18 +15,24 @@ export const chatImageStorage = diskStorage({
     },
 });
 
-export const imageFileFilter = (req: any, file: any, callback: any) => {
-    const allowedTypes = [
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-    ];
+export const imageFileFilter = (
+  req: any,
+  file: any,
+  callback: any
+) => {
 
-    if (!allowedTypes.includes(file.mimetype)) {
-        return callback(new Error("Only image files are allowed!"), false);
-    }
+  console.log("UPLOAD FILE:", {
+    name: file.originalname,
+    type: file.mimetype,
+  });
 
+  if (
+    file.mimetype.startsWith("image/")
+    ||
+    /\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalname)
+  ) {
     callback(null, true);
+  } else {
+    callback(new Error("Only image files are allowed!"), false);
+  }
 };

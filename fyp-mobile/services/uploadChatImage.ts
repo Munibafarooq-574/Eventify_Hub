@@ -5,15 +5,23 @@ export default async function uploadChatImage(imageUri: string): Promise<string>
     const url = `https://eventify-hub.onrender.com/chat/upload`;
 
     const formData = new FormData();
-    const filename = imageUri.split("/").pop() || `photo_${Date.now()}.jpg`;
+   /* const filename = imageUri.split("/").pop() || `photo_${Date.now()}.jpg`;
     const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : "image/jpeg";
+    const type = match ? `image/${match[1]}` : "image/jpeg"; */
+    const filename = `photo-${Date.now()}.jpg`;
+const type = "image/jpeg";
 
-    formData.append("image", {
+   /* formData.append("image", {
         uri: imageUri,
         name: filename,
         type,
-    } as any);
+    } as any); */
+
+    formData.append("file", {
+    uri: imageUri,
+    name: filename,
+    type,
+} as any);
 
     try {
         const response = await axios.post(url, formData, {

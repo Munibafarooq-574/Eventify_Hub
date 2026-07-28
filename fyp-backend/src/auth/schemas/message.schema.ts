@@ -14,8 +14,16 @@ export class Message extends Document {
     @Prop({ required: true })
     receiverId: string;
 
-    @Prop({ required: true })
-    message: string;
+   /* @Prop({ required: true })
+    message: string; */
+
+    @Prop({
+  required: function (this: Message) {
+    return !this.imageUrl;
+  },
+  default: '',
+})
+message: string;
 
     // 🔵 NEW
     @Prop({ default: '' })
