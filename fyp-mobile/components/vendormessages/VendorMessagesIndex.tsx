@@ -26,9 +26,20 @@ const UNREAD_OVERRIDES_KEY = "chatUnreadOverrides";
 
 // ---------- helpers ----------
 const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
+
+const hasImage = (m: any) => {
+    return !!(
+        m?.imageUrl ||
+        m?.image ||
+        m?.media ||
+        m?.attachment ||
+        m?.photoUrl
+    );
+};
+
 const getMsgPreview = (m: any) => {
-  if (m?.imageUrl) return "📷 Photo";
-  return getMsgText(m);
+    if (hasImage(m)) return "Photo";
+    return getMsgText(m);
 };
 const getMsgTime = (m: any) => m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
@@ -108,7 +119,32 @@ const MessagesScreen: React.FC = () => {
             myUserIdRef.current = user._id;
 
             const data = (await getConversationList(user._id)) || [];
-            setConversations(data);
+            //setConversations(data);
+
+            setConversations((prevConvos) => {
+    const prevMap = new Map(prevConvos.map((c) => [c.chatId, c]));
+
+    return data.map((c: any) => {
+        const prev = prevMap.get(c.chatId);
+
+        if (prev?.lastMessage && hasImage(prev.lastMessage)) {
+            const prevTime = new Date(getMsgTime(prev.lastMessage)).getTime();
+
+            const freshTime = c.lastMessage
+                ? new Date(getMsgTime(c.lastMessage)).getTime()
+                : 0;
+
+            if (prevTime >= freshTime) {
+                return {
+                    ...c,
+                    lastMessage: prev.lastMessage,
+                };
+            }
+        }
+
+        return c;
+    });
+});
 
             // Seed the local override only for chats we haven't tracked yet,
             // so we never stomp on a count the user already interacted with.
@@ -156,10 +192,16 @@ const MessagesScreen: React.FC = () => {
                 const updatedConvo = {
     ...prev[idx],
     lastMessage: {
-        message: getMsgText(incoming),
-        imageUrl: incoming?.imageUrl ?? "",
-        timestamp: getMsgTime(incoming),
-    },
+    message: getMsgText(incoming),
+    imageUrl:
+        incoming?.imageUrl ||
+        incoming?.image ||
+        incoming?.media ||
+        incoming?.attachment ||
+        incoming?.photoUrl ||
+        "",
+    timestamp: getMsgTime(incoming),
+},
 };
                 const rest = prev.filter((_, i) => i !== idx);
                 return [updatedConvo, ...rest];
@@ -207,6 +249,7 @@ const MessagesScreen: React.FC = () => {
     };
 
     const renderMessage = ({ item }: { item: typeof conversations[0] }) => {
+        console.log("LAST MESSAGE", item.lastMessage);
         const participant = item.participants?.[0] || {};
         const unread = unreadOverrides[item.chatId] ?? Number(item.unreadCount) ?? 0;
 
@@ -221,18 +264,42 @@ const MessagesScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.textContainer}>
-                    <Text style={styles.title} numberOfLines={1}>{participant.name || "Unknown"}</Text>
-                    <Text
-                        style={[
-                            styles.subtitle,
-                            unread > 0 && styles.subtitleUnread,
-                        ]}
-                        numberOfLines={1}
-                    >
-                       
-                       {item.lastMessage ? getMsgPreview(item.lastMessage) : "No messages yet"}
-                    </Text>
-                </View>
+
+    <Text
+        style={styles.title}
+        numberOfLines={1}
+    >
+        {participant.name || "Unknown"}
+    </Text>
+
+    <View style={styles.subtitleRow}>
+
+        {item.lastMessage && hasImage(item.lastMessage) && (
+            <Ionicons
+                name="camera"
+                size={13}
+                color={unread > 0 ? PRIMARY : "#8A8A8A"}
+                style={{ marginRight: 4 }}
+            />
+        )}
+
+        <Text
+            style={[
+                styles.subtitle,
+                unread > 0 && styles.subtitleUnread,
+            ]}
+            numberOfLines={1}
+        >
+            {item.lastMessage
+                ? hasImage(item.lastMessage)
+                    ? "Photo"
+                    : getMsgText(item.lastMessage)
+                : "No messages yet"}
+        </Text>
+
+    </View>
+
+</View>
                 <View style={styles.rightContainer}>
                     <Text style={styles.time}>
                         {item.lastMessage ? formatListTime(getMsgTime(item.lastMessage)) : ""}
@@ -374,16 +441,20 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingRight: 8,
     },
+    subtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 3,
+},
     title: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1A1A1A',
     },
     subtitle: {
-        fontSize: 13,
-        color: '#8A8A8A',
-        marginTop: 3,
-    },
+    fontSize: 13,
+    color: '#8A8A8A',
+},
     subtitleUnread: {
         color: '#3A3A3A',
         fontWeight: '600',

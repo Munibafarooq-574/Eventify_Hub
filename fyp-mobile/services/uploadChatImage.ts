@@ -11,16 +11,11 @@ export default async function uploadChatImage(imageUri: string): Promise<string>
     const filename = `photo-${Date.now()}.jpg`;
 const type = "image/jpeg";
 
-   /* formData.append("image", {
-        uri: imageUri,
-        name: filename,
-        type,
-    } as any); */
 
-    formData.append("file", {
+ formData.append("image", {
     uri: imageUri,
     name: filename,
-    type,
+    type: "image/jpeg",
 } as any);
 
     try {
