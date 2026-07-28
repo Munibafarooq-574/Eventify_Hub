@@ -17,7 +17,7 @@ interface Order {
     date: string;
     package: string;
     price: string;
-    status: "Processing" | "Completed";
+    status: "Pending" | "Processing" | "Completed";
 }
 
 const { width } = Dimensions.get('window');
@@ -31,24 +31,32 @@ const getCardColor = (label: string) => {
     switch (label) {
         case "Orders":
             return "#C79AE8";
+        case "Pending":
+            return "#E8A23A"; // amber - order placed, not yet confirmed
         case "Processing":
-            return "#4A84BD";
+            return "#4A84BD"; // blue - confirmed, work in progress
         case "Completed":
-            return "#63BE63";
+            return "#63BE63"; // green - done
         default:
             return PRIMARY;
     }
 };
 
-// Backend statuses that count as "Processing" in the UI.
-// Adjust here if your backend uses different status strings.
-const PROCESSING_STATUSES = ["pending", "confirmed"];
+// Backend statuses mapped to UI filters:
+// pending    -> "Pending"    (just placed, vendor hasn't confirmed yet)
+// confirmed  -> "Processing" (vendor confirmed, work in progress)
+// completed  -> "Completed"
+// cancelled  -> excluded everywhere except explicitly shown
+const PENDING_STATUS = "pending";
+const PROCESSING_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 
+type FilterType = "All" | "Pending" | "Processing" | "Completed";
+
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
-    const [selectedFilter, setSelectedFilter] = useState<"All" | "Processing" | "Completed">("All");
+    const [selectedFilter, setSelectedFilter] = useState<FilterType>("All");
     const [orders, setOrders] = useState<any[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
@@ -76,10 +84,12 @@ const OrderSummary = () => {
     // on the summary cards increment/decrement instantly.
     const orderStats = useMemo(() => {
         const nonCancelled = orders.filter((o) => o.status !== CANCELLED_STATUS);
-        const processing = orders.filter((o) => PROCESSING_STATUSES.includes(o.status)).length;
+        const pending = orders.filter((o) => o.status === PENDING_STATUS).length;
+        const processing = orders.filter((o) => o.status === PROCESSING_STATUS).length;
         const completed = orders.filter((o) => o.status === COMPLETED_STATUS).length;
         return {
             totalOrders: nonCancelled.length,
+            pending,
             processing,
             completed,
         };
@@ -88,6 +98,7 @@ const OrderSummary = () => {
     const getStatusColor = (status: string) => {
         switch (status) {
             case "pending":
+                return "#E8A23A";
             case "confirmed":
                 return "#337AB7";
             case "completed":
@@ -101,13 +112,15 @@ const OrderSummary = () => {
 
     // Filter respects the selected summary card:
     // - All -> everything except cancelled
-    // - Processing -> pending / confirmed orders only
+    // - Pending -> newly placed orders only
+    // - Processing -> confirmed orders only
     // - Completed -> completed orders only
     const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
             if (order.status === CANCELLED_STATUS) return false;
             if (selectedFilter === "All") return true;
-            if (selectedFilter === "Processing") return PROCESSING_STATUSES.includes(order.status);
+            if (selectedFilter === "Pending") return order.status === PENDING_STATUS;
+            if (selectedFilter === "Processing") return order.status === PROCESSING_STATUS;
             if (selectedFilter === "Completed") return order.status === COMPLETED_STATUS;
             return true;
         });
@@ -129,7 +142,7 @@ const OrderSummary = () => {
     };
 
     // Handler for summary card clicks
-    const handleSummaryCardClick = (filterType: "All" | "Processing" | "Completed") => {
+    const handleSummaryCardClick = (filterType: FilterType) => {
         setSelectedFilter(filterType);
     };
 
@@ -191,6 +204,19 @@ const OrderSummary = () => {
                             value={orderStats.totalOrders}
                             icon="cart-outline"
                             isActive={selectedFilter === "All"}
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.summaryCardWrapper}
+                        onPress={() => handleSummaryCardClick("Pending")}
+                        activeOpacity={0.7}
+                    >
+                        <SummaryCard
+                            label="Pending"
+                            value={orderStats.pending}
+                            icon="time-outline"
+                            isActive={selectedFilter === "Pending"}
                         />
                     </TouchableOpacity>
 
@@ -402,7 +428,7 @@ const SummaryCard = ({
         ]}
     >
         <View style={styles.summaryIconWrap}>
-            <Ionicons name={icon} size={20} color={isActive ? PRIMARY : "#FFFFFF"} />
+            <Ionicons name={icon} size={18} color={isActive ? PRIMARY : "#FFFFFF"} />
         </View>
         <Text style={[styles.summaryValue, isActive && styles.summaryValueActive]}>{value}</Text>
         <Text style={[styles.summaryLabel, isActive && styles.summaryLabelActive]}>{label}</Text>
@@ -473,15 +499,16 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         marginBottom: 18,
-        paddingHorizontal: 15,
+        paddingHorizontal: 12,
     },
     summaryCardWrapper: {
         flex: 1,
-        marginHorizontal: 5,
+        marginHorizontal: 3,
     },
     summaryCard: {
-        padding: 14,
-        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 6,
+        borderRadius: 14,
         alignItems: "center",
         backgroundColor: "#FFFFFF",
         borderWidth: 1.5,
@@ -493,13 +520,13 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     summaryIconWrap: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         backgroundColor: "rgba(255,255,255,0.22)",
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 8,
+        marginBottom: 6,
     },
     activeIndicator: {
         position: "absolute",
@@ -510,7 +537,7 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     summaryValue: {
-        fontSize: 24,
+        fontSize: 19,
         fontWeight: "800",
         color: "#FFFFFF",
     },
@@ -518,10 +545,11 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
     },
     summaryLabel: {
-        fontSize: 12,
+        fontSize: 10,
         color: "#FFFFFF",
         fontWeight: "600",
-        marginTop: 3,
+        marginTop: 2,
+        textAlign: "center",
     },
     summaryLabelActive: {
         color: "rgba(255,255,255,0.85)",
