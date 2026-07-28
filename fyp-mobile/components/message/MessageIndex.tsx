@@ -2,7 +2,10 @@ import getConversationMessages from "@/services/getConversationMessages";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as FileSystem from "expo-file-system/legacy";
 import uploadChatImage from "@/services/uploadChatImage";
+import { Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -17,6 +20,9 @@ import {
   Alert,
 ActionSheetIOS,
 Image,
+Modal,        
+  ScrollView,   
+  Dimensions, 
 } from "react-native";
 import { io, Socket } from "socket.io-client";
 
@@ -115,6 +121,11 @@ const ChatScreen: React.FC = () => {
   const [receiverName, setReceiverName] = useState<string>("Conversation");
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+const [viewerUri, setViewerUri] = useState<string | null>(null);
+const [downloading, setDownloading] = useState(false);
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
   const socketRef = useRef<Socket | null>(null);
   // Refs mirror state so socket event handlers (registered once, on mount)
@@ -355,6 +366,46 @@ const ChatScreen: React.FC = () => {
     }
 };
 
+const handleDownloadImage = async () => {
+  if (!viewerUri) return;
+
+  try {
+    setDownloading(true);
+
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Gallery access is required to save photos."
+      );
+      return;
+    }
+
+    const fileName =
+      viewerUri.split("/").pop() || `chat-image-${Date.now()}.jpg`;
+
+    // 🔵 legacy API me cacheDirectory ek string hoti hai, function nahi
+    const localUri = FileSystem.cacheDirectory + fileName;
+
+    const downloadResult = await FileSystem.downloadAsync(
+      viewerUri,
+      localUri
+    );
+
+    const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+
+    await MediaLibrary.createAlbumAsync("Eventify", asset, false);
+
+    Alert.alert("Saved", "Image saved to your gallery.");
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Download failed", "Could not save the image.");
+  } finally {
+    setDownloading(false);
+  }
+};
+
 const handleAttachPress = () => {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -454,12 +505,20 @@ const openGallery = async () => {
           ]}
         >
           {getMsgImage(item) ? (
-  <Image
-    source={{ uri: getMsgImage(item) }}
-    style={styles.chatImage}
-    resizeMode="cover"
-  />
-) : null}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setViewerUri(getMsgImage(item));
+                setViewerVisible(true);
+              }}
+            >
+              <Image
+                source={{ uri: getMsgImage(item) }}
+                style={styles.chatImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ) : null}
 
 {getMsgText(item) ? (
   <Text
@@ -493,6 +552,7 @@ const openGallery = async () => {
   };
 
   return (
+<>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -572,7 +632,71 @@ const openGallery = async () => {
       </View>
       <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>
     </KeyboardAvoidingView>
-  );
+
+<Modal
+  visible={viewerVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setViewerVisible(false)}
+>
+  <View style={styles.viewerBackdrop}>
+
+    <View style={styles.viewerHeader}>
+
+      <TouchableOpacity
+        style={styles.viewerIconBtn}
+        onPress={() => setViewerVisible(false)}
+      >
+        <Ionicons
+          name="close"
+          size={26}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.viewerIconBtn}
+        onPress={handleDownloadImage}
+        disabled={downloading}
+      >
+        <Ionicons
+          name={
+            downloading
+              ? "hourglass-outline"
+              : "download-outline"
+          }
+          size={24}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
+
+    </View>
+
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={styles.viewerScrollContent}
+      maximumZoomScale={4}
+      minimumZoomScale={1}
+      pinchGestureEnabled
+      centerContent
+    >
+      {viewerUri && (
+        <Image
+          source={{ uri: viewerUri }}
+          style={{
+            width: SCREEN_W,
+            height: SCREEN_H * 0.8,
+          }}
+          resizeMode="contain"
+        />
+      )}
+    </ScrollView>
+
+  </View>
+</Modal>
+
+</>
+);
 };
 
 const styles = StyleSheet.create({
@@ -799,6 +923,34 @@ attachButton: {
     color: "#7A7A7A",
     marginVertical: 6,
   },
+  viewerBackdrop: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.95)",
+},
+
+viewerHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingHorizontal: 16,
+  paddingTop: Platform.OS === "ios" ? 55 : 30,
+  paddingBottom: 10,
+},
+
+viewerIconBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: "rgba(255,255,255,0.15)",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+viewerScrollContent: {
+  flexGrow: 1,
+  justifyContent: "center",
+  alignItems: "center",
+},
 });
 
 export default ChatScreen;
