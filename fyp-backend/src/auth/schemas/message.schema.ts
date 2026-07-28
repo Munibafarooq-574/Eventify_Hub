@@ -17,6 +17,10 @@ export class Message extends Document {
     @Prop({ required: true })
     message: string;
 
+    // 🔵 NEW
+    @Prop({ default: '' })
+    imageUrl: string;
+
     @Prop({ default: false })
     isRead: boolean;
 

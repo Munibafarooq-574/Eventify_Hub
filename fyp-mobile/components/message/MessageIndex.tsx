@@ -1,6 +1,8 @@
 import getConversationMessages from "@/services/getConversationMessages";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import uploadChatImage from "@/services/uploadChatImage";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -12,6 +14,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Alert,
+ActionSheetIOS,
+Image,
 } from "react-native";
 import { io, Socket } from "socket.io-client";
 
@@ -29,6 +34,7 @@ const BACK_BTN_SIZE = 36;
 // senderId as string or populated object) - these getters make the UI resilient
 // to any of those shapes instead of crashing / silently failing.
 const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
+const getMsgImage = (m: any) => m?.imageUrl ?? "";
 const getMsgTime = (m: any) =>
   m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
@@ -108,6 +114,7 @@ const ChatScreen: React.FC = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [receiverName, setReceiverName] = useState<string>("Conversation");
   const [loading, setLoading] = useState<boolean>(true);
+  const [uploading, setUploading] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   // Refs mirror state so socket event handlers (registered once, on mount)
@@ -306,6 +313,99 @@ const ChatScreen: React.FC = () => {
     emitMessage(tempId, trimmed);
   };
 
+  const sendImageMessage = async (imageUri: string) => {
+    if (!userRef.current) return;
+    setUploading(true);
+    try {
+      const remoteUrl = await uploadChatImage(imageUri);
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const now = new Date().toISOString();
+      const optimisticMsg = {
+        _id: tempId,
+        chatId: chatIdRef.current,
+        senderId: userRef.current._id,
+        message: "",
+        content: "",
+        imageUrl: remoteUrl,
+        timestamp: now,
+        createdAt: now,
+        temp: true,
+        status: "sending" as const,
+      };
+
+      setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
+
+      const socket = socketRef.current;
+      if (socket?.connected) {
+        socket.emit("sendMessage", {
+          user: userRef.current._id,
+          receiverId: receiverIdRef.current,
+          chatId: chatIdRef.current,
+          content: "",
+          imageUrl: remoteUrl,
+        });
+        setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
+        scheduleFailureCheck(tempId);
+      }
+    } catch (error) {
+      Alert.alert("Upload failed", "Could not send image. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+};
+
+const handleAttachPress = () => {
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ["Cancel", "Take Photo", "Choose from Gallery"],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) openCamera();
+          else if (buttonIndex === 2) openGallery();
+        }
+      );
+    } else {
+      Alert.alert("Send Photo", "", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Take Photo", onPress: openCamera },
+        { text: "Choose from Gallery", onPress: openGallery },
+      ]);
+    }
+};
+
+const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Camera access is required to take photos.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      sendImageMessage(result.assets[0].uri);
+    }
+};
+
+const openGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Gallery access is required to send photos.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      sendImageMessage(result.assets[0].uri);
+    }
+};
+
   const handleRetry = (msg: any) => {
     setMessages((prev) =>
       prev.map((m) => (m._id === msg._id ? { ...m, status: "sending", timestamp: new Date().toISOString() } : m))
@@ -353,9 +453,24 @@ const ChatScreen: React.FC = () => {
             isFailed && styles.failedMessageContainer,
           ]}
         >
-          <Text style={[styles.messageText, isSender ? styles.senderMessageText : styles.receiverMessageText]}>
-            {getMsgText(item)}
-          </Text>
+          {getMsgImage(item) ? (
+  <Image
+    source={{ uri: getMsgImage(item) }}
+    style={styles.chatImage}
+    resizeMode="cover"
+  />
+) : null}
+
+{getMsgText(item) ? (
+  <Text
+    style={[
+      styles.messageText,
+      isSender ? styles.senderMessageText : styles.receiverMessageText,
+    ]}
+  >
+    {getMsgText(item)}
+  </Text>
+) : null}
 
           <View style={styles.metaRow}>
             {isFailed ? (
@@ -427,6 +542,17 @@ const ChatScreen: React.FC = () => {
 
       {/* Footer */}
       <View style={styles.footer}>
+        <TouchableOpacity
+  style={styles.attachButton}
+  onPress={handleAttachPress}
+  disabled={uploading}
+>
+  <Ionicons
+    name="camera"
+    size={22}
+    color={PRIMARY}
+  />
+</TouchableOpacity>
         <TextInput
           style={styles.messageInput}
           placeholder="Write a message"
@@ -561,6 +687,25 @@ const styles = StyleSheet.create({
   failedMessageContainer: {
     opacity: 0.65,
   },
+
+  chatImage: {
+  width: 200,
+  height: 200,
+  borderRadius: 12,
+  marginBottom: 4,
+},
+
+attachButton: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: "#F8F0F4",
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 8,
+  borderWidth: 1,
+  borderColor: "#E6D4E6",
+},
   messageText: {
     fontSize: 15.5,
     lineHeight: 21,

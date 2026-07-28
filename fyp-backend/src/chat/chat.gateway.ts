@@ -42,7 +42,7 @@ server!: Server;
     }
 
     // User sends a message
-    @SubscribeMessage('sendMessage')
+    /*@SubscribeMessage('sendMessage')
     async handleMessage(client: Socket, payload: {
     user: string;
     receiverId: string;
@@ -61,7 +61,36 @@ server!: Server;
 
         // Emit message to all users in the same conversation
         this.server.to(payload.chatId).emit('newMessage', message); // Broadcast the new message to all clients in that conversation
-    }
+    } */
+
+        // User sends a message
+@SubscribeMessage('sendMessage')
+async handleMessage(
+    client: Socket,
+    payload: {
+        user: string;
+        receiverId: string;
+        chatId: string;
+        content: string;
+        imageUrl?: string;
+    },
+) {
+    this.logger.log(
+        `Received message from ${payload.user} in chatId: ${payload.chatId}`,
+    );
+
+    // Create and save the message in the database
+    const message = await this.chatService.createMessage(
+        payload.chatId,
+        payload.user,
+        payload.receiverId,
+        payload.content,
+        payload.imageUrl || '',
+    );
+
+    // Emit message to all users in the same conversation
+    this.server.to(payload.chatId).emit('newMessage', message);
+}
 
     // User joins a conversation
     // User joins a conversation

@@ -35,6 +35,13 @@
           "backgroundColor": "#ffffff"
         }
       ],
+        [
+    "expo-image-picker",
+    {
+      "photosPermission": "App needs access to your photos to send images.",
+      "cameraPermission": "App needs access to your camera to take photos."
+    }
+  ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-font",

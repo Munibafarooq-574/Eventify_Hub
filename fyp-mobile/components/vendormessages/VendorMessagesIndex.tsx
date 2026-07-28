@@ -26,6 +26,10 @@ const UNREAD_OVERRIDES_KEY = "chatUnreadOverrides";
 
 // ---------- helpers ----------
 const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
+const getMsgPreview = (m: any) => {
+  if (m?.imageUrl) return "📷 Photo";
+  return getMsgText(m);
+};
 const getMsgTime = (m: any) => m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
     const s = m?.senderId ?? m?.sender;
@@ -150,9 +154,13 @@ const MessagesScreen: React.FC = () => {
                     return prev;
                 }
                 const updatedConvo = {
-                    ...prev[idx],
-                    lastMessage: { message: getMsgText(incoming), timestamp: getMsgTime(incoming) },
-                };
+    ...prev[idx],
+    lastMessage: {
+        message: getMsgText(incoming),
+        imageUrl: incoming?.imageUrl ?? "",
+        timestamp: getMsgTime(incoming),
+    },
+};
                 const rest = prev.filter((_, i) => i !== idx);
                 return [updatedConvo, ...rest];
             });
@@ -221,7 +229,8 @@ const MessagesScreen: React.FC = () => {
                         ]}
                         numberOfLines={1}
                     >
-                        {item.lastMessage ? getMsgText(item.lastMessage) : "No messages yet"}
+                       
+                       {item.lastMessage ? getMsgPreview(item.lastMessage) : "No messages yet"}
                     </Text>
                 </View>
                 <View style={styles.rightContainer}>

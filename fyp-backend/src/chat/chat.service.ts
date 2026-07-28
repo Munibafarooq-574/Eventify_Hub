@@ -106,7 +106,7 @@ return conversationsWithUnread as any;
     }
 
     // Create a new message for a conversation
-    async createMessage(
+   /* async createMessage(
     chatId: string,
     senderId: string,
     receiverId: string,
@@ -150,8 +150,56 @@ return conversationsWithUnread as any;
     }
 
     return message;
-}
+} */
 
+    // Create a new message for a conversation
+async createMessage(
+    chatId: string,
+    senderId: string,
+    receiverId: string,
+    content: string,
+    imageUrl: string = '',
+): Promise<Message> {
+    const message = new this.messageModel({
+        chatId,
+        senderId,
+        receiverId,
+        message: content,
+        imageUrl,
+        isRead: false,
+    });
+
+    // Pehle message save karo
+    await message.save();
+
+    // Phir conversation ka lastMessage update karo
+    await this.conversationModel.updateOne(
+        { chatId },
+        { lastMessage: message._id },
+    );
+
+    const conversationObj = await this.conversationModel
+        .findOne({ chatId })
+        .populate('participants');
+
+    const otherUser = conversationObj?.participants.find(
+        x => x._id && !x._id.equals(senderId),
+    );
+
+    try {
+        console.log("Sending Push in messages");
+        await this.sendPushNotification(
+            "New Message",
+            imageUrl ? "📷 Photo" : content,
+            otherUser?._id,
+            "MESSAGE",
+        );
+    } catch (error) {
+        console.log("Sending Push in messages", error);
+    }
+
+    return message;
+}
     // Get all messages for a conversation
     async getMessagesForConversation(chatId: string): Promise<Message[]> {
         return this.messageModel.find({ chatId }).sort({ timestamp: 1 }).exec();
