@@ -3,7 +3,7 @@ import getVendorOrderStats from "@/services/getVendorOrderStats";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
@@ -61,32 +61,35 @@ const DashboardScreen = () => {
         fetchUsername();
     }, []);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const userRaw = await getSecureData("user");
-                const user = JSON.parse(userRaw || "");
-                if (!user) throw "user not found";
+    const fetchData = React.useCallback(async () => {
+    try {
+        const userRaw = await getSecureData("user");
+        const user = JSON.parse(userRaw || "");
+        if (!user) throw "user not found";
 
-                setPackages(user.packages || []);
+        setPackages(user.packages || []);
 
-                const statsData = await getVendorOrderStats("Vendor", user._id);
-                setOrderStats(statsData);
+        const statsData = await getVendorOrderStats("Vendor", user._id);
+        setOrderStats(statsData);
 
-                const response = await getOrderStatsMonthly(user._id);
-                setOrderAmountArray(response.map((item: any) => item.totalAmount));
-                setOrderCountArray(response.map((item: any) => item.orderCount));
-                setMonthNameArray(
-                    response.map((item: any) => monthNames[item.month])
-                );
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
+        const response = await getOrderStatsMonthly(user._id);
+        setOrderAmountArray(response.map((item: any) => item.totalAmount));
+        setOrderCountArray(response.map((item: any) => item.orderCount));
+        setMonthNameArray(
+            response.map((item: any) => monthNames[item.month])
+        );
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    } finally {
+        setLoading(false);
+    }
+}, []);
+
+useFocusEffect(
+    React.useCallback(() => {
         fetchData();
-    }, []);
+    }, [fetchData])
+);
 
     const fetchUsername = async () => {
         const storedUser = await getSecureData("user");
