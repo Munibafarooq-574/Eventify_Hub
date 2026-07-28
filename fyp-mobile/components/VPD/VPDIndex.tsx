@@ -682,19 +682,7 @@ const category =
                                 <Text style={styles.packageDetailsTag}>Package Details</Text>
                             </View>
                         </View>
-                        <TouchableOpacity
-                            testID={`edit-package-${pkg._id}`}
-                            style={styles.editIconButton}
-                            onPress={() => {
-                                router.push({
-                                    pathname: '/vendorpackages',
-                                    params: { packageId: pkg._id },
-                                });
-                            }}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons name="create-outline" size={16} color={PRIMARY} />
-                        </TouchableOpacity>
+                       
                     </View>
 
                     <View style={styles.packageDivider} />
