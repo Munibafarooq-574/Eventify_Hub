@@ -48,6 +48,8 @@ async updateContactDetails(
   @Body() dto: CreateContactDetailsDto,
   @UploadedFile() file: Express.Multer.File,
 ): Promise<User> {
+    console.log("PATCH contactDetails userId:", userId);
+  console.log("PATCH contactDetails dto:", dto);
   return await this.vendorService.updateContactDetails(userId, dto, file);
 }
 

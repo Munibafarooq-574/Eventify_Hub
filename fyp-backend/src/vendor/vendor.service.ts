@@ -152,8 +152,7 @@ export class VendorService {
         user.contactDetails = { ...createContactDetailsDto, brandLogo: fileUrl?.Location || "" }
         return await user.save();
     }
-
-    async updateContactDetails(
+async updateContactDetails(
   userId: string,
   dto: CreateContactDetailsDto,
   file: Express.Multer.File,
@@ -173,13 +172,16 @@ export class VendorService {
   }
 
   user.contactDetails = {
-    ...user.contactDetails,
+    ...((user.contactDetails as any)?.toObject?.() ?? user.contactDetails),
     ...dto,
     brandLogo: logo,
   };
 
+  user.markModified('contactDetails');
+
   return await user.save();
 }
+
    async createBuisnessDetails(
         userId: string,
         dto:
