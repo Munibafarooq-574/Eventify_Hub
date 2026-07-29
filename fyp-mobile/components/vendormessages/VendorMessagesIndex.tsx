@@ -263,7 +263,7 @@ const MessagesScreen: React.FC = () => {
         const participant = item.participants?.[0] || {};
         await saveSecureData("chatId", item.chatId);
         await saveSecureData("receiverId", participant._id || "");
-        await saveSecureData("receiverName", participant.name || "Conversation");
+        await saveSecureData("receiverName",participant.displayName || participant.name || "Conversation");
         await saveSecureData("receiverAvatar", participant.avatar || "");
 
         // Clear the badge immediately - the whole point of opening the chat.
@@ -291,13 +291,12 @@ const MessagesScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.textContainer}>
-
-    <Text
-        style={styles.title}
-        numberOfLines={1}
-    >
-        {participant.name || "Unknown"}
-    </Text>
+<Text
+    style={styles.title}
+    numberOfLines={1}
+>
+    {participant.displayName || participant.name || "Unknown"}
+</Text>
 
     <View style={styles.subtitleRow}>
 

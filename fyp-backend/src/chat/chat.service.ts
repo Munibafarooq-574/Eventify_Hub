@@ -83,10 +83,10 @@ export class ChatService {
         // 🔵 NEW: User schema has no dedicated "avatar" field.
         // Use coverImage first, fall back to the first uploaded image.
         const participants = (conversation.participants || []).map((p: any) => ({
-            ...p,
-            avatar: p.coverImage || (p.images && p.images.length > 0 ? p.images[0] : ""),
-        }));
-
+    ...p,
+    avatar: p.brandLogo || p.coverImage || (p.images && p.images.length > 0 ? p.images[0] : ""),
+    displayName: p.brandName || p.name || "",
+}));
         return {
             ...conversation,
             participants,
