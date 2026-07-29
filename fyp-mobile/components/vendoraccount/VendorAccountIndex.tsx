@@ -1,7 +1,8 @@
 import { deleteSecureData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Image,
@@ -27,9 +28,11 @@ const AccountScreen: React.FC = () => {
   const [avatar, setAvatar] = useState("");
   const [email, setEmail] = useState("");
 
-  useEffect(() => {
-    fetchUserDetails(); // Fetch username and email on component mount
-  }, []);
+  useFocusEffect(
+  useCallback(() => {
+    fetchUserDetails();
+  }, [])
+);
 
   const fetchUserDetails = async () => {
   const storedUser = (await getSecureData("user")) || "Guest";

@@ -2,7 +2,7 @@
 
 import getVendorContactDetails from '@/services/getVendorContactDetails';
 import updateContactDetails from '@/services/updateContactDetails';
-import { getSecureData } from '@/store';
+import { getSecureData, saveSecureData } from '@/store';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from "react";
@@ -137,7 +137,34 @@ const EditContactDetailsScreen = () => {
         (formData as any).append('file', { uri: logoUri, name: filename, type });
       }
 
-      await updateContactDetails(userId, formData);
+      const response = await updateContactDetails(userId, formData);
+
+try {
+  const rawUser = await getSecureData("user");
+  const user = rawUser ? JSON.parse(rawUser) : null;
+  if (user) {
+    user.contactDetails = response?.contactDetails || {
+      brandName,
+      contactNumber,
+      instagramLink,
+      facebookLink,
+      bookingEmail,
+      website,
+      city,
+      officialAddress: address,
+      officialGoogleLink: googleLink,
+      brandLogo: response?.contactDetails?.brandLogo || existingLogoUrl,
+    };
+    await saveSecureData("user", JSON.stringify(user));   // 👈 sahi function name
+  }
+} catch (e) {
+  console.log("Failed to refresh cached user:", e);
+}
+
+Alert.alert("Success", "Contact details updated successfully!", [
+  { text: "OK", onPress: () => router.back() },
+]);
+      
       Alert.alert("Success", "Contact details updated successfully!", [
         { text: "OK", onPress: () => router.back() },
       ]);
