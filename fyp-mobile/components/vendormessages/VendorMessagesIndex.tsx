@@ -36,8 +36,10 @@ const hasImage = (m: any) => {
         m?.photoUrl
     );
 };
+const isDeleted = (m: any) => !!m?.isDeletedForEveryone;
 
 const getMsgPreview = (m: any) => {
+    if (isDeleted(m)) return "This message was deleted";
     if (hasImage(m)) return "Photo";
     return getMsgText(m);
 };
@@ -223,9 +225,10 @@ const MessagesScreen: React.FC = () => {
                 return {
                     ...chat,
                     lastMessage:{
-                        ...chat.lastMessage,
-                        message:"This message was deleted"
-                    }
+    ...chat.lastMessage,
+    message: "This message was deleted",
+    isDeletedForEveryone: true,
+}
                 }
             }
 
@@ -298,7 +301,9 @@ const MessagesScreen: React.FC = () => {
 
     <View style={styles.subtitleRow}>
 
-        {item.lastMessage && hasImage(item.lastMessage) && (
+        {item.lastMessage &&
+    hasImage(item.lastMessage) &&
+    !isDeleted(item.lastMessage) && (
             <Ionicons
                 name="camera"
                 size={13}
@@ -308,18 +313,17 @@ const MessagesScreen: React.FC = () => {
         )}
 
         <Text
-            style={[
-                styles.subtitle,
-                unread > 0 && styles.subtitleUnread,
-            ]}
-            numberOfLines={1}
-        >
-            {item.lastMessage
-                ? hasImage(item.lastMessage)
-                    ? "Photo"
-                    : getMsgText(item.lastMessage)
-                : "No messages yet"}
-        </Text>
+    style={[
+        styles.subtitle,
+        unread > 0 && styles.subtitleUnread,
+        isDeleted(item.lastMessage) && styles.subtitleDeleted,
+    ]}
+    numberOfLines={1}
+>
+    {item.lastMessage
+        ? getMsgPreview(item.lastMessage)
+        : "No messages yet"}
+</Text>
 
     </View>
 
@@ -483,6 +487,11 @@ const styles = StyleSheet.create({
         color: '#3A3A3A',
         fontWeight: '600',
     },
+    subtitleDeleted: {
+        fontSize: 14,
+    fontStyle: "italic",
+    color: "#9E9E9E",
+},
     rightContainer: {
         alignItems: 'flex-end',
     },

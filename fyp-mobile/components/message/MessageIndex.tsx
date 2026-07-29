@@ -650,21 +650,23 @@ const handleLongPressMessage = (item: any) => {
   </View>
 ) : (
   <>
-    {getMsgImage(item) ? (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => {
-          setViewerUri(getMsgImage(item));
-          setViewerVisible(true);
-        }}
-      >
-        <Image
-          source={{ uri: getMsgImage(item) }}
-          style={styles.chatImage}
-          resizeMode="cover"
-        />
-      </TouchableOpacity>
-    ) : null}
+   {getMsgImage(item) ? (
+  <TouchableOpacity
+    activeOpacity={0.9}
+    onPress={() => {
+      setViewerUri(getMsgImage(item));
+      setViewerVisible(true);
+    }}
+    onLongPress={() => handleLongPressMessage(item)}
+    delayLongPress={500}
+  >
+    <Image
+      source={{ uri: getMsgImage(item) }}
+      style={styles.chatImage}
+      resizeMode="cover"
+    />
+  </TouchableOpacity>
+) : null}
 
     {getMsgText(item) ? (
       <Text
