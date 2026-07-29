@@ -24,6 +24,7 @@ Image,
 Modal,        
   ScrollView,   
   Dimensions, 
+  Linking,
 } from "react-native";
 import { io, Socket } from "socket.io-client";
 
@@ -868,89 +869,152 @@ const handleLongPressMessage = (item: any) => {
 </Modal>
 <Modal
   visible={contactModalVisible}
-  transparent
-  animationType="fade"
+  animationType="slide"
+  presentationStyle="pageSheet"
   onRequestClose={() => setContactModalVisible(false)}
 >
-  <View style={styles.contactBackdrop}>
-    <View style={styles.contactCard}>
-      <View style={styles.contactHeaderRow}>
-        <Text style={styles.contactHeaderTitle}>Contact Details</Text>
-        <TouchableOpacity onPress={() => setContactModalVisible(false)}>
-          <Ionicons name="close" size={24} color="#780C60" />
-        </TouchableOpacity>
-      </View>
+  <View style={styles.vendorInfoContainer}>
+    {/* Header */}
+    <View style={styles.vendorInfoHeader}>
+      <TouchableOpacity
+        onPress={() => setContactModalVisible(false)}
+        style={styles.headerIconBtn}
+      >
+        <Ionicons name="close" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+      <Text style={styles.vendorInfoHeaderTitle}>Vendor Info</Text>
+      <View style={{ width: BACK_BTN_SIZE }} />
+    </View>
 
-      {contactLoading ? (
+    {contactLoading ? (
+      <View style={styles.vendorInfoCenter}>
         <Text style={styles.contactLoadingText}>Loading...</Text>
-      ) : !contactDetails ? (
+      </View>
+    ) : !contactDetails ? (
+      <View style={styles.vendorInfoCenter}>
+        <Ionicons name="person-circle-outline" size={56} color="#C9A9C2" />
         <Text style={styles.contactLoadingText}>
           Contact details not available yet.
         </Text>
-      ) : (
-        <ScrollView style={{ maxHeight: 400 }}>
+      </View>
+    ) : (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.vendorInfoScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile block */}
+        <View style={styles.vendorProfileBlock}>
           {contactDetails.brandLogo ? (
             <Image
               source={{ uri: contactDetails.brandLogo }}
-              style={styles.contactLogo}
+              style={styles.vendorLogoLarge}
             />
-          ) : null}
-
-          {contactDetails.brandName ? (
-            <Text style={styles.contactBrandName}>{contactDetails.brandName}</Text>
-          ) : null}
-
-          {contactDetails.contactNumber ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="call-outline" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.contactNumber}</Text>
+          ) : (
+            <View style={styles.vendorLogoPlaceholder}>
+              <Text style={styles.vendorLogoPlaceholderText}>
+                {contactDetails.brandName?.trim()?.charAt(0)?.toUpperCase() || "?"}
+              </Text>
             </View>
-          ) : null}
-
-          {contactDetails.bookingEmail ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="mail-outline" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.bookingEmail}</Text>
-            </View>
-          ) : null}
-
+          )}
+          <Text style={styles.vendorBrandNameLarge}>
+            {contactDetails.brandName || receiverName}
+          </Text>
           {contactDetails.city ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="location-outline" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.city}</Text>
+            <View style={styles.vendorCityPill}>
+              <Ionicons name="location" size={12} color={PRIMARY} />
+              <Text style={styles.vendorCityPillText}>{contactDetails.city}</Text>
             </View>
           ) : null}
+        </View>
 
-          {contactDetails.officialAddress ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="business-outline" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.officialAddress}</Text>
-            </View>
-          ) : null}
+        {/* Contact Information card */}
+        {(contactDetails.contactNumber || contactDetails.bookingEmail || contactDetails.officialAddress) && (
+          <View style={styles.vendorSectionCard}>
+            <Text style={styles.vendorSectionTitle}>Contact Information</Text>
 
-          {contactDetails.instagramLink ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="logo-instagram" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.instagramLink}</Text>
-            </View>
-          ) : null}
+            {contactDetails.contactNumber ? (
+              <View style={styles.vendorInfoRow}>
+                <View style={styles.vendorInfoIconWrap}>
+                  <Ionicons name="call" size={16} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.vendorInfoLabel}>Phone</Text>
+                  <Text style={styles.vendorInfoValue}>{contactDetails.contactNumber}</Text>
+                </View>
+              </View>
+            ) : null}
 
-          {contactDetails.facebookLink ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="logo-facebook" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.facebookLink}</Text>
-            </View>
-          ) : null}
+            {contactDetails.bookingEmail ? (
+              <View style={styles.vendorInfoRow}>
+                <View style={styles.vendorInfoIconWrap}>
+                  <Ionicons name="mail" size={16} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.vendorInfoLabel}>Email</Text>
+                  <Text style={styles.vendorInfoValue}>{contactDetails.bookingEmail}</Text>
+                </View>
+              </View>
+            ) : null}
 
-          {contactDetails.website ? (
-            <View style={styles.contactRow}>
-              <Ionicons name="globe-outline" size={16} color="#780C60" />
-              <Text style={styles.contactText}>{contactDetails.website}</Text>
+            {contactDetails.officialAddress ? (
+              <View style={[styles.vendorInfoRow, { borderBottomWidth: 0 }]}>
+                <View style={styles.vendorInfoIconWrap}>
+                  <Ionicons name="business" size={16} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.vendorInfoLabel}>Address</Text>
+                  <Text style={styles.vendorInfoValue}>{contactDetails.officialAddress}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {/* Social & Web */}
+        {(contactDetails.instagramLink || contactDetails.facebookLink || contactDetails.website || contactDetails.officialGoogleLink) && (
+          <View style={styles.vendorSectionCard}>
+            <Text style={styles.vendorSectionTitle}>Social & Web</Text>
+            <View style={styles.vendorSocialRow}>
+              {contactDetails.instagramLink ? (
+                <TouchableOpacity
+                  style={styles.vendorSocialBtn}
+                  onPress={() => Linking.openURL(contactDetails.instagramLink)}
+                >
+                  <Ionicons name="logo-instagram" size={20} color={PRIMARY} />
+                </TouchableOpacity>
+              ) : null}
+              {contactDetails.facebookLink ? (
+                <TouchableOpacity
+                  style={styles.vendorSocialBtn}
+                  onPress={() => Linking.openURL(contactDetails.facebookLink)}
+                >
+                  <Ionicons name="logo-facebook" size={20} color={PRIMARY} />
+                </TouchableOpacity>
+              ) : null}
+              {contactDetails.website ? (
+                <TouchableOpacity
+                  style={styles.vendorSocialBtn}
+                  onPress={() => Linking.openURL(contactDetails.website)}
+                >
+                  <Ionicons name="globe" size={20} color={PRIMARY} />
+                </TouchableOpacity>
+              ) : null}
+              {contactDetails.officialGoogleLink ? (
+                <TouchableOpacity
+                  style={styles.vendorSocialBtn}
+                  onPress={() => Linking.openURL(contactDetails.officialGoogleLink)}
+                >
+                  <Ionicons name="map" size={20} color={PRIMARY} />
+                </TouchableOpacity>
+              ) : null}
             </View>
-          ) : null}
-        </ScrollView>
-      )}
-    </View>
+          </View>
+        )}
+
+        <View style={{ height: 30 }} />
+      </ScrollView>
+    )}
   </View>
 </Modal>
 </>
@@ -1274,6 +1338,148 @@ contactText: {
   fontSize: 14,
   color: "#333",
   flexShrink: 1,
+},
+vendorInfoContainer: {
+  flex: 1,
+  backgroundColor: BG,
+},
+vendorInfoHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  backgroundColor: PRIMARY,
+  paddingHorizontal: 12,
+  paddingTop: Platform.OS === "ios" ? 60 : 40,
+  paddingBottom: 16,
+  borderBottomLeftRadius: 22,
+  borderBottomRightRadius: 22,
+},
+vendorInfoHeaderTitle: {
+  fontSize: 17,
+  fontWeight: "800",
+  color: "#FFFFFF",
+},
+vendorInfoCenter: {
+  flex: 1,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 30,
+},
+vendorInfoScroll: {
+  paddingHorizontal: 18,
+  paddingTop: 24,
+},
+vendorProfileBlock: {
+  alignItems: "center",
+  marginBottom: 22,
+},
+vendorLogoLarge: {
+  width: 96,
+  height: 96,
+  borderRadius: 48,
+  marginBottom: 12,
+  borderWidth: 3,
+  borderColor: "#FFFFFF",
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.1,
+  shadowRadius: 6,
+  elevation: 3,
+},
+vendorLogoPlaceholder: {
+  width: 96,
+  height: 96,
+  borderRadius: 48,
+  backgroundColor: PRIMARY,
+  justifyContent: "center",
+  alignItems: "center",
+  marginBottom: 12,
+  borderWidth: 3,
+  borderColor: "#FFFFFF",
+},
+vendorLogoPlaceholderText: {
+  color: "#FFFFFF",
+  fontSize: 34,
+  fontWeight: "800",
+},
+vendorBrandNameLarge: {
+  fontSize: 21,
+  fontWeight: "800",
+  color: "#1A1A1A",
+  marginBottom: 6,
+  textAlign: "center",
+},
+vendorCityPill: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "rgba(120,12,96,0.08)",
+  borderRadius: 12,
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+},
+vendorCityPillText: {
+  fontSize: 12,
+  fontWeight: "600",
+  color: PRIMARY_DARK,
+  marginLeft: 4,
+},
+vendorSectionCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 16,
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+  marginBottom: 16,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 6,
+  elevation: 1,
+},
+vendorSectionTitle: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: PRIMARY,
+  marginBottom: 10,
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+},
+vendorInfoRow: {
+  flexDirection: "row",
+  alignItems: "flex-start",
+  paddingVertical: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: "#F0E4EC",
+},
+vendorInfoIconWrap: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: "rgba(120,12,96,0.08)",
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 12,
+},
+vendorInfoLabel: {
+  fontSize: 11,
+  color: "#9E9E9E",
+  marginBottom: 2,
+},
+vendorInfoValue: {
+  fontSize: 14.5,
+  color: "#1A1A1A",
+  fontWeight: "600",
+},
+vendorSocialRow: {
+  flexDirection: "row",
+  gap: 12,
+},
+vendorSocialBtn: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: "rgba(120,12,96,0.08)",
+  justifyContent: "center",
+  alignItems: "center",
 },
 });
 

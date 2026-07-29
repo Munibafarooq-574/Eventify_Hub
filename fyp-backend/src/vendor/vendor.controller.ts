@@ -89,11 +89,15 @@ async updateBusinessDetails(
         return this.vendorService.addPackages(userId, createPackagesDto);
     }
 
-    @Get('contact-details')
+    /*@Get('contact-details')
     async getContactDetails(@Param('userId') userId: string) {
         return this.vendorService.getContactDetails(userId);
-    }
+    } */
 
+    @Get('contact-details/:userId')
+     async getContactDetails(@Param('userId') userId: string) {
+    return this.vendorService.getContactDetails(userId);
+     }
     // Get Business Details
     @Get('business-details')
     async getBusinessDetails(@Param('userId') userId: string) {
