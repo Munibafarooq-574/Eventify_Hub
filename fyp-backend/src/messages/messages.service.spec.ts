@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { MessagesService } from './messages.service';
-import { Message } from './schemas/message.schema';
+import { Message, MessageSchema } from '../auth/schemas/message.schema';
 import { Model } from 'mongoose';
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { AppModule } from '../app.module';
-import { MessageSchema } from './schemas/message.schema';
 import mongoose from 'mongoose';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';

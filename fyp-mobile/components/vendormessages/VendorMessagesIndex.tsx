@@ -191,7 +191,8 @@ const MessagesScreen: React.FC = () => {
                 }
                 const updatedConvo = {
     ...prev[idx],
-    lastMessage: {
+  lastMessage:{
+    _id: incoming._id,
     message: getMsgText(incoming),
     imageUrl:
         incoming?.imageUrl ||
@@ -213,7 +214,30 @@ const MessagesScreen: React.FC = () => {
             }
         });
 
+        socketConnection.on("messageDeletedForEveryone",(payload)=>{
+
+    setConversations(prev =>
+        prev.map(chat=>{
+
+            if(chat.lastMessage?._id === payload.messageId){
+                return {
+                    ...chat,
+                    lastMessage:{
+                        ...chat.lastMessage,
+                        message:"This message was deleted"
+                    }
+                }
+            }
+
+            return chat;
+        })
+    );
+
+});
         return () => {
+            socketConnection.off("newMessage");
+
+          socketConnection.off("messageDeletedForEveryone");
             socketConnection.disconnect();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

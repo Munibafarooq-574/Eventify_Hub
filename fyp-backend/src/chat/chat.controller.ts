@@ -36,6 +36,7 @@ import {
   Post,
   Param,
   Get,
+  Query,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
@@ -68,10 +69,17 @@ export class ChatController {
 
   // Get all messages in a conversation
   @Get('messages/:chatId')
-  async getConversationMessages(@Param('chatId') chatId: string) {
-    const messages = await this.chatService.getConversationMessages(chatId);
-    return { messages };
-  }
+async getConversationMessages(
+  @Param('chatId') chatId: string,
+  @Query('userId') userId: string,
+) {
+  const messages = await this.chatService.getConversationMessages(
+    chatId,
+    userId,
+  );
+
+  return { messages };
+}
 
   // 🔵 NEW: Upload chat image
   @Post('upload')

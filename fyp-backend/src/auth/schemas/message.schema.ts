@@ -14,18 +14,14 @@ export class Message extends Document {
     @Prop({ required: true })
     receiverId: string;
 
-   /* @Prop({ required: true })
-    message: string; */
-
     @Prop({
-  required: function (this: Message) {
-    return !this.imageUrl;
-  },
-  default: '',
-})
-message: string;
+        required: function (this: Message) {
+            return !this.imageUrl;
+        },
+        default: '',
+    })
+    message: string;
 
-    // 🔵 NEW
     @Prop({ default: '' })
     imageUrl: string;
 
@@ -34,6 +30,13 @@ message: string;
 
     @Prop({ default: Date.now })
     timestamp: Date;
+
+    // 🔵 NEW — delete feature
+    @Prop({ type: [String], default: [] })
+    deletedFor: string[];
+
+    @Prop({ default: false })
+    isDeletedForEveryone: boolean;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

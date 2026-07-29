@@ -118,4 +118,37 @@ async handleJoinConversation(
             client.emit('previousMessages', messages);
         });
 }
+
+// 🔵 NEW: Delete for Me
+    @SubscribeMessage('deleteForMe')
+    async handleDeleteForMe(
+        client: Socket,
+        payload: { messageId: string; userId: string },
+    ) {
+        await this.chatService.deleteMessageForMe(payload.messageId, payload.userId);
+        // Sirf isi client ko confirm — baaki users ko farq nahi padta
+        client.emit('messageDeletedForMe', { messageId: payload.messageId });
+    }
+
+    // 🔵 NEW: Delete for Everyone (sender only, no time limit)
+    @SubscribeMessage('deleteForEveryone')
+    async handleDeleteForEveryone(
+        client: Socket,
+        payload: { messageId: string; userId: string; chatId: string },
+        
+    ) {
+        console.log("DELETE FOR EVERYONE PAYLOAD", payload);
+        try {
+            await this.chatService.deleteMessageForEveryone(payload.messageId, payload.userId);
+            // Dono taraf broadcast — turant "This message was deleted" dikhega
+            this.server.to(payload.chatId).emit('messageDeletedForEveryone', {
+                messageId: payload.messageId,
+            });
+        } catch (err) {
+            client.emit('deleteError', {
+                messageId: payload.messageId,
+                error: err instanceof Error ? err.message : 'Unknown error',
+            });
+        }
+    }
 }

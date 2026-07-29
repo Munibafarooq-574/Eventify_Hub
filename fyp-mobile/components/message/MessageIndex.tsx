@@ -165,12 +165,19 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
         return;
       }
 
-      socket.emit("sendMessage", {
-        user: userRef.current._id,
-        receiverId: receiverIdRef.current,
-        chatId: chatIdRef.current,
-        content: text,
-      });
+      console.log("EMITTING SEND MESSAGE", {
+  user: userRef.current._id,
+  receiverId: receiverIdRef.current,
+  chatId: chatIdRef.current,
+  content: text,
+});
+
+socket.emit("sendMessage", {
+  user: userRef.current._id,
+  receiverId: receiverIdRef.current,
+  chatId: chatIdRef.current,
+  content: text,
+});
       // Dispatched over the wire successfully -> single tick.
       setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
       scheduleFailureCheck(tempId);
@@ -236,12 +243,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
       });
     });
 
-    // Read-receipts: when the OTHER person opens the chat, the backend
-    // emits { chatId, seenBy }. We only flip OUR sent messages to a blue
-    // tick when seenBy is the OTHER participant - NOT when it's ourselves.
-    // Without this check, simply re-opening your own chat (which also
-    // marks the other person's messages as seen on your side) would
-    // incorrectly blue-tick your own outgoing messages too.
+
     socket.on("messagesSeen", (payload: { chatId?: string; seenBy?: string }) => {
       if (!isMounted || !payload?.chatId || payload.chatId !== chatIdRef.current) return;
       if (!payload.seenBy || payload.seenBy === userRef.current?._id) return;
@@ -255,6 +257,15 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
       );
     });
 
+    // 🔵 NEW: someone deleted a message for everyone — reflect it live
+socket.on("messageDeletedForEveryone", (payload: { messageId: string }) => {
+  if (!isMounted) return;
+  setMessages((prev) =>
+    prev.map((m) =>
+      m._id === payload.messageId ? { ...m, isDeletedForEveryone: true } : m
+    )
+  );
+});
     const fetchMessages = async () => {
       try {
         setLoading(true);
@@ -272,7 +283,10 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
         if (!isMounted) return;
         setReceiverName(rName);
 
-        const messagesData = await getConversationMessages(chatIdValue);
+        const messagesData = await getConversationMessages(
+    chatIdValue,
+    user._id
+);
         if (!isMounted) return;
         setMessages(
           sortDesc(dedupeById((messagesData || []).map((m: any) => ({ ...m, status: "delivered" }))))
@@ -295,6 +309,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
       socket.off("newMessage");
       socket.off("connect");
       socket.off("messagesSeen");
+      socket.off("messageDeletedForEveryone"); // 🔵 NEW
       socket.disconnect();
       Object.values(pendingTimeouts.current).forEach(clearTimeout);
     };
@@ -464,6 +479,115 @@ const openGallery = async () => {
     emitMessage(msg._id, getMsgText(msg));
   };
 
+  const handleDeleteForMe = (item: any) => {
+
+  Alert.alert(
+    "Delete Message",
+    "Delete this message from your device?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+
+          setMessages((prev) =>
+            prev.filter((m) => m._id !== item._id)
+          );
+
+          socketRef.current?.emit("deleteForMe", {
+            messageId: item._id,
+            userId: userRef.current._id,
+          });
+
+        },
+      },
+    ]
+  );
+
+};
+
+const handleDeleteForEveryone = (item: any) => {
+
+  Alert.alert(
+    "Delete Message",
+    "This message will be deleted for everyone.",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete for Everyone",
+        style: "destructive",
+        onPress: () => {
+            console.log("DELETE ID", item._id);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m._id === item._id
+                ? {
+                    ...m,
+                    isDeletedForEveryone: true
+                  }
+                : m
+            )
+          );
+
+
+          socketRef.current?.emit(
+            "deleteForEveryone",
+            {
+              messageId: item._id,
+              userId: userRef.current._id,
+              chatId: chatIdRef.current,
+            }
+          );
+
+        },
+      },
+    ]
+  );
+
+};
+
+const handleLongPressMessage = (item: any) => {
+  if (item.isDeletedForEveryone || item.temp) return; // deleted ya abhi bhej rahe optimistic msg pe kuch mat karo
+  const isSender = getSenderId(item) === userRef.current?._id;
+
+  if (Platform.OS === "ios") {
+    const options = isSender
+      ? ["Cancel", "Delete for Me", "Delete for Everyone"]
+      : ["Cancel", "Delete for Me"];
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        options,
+        cancelButtonIndex: 0,
+        destructiveButtonIndex: isSender ? 2 : undefined,
+      },
+      (buttonIndex) => {
+        if (options[buttonIndex] === "Delete for Me") handleDeleteForMe(item);
+        else if (options[buttonIndex] === "Delete for Everyone") handleDeleteForEveryone(item);
+      }
+    );
+  } else {
+    const buttons: any[] = [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete for Me", onPress: () => handleDeleteForMe(item) },
+    ];
+    if (isSender) {
+      buttons.push({
+        text: "Delete for Everyone",
+        style: "destructive",
+        onPress: () => handleDeleteForEveryone(item),
+      });
+    }
+    Alert.alert("Delete Message", "", buttons);
+  }
+};
+
   const displayData = buildDisplayData(messages);
 
   const renderTicks = (item: any) => {
@@ -494,42 +618,66 @@ const openGallery = async () => {
 
     return (
       <View style={[styles.messageRow, isSender ? styles.rowSender : styles.rowReceiver]}>
-        <TouchableOpacity
-          activeOpacity={isFailed ? 0.6 : 1}
-          disabled={!isFailed}
-          onPress={() => isFailed && handleRetry(item)}
-          style={[
-            styles.messageContainer,
-            isSender ? styles.senderMessageContainer : styles.receiverMessageContainer,
-            isFailed && styles.failedMessageContainer,
-          ]}
-        >
-          {getMsgImage(item) ? (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => {
-                setViewerUri(getMsgImage(item));
-                setViewerVisible(true);
-              }}
-            >
-              <Image
-                source={{ uri: getMsgImage(item) }}
-                style={styles.chatImage}
-                resizeMode="cover"
-              />
-            </TouchableOpacity>
-          ) : null}
+   <TouchableOpacity
+  activeOpacity={isFailed ? 0.6 : 1}
+  disabled={item.isDeletedForEveryone}
+  onPress={() => isFailed && handleRetry(item)}
+  onLongPress={() => handleLongPressMessage(item)}
+  delayLongPress={500}
+  style={[
+    styles.messageContainer,
+    isSender
+      ? styles.senderMessageContainer
+      : styles.receiverMessageContainer,
+    isFailed && styles.failedMessageContainer,
+  ]}
+>
+  {item.isDeletedForEveryone ? (
+  <View style={styles.deletedRow}>
+    <Ionicons
+      name="ban-outline"
+      size={14}
+      color={isSender ? "rgba(255,255,255,0.75)" : "#9E9E9E"}
+    />
+    <Text
+      style={[
+        styles.deletedText,
+        isSender && { color: "rgba(255,255,255,0.75)" },
+      ]}
+    >
+      {isSender ? "You deleted this message" : "This message was deleted"}
+    </Text>
+  </View>
+) : (
+  <>
+    {getMsgImage(item) ? (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => {
+          setViewerUri(getMsgImage(item));
+          setViewerVisible(true);
+        }}
+      >
+        <Image
+          source={{ uri: getMsgImage(item) }}
+          style={styles.chatImage}
+          resizeMode="cover"
+        />
+      </TouchableOpacity>
+    ) : null}
 
-{getMsgText(item) ? (
-  <Text
-    style={[
-      styles.messageText,
-      isSender ? styles.senderMessageText : styles.receiverMessageText,
-    ]}
-  >
-    {getMsgText(item)}
-  </Text>
-) : null}
+    {getMsgText(item) ? (
+      <Text
+        style={[
+          styles.messageText,
+          isSender ? styles.senderMessageText : styles.receiverMessageText,
+        ]}
+      >
+        {getMsgText(item)}
+      </Text>
+    ) : null}
+  </>
+)}
 
           <View style={styles.metaRow}>
             {isFailed ? (
@@ -950,6 +1098,17 @@ viewerScrollContent: {
   flexGrow: 1,
   justifyContent: "center",
   alignItems: "center",
+},
+deletedRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingVertical: 4,
+},
+deletedText: {
+  fontStyle: "italic",
+  color: "#9E9E9E",
+  fontSize: 13,
+  marginLeft: 5,
 },
 });
 

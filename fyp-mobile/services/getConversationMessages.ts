@@ -1,22 +1,24 @@
-//fyp-mobile/services/getConversationMessages.ts
+//fyp-mobile/services/getConversationMessage.ts
 
-import axios, { AxiosRequestConfig } from "axios";
+import axios from "axios";
 
-export default async function getConversationMessages(chatId: string) {
-    const url = `https://eventify-hub.onrender.com/chat/messages/${chatId}`; // Backend URL to fetch conversations
-    // const url = `http://192.168.100.15:3000/chat/messages/${chatId}`;
-    const config: AxiosRequestConfig = {
-        maxBodyLength: Infinity,
-        method: "GET",
-        url,
-    };
+export default async function getConversationMessages(
+    chatId: string,
+    userId: string
+) {
+    const url =
+        `https://eventify-hub.onrender.com/chat/messages/${chatId}?userId=${userId}`;
 
     try {
-        // Send GET request to fetch conversation list
-        const response = await axios(config);
-        return response.data.messages; // Returning the list of messages
+        const response = await axios({
+            method: "GET",
+            url,
+        });
+
+        return response.data.messages;
+
     } catch (error) {
-        console.error("Error fetching conversation list:", error);
-        throw error; // Handle errors properly
+        console.error("Error fetching conversation messages:", error);
+        throw error;
     }
 }

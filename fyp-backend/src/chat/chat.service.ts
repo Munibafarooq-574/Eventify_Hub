@@ -1,5 +1,6 @@
 // fyp-backend/src/chat/chat.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+//import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Message } from './../auth/schemas/message.schema';
@@ -56,9 +57,9 @@ export class ChatService {
             match: { _id: { $ne: userId } },
         })
         .populate({
-        path: 'lastMessage',
-        select: 'message imageUrl timestamp',   // imageUrl add kar diya
-        })
+    path: 'lastMessage',
+    select: 'message imageUrl timestamp isDeletedForEveryone',
+})
         .lean()
         .exec();
 
@@ -98,60 +99,24 @@ return conversationsWithUnread as any;
 }
 
     // Get all messages for a conversation (chatId)
-    async getConversationMessages(chatId: string): Promise<Message[]> {
+  /*  async getConversationMessages(chatId: string): Promise<Message[]> {
         return this.messageModel
             .find({ chatId })
             .sort({ timestamp: -1 })  // Sort messages by timestamp to get the correct order
             .exec();
+    }*/
+
+    // Get all messages for a conversation (chatId)
+async getConversationMessages(chatId: string, userId?: string): Promise<Message[]> {
+    const filter: any = { chatId };
+    if (userId) {
+        filter.deletedFor = { $ne: userId };
     }
-
-    // Create a new message for a conversation
-   /* async createMessage(
-    chatId: string,
-    senderId: string,
-    receiverId: string,
-    content: string,
-): Promise<Message> {
-    const message = new this.messageModel({
-        chatId,
-        senderId,
-        receiverId,
-        message: content,
-        isRead: false,
-    });
-
-    // Pehle message save karo
-    await message.save();
-
-    // Phir conversation ka lastMessage update karo
-    await this.conversationModel.updateOne(
-        { chatId },
-        { lastMessage: message._id },
-    );
-
-    const conversationObj = await this.conversationModel
-        .findOne({ chatId })
-        .populate('participants');
-
-    const otherUser = conversationObj?.participants.find(
-        x => x._id && !x._id.equals(senderId),
-    );
-
-    try {
-        console.log("Sending Push in messages");
-        await this.sendPushNotification(
-            "New Message",
-            content,
-            otherUser?._id,
-            "MESSAGE",
-        );
-    } catch (error) {
-        console.log("Sending Push in messages", error);
-    }
-
-    return message;
-} */
-
+    return this.messageModel
+        .find(filter)
+        .sort({ timestamp: -1 })
+        .exec();
+}
     // Create a new message for a conversation
 async createMessage(
     chatId: string,
@@ -160,6 +125,9 @@ async createMessage(
     content: string,
     imageUrl: string = '',
 ): Promise<Message> {
+
+    console.log("CHAT SERVICE createMessage CALLED");
+
     const message = new this.messageModel({
         chatId,
         senderId,
@@ -167,10 +135,16 @@ async createMessage(
         message: content,
         imageUrl,
         isRead: false,
+        isDeletedForEveryone: false,
     });
 
-    // Pehle message save karo
+    console.log(message);
+
     await message.save();
+
+const saved = await this.messageModel.findById(message._id).lean();
+
+console.log("SAVED DOC =", saved);
 
     // Phir conversation ka lastMessage update karo
     await this.conversationModel.updateOne(
@@ -201,10 +175,18 @@ async createMessage(
     return message;
 }
     // Get all messages for a conversation
-    async getMessagesForConversation(chatId: string): Promise<Message[]> {
+   /* async getMessagesForConversation(chatId: string): Promise<Message[]> {
         return this.messageModel.find({ chatId }).sort({ timestamp: 1 }).exec();
-    }
+    }*/
 
+        // Get all messages for a conversation
+async getMessagesForConversation(chatId: string, userId?: string): Promise<Message[]> {
+    const filter: any = { chatId };
+    if (userId) {
+        filter.deletedFor = { $ne: userId };
+    }
+    return this.messageModel.find(filter).sort({ timestamp: 1 }).exec();
+}
     async markMessagesAsRead(chatId: string, userId: string) {
     await this.messageModel.updateMany(
         {
@@ -267,4 +249,41 @@ async createMessage(
         });
         return await notification.save();
     }
+
+    // 🔵 NEW: Delete for Me — sirf calling user ki list se hide hoga
+async deleteMessageForMe(messageId: string, userId: string): Promise<void> {
+    await this.messageModel.updateOne(
+        { _id: messageId },
+        { $addToSet: { deletedFor: userId } },
+    );
+}
+
+// 🔵 NEW: Delete for Everyone — sirf sender kar sakta hai, no time limit
+async deleteMessageForEveryone(
+ messageId:string,
+ userId:string
+):Promise<Message>{
+
+ const msg = await this.messageModel.findById(messageId);
+
+ if(!msg){
+   throw new NotFoundException("Message not found");
+ }
+
+
+ if(msg.senderId.toString() !== userId.toString()){
+   throw new ForbiddenException(
+     "You can only delete your own messages"
+   );
+ }
+
+
+ msg.isDeletedForEveryone = true;
+
+ await msg.save();
+
+ console.log("DELETED MESSAGE",msg._id);
+
+ return msg;
+}
 }
