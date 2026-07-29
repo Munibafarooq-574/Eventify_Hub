@@ -51,6 +51,9 @@ const AccountScreen: React.FC = () => {
       // case 'Notifications':
       //   router.push('/notificationacc');
       //   break;
+      case 'Contact Details':
+  router.push('/editvendorcontactdetails' as any);
+  break;
       case 'Frequently Asked Questions':
         router.push('/vendorfaqs');
         break;
@@ -110,6 +113,12 @@ const AccountScreen: React.FC = () => {
       danger: false,
     },
     // { title: 'Notifications' },
+     {
+     title: 'Contact Details',
+     subtitle: 'Manage phone, email, socials & address',
+     icon: 'call-outline' as const,
+      danger: false,
+    },
     {
       title: 'Frequently Asked Questions',
       subtitle: 'Get quick answers to common queries',
