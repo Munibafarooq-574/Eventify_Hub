@@ -1,4 +1,5 @@
 import getConversationMessages from "@/services/getConversationMessages";
+import getVendorContactDetails from "@/services/getVendorContactDetails";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -124,7 +125,9 @@ const ChatScreen: React.FC = () => {
   const [viewerVisible, setViewerVisible] = useState(false);
 const [viewerUri, setViewerUri] = useState<string | null>(null);
 const [downloading, setDownloading] = useState(false);
-
+const [contactModalVisible, setContactModalVisible] = useState(false);
+const [contactDetails, setContactDetails] = useState<any>(null);
+const [contactLoading, setContactLoading] = useState(false);
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
   const socketRef = useRef<Socket | null>(null);
@@ -421,6 +424,21 @@ const handleDownloadImage = async () => {
   }
 };
 
+const handleOpenContactDetails = async () => {
+    setContactModalVisible(true);
+    if (contactDetails) return; // already fetched once, cache use karo
+
+    setContactLoading(true);
+    try {
+        const data = await getVendorContactDetails(receiverIdRef.current);
+        setContactDetails(data);
+    } catch (error) {
+        setContactDetails(null);
+    } finally {
+        setContactLoading(false);
+    }
+};
+
 const handleAttachPress = () => {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -715,21 +733,25 @@ const handleLongPressMessage = (item: any) => {
       keyboardVerticalOffset={0}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerIconBtn}>
-          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
+    <TouchableOpacity onPress={() => router.back()} style={styles.headerIconBtn}>
+      <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+    </TouchableOpacity>
 
-        <View style={styles.headerCenterWrap}>
-          <View style={styles.headerAvatarCircle}>
-            <Text style={styles.headerAvatarInitial}>
-              {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
-            </Text>
-          </View>
-          <Text style={styles.title} numberOfLines={1}>
-            {receiverName}
-          </Text>
-        </View>
+    <TouchableOpacity
+      style={styles.headerCenterWrap}
+      activeOpacity={0.8}
+      onPress={handleOpenContactDetails}
+    >
+      <View style={styles.headerAvatarCircle}>
+        <Text style={styles.headerAvatarInitial}>
+          {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
+        </Text>
       </View>
+      <Text style={styles.title} numberOfLines={1}>
+        {receiverName}
+      </Text>
+    </TouchableOpacity>
+</View>
 
       {/* Chat Area */}
       {!loading && messages.length === 0 ? (
@@ -844,7 +866,93 @@ const handleLongPressMessage = (item: any) => {
 
   </View>
 </Modal>
+<Modal
+  visible={contactModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setContactModalVisible(false)}
+>
+  <View style={styles.contactBackdrop}>
+    <View style={styles.contactCard}>
+      <View style={styles.contactHeaderRow}>
+        <Text style={styles.contactHeaderTitle}>Contact Details</Text>
+        <TouchableOpacity onPress={() => setContactModalVisible(false)}>
+          <Ionicons name="close" size={24} color="#780C60" />
+        </TouchableOpacity>
+      </View>
 
+      {contactLoading ? (
+        <Text style={styles.contactLoadingText}>Loading...</Text>
+      ) : !contactDetails ? (
+        <Text style={styles.contactLoadingText}>
+          Contact details not available yet.
+        </Text>
+      ) : (
+        <ScrollView style={{ maxHeight: 400 }}>
+          {contactDetails.brandLogo ? (
+            <Image
+              source={{ uri: contactDetails.brandLogo }}
+              style={styles.contactLogo}
+            />
+          ) : null}
+
+          {contactDetails.brandName ? (
+            <Text style={styles.contactBrandName}>{contactDetails.brandName}</Text>
+          ) : null}
+
+          {contactDetails.contactNumber ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="call-outline" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.contactNumber}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.bookingEmail ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="mail-outline" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.bookingEmail}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.city ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="location-outline" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.city}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.officialAddress ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="business-outline" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.officialAddress}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.instagramLink ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="logo-instagram" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.instagramLink}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.facebookLink ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="logo-facebook" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.facebookLink}</Text>
+            </View>
+          ) : null}
+
+          {contactDetails.website ? (
+            <View style={styles.contactRow}>
+              <Ionicons name="globe-outline" size={16} color="#780C60" />
+              <Text style={styles.contactText}>{contactDetails.website}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      )}
+    </View>
+  </View>
+</Modal>
 </>
 );
 };
@@ -1111,6 +1219,61 @@ deletedText: {
   color: "#9E9E9E",
   fontSize: 13,
   marginLeft: 5,
+},
+contactBackdrop: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 24,
+},
+contactCard: {
+  width: "100%",
+  backgroundColor: "#FFFFFF",
+  borderRadius: 18,
+  padding: 18,
+  maxHeight: "75%",
+},
+contactHeaderRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 14,
+},
+contactHeaderTitle: {
+  fontSize: 17,
+  fontWeight: "800",
+  color: "#1A1A1A",
+},
+contactLoadingText: {
+  color: "#8A8A8A",
+  textAlign: "center",
+  paddingVertical: 20,
+},
+contactLogo: {
+  width: 70,
+  height: 70,
+  borderRadius: 35,
+  alignSelf: "center",
+  marginBottom: 10,
+},
+contactBrandName: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#780C60",
+  textAlign: "center",
+  marginBottom: 14,
+},
+contactRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  marginBottom: 12,
+},
+contactText: {
+  marginLeft: 10,
+  fontSize: 14,
+  color: "#333",
+  flexShrink: 1,
 },
 });
 
