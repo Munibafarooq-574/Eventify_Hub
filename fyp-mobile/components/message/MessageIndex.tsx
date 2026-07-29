@@ -739,19 +739,28 @@ const handleLongPressMessage = (item: any) => {
     </TouchableOpacity>
 
     <TouchableOpacity
-      style={styles.headerCenterWrap}
-      activeOpacity={0.8}
-      onPress={handleOpenContactDetails}
-    >
-      <View style={styles.headerAvatarCircle}>
-        <Text style={styles.headerAvatarInitial}>
-          {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
-        </Text>
-      </View>
-      <Text style={styles.title} numberOfLines={1}>
-        {receiverName}
-      </Text>
-    </TouchableOpacity>
+  style={styles.headerCenterWrap}
+  activeOpacity={0.8}
+  onPress={handleOpenContactDetails}
+>
+  <View style={styles.headerAvatarCircle}>
+    <Text style={styles.headerAvatarInitial}>
+      {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
+    </Text>
+  </View>
+  <View style={styles.headerNameRow}>
+    <Text style={styles.title} numberOfLines={1}>
+      {receiverName}
+    </Text>
+    
+    <Ionicons
+      name="information-circle-outline"
+      size={16}
+      color="rgba(255,255,255,0.85)"
+      style={styles.headerInfoIcon}
+    />
+  </View>
+</TouchableOpacity>
 </View>
 
       {/* Chat Area */}
@@ -1026,6 +1035,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
+  headerNameRow: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+headerInfoIcon: {
+  marginLeft: 5,
+  marginTop: 1,
+},
   header: {
     flexDirection: "row",
     alignItems: "center",
