@@ -591,6 +591,13 @@ export class User extends Document {
   @Prop()
   password?: string;
 
+  // 🔵 NEW (Phase 7.1) — presence tracking
+  @Prop({ default: false })
+  isOnline: boolean;
+
+  @Prop({ type: Date, default: null })
+  lastSeen: Date | null;
+
   @Prop()
   name: string;
 

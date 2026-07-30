@@ -14,12 +14,17 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { io, Socket } from 'socket.io-client';
+import {
+    connectSocket,
+    registerUser,
+    onNewMessage,
+    onMessageDeletedForEveryone,
+    listenPresenceUpdate,
+} from '@/utils/socketService';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 
 const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
-const SOCKET_URL = 'https://eventify-hub.onrender.com';
 const DEFAULT_AVATAR =
     "https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg";
 const UNREAD_OVERRIDES_KEY = "chatUnreadOverrides";
@@ -99,9 +104,10 @@ const MessagesScreen: React.FC = () => {
     // the badge match "however many messages actually arrived" instead of
     // being stuck at whatever fixed number the backend happens to send.
     const [unreadOverrides, setUnreadOverrides] = useState<Record<string, number>>({});
+    // 🔵 NEW (Phase 7.1): userId -> isOnline, updated live over the socket.
+    const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
     const overridesRef = useRef<Record<string, number>>({});
     const myUserIdRef = useRef<string>("");
-    const socketRef = useRef<Socket | null>(null);
 
     const updateOverrides = useCallback((updater: (prev: Record<string, number>) => Record<string, number>) => {
         setUnreadOverrides((prev) => {
@@ -121,32 +127,45 @@ const MessagesScreen: React.FC = () => {
             myUserIdRef.current = user._id;
 
             const data = (await getConversationList(user._id)) || [];
-            //setConversations(data);
 
             setConversations((prevConvos) => {
-    const prevMap = new Map(prevConvos.map((c) => [c.chatId, c]));
+                const prevMap = new Map(prevConvos.map((c) => [c.chatId, c]));
 
-    return data.map((c: any) => {
-        const prev = prevMap.get(c.chatId);
+                return data.map((c: any) => {
+                    const prev = prevMap.get(c.chatId);
 
-        if (prev?.lastMessage && hasImage(prev.lastMessage)) {
-            const prevTime = new Date(getMsgTime(prev.lastMessage)).getTime();
+                    if (prev?.lastMessage && hasImage(prev.lastMessage)) {
+                        const prevTime = new Date(getMsgTime(prev.lastMessage)).getTime();
 
-            const freshTime = c.lastMessage
-                ? new Date(getMsgTime(c.lastMessage)).getTime()
-                : 0;
+                        const freshTime = c.lastMessage
+                            ? new Date(getMsgTime(c.lastMessage)).getTime()
+                            : 0;
 
-            if (prevTime >= freshTime) {
-                return {
-                    ...c,
-                    lastMessage: prev.lastMessage,
-                };
-            }
-        }
+                        if (prevTime >= freshTime) {
+                            return {
+                                ...c,
+                                lastMessage: prev.lastMessage,
+                            };
+                        }
+                    }
 
-        return c;
-    });
-});
+                    return c;
+                });
+            });
+
+            // Seed initial online state from whatever the backend returned
+            // on the participant doc (isOnline is now part of the User
+            // schema as of Phase 7.1) — live changes come over the socket.
+            setOnlineMap((prev) => {
+                const merged = { ...prev };
+                data.forEach((c: any) => {
+                    const participant = c.participants?.[0];
+                    if (participant?._id && !(participant._id in merged)) {
+                        merged[participant._id] = !!participant.isOnline;
+                    }
+                });
+                return merged;
+            });
 
             // Seed the local override only for chats we haven't tracked yet,
             // so we never stomp on a count the user already interacted with.
@@ -171,12 +190,17 @@ const MessagesScreen: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const socketConnection = io(SOCKET_URL);
-        socketRef.current = socketConnection;
+        const socket = connectSocket();
+
+        (async () => {
+            const rawUser = await getSecureData("user");
+            const user = rawUser ? JSON.parse(rawUser) : null;
+            if (user?._id) registerUser(user._id);
+        })();
 
         fetchConversations();
 
-        socketConnection.on("newMessage", (incoming: any) => {
+        const offNewMessage = onNewMessage((incoming: any) => {
             const chatId = incoming?.chatId;
             if (!chatId) {
                 fetchConversations(true);
@@ -192,20 +216,20 @@ const MessagesScreen: React.FC = () => {
                     return prev;
                 }
                 const updatedConvo = {
-    ...prev[idx],
-  lastMessage:{
-    _id: incoming._id,
-    message: getMsgText(incoming),
-    imageUrl:
-        incoming?.imageUrl ||
-        incoming?.image ||
-        incoming?.media ||
-        incoming?.attachment ||
-        incoming?.photoUrl ||
-        "",
-    timestamp: getMsgTime(incoming),
-},
-};
+                    ...prev[idx],
+                    lastMessage: {
+                        _id: incoming._id,
+                        message: getMsgText(incoming),
+                        imageUrl:
+                            incoming?.imageUrl ||
+                            incoming?.image ||
+                            incoming?.media ||
+                            incoming?.attachment ||
+                            incoming?.photoUrl ||
+                            "",
+                        timestamp: getMsgTime(incoming),
+                    },
+                };
                 const rest = prev.filter((_, i) => i !== idx);
                 return [updatedConvo, ...rest];
             });
@@ -216,32 +240,34 @@ const MessagesScreen: React.FC = () => {
             }
         });
 
-        socketConnection.on("messageDeletedForEveryone",(payload)=>{
+        const offDeleted = onMessageDeletedForEveryone((payload) => {
+            setConversations(prev =>
+                prev.map(chat => {
+                    if (chat.lastMessage?._id === payload.messageId) {
+                        return {
+                            ...chat,
+                            lastMessage: {
+                                ...chat.lastMessage,
+                                message: "This message was deleted",
+                                isDeletedForEveryone: true,
+                            }
+                        }
+                    }
+                    return chat;
+                })
+            );
+        });
 
-    setConversations(prev =>
-        prev.map(chat=>{
+        // 🔵 NEW (Phase 7.1): live online/offline dot on each conversation row
+        const offPresence = listenPresenceUpdate((payload) => {
+            setOnlineMap((prev) => ({ ...prev, [payload.userId]: payload.isOnline }));
+        });
 
-            if(chat.lastMessage?._id === payload.messageId){
-                return {
-                    ...chat,
-                    lastMessage:{
-    ...chat.lastMessage,
-    message: "This message was deleted",
-    isDeletedForEveryone: true,
-}
-                }
-            }
-
-            return chat;
-        })
-    );
-
-});
         return () => {
-            socketConnection.off("newMessage");
-
-          socketConnection.off("messageDeletedForEveryone");
-            socketConnection.disconnect();
+            offNewMessage();
+            offDeleted();
+            offPresence();
+            // NOTE: socket is shared app-wide — do not disconnect here.
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -263,22 +289,19 @@ const MessagesScreen: React.FC = () => {
         const participant = item.participants?.[0] || {};
         await saveSecureData("chatId", item.chatId);
         await saveSecureData("receiverId", participant._id || "");
-        await saveSecureData("receiverName",participant.displayName || participant.name || "Conversation");
+        await saveSecureData("receiverName", participant.displayName || participant.name || "Conversation");
         await saveSecureData("receiverAvatar", participant.avatar || "");
 
         // Clear the badge immediately - the whole point of opening the chat.
         updateOverrides((prev) => ({ ...prev, [item.chatId]: 0 }));
 
         router.push(`/message`);
-        if (socketRef.current) {
-            socketRef.current.emit("joinConversation", { chatId: item.chatId, userId: myUserIdRef.current });
-        }
     };
 
     const renderMessage = ({ item }: { item: typeof conversations[0] }) => {
-        console.log("LAST MESSAGE", item.lastMessage);
         const participant = item.participants?.[0] || {};
         const unread = unreadOverrides[item.chatId] ?? Number(item.unreadCount) ?? 0;
+        const isOnline = participant._id ? !!onlineMap[participant._id] : false;
 
         return (
             <TouchableOpacity
@@ -288,45 +311,40 @@ const MessagesScreen: React.FC = () => {
             >
                 <View style={styles.avatarWrap}>
                     <Image source={{ uri: participant.avatar || DEFAULT_AVATAR }} style={styles.avatar} />
+                    {isOnline && <View style={styles.onlineDot} />}
                 </View>
 
                 <View style={styles.textContainer}>
-<Text
-    style={styles.title}
-    numberOfLines={1}
->
-    {participant.displayName || participant.name || "Unknown"}
-</Text>
+                    <Text style={styles.title} numberOfLines={1}>
+                        {participant.displayName || participant.name || "Unknown"}
+                    </Text>
 
-    <View style={styles.subtitleRow}>
+                    <View style={styles.subtitleRow}>
+                        {item.lastMessage &&
+                            hasImage(item.lastMessage) &&
+                            !isDeleted(item.lastMessage) && (
+                                <Ionicons
+                                    name="camera"
+                                    size={13}
+                                    color={unread > 0 ? PRIMARY : "#8A8A8A"}
+                                    style={{ marginRight: 4 }}
+                                />
+                            )}
 
-        {item.lastMessage &&
-    hasImage(item.lastMessage) &&
-    !isDeleted(item.lastMessage) && (
-            <Ionicons
-                name="camera"
-                size={13}
-                color={unread > 0 ? PRIMARY : "#8A8A8A"}
-                style={{ marginRight: 4 }}
-            />
-        )}
-
-        <Text
-    style={[
-        styles.subtitle,
-        unread > 0 && styles.subtitleUnread,
-        isDeleted(item.lastMessage) && styles.subtitleDeleted,
-    ]}
-    numberOfLines={1}
->
-    {item.lastMessage
-        ? getMsgPreview(item.lastMessage)
-        : "No messages yet"}
-</Text>
-
-    </View>
-
-</View>
+                        <Text
+                            style={[
+                                styles.subtitle,
+                                unread > 0 && styles.subtitleUnread,
+                                isDeleted(item.lastMessage) && styles.subtitleDeleted,
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {item.lastMessage
+                                ? getMsgPreview(item.lastMessage)
+                                : "No messages yet"}
+                        </Text>
+                    </View>
+                </View>
                 <View style={styles.rightContainer}>
                     <Text style={styles.time}>
                         {item.lastMessage ? formatListTime(getMsgTime(item.lastMessage)) : ""}
@@ -464,33 +482,44 @@ const styles = StyleSheet.create({
         height: 50,
         borderRadius: 25,
     },
+    onlineDot: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#3ED598',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+    },
     textContainer: {
         flex: 1,
         paddingRight: 8,
     },
     subtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 3,
-},
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 3,
+    },
     title: {
         fontSize: 16,
         fontWeight: '700',
         color: '#1A1A1A',
     },
     subtitle: {
-    fontSize: 13,
-    color: '#8A8A8A',
-},
+        fontSize: 13,
+        color: '#8A8A8A',
+    },
     subtitleUnread: {
         color: '#3A3A3A',
         fontWeight: '600',
     },
     subtitleDeleted: {
         fontSize: 14,
-    fontStyle: "italic",
-    color: "#9E9E9E",
-},
+        fontStyle: "italic",
+        color: "#9E9E9E",
+    },
     rightContainer: {
         alignItems: 'flex-end',
     },
