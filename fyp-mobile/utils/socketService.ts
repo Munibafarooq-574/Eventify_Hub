@@ -1,4 +1,3 @@
-
 // fyp-mobile/utils/socketService.ts
 //
 // Single source of truth for the app's socket.io connection. Every screen
@@ -117,6 +116,9 @@ export function sendChatMessage(payload: {
   chatId: string;
   content: string;
   imageUrl?: string;
+  // 🟢 NEW (Reply feature) — optional reference to the message being
+  // replied to. Reuses the existing sendMessage payload/event.
+  repliedToMessageId?: string | null;
 }) {
   socket?.emit("sendMessage", payload);
 }
@@ -127,6 +129,15 @@ export function emitDeleteForMe(messageId: string, userId: string) {
 
 export function emitDeleteForEveryone(messageId: string, userId: string, chatId: string) {
   socket?.emit("deleteForEveryone", { messageId, userId, chatId });
+}
+
+// 🟢 NEW (Pin feature)
+export function emitPinMessage(chatId: string, messageId: string, userId: string) {
+  socket?.emit("pinMessage", { chatId, messageId, userId });
+}
+
+export function emitUnpinMessage(chatId: string, messageId: string, userId: string) {
+  socket?.emit("unpinMessage", { chatId, messageId, userId });
 }
 
 // ---------------------------------------------------------------------
@@ -179,4 +190,26 @@ export function listenMessageSeen(
 ) {
   socket?.on("messagesSeen", cb);
   return () => socket?.off("messagesSeen", cb);
+}
+
+// 🟢 NEW (Pin feature) — real-time pin/unpin updates for the other
+// participant. Registered/cleaned up the same way as every other listener
+// above; does not touch typing/presence/delivery/seen listeners.
+export function onMessagePinned(
+  cb: (payload: { chatId: string; messageId: string; pinnedBy: string }) => void
+) {
+  socket?.on("messagePinned", cb);
+  return () => socket?.off("messagePinned", cb);
+}
+
+export function onMessageUnpinned(
+  cb: (payload: { chatId: string; messageId: string; unpinnedBy: string }) => void
+) {
+  socket?.on("messageUnpinned", cb);
+  return () => socket?.off("messageUnpinned", cb);
+}
+
+export function onPinError(cb: (payload: { messageId: string; error: string }) => void) {
+  socket?.on("pinError", cb);
+  return () => socket?.off("pinError", cb);
 }

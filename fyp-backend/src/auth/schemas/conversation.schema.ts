@@ -1,4 +1,35 @@
 // src/chat/schemas/conversation.schema.ts
+/*import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { User } from './user.schema';
+import { Message } from './message.schema';
+
+@Schema()
+export class Conversation extends Document {
+    @Prop({
+    required: true,
+    unique: true,
+    index: true,
+})
+chatId: string;   // Unique ID for the conversation (can be generated or mapped from participants)
+
+    @Prop({ type: [Types.ObjectId], ref: 'User', required: true })
+    participants: User[]; // List of participants (userId, vendorId)
+
+    @Prop({ type: Types.ObjectId, ref: 'Message' })
+    lastMessage: Message; // Reference to the last message
+
+    @Prop({ default: Date.now })
+    createdAt: Date;
+}
+
+export const ConversationSchema = SchemaFactory.createForClass(Conversation);
+
+ConversationSchema.index({ chatId: 1 }, { unique: true }); */
+
+
+
+// src/chat/schemas/conversation.schema.ts
 import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { User } from './user.schema';
@@ -21,6 +52,14 @@ chatId: string;   // Unique ID for the conversation (can be generated or mapped 
 
     @Prop({ default: Date.now })
     createdAt: Date;
+
+    // 🟢 NEW (Pin feature) — references to pinned messages for this
+    // conversation. Storing IDs only (not full message content) so we
+    // never duplicate data that can change/get deleted independently.
+    // Existing conversations simply have this default to [] — no
+    // migration required.
+    @Prop({ type: [Types.ObjectId], ref: 'Message', default: [] })
+    pinnedMessageIds: Types.ObjectId[];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

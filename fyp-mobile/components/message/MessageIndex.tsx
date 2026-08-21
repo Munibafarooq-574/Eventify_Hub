@@ -1,6 +1,7 @@
 import getConversationMessages from "@/services/getConversationMessages";
 import getVendorContactDetails from "@/services/getVendorContactDetails";
 import getUserPresence from "@/services/getUserPresence";
+import getPinnedMessages from "@/services/getPinnedMessages";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -38,8 +39,12 @@ import {
   emitTypingStart,
   emitTypingStop,
   emitMessageSeen,
+  emitPinMessage,
+  emitUnpinMessage,
   onNewMessage,
   onMessageDeletedForEveryone,
+  onMessagePinned,
+  onMessageUnpinned,
   listenTypingStatus,
   listenPresenceUpdate,
   listenMessageDelivered,
@@ -65,6 +70,16 @@ const getMsgTime = (m: any) =>
 const getSenderId = (m: any) => {
   const s = m?.senderId ?? m?.sender;
   return typeof s === "object" && s !== null ? s._id : s;
+};
+
+// Normalizes an id whether it arrives as a raw string or a populated
+// object ({ _id: ... }) — used for reply/pin comparisons where the same
+// field can be either shape depending on where the data came from
+// (optimistic snapshot vs. server-populated payload).
+const idStr = (id: any): string => {
+  if (!id) return "";
+  if (typeof id === "object") return String(id._id ?? id.id ?? "");
+  return String(id);
 };
 
 const sortDesc = (arr: any[]) =>
@@ -138,6 +153,23 @@ const formatPresence = (isOnline: boolean, lastSeen: string | null): string => {
   return `Last seen ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
 };
 
+// 🟢 NEW (Reply feature) — reads the replied-to reference off a message,
+// whichever shape it happens to be in:
+//  - populated object from the server (normal case)
+//  - a lightweight local snapshot we attach to optimistic messages
+//  - null/undefined for ordinary messages (the overwhelming majority)
+const getRepliedTo = (m: any) => m?.repliedToMessageId ?? null;
+
+// Safe preview text for a quoted/replied message. Handles the "original
+// message no longer exists / was deleted" cases without ever crashing.
+const getReplyPreviewText = (r: any) => {
+  if (!r) return "Message deleted";
+  if (r?.isDeletedForEveryone) return "This message was deleted";
+  if (getMsgImage(r)) return "📷 Photo";
+  const text = getMsgText(r);
+  return text ? text : "Message";
+};
+
 // Builds the array actually fed to the (inverted) FlatList, inserting date
 // separators at the right spots. Logic is built in normal chronological
 // (oldest -> newest) order first, then reversed once at the end, because
@@ -178,6 +210,23 @@ const ChatScreen: React.FC = () => {
   });
   const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
+  // 🟢 NEW (Reply feature) — message currently being replied to, shown in
+  // the composer preview. Null when not replying.
+  const [replyingTo, setReplyingTo] = useState<any>(null);
+
+  // 🟢 NEW (Search feature)
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // 🟢 NEW (Pin feature)
+  const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
+
+  // Briefly highlights a message after jumping to it (from a quoted reply,
+  // a search result, or the pinned banner) so the user can actually spot it.
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
   // Refs mirror state so socket event handlers (registered once, on mount)
   // always read the LATEST values instead of a stale closure from the first
   // render. This was the root cause of messages getting stuck on
@@ -190,6 +239,50 @@ const ChatScreen: React.FC = () => {
   const pendingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const seenMessageIdsRef = useRef<Set<string>>(new Set()); // avoid re-emitting messageSeen for the same id
   const router = useRouter();
+
+  // 🟢 NEW — kept in sync with `messages` so socket callbacks (registered
+  // once on mount) and scroll helpers can read the latest list without
+  // needing to be re-created every render.
+  const messagesRef = useRef<any[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // 🟢 NEW — reused by quoted-reply taps, search-result taps, and the
+  // pinned banner. Only scrolls within what's already loaded in the
+  // existing FlatList/data — no second list is introduced.
+  const flatListRef = useRef<FlatList<any>>(null);
+
+  const findMessageIndex = useCallback((messageId: string) => {
+    const displayList = buildDisplayData(messagesRef.current);
+    return displayList.findIndex((m) => m._id === messageId);
+  }, []);
+
+  const scrollToMessage = useCallback(
+    (messageId: string) => {
+      if (!messageId) return;
+      const index = findMessageIndex(messageId);
+      if (index === -1) {
+        Alert.alert(
+          "Message not found",
+          "This message isn't available in the current view."
+        );
+        return;
+      }
+      try {
+        flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
+      } catch {
+        // Fall back safely rather than crashing if the list can't resolve
+        // the index yet (e.g. still measuring items).
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+      setHighlightedMessageId(messageId);
+      setTimeout(() => {
+        setHighlightedMessageId((cur) => (cur === messageId ? null : cur));
+      }, 1600);
+    },
+    [findMessageIndex]
+  );
 
   const scheduleFailureCheck = useCallback((tempId: string) => {
     if (pendingTimeouts.current[tempId]) clearTimeout(pendingTimeouts.current[tempId]);
@@ -206,7 +299,7 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   const emitMessage = useCallback(
-    (tempId: string, text: string) => {
+    (tempId: string, text: string, repliedToMessageId: string | null = null) => {
       if (!userRef.current) return;
 
       sendChatMessage({
@@ -214,6 +307,7 @@ const ChatScreen: React.FC = () => {
         receiverId: receiverIdRef.current,
         chatId: chatIdRef.current,
         content: text,
+        repliedToMessageId: repliedToMessageId || undefined,
       });
       // Dispatched over the wire successfully -> single tick.
       setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
@@ -257,7 +351,10 @@ const ChatScreen: React.FC = () => {
         const stuck = prev.filter(
           (m) => m.temp && (m.status === "sending" || m.status === "failed")
         );
-        stuck.forEach((m) => emitMessage(m._id, getMsgText(m)));
+        stuck.forEach((m) => {
+          const rid = idStr(getRepliedTo(m)) || null;
+          emitMessage(m._id, getMsgText(m), rid);
+        });
         return prev.map((m) =>
           m.temp && (m.status === "sending" || m.status === "failed")
             ? { ...m, status: "sending" }
@@ -372,6 +469,23 @@ const ChatScreen: React.FC = () => {
       );
     });
 
+    // 🟢 NEW (Pin feature) — real-time pin/unpin from either participant.
+    // Registered/cleaned up alongside every other listener; does not touch
+    // typing, presence, delivery, or seen listeners.
+    const offMessagePinned = onMessagePinned((payload) => {
+      if (!isMounted || payload.chatId !== chatIdRef.current) return;
+      setPinnedMessages((prev) => {
+        if (prev.some((p) => idStr(p._id) === idStr(payload.messageId))) return prev;
+        const found = messagesRef.current.find((m) => m._id === payload.messageId);
+        return [...prev, found || { _id: payload.messageId }];
+      });
+    });
+
+    const offMessageUnpinned = onMessageUnpinned((payload) => {
+      if (!isMounted || payload.chatId !== chatIdRef.current) return;
+      setPinnedMessages((prev) => prev.filter((p) => idStr(p._id) !== idStr(payload.messageId)));
+    });
+
     const fetchMessages = async () => {
       try {
         setLoading(true);
@@ -409,6 +523,17 @@ const ChatScreen: React.FC = () => {
         setMessages(loaded);
         markVisibleMessagesSeen(loaded);
 
+        // 🟢 NEW (Pin feature) — initial pinned-messages snapshot.
+        if (chatIdValue) {
+          getPinnedMessages(chatIdValue, user._id)
+            .then((pinned) => {
+              if (isMounted) setPinnedMessages(pinned || []);
+            })
+            .catch(() => {
+              // Non-fatal — pinned banner just stays empty.
+            });
+        }
+
         if (socket.connected) {
           joinConversation(chatIdValue, user._id);
         }
@@ -430,6 +555,8 @@ const ChatScreen: React.FC = () => {
       offTyping();
       offPresence();
       offDeletedForEveryone();
+      offMessagePinned();
+      offMessageUnpinned();
       if (chatIdRef.current && userRef.current) {
         emitTypingStop(chatIdRef.current, userRef.current._id);
       }
@@ -454,6 +581,20 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  // 🟢 NEW (Reply feature) — builds the small snapshot we attach to
+  // optimistic messages so the quoted preview renders instantly, before
+  // the server round-trip comes back with the populated version.
+  const buildReplySnapshot = (original: any) =>
+    original
+      ? {
+          _id: original._id,
+          message: getMsgText(original),
+          imageUrl: getMsgImage(original),
+          senderId: getSenderId(original),
+          isDeletedForEveryone: !!original.isDeletedForEveryone,
+        }
+      : null;
+
   const handleSendMessage = async () => {
     const trimmed = message.trim();
     if (!trimmed || !userRef.current) return;
@@ -462,6 +603,9 @@ const ChatScreen: React.FC = () => {
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const now = new Date().toISOString();
+    const replySnapshot = buildReplySnapshot(replyingTo);
+    const replyId = replyingTo?._id ?? null;
+
     const optimisticMsg = {
       _id: tempId,
       chatId: chatIdRef.current,
@@ -472,16 +616,20 @@ const ChatScreen: React.FC = () => {
       createdAt: now,
       temp: true,
       status: "sending" as const,
+      repliedToMessageId: replySnapshot,
     };
 
     setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
     setMessage("");
-    emitMessage(tempId, trimmed);
+    setReplyingTo(null);
+    emitMessage(tempId, trimmed, replyId);
   };
 
   const sendImageMessage = async (imageUri: string) => {
     if (!userRef.current) return;
     setUploading(true);
+    const replySnapshot = buildReplySnapshot(replyingTo);
+    const replyId = replyingTo?._id ?? null;
     try {
       const remoteUrl = await uploadChatImage(imageUri);
 
@@ -498,9 +646,11 @@ const ChatScreen: React.FC = () => {
         createdAt: now,
         temp: true,
         status: "sending" as const,
+        repliedToMessageId: replySnapshot,
       };
 
       setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
+      setReplyingTo(null);
 
       sendChatMessage({
         user: userRef.current._id,
@@ -508,6 +658,7 @@ const ChatScreen: React.FC = () => {
         chatId: chatIdRef.current,
         content: "",
         imageUrl: remoteUrl,
+        repliedToMessageId: replyId || undefined,
       });
       setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
       scheduleFailureCheck(tempId);
@@ -628,7 +779,8 @@ const ChatScreen: React.FC = () => {
     setMessages((prev) =>
       prev.map((m) => (m._id === msg._id ? { ...m, status: "sending", timestamp: new Date().toISOString() } : m))
     );
-    emitMessage(msg._id, getMsgText(msg));
+    const rid = idStr(getRepliedTo(msg)) || null;
+    emitMessage(msg._id, getMsgText(msg), rid);
   };
 
   const handleDeleteForMe = (item: any) => {
@@ -671,28 +823,59 @@ const ChatScreen: React.FC = () => {
     );
   };
 
+  // 🟢 NEW (Reply feature)
+  const handleReplyToMessage = (item: any) => {
+    setReplyingTo(item);
+  };
+
+  // 🟢 NEW (Pin feature) — optimistic pin/unpin with revert-on-failure via
+  // the 'pinError' event (see socketService.onPinError, wired below).
+  const isMessagePinned = useCallback(
+    (item: any) => pinnedMessages.some((p) => idStr(p._id) === idStr(item._id)),
+    [pinnedMessages]
+  );
+
+  const handleTogglePin = (item: any) => {
+    if (!userRef.current || !chatIdRef.current) return;
+    const alreadyPinned = isMessagePinned(item);
+
+    if (alreadyPinned) {
+      setPinnedMessages((prev) => prev.filter((p) => idStr(p._id) !== idStr(item._id)));
+      emitUnpinMessage(chatIdRef.current, item._id, userRef.current._id);
+    } else {
+      setPinnedMessages((prev) => [...prev, item]);
+      emitPinMessage(chatIdRef.current, item._id, userRef.current._id);
+    }
+  };
+
   const handleLongPressMessage = (item: any) => {
     if (item.isDeletedForEveryone || item.temp) return; // deleted ya abhi bhej rahe optimistic msg pe kuch mat karo
     const isSender = getSenderId(item) === userRef.current?._id;
+    const pinLabel = isMessagePinned(item) ? "Unpin Message" : "Pin Message";
 
     if (Platform.OS === "ios") {
       const options = isSender
-        ? ["Cancel", "Delete for Me", "Delete for Everyone"]
-        : ["Cancel", "Delete for Me"];
+        ? ["Cancel", "Reply", pinLabel, "Delete for Me", "Delete for Everyone"]
+        : ["Cancel", "Reply", pinLabel, "Delete for Me"];
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
           cancelButtonIndex: 0,
-          destructiveButtonIndex: isSender ? 2 : undefined,
+          destructiveButtonIndex: isSender ? options.length - 1 : undefined,
         },
         (buttonIndex) => {
-          if (options[buttonIndex] === "Delete for Me") handleDeleteForMe(item);
-          else if (options[buttonIndex] === "Delete for Everyone") handleDeleteForEveryone(item);
+          const label = options[buttonIndex];
+          if (label === "Reply") handleReplyToMessage(item);
+          else if (label === pinLabel) handleTogglePin(item);
+          else if (label === "Delete for Me") handleDeleteForMe(item);
+          else if (label === "Delete for Everyone") handleDeleteForEveryone(item);
         }
       );
     } else {
       const buttons: any[] = [
         { text: "Cancel", style: "cancel" },
+        { text: "Reply", onPress: () => handleReplyToMessage(item) },
+        { text: pinLabel, onPress: () => handleTogglePin(item) },
         { text: "Delete for Me", onPress: () => handleDeleteForMe(item) },
       ];
       if (isSender) {
@@ -702,8 +885,49 @@ const ChatScreen: React.FC = () => {
           onPress: () => handleDeleteForEveryone(item),
         });
       }
-      Alert.alert("Delete Message", "", buttons);
+      Alert.alert("Message Options", "", buttons);
     }
+  };
+
+  // 🟢 NEW (Search feature) — searches the already-loaded `messages` array
+  // instead of hitting the network on every keystroke. The conversation is
+  // fully loaded when the screen opens, so this reuses that data (a
+  // conversation-scoped backend search endpoint also exists — see
+  // services/searchConversationMessages.ts — for when that assumption no
+  // longer holds, e.g. once pagination is introduced).
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchQueryChange = (text: string) => {
+    setSearchQuery(text);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    const trimmed = text.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    searchDebounceRef.current = setTimeout(() => {
+      const q = trimmed.toLowerCase();
+      const results = messagesRef.current.filter(
+        (m) =>
+          !m.isDeletedForEveryone &&
+          !m.temp &&
+          getMsgText(m).toLowerCase().includes(q)
+      );
+      setSearchResults(sortDesc(results));
+      setSearching(false);
+    }, 250);
+  };
+
+  const closeSearch = () => {
+    setSearchMode(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearching(false);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   };
 
   const displayData = buildDisplayData(messages);
@@ -733,6 +957,9 @@ const ChatScreen: React.FC = () => {
 
     const isSender = getSenderId(item) === userRef.current?._id;
     const isFailed = item.status === "failed";
+    const repliedTo = getRepliedTo(item);
+    const pinned = isMessagePinned(item);
+    const isHighlighted = highlightedMessageId === item._id;
 
     return (
       <View style={[styles.messageRow, isSender ? styles.rowSender : styles.rowReceiver]}>
@@ -748,6 +975,7 @@ const ChatScreen: React.FC = () => {
               ? styles.senderMessageContainer
               : styles.receiverMessageContainer,
             isFailed && styles.failedMessageContainer,
+            isHighlighted && styles.highlightedMessageContainer,
           ]}
         >
           {item.isDeletedForEveryone ? (
@@ -768,6 +996,33 @@ const ChatScreen: React.FC = () => {
             </View>
           ) : (
             <>
+              {/* 🟢 NEW (Reply feature) — quoted original message preview */}
+              {repliedTo ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => scrollToMessage(idStr(repliedTo))}
+                  style={[
+                    styles.quotedBox,
+                    isSender ? styles.quotedBoxSender : styles.quotedBoxReceiver,
+                  ]}
+                >
+                  <Text
+                    style={[styles.quotedSender, isSender && styles.quotedSenderOnDark]}
+                    numberOfLines={1}
+                  >
+                    {idStr(getSenderId(repliedTo)) === idStr(userRef.current?._id)
+                      ? "You"
+                      : receiverName}
+                  </Text>
+                  <Text
+                    style={[styles.quotedText, isSender && styles.quotedTextOnDark]}
+                    numberOfLines={1}
+                  >
+                    {getReplyPreviewText(repliedTo)}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
               {getMsgImage(item) ? (
                 <TouchableOpacity
                   activeOpacity={0.9}
@@ -807,6 +1062,14 @@ const ChatScreen: React.FC = () => {
               </>
             ) : (
               <>
+                {pinned && (
+                  <Ionicons
+                    name="pin"
+                    size={11}
+                    color={isSender ? "rgba(255,255,255,0.85)" : PRIMARY}
+                    style={{ marginRight: 4 }}
+                  />
+                )}
                 <Text style={[styles.metaText, isSender ? styles.metaTextSender : styles.metaTextReceiver]}>
                   {formatTime(getMsgTime(item))}
                 </Text>
@@ -824,6 +1087,8 @@ const ChatScreen: React.FC = () => {
     ? "typing..."
     : formatPresence(presence.isOnline, presence.lastSeen);
 
+  const latestPinned = pinnedMessages[pinnedMessages.length - 1];
+
   return (
     <>
       <KeyboardAvoidingView
@@ -837,99 +1102,243 @@ const ChatScreen: React.FC = () => {
         // gap between the input box and the keyboard.
         keyboardVerticalOffset={0}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerIconBtn}>
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerCenterWrap}
-            activeOpacity={0.8}
-            onPress={handleOpenContactDetails}
-          >
-            <View style={styles.headerAvatarCircle}>
-              <Text style={styles.headerAvatarInitial}>
-                {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
-              </Text>
-              {presence.isOnline && <View style={styles.onlineDot} />}
-            </View>
-            <View style={styles.headerTextCol}>
-              <View style={styles.headerNameRow}>
-                <Text style={styles.title} numberOfLines={1}>
-                  {receiverName}
-                </Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={16}
-                  color="rgba(255,255,255,0.85)"
-                  style={styles.headerInfoIcon}
-                />
-              </View>
-              {!!headerSubtitle && (
-                <Text
-                  style={[
-                    styles.headerSubtitleText,
-                    isReceiverTyping && styles.headerSubtitleTyping,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {headerSubtitle}
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Chat Area */}
-        {!loading && messages.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubble-ellipses-outline" size={40} color={PRIMARY} />
-            <Text style={styles.emptyTitle}>Say hi 👋</Text>
-            <Text style={styles.emptySubtitle}>No messages yet. Start the conversation below.</Text>
+        {searchMode ? (
+          // 🟢 NEW (Search feature) — replaces the normal header while
+          // active; the underlying FlatList/messages stay mounted, only
+          // this overlay changes.
+          <View style={styles.header}>
+            <TouchableOpacity onPress={closeSearch} style={styles.headerIconBtn}>
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search in conversation"
+              placeholderTextColor="rgba(255,255,255,0.7)"
+              value={searchQuery}
+              onChangeText={handleSearchQueryChange}
+              autoFocus
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => handleSearchQueryChange("")}
+                style={styles.searchClearBtn}
+              >
+                <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.85)" />
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
-          <FlatList
-            data={displayData}
-            renderItem={renderItem}
-            keyExtractor={(item) => item._id}
-            style={styles.chatArea}
-            contentContainerStyle={styles.chatContent}
-            inverted
-            showsVerticalScrollIndicator={false}
-          />
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerIconBtn}>
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerCenterWrap}
+              activeOpacity={0.8}
+              onPress={handleOpenContactDetails}
+            >
+              <View style={styles.headerAvatarCircle}>
+                <Text style={styles.headerAvatarInitial}>
+                  {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
+                </Text>
+                {presence.isOnline && <View style={styles.onlineDot} />}
+              </View>
+              <View style={styles.headerTextCol}>
+                <View style={styles.headerNameRow}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {receiverName}
+                  </Text>
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={16}
+                    color="rgba(255,255,255,0.85)"
+                    style={styles.headerInfoIcon}
+                  />
+                </View>
+                {!!headerSubtitle && (
+                  <Text
+                    style={[
+                      styles.headerSubtitleText,
+                      isReceiverTyping && styles.headerSubtitleTyping,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {headerSubtitle}
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* 🟢 NEW (Search feature) — search entry point in the header */}
+            <TouchableOpacity onPress={() => setSearchMode(true)} style={styles.headerIconBtn}>
+              <Ionicons name="search" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         )}
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.attachButton}
-            onPress={handleAttachPress}
-            disabled={uploading}
-          >
-            <Ionicons
-              name="camera"
-              size={22}
-              color={PRIMARY}
-            />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.messageInput}
-            placeholder="Write a message"
-            placeholderTextColor="#B3A1B2"
-            value={message}
-            onChangeText={handleChangeMessage}
-            multiline
-            onSubmitEditing={handleSendMessage}
+        {searchMode ? (
+          // 🟢 NEW (Search feature) — results list. Reuses the existing
+          // message data/format; not a second persistent message list.
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item._id}
+            style={styles.chatArea}
+            contentContainerStyle={{ paddingVertical: 8 }}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.searchResultRow}
+                onPress={() => {
+                  const id = item._id;
+                  closeSearch();
+                  setTimeout(() => scrollToMessage(id), 80);
+                }}
+              >
+                <Ionicons
+                  name="chatbox-ellipses-outline"
+                  size={18}
+                  color={PRIMARY}
+                  style={{ marginRight: 10 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.searchResultSender}>
+                    {getSenderId(item) === userRef.current?._id ? "You" : receiverName}
+                  </Text>
+                  <Text style={styles.searchResultText} numberOfLines={2}>
+                    {getMsgText(item)}
+                  </Text>
+                  <Text style={styles.searchResultTime}>{formatTime(getMsgTime(item))}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              searchQuery.trim().length === 0 ? null : (
+                <Text style={styles.searchEmptyText}>
+                  {searching ? "Searching..." : "No messages found"}
+                </Text>
+              )
+            }
           />
-          <TouchableOpacity
-            style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-            onPress={handleSendMessage}
-            disabled={!message.trim()}
-          >
-            <Ionicons name="send" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>
+        ) : (
+          <>
+            {/* 🟢 NEW (Pin feature) — banner for the most recently pinned
+                message; tapping it scrolls to that message. */}
+            {latestPinned && (
+              <TouchableOpacity
+                style={styles.pinnedBanner}
+                activeOpacity={0.85}
+                onPress={() => scrollToMessage(idStr(latestPinned._id))}
+              >
+                <Ionicons name="pin" size={16} color={PRIMARY} style={{ marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pinnedBannerLabel}>
+                    {pinnedMessages.length > 1
+                      ? `${pinnedMessages.length} Pinned Messages`
+                      : "Pinned Message"}
+                  </Text>
+                  <Text style={styles.pinnedBannerText} numberOfLines={1}>
+                    {getReplyPreviewText(latestPinned)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#B0B0B0" />
+              </TouchableOpacity>
+            )}
+
+            {/* Chat Area */}
+            {!loading && messages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-ellipses-outline" size={40} color={PRIMARY} />
+                <Text style={styles.emptyTitle}>Say hi 👋</Text>
+                <Text style={styles.emptySubtitle}>No messages yet. Start the conversation below.</Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={displayData}
+                renderItem={renderItem}
+                keyExtractor={(item) => item._id}
+                style={styles.chatArea}
+                contentContainerStyle={styles.chatContent}
+                inverted
+                showsVerticalScrollIndicator={false}
+                onScrollToIndexFailed={(info) => {
+                  // Item not measured yet — retry shortly instead of
+                  // crashing or silently doing nothing.
+                  setTimeout(() => {
+                    flatListRef.current?.scrollToIndex({
+                      index: info.index,
+                      animated: true,
+                      viewPosition: 0.4,
+                    });
+                  }, 250);
+                }}
+              />
+            )}
+
+            {/* 🟢 NEW (Reply feature) — reply preview above composer */}
+            {replyingTo && (
+              <View style={styles.replyPreviewBar}>
+                <View style={styles.replyPreviewAccent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.replyPreviewName} numberOfLines={1}>
+                    {getSenderId(replyingTo) === userRef.current?._id ? "You" : receiverName}
+                  </Text>
+                  <View style={styles.replyPreviewContentRow}>
+                    {getMsgImage(replyingTo) ? (
+                      <Image
+                        source={{ uri: getMsgImage(replyingTo) }}
+                        style={styles.replyPreviewThumb}
+                      />
+                    ) : null}
+                    <Text style={styles.replyPreviewText} numberOfLines={1}>
+                      {getReplyPreviewText(replyingTo)}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setReplyingTo(null)}
+                  style={styles.replyPreviewCloseBtn}
+                >
+                  <Ionicons name="close" size={18} color="#8A8A8A" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <TouchableOpacity
+                style={styles.attachButton}
+                onPress={handleAttachPress}
+                disabled={uploading}
+              >
+                <Ionicons
+                  name="camera"
+                  size={22}
+                  color={PRIMARY}
+                />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Write a message"
+                placeholderTextColor="#B3A1B2"
+                value={message}
+                onChangeText={handleChangeMessage}
+                multiline
+                onSubmitEditing={handleSendMessage}
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
+                onPress={handleSendMessage}
+                disabled={!message.trim()}
+              >
+                <Ionicons name="send" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>
+          </>
+        )}
       </KeyboardAvoidingView>
 
       <Modal
@@ -1184,16 +1593,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // Takes the remaining space next to the back button and centers its
-  // content, with a right margin equal to the back button's width so the
-  // avatar+name group is visually centered across the FULL header width
-  // (not just the leftover space), now that the 3-dot menu is gone.
+  // Sits between the back button and the search button (both fixed-width),
+  // so flex:1 + centered content keeps the avatar+name group visually
+  // centered without needing a manual margin hack.
   headerCenterWrap: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: BACK_BTN_SIZE,
   },
   headerAvatarCircle: {
     width: 34,
@@ -1224,7 +1631,81 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     color: "#FFFFFF",
-    maxWidth: 160,
+    maxWidth: 140,
+  },
+  // 🟢 NEW (Search feature)
+  searchInput: {
+    flex: 1,
+    marginHorizontal: 10,
+    color: "#FFFFFF",
+    fontSize: 15,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.4)",
+  },
+  searchClearBtn: {
+    padding: 4,
+  },
+  searchResultRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchResultSender: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: PRIMARY,
+    marginBottom: 2,
+  },
+  searchResultText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  searchResultTime: {
+    fontSize: 10.5,
+    color: "#9E9E9E",
+    marginTop: 3,
+  },
+  searchEmptyText: {
+    textAlign: "center",
+    color: "#9E9E9E",
+    marginTop: 40,
+    fontSize: 13.5,
+  },
+  // 🟢 NEW (Pin feature)
+  pinnedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 12,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  pinnedBannerLabel: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    color: PRIMARY,
+  },
+  pinnedBannerText: {
+    fontSize: 12.5,
+    color: "#6A6A6A",
+    marginTop: 1,
   },
   chatArea: {
     flex: 1,
@@ -1278,6 +1759,85 @@ const styles = StyleSheet.create({
   },
   failedMessageContainer: {
     opacity: 0.65,
+  },
+  // 🟢 NEW — brief highlight flash when jumping to a message
+  highlightedMessageContainer: {
+    borderWidth: 2,
+    borderColor: "#F4C94C",
+  },
+  // 🟢 NEW (Reply feature) — quoted message box inside a bubble
+  quotedBox: {
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  quotedBoxSender: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderLeftColor: "rgba(255,255,255,0.75)",
+  },
+  quotedBoxReceiver: {
+    backgroundColor: "rgba(120,12,96,0.06)",
+    borderLeftColor: PRIMARY,
+  },
+  quotedSender: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: PRIMARY,
+    marginBottom: 1,
+  },
+  quotedSenderOnDark: {
+    color: "#FFFFFF",
+  },
+  quotedText: {
+    fontSize: 12.5,
+    color: "#5A5A5A",
+  },
+  quotedTextOnDark: {
+    color: "rgba(255,255,255,0.85)",
+  },
+  // 🟢 NEW (Reply feature) — reply preview bar above composer
+  replyPreviewBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E6D4E6",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  replyPreviewAccent: {
+    width: 3,
+    alignSelf: "stretch",
+    backgroundColor: PRIMARY,
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  replyPreviewName: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: PRIMARY,
+  },
+  replyPreviewContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  replyPreviewThumb: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  replyPreviewText: {
+    fontSize: 13,
+    color: "#6A6A6A",
+    flexShrink: 1,
+  },
+  replyPreviewCloseBtn: {
+    padding: 6,
+    marginLeft: 6,
   },
   chatImage: {
     width: 200,
