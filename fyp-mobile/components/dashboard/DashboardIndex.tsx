@@ -1,16 +1,22 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Text, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import Header from './Header';
 //import SearchBar from './SearchBar';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
 import BottomNavigationFinal from './BottomNavigationFinal';
 
+const COLORS = {
+  bg: '#FDF2F8',
+};
 
 const DashboardIndex: React.FC = () => {
   return (
     <View style={styles.container}>
-      <ScrollView>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         <Header />
         <View style={styles.content}>
           <CategoryGrid />
@@ -25,11 +31,15 @@ const DashboardIndex: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8E9F0',
-    paddingTop: 50
+    backgroundColor: COLORS.bg,
+    paddingTop: 50,
+  },
+  scrollContent: {
+    paddingBottom: 110, // keeps content clear of the floating bottom nav
   },
   content: {
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
   },
   welcomeSection: {
     marginBottom: 20,

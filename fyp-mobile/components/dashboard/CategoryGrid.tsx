@@ -1,8 +1,20 @@
 import getAllCategories from '@/services/getAllCategories';
 import { saveSecureData } from '@/store';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const COLORS = {
+  primary: '#6B1E4F',
+  primaryDark: '#4A1436',
+  accent: '#D4A657',
+  bg: '#FDF2F8',
+  card: '#FFFFFF',
+  textDark: '#2B1B26',
+  textMuted: '#8B7688',
+  border: '#F3DCE8',
+};
 
 export interface ICategory {
   _id: string
@@ -14,18 +26,23 @@ export interface ICategory {
 
 const CategoryItem: React.FC<{ item: ICategory }> = ({ item }) => (
   <View style={styles.categoryItem}>
-    <TouchableOpacity style={styles.categoryIcon} accessibilityRole="button"
+    <TouchableOpacity
+      style={styles.categoryTouchable}
+      accessibilityRole="button"
+      activeOpacity={0.75}
       onPress={async () => {
         await saveSecureData("categoryId", item._id);
         await saveSecureData("categoryName", item.name); // Save category name
         router.push("/categoryvendorlisting");
       }}>
-      <Image
-        resizeMode="contain"
-        source={{ uri: item.image }}
-        style={styles.categoryIcon}
-      />
-      <Text style={styles.categoryName}>{item.name}</Text>
+      <View style={styles.categoryIconWrap}>
+        <Image
+          resizeMode="contain"
+          source={{ uri: item.image }}
+          style={styles.categoryIcon}
+        />
+      </View>
+      <Text style={styles.categoryName} numberOfLines={1}>{item.name}</Text>
     </TouchableOpacity>
   </View>
 );
@@ -43,10 +60,16 @@ const CategoryGrid: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Vendor Categories</Text>
+        <View>
+          <Text style={styles.title}>Vendor Categories</Text>
+          <View style={styles.titleAccent} />
+        </View>
         <TouchableOpacity
+          style={styles.seeAllButton}
+          activeOpacity={0.7}
           onPress={() => { router.push("/vendorcategories") }}>
           <Text style={styles.seeAll}>See all</Text>
+          <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
       <FlatList
@@ -55,7 +78,7 @@ const CategoryGrid: React.FC = () => {
         keyExtractor={(item) => item._id}
         numColumns={4}
         columnWrapperStyle={styles.row}
-         scrollEnabled={false}
+        scrollEnabled={false}
       />
     </View>
   );
@@ -63,49 +86,71 @@ const CategoryGrid: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
-    backgroundColor: '#F8E9F0',
+    marginBottom: 22,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignItems: 'flex-start',
+    marginBottom: 18,
   },
-  // title: {
-  //   fontSize: 18,
-  //   fontWeight: '500',
-  //   color: '#000000',
-  // },
   title: {
     fontSize: 18,
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-    paddingRight: 15,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  titleAccent: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.accent,
+    marginTop: 6,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   seeAll: {
-    fontSize: 15,
-    color: '#000000',
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginRight: 2,
   },
   row: {
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   categoryItem: {
     alignItems: 'center',
+    width: '23%',
+  },
+  categoryTouchable: {
+    alignItems: 'center',
+  },
+  categoryIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   categoryIcon: {
-    width: 65,
-    height: 65,
-    borderRadius: 50,
-    marginBottom: 7,
+    width: 34,
+    height: 34,
   },
   categoryName: {
-    fontSize: 9.8,
-    fontWeight: '500',
-    color: '#000000',
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: COLORS.textDark,
     textAlign: 'center',
   },
 });
