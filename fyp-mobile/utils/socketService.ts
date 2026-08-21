@@ -164,7 +164,11 @@ export function listenPresenceUpdate(
 }
 
 export function listenMessageDelivered(
-  cb: (payload: { messageId: string; deliveredAt: string }) => void
+  cb: (payload: {
+    messageId: string;
+    chatId?: string;
+    deliveredAt?: string;
+  }) => void
 ) {
   socket?.on("messageDelivered", cb);
   return () => socket?.off("messageDelivered", cb);

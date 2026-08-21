@@ -82,29 +82,73 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     // socket. Without this we'd have no way to map a bare socket.io
     // connection to a user for presence / delivery checks.
     @SubscribeMessage('registerUser')
-    async handleRegisterUser(client: Socket, payload: { userId: string }) {
-        if (!payload?.userId) return;
-        const { userId } = payload;
+async handleRegisterUser(
+    client: Socket,
+    payload: { userId: string },
+) {
+    if (!payload?.userId) return;
 
-        this.socketUserMap.set(client.id, userId);
-        const wasOffline = !this.isUserOnline(userId);
+    const { userId } = payload;
 
-        if (!this.onlineUsers.has(userId)) this.onlineUsers.set(userId, new Set());
-        this.onlineUsers.get(userId)!.add(client.id);
+    this.socketUserMap.set(client.id, userId);
 
-        // personal room — lets us push presence/notifications straight to a
-        // user without needing to know which of their socket ids to target.
-        client.join(`user:${userId}`);
+    const wasOffline = !this.isUserOnline(userId);
 
-        if (wasOffline) {
-            try {
-                await this.chatService.setUserOnline(userId);
-                await this.broadcastPresence(userId, true, null);
-            } catch (err) {
-                this.logger.error('Failed to persist online presence', err as any);
+    if (!this.onlineUsers.has(userId)) {
+        this.onlineUsers.set(userId, new Set());
+    }
+
+    this.onlineUsers.get(userId)!.add(client.id);
+
+    // Personal room for this user
+    client.join(`user:${userId}`);
+
+    if (wasOffline) {
+        try {
+            // Mark user online
+            await this.chatService.setUserOnline(userId);
+
+            // Notify conversation peers
+            await this.broadcastPresence(
+                userId,
+                true,
+                null,
+            );
+
+            // --------------------------------------------------
+            // IMPORTANT:
+            // Deliver messages that were sent while this user
+            // was offline.
+            // --------------------------------------------------
+            const pendingMessages =
+                await this.chatService.markPendingMessagesDeliveredForUser(
+                    userId,
+                );
+
+            for (const pending of pendingMessages) {
+                // Notify the sender directly.
+                // This works even if sender is not currently inside
+                // the conversation room.
+                this.server
+                    .to(`user:${pending.senderId}`)
+                    .emit('messageDelivered', {
+                        messageId: pending.messageId,
+                        chatId: pending.chatId,
+                        deliveredAt: pending.deliveredAt,
+                    });
             }
+
+            this.logger.log(
+                `User ${userId} came online. Delivered ${pendingMessages.length} pending messages.`,
+            );
+        } catch (err) {
+            this.logger.error(
+                'Failed to process online presence / pending delivery',
+                err as any,
+            );
         }
     }
+}
 
     private isUserOnline(userId: string): boolean {
         return this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0;

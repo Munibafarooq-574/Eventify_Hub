@@ -323,15 +323,30 @@ const ChatScreen: React.FC = () => {
 
     // 🔵 NEW (Phase 7.1): a message I sent just reached the receiver's device.
     const offDelivered = listenMessageDelivered((payload) => {
-      if (!isMounted || !payload?.messageId) return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m._id === payload.messageId && (m.status === "sent" || m.status === "sending")
-            ? { ...m, status: "delivered" }
-            : m
-        )
-      );
-    });
+  if (!isMounted || !payload?.messageId) return;
+
+  // Ignore delivery events belonging to another conversation.
+  if (
+    payload.chatId &&
+    payload.chatId !== chatIdRef.current
+  ) {
+    return;
+  }
+
+  setMessages((prev) =>
+    prev.map((m) =>
+      m._id === payload.messageId &&
+      (m.status === "sent" || m.status === "sending")
+        ? {
+            ...m,
+            status: "delivered",
+            deliveredAt:
+              payload.deliveredAt ?? m.deliveredAt,
+          }
+        : m
+    )
+  );
+});
 
     // 🔵 NEW (Phase 7.1): typing indicator for the person we're chatting with
     const offTyping = listenTypingStatus((payload) => {

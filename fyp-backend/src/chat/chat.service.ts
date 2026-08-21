@@ -330,25 +330,64 @@ export class ChatService {
     }
 
     // ---- Delivered / Seen ----
-    async markMessageDelivered(messageId: string, deliveredAt: Date): Promise<void> {
-        await this.messageModel.updateOne(
-            { _id: messageId, deliveredAt: null },
-            { $set: { deliveredAt } },
-        );
+
+async markMessageDelivered(messageId: string, deliveredAt: Date): Promise<void> {
+    await this.messageModel.updateOne(
+        { _id: messageId, deliveredAt: null },
+        { $set: { deliveredAt } },
+    );
+}
+
+// Mark all pending messages as delivered when the receiver comes online
+async markPendingMessagesDeliveredForUser(receiverId: string) {
+    const deliveredAt = new Date();
+
+    const messages = await this.messageModel
+        .find({
+            receiverId,
+            deliveredAt: null,
+            isDeletedForEveryone: { $ne: true },
+        })
+        .select('_id senderId chatId')
+        .lean();
+
+    if (!messages.length) {
+        return [];
     }
 
-    async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
-        await this.messageModel.updateMany(
-            { _id: { $in: messageIds } },
-            [
-                {
-                    $set: {
-                        isRead: true,
-                        seenAt,
-                        deliveredAt: { $ifNull: ['$deliveredAt', seenAt] },
-                    },
+    const messageIds = messages.map((message) => message._id);
+
+    await this.messageModel.updateMany(
+        {
+            _id: { $in: messageIds },
+        },
+        {
+            $set: {
+                deliveredAt,
+            },
+        },
+    );
+
+    return messages.map((message) => ({
+        messageId: message._id.toString(),
+        senderId: message.senderId.toString(),
+        chatId: message.chatId.toString(),
+        deliveredAt,
+    }));
+}
+
+async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
+    await this.messageModel.updateMany(
+        { _id: { $in: messageIds } },
+        [
+            {
+                $set: {
+                    isRead: true,
+                    seenAt,
+                    deliveredAt: { $ifNull: ['$deliveredAt', seenAt] },
                 },
-            ] as any,
-        );
-    }
+            },
+        ] as any,
+    );
+}
 }
