@@ -149,17 +149,30 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         // 🔵 NEW: if the receiver already has an active socket connection,
         // the message counts as "delivered" the instant it's broadcast.
         if (this.isUserOnline(payload.receiverId)) {
-            const deliveredAt = new Date();
-            await this.chatService.markMessageDelivered(message._id.toString(), deliveredAt);
-            message.deliveredAt = deliveredAt;
-            this.server.to(payload.chatId).emit('messageDelivered', {
-                messageId: message._id,
-                deliveredAt,
-            });
-        }
+    const deliveredAt = new Date();
 
-        // Emit message to all users in the same conversation
-        this.server.to(payload.chatId).emit('newMessage', message);
+    await this.chatService.markMessageDelivered(
+        message._id.toString(),
+        deliveredAt,
+    );
+
+    message.deliveredAt = deliveredAt;
+}
+
+// Emit message to all users in the same conversation
+this.server.to(payload.chatId).emit('newMessage', message);
+
+this.logger.log(
+    `Delivery check: receiver=${payload.receiverId}, online=${this.isUserOnline(payload.receiverId)}`
+);
+
+// If receiver is online, also notify sender that the message was delivered
+if (this.isUserOnline(payload.receiverId)) {
+    this.server.to(payload.chatId).emit('messageDelivered', {
+        messageId: message._id.toString(),
+        deliveredAt: message.deliveredAt,
+    });
+    }
     }
 
     // User joins a conversation

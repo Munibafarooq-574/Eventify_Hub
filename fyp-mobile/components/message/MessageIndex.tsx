@@ -83,7 +83,11 @@ const dedupeById = (arr: any[]) => {
   }
   return out;
 };
-
+const deriveStatus = (m: any): "sent" | "delivered" | "seen" => {
+  if (m?.seenAt) return "seen";
+  if (m?.deliveredAt) return "delivered";
+  return "sent";
+};
 const formatTime = (iso: string) => {
   const d = new Date(iso);
   let h = d.getHours();
@@ -285,9 +289,9 @@ const ChatScreen: React.FC = () => {
             delete pendingTimeouts.current[tempId];
           }
           updated = [...prev];
-          updated[matchIndex] = { ...incoming, status: "delivered" };
+          updated[matchIndex] = { ...incoming, status: deriveStatus(incoming) };
         } else {
-          updated = [{ ...incoming, status: "delivered" }, ...prev];
+          updated = [{ ...incoming, status: deriveStatus(incoming) }, ...prev];
         }
         return sortDesc(dedupeById(updated));
       });
@@ -385,8 +389,8 @@ const ChatScreen: React.FC = () => {
         );
         if (!isMounted) return;
         const loaded = sortDesc(
-          dedupeById((messagesData || []).map((m: any) => ({ ...m, status: "delivered" })))
-        );
+  dedupeById((messagesData || []).map((m: any) => ({ ...m, status: deriveStatus(m) })))
+);
         setMessages(loaded);
         markVisibleMessagesSeen(loaded);
 
