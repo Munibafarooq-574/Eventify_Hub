@@ -1,18 +1,20 @@
+// fyp-backend/src/chat/chat.controller.ts
 
-
-// src/chat/conversation.controller.ts
 import {
+  BadRequestException,
   Controller,
-  Post,
-  Param,
   Get,
+  Param,
+  Post,
   Query,
-  UseInterceptors,
   UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+
 import { FileInterceptor } from '@nestjs/platform-express';
+
 import { ChatService } from './chat.service';
-//import { chatImageStorage, imageFileFilter } from './multer.config';
+
 import {
   chatImageStorage,
   imageFileFilter,
@@ -21,83 +23,13 @@ import {
 
 @Controller('chat')
 export class ChatController {
-  constructor(private chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService) {}
 
-  @Post(':userId/:vendorId')
-  async createOrGetConversation(
-    @Param('userId') userId: string,
-    @Param('vendorId') vendorId: string,
-  ) {
-    const chatId = await this.chatService.createOrGetConversation(
-      userId,
-      vendorId,
-    );
-    return { chatId };
-  }
+  // ============================================================
+  // IMAGE UPLOAD
+  // IMPORTANT: Keep static routes BEFORE :userId/:vendorId
+  // ============================================================
 
-  // API to get conversation list for a user
-  @Get(':userId')
-  async getConversationList(@Param('userId') userId: string) {
-    const conversations = await this.chatService.getUserConversations(userId);
-    return { conversations };
-  }
-
-  // Get all messages in a conversation
-  @Get('messages/:chatId')
-  async getConversationMessages(
-    @Param('chatId') chatId: string,
-    @Query('userId') userId: string,
-  ) {
-    const messages = await this.chatService.getConversationMessages(
-      chatId,
-      userId,
-    );
-
-    return { messages };
-  }
-
-  // 🟢 NEW (Search feature) — conversation-scoped, case-insensitive text
-  // search. Kept under /chat/conversations/:chatId/... to match the
-  // existing controller's route conventions rather than a flat path.
-  @Get('conversations/:chatId/messages/search')
-  async searchMessages(
-    @Param('chatId') chatId: string,
-    @Query('q') q: string,
-    @Query('userId') userId: string,
-  ) {
-    const results = await this.chatService.searchMessages(
-      chatId,
-      userId,
-      q || '',
-    );
-    return { results };
-  }
-
-  // 🟢 NEW (Pin feature) — initial snapshot of pinned messages for a
-  // conversation. Live pin/unpin updates travel over the socket
-  // ('messagePinned' / 'messageUnpinned'), mirroring how delete already
-  // works (REST for the initial load, socket for live updates).
-  @Get('conversations/:chatId/pinned')
-  async getPinnedMessages(
-    @Param('chatId') chatId: string,
-    @Query('userId') userId: string,
-  ) {
-    const pinnedMessages = await this.chatService.getPinnedMessages(
-      chatId,
-      userId,
-    );
-    return { pinnedMessages };
-  }
-
-  // 🔵 NEW (Phase 7.1): initial online/last-seen snapshot when a chat
-  // screen first opens — after this, live updates come over the socket
-  // via 'presenceUpdated' / 'userOnline' / 'userOffline'.
-  @Get('presence/:userId')
-  async getPresence(@Param('userId') userId: string) {
-    return this.chatService.getUserPresence(userId);
-  }
-
-  // Upload chat image
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('image', {
@@ -108,24 +40,175 @@ export class ChatController {
       },
     }),
   )
-  async uploadChatImage(@UploadedFile() file: Express.Multer.File) {
+  async uploadChatImage(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+
     const imageUrl = `/public/uploads/chat/${file.filename}`;
-    return { imageUrl };
+
+    console.log('IMAGE UPLOAD CONTROLLER:', imageUrl);
+
+    return {
+      imageUrl,
+    };
   }
 
-  // Upload chat video
-@Post('upload/video')
-@UseInterceptors(
-  FileInterceptor('video', {
-    storage: chatImageStorage,
-    fileFilter: videoFileFilter,
-    limits: {
-      fileSize: 50 * 1024 * 1024, // 50MB
-    },
-  }),
-)
-async uploadChatVideo(@UploadedFile() file: Express.Multer.File) {
-  const videoUrl = `/public/uploads/chat/${file.filename}`;
-  return { videoUrl };
-}
+  // ============================================================
+  // VIDEO UPLOAD
+  // IMPORTANT: This MUST be before :userId/:vendorId
+  // ============================================================
+
+  @Post('upload/video')
+  @UseInterceptors(
+    FileInterceptor('video', {
+      storage: chatImageStorage,
+      fileFilter: videoFileFilter,
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB
+      },
+    }),
+  )
+  async uploadChatVideo(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Video file is required');
+    }
+
+    const videoUrl = `/public/uploads/chat/${file.filename}`;
+
+    console.log('VIDEO UPLOAD CONTROLLER:', videoUrl);
+    console.log('VIDEO FILE:', {
+      filename: file.filename,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
+    return {
+      videoUrl,
+    };
+  }
+
+  // ============================================================
+  // CREATE / GET CONVERSATION
+  // ============================================================
+  // IMPORTANT:
+  // This dynamic route MUST come AFTER:
+  // /upload
+  // /upload/video
+  //
+  // Otherwise:
+  // POST /chat/upload/video
+  // can be interpreted as:
+  // userId = "upload"
+  // vendorId = "video"
+  // ============================================================
+
+  @Post(':userId/:vendorId')
+  async createOrGetConversation(
+    @Param('userId') userId: string,
+    @Param('vendorId') vendorId: string,
+  ) {
+    const chatId = await this.chatService.createOrGetConversation(
+      userId,
+      vendorId,
+    );
+
+    return {
+      chatId,
+    };
+  }
+
+  // ============================================================
+  // GET CONVERSATION LIST
+  // ============================================================
+
+  @Get(':userId')
+  async getConversationList(
+    @Param('userId') userId: string,
+  ) {
+    const conversations =
+      await this.chatService.getUserConversations(userId);
+
+    return {
+      conversations,
+    };
+  }
+
+  // ============================================================
+  // GET ALL MESSAGES IN A CONVERSATION
+  // ============================================================
+
+  @Get('messages/:chatId')
+  async getConversationMessages(
+    @Param('chatId') chatId: string,
+    @Query('userId') userId: string,
+  ) {
+    const messages =
+      await this.chatService.getConversationMessages(
+        chatId,
+        userId,
+      );
+
+    return {
+      messages,
+    };
+  }
+
+  // ============================================================
+  // SEARCH MESSAGES
+  // ============================================================
+
+  @Get('conversations/:chatId/messages/search')
+  async searchMessages(
+    @Param('chatId') chatId: string,
+    @Query('q') q: string,
+    @Query('userId') userId: string,
+  ) {
+    const results =
+      await this.chatService.searchMessages(
+        chatId,
+        userId,
+        q || '',
+      );
+
+    return {
+      results,
+    };
+  }
+
+  // ============================================================
+  // GET PINNED MESSAGES
+  // ============================================================
+
+  @Get('conversations/:chatId/pinned')
+  async getPinnedMessages(
+    @Param('chatId') chatId: string,
+    @Query('userId') userId: string,
+  ) {
+    const pinnedMessages =
+      await this.chatService.getPinnedMessages(
+        chatId,
+        userId,
+      );
+
+    return {
+      pinnedMessages,
+    };
+  }
+
+  // ============================================================
+  // GET USER PRESENCE
+  // ============================================================
+
+  @Get('presence/:userId')
+  async getPresence(
+    @Param('userId') userId: string,
+  ) {
+    return this.chatService.getUserPresence(userId);
+  }
 }

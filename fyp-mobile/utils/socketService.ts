@@ -1,11 +1,5 @@
 // fyp-mobile/utils/socketService.ts
-//
-// Single source of truth for the app's socket.io connection. Every screen
-// that needs sockets (ChatScreen, MessagesScreen, ...) goes through the
-// functions exported here instead of calling `io(...)` directly — this is
-// what guarantees only ONE socket connection exists at a time, and gives us
-// one place to clean up listeners instead of scattering `.off()` calls
-// across components.
+
 
 import { io, Socket } from "socket.io-client";
 
@@ -14,11 +8,6 @@ const SOCKET_URL = "https://eventify-hub.onrender.com";
 let socket: Socket | null = null;
 let currentUserId: string | null = null;
 
-/**
- * Creates the socket connection if one doesn't already exist, and returns
- * it. Safe to call from multiple screens — it will never open a second
- * connection.
- */
 export function connectSocket(): Socket {
   if (socket) return socket;
 
