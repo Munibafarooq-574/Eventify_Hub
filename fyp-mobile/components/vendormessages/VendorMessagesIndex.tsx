@@ -20,6 +20,7 @@ import {
     onNewMessage,
     onMessageDeletedForEveryone,
     listenPresenceUpdate,
+     listenTypingStatus,
 } from '@/utils/socketService';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 
@@ -106,6 +107,7 @@ const MessagesScreen: React.FC = () => {
     const [unreadOverrides, setUnreadOverrides] = useState<Record<string, number>>({});
     // 🔵 NEW (Phase 7.1): userId -> isOnline, updated live over the socket.
     const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
+    const [typingMap, setTypingMap] = useState<Record<string, boolean>>({});
     const overridesRef = useRef<Record<string, number>>({});
     const myUserIdRef = useRef<string>("");
 
@@ -129,29 +131,46 @@ const MessagesScreen: React.FC = () => {
             const data = (await getConversationList(user._id)) || [];
 
             setConversations((prevConvos) => {
-                const prevMap = new Map(prevConvos.map((c) => [c.chatId, c]));
+    const prevMap = new Map(prevConvos.map((c) => [c.chatId, c]));
 
-                return data.map((c: any) => {
-                    const prev = prevMap.get(c.chatId);
+    const merged = data.map((c: any) => {
+        const prev = prevMap.get(c.chatId);
 
-                    if (prev?.lastMessage && hasImage(prev.lastMessage)) {
-                        const prevTime = new Date(getMsgTime(prev.lastMessage)).getTime();
+        if (prev?.lastMessage && hasImage(prev.lastMessage)) {
+            const prevTime = new Date(
+                getMsgTime(prev.lastMessage)
+            ).getTime();
 
-                        const freshTime = c.lastMessage
-                            ? new Date(getMsgTime(c.lastMessage)).getTime()
-                            : 0;
+            const freshTime = c.lastMessage
+                ? new Date(getMsgTime(c.lastMessage)).getTime()
+                : 0;
 
-                        if (prevTime >= freshTime) {
-                            return {
-                                ...c,
-                                lastMessage: prev.lastMessage,
-                            };
-                        }
-                    }
+            if (prevTime >= freshTime) {
+                return {
+                    ...c,
+                    lastMessage: prev.lastMessage,
+                };
+            }
+        }
 
-                    return c;
-                });
-            });
+        return c;
+    });
+
+    // Most recent chat first
+    merged.sort((a: any, b: any) => {
+        const aTime = a.lastMessage
+            ? new Date(getMsgTime(a.lastMessage)).getTime()
+            : 0;
+
+        const bTime = b.lastMessage
+            ? new Date(getMsgTime(b.lastMessage)).getTime()
+            : 0;
+
+        return bTime - aTime;
+    });
+
+    return merged;
+});
 
             // Seed initial online state from whatever the backend returned
             // on the participant doc (isOnline is now part of the User
@@ -263,10 +282,28 @@ const MessagesScreen: React.FC = () => {
             setOnlineMap((prev) => ({ ...prev, [payload.userId]: payload.isOnline }));
         });
 
+        const offTyping = listenTypingStatus((payload) => {
+    // payload: { userId, chatId, isTyping }
+
+    if (!payload?.chatId) return;
+
+    setTypingMap((prev) => {
+        if (prev[payload.chatId] === payload.isTyping) {
+            return prev;
+        }
+
+        return {
+            ...prev,
+            [payload.chatId]: payload.isTyping,
+        };
+    });
+});
+
         return () => {
             offNewMessage();
             offDeleted();
             offPresence();
+            offTyping();
             // NOTE: socket is shared app-wide — do not disconnect here.
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -302,6 +339,7 @@ const MessagesScreen: React.FC = () => {
         const participant = item.participants?.[0] || {};
         const unread = unreadOverrides[item.chatId] ?? Number(item.unreadCount) ?? 0;
         const isOnline = participant._id ? !!onlineMap[participant._id] : false;
+        const isTyping = !!typingMap[item.chatId];
 
         return (
             <TouchableOpacity
@@ -332,17 +370,20 @@ const MessagesScreen: React.FC = () => {
                             )}
 
                         <Text
-                            style={[
-                                styles.subtitle,
-                                unread > 0 && styles.subtitleUnread,
-                                isDeleted(item.lastMessage) && styles.subtitleDeleted,
-                            ]}
-                            numberOfLines={1}
-                        >
-                            {item.lastMessage
-                                ? getMsgPreview(item.lastMessage)
-                                : "No messages yet"}
-                        </Text>
+    style={[
+        styles.subtitle,
+        unread > 0 && styles.subtitleUnread,
+        isDeleted(item.lastMessage) && styles.subtitleDeleted,
+        isTyping && styles.subtitleTyping,
+    ]}
+    numberOfLines={1}
+>
+    {isTyping
+        ? "typing..."
+        : item.lastMessage
+        ? getMsgPreview(item.lastMessage)
+        : "No messages yet"}
+</Text>
                     </View>
                 </View>
                 <View style={styles.rightContainer}>
@@ -520,6 +561,11 @@ const styles = StyleSheet.create({
         fontStyle: "italic",
         color: "#9E9E9E",
     },
+    subtitleTyping: {
+    color: PRIMARY,
+    fontStyle: "italic",
+    fontWeight: "600",
+},
     rightContainer: {
         alignItems: 'flex-end',
     },
