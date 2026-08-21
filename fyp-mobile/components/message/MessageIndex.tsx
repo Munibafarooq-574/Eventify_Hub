@@ -8,6 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system/legacy";
 import uploadChatImage from "@/services/uploadChatImage";
+import uploadChatVideo from "@/services/uploadChatVideo";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
@@ -52,7 +53,7 @@ import {
   listenMessageSeen,
   type PinDuration,
 } from "@/utils/socketService";
-import uploadChatVideo from "@/services/uploadChatVideo";
+
 
 const PRIMARY = "#780C60";
 const PRIMARY_DARK = "#5C0949";
@@ -76,10 +77,6 @@ const getSenderId = (m: any) => {
   return typeof s === "object" && s !== null ? s._id : s;
 };
 
-// Normalizes an id whether it arrives as a raw string or a populated
-// object ({ _id: ... }) — used for reply/pin comparisons where the same
-// field can be either shape depending on where the data came from
-// (optimistic snapshot vs. server-populated payload).
 const idStr = (id: any): string => {
   if (!id) return "";
   if (typeof id === "object") return String(id._id ?? id.id ?? "");
@@ -155,8 +152,6 @@ const dateLabel = (iso: string) => {
     year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
   });
 };
-
-// 🔵 NEW (Phase 7.1) — WhatsApp-style "Online" / "Last seen ..." header text.
 const formatPresence = (isOnline: boolean, lastSeen: string | null): string => {
   if (isOnline) return "Online";
   if (!lastSeen) return "";
@@ -175,16 +170,8 @@ const formatPresence = (isOnline: boolean, lastSeen: string | null): string => {
   if (sameDay(d, yesterday)) return `Last seen yesterday at ${time}`;
   return `Last seen ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
 };
-
-// 🟢 NEW (Reply feature) — reads the replied-to reference off a message,
-// whichever shape it happens to be in:
-//  - populated object from the server (normal case)
-//  - a lightweight local snapshot we attach to optimistic messages
-//  - null/undefined for ordinary messages (the overwhelming majority)
 const getRepliedTo = (m: any) => m?.repliedToMessageId ?? null;
 
-// Safe preview text for a quoted/replied message. Handles the "original
-// message no longer exists / was deleted" cases without ever crashing.
 const getReplyPreviewText = (r: any) => {
   if (!r) return "Message deleted";
   if (r?.isDeletedForEveryone) return "This message was deleted";
@@ -193,12 +180,6 @@ const getReplyPreviewText = (r: any) => {
   const text = getMsgText(r);
   return text ? text : "Message";
 };
-
-// Builds the array actually fed to the (inverted) FlatList, inserting date
-// separators at the right spots. Logic is built in normal chronological
-// (oldest -> newest) order first, then reversed once at the end, because
-// reasoning about "above/below" is far less error-prone that way than trying
-// to insert separators directly into a descending / inverted array.
 const buildDisplayData = (messagesDesc: any[]) => {
   const asc = [...messagesDesc].reverse(); // oldest -> newest
   const out: any[] = [];
@@ -214,18 +195,32 @@ const buildDisplayData = (messagesDesc: any[]) => {
   return out.reverse(); // back to newest -> oldest for inverted list
 };
 
-const ChatVideoBubble: React.FC<{ uri: string; onExpand: () => void }> = ({ uri, onExpand }) => {
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = false;
+const ChatVideoBubble: React.FC<{
+  uri: string;
+  onExpand?: () => void;
+}> = ({ uri, onExpand }) => {
+  const player = useVideoPlayer(uri, (player) => {
+    player.loop = false;
+    player.play();
   });
+
+  useEffect(() => {
+    console.log("CHAT VIDEO URI:", uri);
+  }, [uri]);
+
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onExpand} style={styles.chatImage}>
+    <TouchableOpacity
+      activeOpacity={0.95}
+      onPress={onExpand}
+      style={styles.chatVideoContainer}
+    >
       <VideoView
-        style={{ width: "100%", height: "100%", borderRadius: 12 }}
         player={player}
+        style={styles.chatVideo}
+        nativeControls
         allowsFullscreen
         allowsPictureInPicture
-        nativeControls
+        contentFit="contain"
       />
     </TouchableOpacity>
   );
@@ -250,65 +245,36 @@ const ChatScreen: React.FC = () => {
     lastSeen: null,
   });
   const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-
-  // 🟢 NEW (Reply feature) — message currently being replied to, shown in
-  // the composer preview. Null when not replying.
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [messageOptionsVisible, setMessageOptionsVisible] = useState(false);
 const [selectedMessage, setSelectedMessage] = useState<any>(null);
-
-  // 🟢 NEW (Search feature)
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
-
-  // 🟢 NEW (Pin feature)
   const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
-
-  // Pin duration feature
 const [pinDurationModalVisible, setPinDurationModalVisible] = useState(false);
 const [pinTargetMessage, setPinTargetMessage] = useState<any>(null);
 const [selectedPinDuration, setSelectedPinDuration] =
   useState<PinDuration>("24h");
-
 const [, forcePinTick] = useState(0);
-
 useEffect(() => {
   const id = setInterval(() => {
     forcePinTick((t) => t + 1);
   }, 60000);
-
   return () => clearInterval(id);
 }, []);
-  // Briefly highlights a message after jumping to it (from a quoted reply,
-  // a search result, or the pinned banner) so the user can actually spot it.
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-
-  // Refs mirror state so socket event handlers (registered once, on mount)
-  // always read the LATEST values instead of a stale closure from the first
-  // render. This was the root cause of messages getting stuck on
-  // "Sending..." until the screen was re-opened: on reconnect, the old code
-  // re-joined the room using chatId="" captured at mount time, so the client
-  // silently stopped receiving broadcasts for the real room.
   const chatIdRef = useRef<string>("");
   const receiverIdRef = useRef<string>("");
   const userRef = useRef<any>(null);
   const pendingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const seenMessageIdsRef = useRef<Set<string>>(new Set()); // avoid re-emitting messageSeen for the same id
   const router = useRouter();
-
-  // 🟢 NEW — kept in sync with `messages` so socket callbacks (registered
-  // once on mount) and scroll helpers can read the latest list without
-  // needing to be re-created every render.
   const messagesRef = useRef<any[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  // 🟢 NEW — reused by quoted-reply taps, search-result taps, and the
-  // pinned banner. Only scrolls within what's already loaded in the
-  // existing FlatList/data — no second list is introduced.
   const flatListRef = useRef<FlatList<any>>(null);
 
   const findMessageIndex = useCallback((messageId: string) => {
@@ -330,8 +296,6 @@ useEffect(() => {
       try {
         flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.4 });
       } catch {
-        // Fall back safely rather than crashing if the list can't resolve
-        // the index yet (e.g. still measuring items).
         flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }
       setHighlightedMessageId(messageId);
@@ -373,10 +337,6 @@ useEffect(() => {
     },
     [scheduleFailureCheck]
   );
-
-  // Marks any currently-loaded messages from the other person as seen. Only
-  // called while this screen is mounted and visible, matching the "only
-  // when receiver is currently viewing" requirement.
   const markVisibleMessagesSeen = useCallback((msgs: any[]) => {
     if (!userRef.current || !chatIdRef.current) return;
     const unseenIds = msgs
@@ -397,13 +357,11 @@ useEffect(() => {
   useEffect(() => {
     let isMounted = true;
     const socket = connectSocket();
-
     const handleConnect = () => {
       // Always re-join using the CURRENT chatId (via ref), not a stale one.
       if (chatIdRef.current) {
         joinConversation(chatIdRef.current, userRef.current?._id);
       }
-
       // Flush anything that never made it out because the socket was down.
       setMessages((prev) => {
         const stuck = prev.filter(
@@ -427,7 +385,6 @@ useEffect(() => {
       setMessages((prev) => {
         if (prev.some((m) => m._id === incoming._id)) return prev;
 
-        // Reconcile with an optimistic message we already added locally.
         const matchIndex = prev.findIndex(
           (m) =>
             m.temp &&
@@ -466,8 +423,6 @@ useEffect(() => {
         prev.map((m) => {
           const isMine = getSenderId(m) === userRef.current?._id;
           if (!isMine) return m;
-          // If specific messageIds were included, only flip those; otherwise
-          // (join-based event) flip every delivered message from me.
           if (payload.messageIds && payload.messageIds.length) {
             return payload.messageIds.includes(m._id) ? { ...m, status: "seen" } : m;
           }
@@ -475,11 +430,9 @@ useEffect(() => {
         })
       );
     });
-
     // 🔵 NEW (Phase 7.1): a message I sent just reached the receiver's device.
     const offDelivered = listenMessageDelivered((payload) => {
   if (!isMounted || !payload?.messageId) return;
-
   // Ignore delivery events belonging to another conversation.
   if (
     payload.chatId &&
@@ -487,7 +440,6 @@ useEffect(() => {
   ) {
     return;
   }
-
   setMessages((prev) =>
     prev.map((m) =>
       m._id === payload.messageId &&
@@ -502,16 +454,12 @@ useEffect(() => {
     )
   );
 });
-
-    // 🔵 NEW (Phase 7.1): typing indicator for the person we're chatting with
     const offTyping = listenTypingStatus((payload) => {
       if (!isMounted) return;
       if (payload.chatId !== chatIdRef.current) return;
       if (payload.userId !== receiverIdRef.current) return;
       setIsReceiverTyping(payload.isTyping);
     });
-
-    // 🔵 NEW (Phase 7.1): live online/offline updates for the receiver
     const offPresence = listenPresenceUpdate((payload) => {
       if (!isMounted) return;
       if (payload.userId !== receiverIdRef.current) return;
@@ -526,10 +474,6 @@ useEffect(() => {
         )
       );
     });
-
-    // 🟢 NEW (Pin feature) — real-time pin/unpin from either participant.
-    // Registered/cleaned up alongside every other listener; does not touch
-    // typing, presence, delivery, or seen listeners.
     const offMessagePinned = onMessagePinned((payload) => {
   if (!isMounted || payload.chatId !== chatIdRef.current) return;
 
@@ -581,9 +525,6 @@ useEffect(() => {
 
         if (!isMounted) return;
         setReceiverName(rName);
-
-        // Tell the backend who owns this socket (presence) and fetch the
-        // receiver's current online/last-seen snapshot.
         registerUser(user._id);
         if (rId) {
           getUserPresence(rId).then((p) => {
@@ -640,15 +581,10 @@ useEffect(() => {
         emitTypingStop(chatIdRef.current, userRef.current._id);
       }
       Object.values(pendingTimeouts.current).forEach(clearTimeout);
-      // NOTE: we intentionally do NOT disconnectSocket() here — the socket
-      // is shared app-wide (single instance) and other screens (e.g. the
-      // conversation list) may still need it.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 🔵 NEW (Phase 7.1): typing indicator — debounce lives inside socketService,
-  // this just forwards every keystroke to it.
   const handleChangeMessage = (text: string) => {
     setMessage(text);
     if (!userRef.current || !chatIdRef.current) return;
@@ -660,9 +596,6 @@ useEffect(() => {
     }
   };
 
-  // 🟢 NEW (Reply feature) — builds the small snapshot we attach to
-  // optimistic messages so the quoted preview renders instantly, before
-  // the server round-trip comes back with the populated version.
     const buildReplySnapshot = (original: any) =>
     original
       ? {
@@ -750,48 +683,77 @@ useEffect(() => {
   };
 
     const sendVideoMessage = async (videoUri: string) => {
-    if (!userRef.current) return;
-    setUploading(true);
-    const replySnapshot = buildReplySnapshot(replyingTo);
-    const replyId = replyingTo?._id ?? null;
-    try {
-      const remoteUrl = await uploadChatVideo(videoUri);
+  if (!userRef.current) return;
 
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const now = new Date().toISOString();
-      const optimisticMsg = {
-        _id: tempId,
-        chatId: chatIdRef.current,
-        senderId: userRef.current._id,
-        message: "",
-        content: "",
-        videoUrl: remoteUrl,
-        timestamp: now,
-        createdAt: now,
-        temp: true,
-        status: "sending" as const,
-        repliedToMessageId: replySnapshot,
-      };
+  setUploading(true);
 
-      setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
-      setReplyingTo(null);
+  const replySnapshot = buildReplySnapshot(replyingTo);
+  const replyId = replyingTo?._id ?? null;
 
-      sendChatMessage({
-        user: userRef.current._id,
-        receiverId: receiverIdRef.current,
-        chatId: chatIdRef.current,
-        content: "",
-        videoUrl: remoteUrl,
-        repliedToMessageId: replyId || undefined,
-      });
-      setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
-      scheduleFailureCheck(tempId);
-    } catch (error) {
-      Alert.alert("Upload failed", "Could not send video. Please try again.");
-    } finally {
-      setUploading(false);
+  try {
+    const remoteUrl = await uploadChatVideo(videoUri);
+
+    if (!remoteUrl) {
+      throw new Error("Video upload did not return a URL");
     }
-  };
+
+    console.log("VIDEO UPLOAD SUCCESS:", remoteUrl);
+
+    const tempId = `temp-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+
+    const now = new Date().toISOString();
+
+    const optimisticMsg = {
+      _id: tempId,
+      chatId: chatIdRef.current,
+      senderId: userRef.current._id,
+      message: "",
+      content: "",
+      videoUrl: remoteUrl,
+      timestamp: now,
+      createdAt: now,
+      temp: true,
+      status: "sending" as const,
+      repliedToMessageId: replySnapshot,
+    };
+
+    setMessages((prev) =>
+      sortDesc([optimisticMsg, ...prev])
+    );
+
+    setReplyingTo(null);
+
+    sendChatMessage({
+      user: userRef.current._id,
+      receiverId: receiverIdRef.current,
+      chatId: chatIdRef.current,
+      content: "",
+      videoUrl: remoteUrl,
+      repliedToMessageId: replyId || undefined,
+    });
+
+    setMessages((prev) =>
+      prev.map((m) =>
+        m._id === tempId
+          ? { ...m, status: "sent" }
+          : m
+      )
+    );
+
+    scheduleFailureCheck(tempId);
+  } catch (error) {
+    console.error("VIDEO SEND ERROR:", error);
+
+    Alert.alert(
+      "Upload failed",
+      "Could not send video. Please try again."
+    );
+  } finally {
+    setUploading(false);
+  }
+};
 
   const handleDownloadImage = async () => {
     if (!viewerUri) return;
@@ -902,20 +864,28 @@ useEffect(() => {
   };
 
     const openVideoPicker = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Gallery access is required to send videos.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      quality: 1,
-      videoMaxDuration: 60,
-    });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      sendVideoMessage(result.assets[0].uri);
-    }
-  };
+  const { status } =
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (status !== "granted") {
+    Alert.alert(
+      "Permission needed",
+      "Gallery access is required to send videos."
+    );
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+    allowsEditing: false,
+    quality: 1,
+    videoMaxDuration: 60,
+  });
+
+  if (!result.canceled && result.assets?.[0]?.uri) {
+    await sendVideoMessage(result.assets[0].uri);
+  }
+};
 
   const handleRetry = (msg: any) => {
     setMessages((prev) =>
@@ -965,13 +935,10 @@ useEffect(() => {
     );
   };
 
-  // 🟢 NEW (Reply feature)
   const handleReplyToMessage = (item: any) => {
     setReplyingTo(item);
   };
 
-  // 🟢 NEW (Pin feature) — optimistic pin/unpin with revert-on-failure via
-  // the 'pinError' event (see socketService.onPinError, wired below).
   const isMessagePinned = useCallback(
     (item: any) => pinnedMessages.some((p) => idStr(p._id) === idStr(item._id)),
     [pinnedMessages]
@@ -1067,13 +1034,6 @@ const handleMessageOption = (
     handleDeleteForEveryone(item);
   }
 };
-
-  // 🟢 NEW (Search feature) — searches the already-loaded `messages` array
-  // instead of hitting the network on every keystroke. The conversation is
-  // fully loaded when the screen opens, so this reuses that data (a
-  // conversation-scoped backend search endpoint also exists — see
-  // services/searchConversationMessages.ts — for when that assumption no
-  // longer holds, e.g. once pagination is introduced).
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchQueryChange = (text: string) => {
@@ -1221,14 +1181,14 @@ const handleMessageOption = (
               ) : null}
 
                  {getMsgVideo(item) ? (
-                <ChatVideoBubble
-                  uri={getMsgVideo(item)}
-                  onExpand={() => {
-                    setViewerUri(getMsgVideo(item));
-                    setViewerVisible(true);
-                  }}
-                />
-              ) : null}
+  <ChatVideoBubble
+    uri={getMsgVideo(item)}
+    onExpand={() => {
+      setViewerUri(getMsgVideo(item));
+      setViewerVisible(true);
+    }}
+  />
+) : null}
 
               {getMsgText(item) ? (
                 <Text
@@ -1283,18 +1243,9 @@ const handleMessageOption = (
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        // The header lives INSIDE this same KeyboardAvoidingView (it isn't a
-        // separate native-stack header), so its height is already accounted
-        // for in the normal layout flow. Giving a non-zero offset here on top
-        // of that double-counts the header height and pushes everything up by
-        // that same amount again, which is what produced the big empty pink
-        // gap between the input box and the keyboard.
         keyboardVerticalOffset={0}
       >
         {searchMode ? (
-          // 🟢 NEW (Search feature) — replaces the normal header while
-          // active; the underlying FlatList/messages stay mounted, only
-          // this overlay changes.
           <View style={styles.header}>
             <TouchableOpacity onPress={closeSearch} style={styles.headerIconBtn}>
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
@@ -1366,7 +1317,6 @@ const handleMessageOption = (
             </TouchableOpacity>
           </View>
         )}
-
         {searchMode ? (
           // 🟢 NEW (Search feature) — results list. Reuses the existing
           // message data/format; not a second persistent message list.
@@ -1585,7 +1535,6 @@ const handleMessageOption = (
           </ScrollView>
         </View>
       </Modal>
-
       <Modal
         visible={contactModalVisible}
         animationType="slide"
@@ -1736,7 +1685,6 @@ const handleMessageOption = (
           )}
         </View>
       </Modal>
-
             <Modal
         visible={messageOptionsVisible}
         transparent
@@ -1841,7 +1789,6 @@ const handleMessageOption = (
           </View>
         </TouchableOpacity>
       </Modal>
-
       <Modal
   visible={pinDurationModalVisible}
   transparent
@@ -1914,7 +1861,6 @@ const handleMessageOption = (
     </>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2087,9 +2033,6 @@ pinDurationConfirmText: {
     justifyContent: "center",
     alignItems: "center",
   },
-  // Sits between the back button and the search button (both fixed-width),
-  // so flex:1 + centered content keeps the avatar+name group visually
-  // centered without needing a manual margin hack.
   headerCenterWrap: {
     flex: 1,
     flexDirection: "row",
@@ -2334,11 +2277,25 @@ pinDurationConfirmText: {
     marginLeft: 6,
   },
   chatImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
+  width: 200,
+  height: 200,
+  borderRadius: 12,
+  marginBottom: 4,
+},
+
+chatVideoContainer: {
+  width: 240,
+  height: 180,
+  borderRadius: 12,
+  overflow: "hidden",
+  backgroundColor: "#000000",
+  marginTop: 4,
+},
+
+chatVideo: {
+  width: "100%",
+  height: "100%",
+},
   attachButton: {
     width: 40,
     height: 40,
