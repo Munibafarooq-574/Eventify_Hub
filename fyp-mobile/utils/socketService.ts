@@ -132,8 +132,21 @@ export function emitDeleteForEveryone(messageId: string, userId: string, chatId:
 }
 
 // 🟢 NEW (Pin feature)
-export function emitPinMessage(chatId: string, messageId: string, userId: string) {
-  socket?.emit("pinMessage", { chatId, messageId, userId });
+// 🟢 NEW (Pin duration feature)
+// Keep these values in sync with the backend pin-duration.type.ts.
+export type PinDuration = "24h" | "7d" | "30d";
+export function emitPinMessage(
+  chatId: string,
+  messageId: string,
+  userId: string,
+  duration?: PinDuration
+) {
+  socket?.emit("pinMessage", {
+    chatId,
+    messageId,
+    userId,
+    duration,
+  });
 }
 
 export function emitUnpinMessage(chatId: string, messageId: string, userId: string) {
@@ -196,9 +209,16 @@ export function listenMessageSeen(
 // participant. Registered/cleaned up the same way as every other listener
 // above; does not touch typing/presence/delivery/seen listeners.
 export function onMessagePinned(
-  cb: (payload: { chatId: string; messageId: string; pinnedBy: string }) => void
+  cb: (payload: {
+    chatId: string;
+    messageId: string;
+    pinnedBy: string;
+    pinnedAt?: string | null;
+    pinExpiresAt?: string | null;
+  }) => void
 ) {
   socket?.on("messagePinned", cb);
+
   return () => socket?.off("messagePinned", cb);
 }
 

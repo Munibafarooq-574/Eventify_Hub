@@ -49,6 +49,7 @@ import {
   listenPresenceUpdate,
   listenMessageDelivered,
   listenMessageSeen,
+  type PinDuration,
 } from "@/utils/socketService";
 
 const PRIMARY = "#780C60";
@@ -111,6 +112,25 @@ const formatTime = (iso: string) => {
   h = h % 12;
   if (h === 0) h = 12;
   return `${h}:${m} ${ampm}`;
+};
+
+const formatPinRemaining = (
+  pinExpiresAt: string | null | undefined
+): string | null => {
+  if (!pinExpiresAt) return null;
+
+  const diffMs = new Date(pinExpiresAt).getTime() - Date.now();
+
+  if (diffMs <= 0) return "Expiring…";
+
+  const hours = Math.ceil(diffMs / (60 * 60 * 1000));
+
+  if (hours < 24) {
+    return `Expires in ${hours}h`;
+  }
+
+  const days = Math.ceil(hours / 24);
+  return `Expires in ${days}d`;
 };
 
 const dateLabel = (iso: string) => {
@@ -213,6 +233,8 @@ const ChatScreen: React.FC = () => {
   // 🟢 NEW (Reply feature) — message currently being replied to, shown in
   // the composer preview. Null when not replying.
   const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [messageOptionsVisible, setMessageOptionsVisible] = useState(false);
+const [selectedMessage, setSelectedMessage] = useState<any>(null);
 
   // 🟢 NEW (Search feature)
   const [searchMode, setSearchMode] = useState(false);
@@ -223,6 +245,21 @@ const ChatScreen: React.FC = () => {
   // 🟢 NEW (Pin feature)
   const [pinnedMessages, setPinnedMessages] = useState<any[]>([]);
 
+  // Pin duration feature
+const [pinDurationModalVisible, setPinDurationModalVisible] = useState(false);
+const [pinTargetMessage, setPinTargetMessage] = useState<any>(null);
+const [selectedPinDuration, setSelectedPinDuration] =
+  useState<PinDuration>("24h");
+
+const [, forcePinTick] = useState(0);
+
+useEffect(() => {
+  const id = setInterval(() => {
+    forcePinTick((t) => t + 1);
+  }, 60000);
+
+  return () => clearInterval(id);
+}, []);
   // Briefly highlights a message after jumping to it (from a quoted reply,
   // a search result, or the pinned banner) so the user can actually spot it.
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -473,13 +510,34 @@ const ChatScreen: React.FC = () => {
     // Registered/cleaned up alongside every other listener; does not touch
     // typing, presence, delivery, or seen listeners.
     const offMessagePinned = onMessagePinned((payload) => {
-      if (!isMounted || payload.chatId !== chatIdRef.current) return;
-      setPinnedMessages((prev) => {
-        if (prev.some((p) => idStr(p._id) === idStr(payload.messageId))) return prev;
-        const found = messagesRef.current.find((m) => m._id === payload.messageId);
-        return [...prev, found || { _id: payload.messageId }];
-      });
-    });
+  if (!isMounted || payload.chatId !== chatIdRef.current) return;
+
+  setPinnedMessages((prev) => {
+    const found = messagesRef.current.find(
+      (m) => idStr(m._id) === idStr(payload.messageId)
+    );
+
+    const enriched = {
+      ...(found || { _id: payload.messageId }),
+      pinnedAt: payload.pinnedAt ?? null,
+      pinExpiresAt: payload.pinExpiresAt ?? null,
+    };
+
+    const exists = prev.some(
+      (p) => idStr(p._id) === idStr(payload.messageId)
+    );
+
+    if (exists) {
+      return prev.map((p) =>
+        idStr(p._id) === idStr(payload.messageId)
+          ? { ...p, ...enriched }
+          : p
+      );
+    }
+
+    return [...prev, enriched];
+  });
+});
 
     const offMessageUnpinned = onMessageUnpinned((payload) => {
       if (!isMounted || payload.chatId !== chatIdRef.current) return;
@@ -836,58 +894,95 @@ const ChatScreen: React.FC = () => {
   );
 
   const handleTogglePin = (item: any) => {
-    if (!userRef.current || !chatIdRef.current) return;
-    const alreadyPinned = isMessagePinned(item);
+  if (!userRef.current || !chatIdRef.current) return;
 
-    if (alreadyPinned) {
-      setPinnedMessages((prev) => prev.filter((p) => idStr(p._id) !== idStr(item._id)));
-      emitUnpinMessage(chatIdRef.current, item._id, userRef.current._id);
-    } else {
-      setPinnedMessages((prev) => [...prev, item]);
-      emitPinMessage(chatIdRef.current, item._id, userRef.current._id);
-    }
-  };
+  const alreadyPinned = isMessagePinned(item);
+
+  if (alreadyPinned) {
+    setPinnedMessages((prev) =>
+      prev.filter((p) => idStr(p._id) !== idStr(item._id))
+    );
+
+    emitUnpinMessage(
+      chatIdRef.current,
+      item._id,
+      userRef.current._id
+    );
+  } else {
+    setPinTargetMessage(item);
+    setSelectedPinDuration("24h");
+    setPinDurationModalVisible(true);
+  }
+};
+
+const closePinDurationModal = () => {
+  setPinDurationModalVisible(false);
+  setPinTargetMessage(null);
+};
+
+const handleConfirmPin = () => {
+  const item = pinTargetMessage;
+
+  if (!item || !userRef.current || !chatIdRef.current) {
+    closePinDurationModal();
+    return;
+  }
+
+  const durationMs =
+    selectedPinDuration === "24h"
+      ? 24 * 60 * 60 * 1000
+      : selectedPinDuration === "7d"
+      ? 7 * 24 * 60 * 60 * 1000
+      : 30 * 24 * 60 * 60 * 1000;
+
+  setPinnedMessages([
+  {
+    ...item,
+    pinnedAt: new Date().toISOString(),
+    pinExpiresAt: new Date(Date.now() + durationMs).toISOString(),
+  },
+]);
+
+  emitPinMessage(
+    chatIdRef.current,
+    item._id,
+    userRef.current._id,
+    selectedPinDuration
+  );
+
+  closePinDurationModal();
+};
 
   const handleLongPressMessage = (item: any) => {
-    if (item.isDeletedForEveryone || item.temp) return; // deleted ya abhi bhej rahe optimistic msg pe kuch mat karo
-    const isSender = getSenderId(item) === userRef.current?._id;
-    const pinLabel = isMessagePinned(item) ? "Unpin Message" : "Pin Message";
+  if (item.isDeletedForEveryone || item.temp) return;
 
-    if (Platform.OS === "ios") {
-      const options = isSender
-        ? ["Cancel", "Reply", pinLabel, "Delete for Me", "Delete for Everyone"]
-        : ["Cancel", "Reply", pinLabel, "Delete for Me"];
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: 0,
-          destructiveButtonIndex: isSender ? options.length - 1 : undefined,
-        },
-        (buttonIndex) => {
-          const label = options[buttonIndex];
-          if (label === "Reply") handleReplyToMessage(item);
-          else if (label === pinLabel) handleTogglePin(item);
-          else if (label === "Delete for Me") handleDeleteForMe(item);
-          else if (label === "Delete for Everyone") handleDeleteForEveryone(item);
-        }
-      );
-    } else {
-      const buttons: any[] = [
-        { text: "Cancel", style: "cancel" },
-        { text: "Reply", onPress: () => handleReplyToMessage(item) },
-        { text: pinLabel, onPress: () => handleTogglePin(item) },
-        { text: "Delete for Me", onPress: () => handleDeleteForMe(item) },
-      ];
-      if (isSender) {
-        buttons.push({
-          text: "Delete for Everyone",
-          style: "destructive",
-          onPress: () => handleDeleteForEveryone(item),
-        });
-      }
-      Alert.alert("Message Options", "", buttons);
-    }
-  };
+  setSelectedMessage(item);
+  setMessageOptionsVisible(true);
+};
+
+const closeMessageOptions = () => {
+  setMessageOptionsVisible(false);
+  setSelectedMessage(null);
+};
+
+const handleMessageOption = (
+  action: "reply" | "pin" | "deleteMe" | "deleteEveryone"
+) => {
+  const item = selectedMessage;
+  if (!item) return;
+
+  closeMessageOptions();
+
+  if (action === "reply") {
+    handleReplyToMessage(item);
+  } else if (action === "pin") {
+    handleTogglePin(item);
+  } else if (action === "deleteMe") {
+    handleDeleteForMe(item);
+  } else if (action === "deleteEveryone") {
+    handleDeleteForEveryone(item);
+  }
+};
 
   // 🟢 NEW (Search feature) — searches the already-loaded `messages` array
   // instead of hitting the network on every keystroke. The conversation is
@@ -1241,6 +1336,11 @@ const ChatScreen: React.FC = () => {
                   <Text style={styles.pinnedBannerText} numberOfLines={1}>
                     {getReplyPreviewText(latestPinned)}
                   </Text>
+                  {formatPinRemaining(latestPinned.pinExpiresAt) && (
+  <Text style={styles.pinnedBannerExpiry}>
+    {formatPinRemaining(latestPinned.pinExpiresAt)}
+  </Text>
+)}
                 </View>
                 <Ionicons name="chevron-forward" size={16} color="#B0B0B0" />
               </TouchableOpacity>
@@ -1541,6 +1641,181 @@ const ChatScreen: React.FC = () => {
           )}
         </View>
       </Modal>
+
+            <Modal
+        visible={messageOptionsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeMessageOptions}
+      >
+        <TouchableOpacity
+          style={styles.messageOptionsBackdrop}
+          activeOpacity={1}
+          onPress={closeMessageOptions}
+        >
+          <View
+            style={styles.messageOptionsSheet}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.messageOptionsHandle} />
+
+            {/* Reply */}
+            <TouchableOpacity
+              style={styles.messageOption}
+              onPress={() => handleMessageOption("reply")}
+            >
+              <Ionicons
+                name="arrow-undo-outline"
+                size={22}
+                color={PRIMARY}
+              />
+              <Text style={styles.messageOptionText}>Reply</Text>
+            </TouchableOpacity>
+
+            {/* Pin / Unpin */}
+            <TouchableOpacity
+              style={styles.messageOption}
+              onPress={() => handleMessageOption("pin")}
+            >
+              <Ionicons
+                name={
+                  selectedMessage && isMessagePinned(selectedMessage)
+                    ? "pin-outline"
+                    : "pin"
+                }
+                size={22}
+                color={PRIMARY}
+              />
+              <Text style={styles.messageOptionText}>
+                {selectedMessage && isMessagePinned(selectedMessage)
+                  ? "Unpin Message"
+                  : "Pin Message"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Delete for Me */}
+            <TouchableOpacity
+              style={styles.messageOption}
+              onPress={() => handleMessageOption("deleteMe")}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={22}
+                color="#555"
+              />
+              <Text style={styles.messageOptionText}>
+                Delete for Me
+              </Text>
+            </TouchableOpacity>
+
+            {/* Delete for Everyone — sender only */}
+            {selectedMessage &&
+              getSenderId(selectedMessage) === userRef.current?._id && (
+                <TouchableOpacity
+                  style={styles.messageOption}
+                  onPress={() => handleMessageOption("deleteEveryone")}
+                >
+                  <Ionicons
+                    name="trash-bin-outline"
+                    size={22}
+                    color="#E53935"
+                  />
+                  <Text
+                    style={[
+                      styles.messageOptionText,
+                      { color: "#E53935" },
+                    ]}
+                  >
+                    Delete for Everyone
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+            {/* Cancel */}
+            <TouchableOpacity
+              style={[
+                styles.messageOption,
+                styles.messageOptionCancel,
+              ]}
+              onPress={closeMessageOptions}
+            >
+              <Text style={styles.messageOptionCancelText}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+  visible={pinDurationModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={closePinDurationModal}
+>
+  <TouchableOpacity
+    style={styles.messageOptionsBackdrop}
+    activeOpacity={1}
+    onPress={closePinDurationModal}
+  >
+    <View
+      style={styles.messageOptionsSheet}
+      onStartShouldSetResponder={() => true}
+    >
+      <View style={styles.messageOptionsHandle} />
+
+      <Text style={styles.pinDurationTitle}>
+        Choose how long your pin lasts
+      </Text>
+
+      <Text style={styles.pinDurationSubtitle}>
+        You can unpin at any time.
+      </Text>
+
+      {(["24h", "7d", "30d"] as PinDuration[]).map((duration) => (
+        <TouchableOpacity
+          key={duration}
+          style={styles.pinDurationOption}
+          onPress={() => setSelectedPinDuration(duration)}
+        >
+          <Text style={styles.pinDurationOptionText}>
+            {duration === "24h"
+              ? "24 hours"
+              : duration === "7d"
+              ? "7 days"
+              : "30 days"}
+          </Text>
+
+          <Ionicons
+            name={
+              selectedPinDuration === duration
+                ? "radio-button-on"
+                : "radio-button-off"
+            }
+            size={20}
+            color={PRIMARY}
+          />
+        </TouchableOpacity>
+      ))}
+
+      <View style={styles.pinDurationActionsRow}>
+        <TouchableOpacity
+          style={styles.pinDurationCancelBtn}
+          onPress={closePinDurationModal}
+        >
+          <Text style={styles.pinDurationCancelText}>Cancel</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.pinDurationConfirmBtn}
+          onPress={handleConfirmPin}
+        >
+          <Text style={styles.pinDurationConfirmText}>Pin</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </TouchableOpacity>
+</Modal>
     </>
   );
 };
@@ -1549,6 +1824,130 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
+  },
+
+  pinnedBannerExpiry: {
+  fontSize: 11,
+  color: "#B0839F",
+  marginTop: 1,
+},
+
+pinDurationTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: "#1A1A1A",
+  textAlign: "center",
+  marginBottom: 4,
+},
+
+pinDurationSubtitle: {
+  fontSize: 12.5,
+  color: "#8A8A8A",
+  textAlign: "center",
+  marginBottom: 14,
+},
+
+pinDurationOption: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  minHeight: 50,
+  paddingHorizontal: 14,
+  borderRadius: 12,
+  backgroundColor: "#F8F0F4",
+  marginBottom: 8,
+},
+
+pinDurationOptionText: {
+  fontSize: 15,
+  fontWeight: "600",
+  color: "#222222",
+},
+
+pinDurationActionsRow: {
+  flexDirection: "row",
+  marginTop: 10,
+  gap: 10,
+},
+
+pinDurationCancelBtn: {
+  flex: 1,
+  height: 46,
+  borderRadius: 12,
+  backgroundColor: "#F4EEF2",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+pinDurationCancelText: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: PRIMARY,
+},
+
+pinDurationConfirmBtn: {
+  flex: 1,
+  height: 46,
+  borderRadius: 12,
+  backgroundColor: PRIMARY,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+pinDurationConfirmText: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#FFFFFF",
+},
+    messageOptionsBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+
+  messageOptionsSheet: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === "ios" ? 30 : 18,
+  },
+
+  messageOptionsHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#D0D0D0",
+    alignSelf: "center",
+    marginBottom: 10,
+  },
+
+  messageOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 54,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+
+  messageOptionText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#222222",
+    marginLeft: 14,
+  },
+
+  messageOptionCancel: {
+    justifyContent: "center",
+    backgroundColor: "#F4EEF2",
+    marginTop: 8,
+  },
+
+  messageOptionCancelText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: PRIMARY,
   },
   headerTextCol: {
     flexShrink: 1,
