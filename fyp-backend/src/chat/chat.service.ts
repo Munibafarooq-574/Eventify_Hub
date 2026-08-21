@@ -18,7 +18,7 @@ import { Notification } from 'src/auth/schemas/notification.schema';
 // message reference — never the full document, and never data that
 // leaks info about a different conversation.
 const REPLY_PREVIEW_FIELDS =
-    'message imageUrl senderId chatId isDeletedForEveryone';
+    'message imageUrl videoUrl senderId chatId isDeletedForEveryone';
 
 @Injectable()
 export class ChatService {
@@ -69,7 +69,7 @@ export class ChatService {
             })
             .populate({
                 path: 'lastMessage',
-                select: 'message imageUrl timestamp isDeletedForEveryone deliveredAt seenAt',
+                select: 'message imageUrl videoUrl timestamp isDeletedForEveryone deliveredAt seenAt',
             })
             .lean()
             .exec();
@@ -133,8 +133,9 @@ export class ChatService {
         senderId: string,
         receiverId: string,
         content: string,
-        imageUrl: string = '',
-        repliedToMessageId?: string | null,
+       imageUrl: string = '',
+        videoUrl: string = '',
+       repliedToMessageId?: string | null,
     ): Promise<Message> {
 
         console.log("CHAT SERVICE createMessage CALLED");
@@ -154,15 +155,16 @@ export class ChatService {
         }
 
         const message = new this.messageModel({
-            chatId,
-            senderId,
-            receiverId,
-            message: content,
-            imageUrl,
-            isRead: false,
-            isDeletedForEveryone: false,
-            repliedToMessageId: validReplyId,
-        });
+    chatId,
+    senderId,
+    receiverId,
+    message: content,
+    imageUrl,
+    videoUrl,
+    isRead: false,
+    isDeletedForEveryone: false,
+    repliedToMessageId: validReplyId,
+});
 
         await message.save();
 
@@ -196,12 +198,18 @@ export class ChatService {
 
         try {
             console.log("Sending Push in messages");
-            await this.sendPushNotification(
-                "New Message",
-                imageUrl ? "📷 Photo" : content,
-                otherUser?._id,
-                "MESSAGE",
-            );
+            const notificationBody = videoUrl
+    ? "🎥 Video"
+    : imageUrl
+        ? "📷 Photo"
+        : content;
+
+await this.sendPushNotification(
+    "New Message",
+    notificationBody,
+    otherUser?._id,
+    "MESSAGE",
+);
         } catch (error) {
             console.log("Sending Push in messages", error);
         }
@@ -695,8 +703,8 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
         return this.messageModel
             .find({ _id: { $in: pinnedIds } })
             .select(
-                'message imageUrl senderId receiverId chatId timestamp isDeletedForEveryone pinnedAt pinExpiresAt',
-            )
+    'message imageUrl videoUrl senderId receiverId chatId timestamp isDeletedForEveryone pinnedAt pinExpiresAt',
+)
             .exec();
     }
 }

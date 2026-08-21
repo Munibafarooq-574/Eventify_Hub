@@ -116,6 +116,7 @@ export function sendChatMessage(payload: {
   chatId: string;
   content: string;
   imageUrl?: string;
+  videoUrl?: string;
   // 🟢 NEW (Reply feature) — optional reference to the message being
   // replied to. Reuses the existing sendMessage payload/event.
   repliedToMessageId?: string | null;

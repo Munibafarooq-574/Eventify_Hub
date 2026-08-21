@@ -8,6 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system/legacy";
 import uploadChatImage from "@/services/uploadChatImage";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -51,6 +52,7 @@ import {
   listenMessageSeen,
   type PinDuration,
 } from "@/utils/socketService";
+import uploadChatVideo from "@/services/uploadChatVideo";
 
 const PRIMARY = "#780C60";
 const PRIMARY_DARK = "#5C0949";
@@ -66,6 +68,7 @@ const BACK_BTN_SIZE = 36;
 // to any of those shapes instead of crashing / silently failing.
 const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
 const getMsgImage = (m: any) => m?.imageUrl ?? "";
+const getMsgVideo = (m: any) => m?.videoUrl ?? "";
 const getMsgTime = (m: any) =>
   m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
@@ -185,6 +188,7 @@ const getRepliedTo = (m: any) => m?.repliedToMessageId ?? null;
 const getReplyPreviewText = (r: any) => {
   if (!r) return "Message deleted";
   if (r?.isDeletedForEveryone) return "This message was deleted";
+  if (getMsgVideo(r)) return "🎥 Video";
   if (getMsgImage(r)) return "📷 Photo";
   const text = getMsgText(r);
   return text ? text : "Message";
@@ -208,6 +212,23 @@ const buildDisplayData = (messagesDesc: any[]) => {
     out.push({ ...msg, __type: "message" });
   }
   return out.reverse(); // back to newest -> oldest for inverted list
+};
+
+const ChatVideoBubble: React.FC<{ uri: string; onExpand: () => void }> = ({ uri, onExpand }) => {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+  });
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={onExpand} style={styles.chatImage}>
+      <VideoView
+        style={{ width: "100%", height: "100%", borderRadius: 12 }}
+        player={player}
+        allowsFullscreen
+        allowsPictureInPicture
+        nativeControls
+      />
+    </TouchableOpacity>
+  );
 };
 
 const ChatScreen: React.FC = () => {
@@ -642,12 +663,13 @@ useEffect(() => {
   // 🟢 NEW (Reply feature) — builds the small snapshot we attach to
   // optimistic messages so the quoted preview renders instantly, before
   // the server round-trip comes back with the populated version.
-  const buildReplySnapshot = (original: any) =>
+    const buildReplySnapshot = (original: any) =>
     original
       ? {
           _id: original._id,
           message: getMsgText(original),
           imageUrl: getMsgImage(original),
+          videoUrl: getMsgVideo(original),
           senderId: getSenderId(original),
           isDeletedForEveryone: !!original.isDeletedForEveryone,
         }
@@ -727,6 +749,50 @@ useEffect(() => {
     }
   };
 
+    const sendVideoMessage = async (videoUri: string) => {
+    if (!userRef.current) return;
+    setUploading(true);
+    const replySnapshot = buildReplySnapshot(replyingTo);
+    const replyId = replyingTo?._id ?? null;
+    try {
+      const remoteUrl = await uploadChatVideo(videoUri);
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const now = new Date().toISOString();
+      const optimisticMsg = {
+        _id: tempId,
+        chatId: chatIdRef.current,
+        senderId: userRef.current._id,
+        message: "",
+        content: "",
+        videoUrl: remoteUrl,
+        timestamp: now,
+        createdAt: now,
+        temp: true,
+        status: "sending" as const,
+        repliedToMessageId: replySnapshot,
+      };
+
+      setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
+      setReplyingTo(null);
+
+      sendChatMessage({
+        user: userRef.current._id,
+        receiverId: receiverIdRef.current,
+        chatId: chatIdRef.current,
+        content: "",
+        videoUrl: remoteUrl,
+        repliedToMessageId: replyId || undefined,
+      });
+      setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
+      scheduleFailureCheck(tempId);
+    } catch (error) {
+      Alert.alert("Upload failed", "Could not send video. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleDownloadImage = async () => {
     if (!viewerUri) return;
 
@@ -782,23 +848,25 @@ useEffect(() => {
     }
   };
 
-  const handleAttachPress = () => {
+    const handleAttachPress = () => {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ["Cancel", "Take Photo", "Choose from Gallery"],
+          options: ["Cancel", "Take Photo", "Choose from Gallery", "Choose Video"],
           cancelButtonIndex: 0,
         },
         (buttonIndex) => {
           if (buttonIndex === 1) openCamera();
           else if (buttonIndex === 2) openGallery();
+          else if (buttonIndex === 3) openVideoPicker();
         }
       );
     } else {
-      Alert.alert("Send Photo", "", [
+      Alert.alert("Send Media", "", [
         { text: "Cancel", style: "cancel" },
         { text: "Take Photo", onPress: openCamera },
         { text: "Choose from Gallery", onPress: openGallery },
+        { text: "Choose Video", onPress: openVideoPicker },
       ]);
     }
   };
@@ -830,6 +898,22 @@ useEffect(() => {
     });
     if (!result.canceled && result.assets?.[0]?.uri) {
       sendImageMessage(result.assets[0].uri);
+    }
+  };
+
+    const openVideoPicker = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Gallery access is required to send videos.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      quality: 1,
+      videoMaxDuration: 60,
+    });
+    if (!result.canceled && result.assets?.[0]?.uri) {
+      sendVideoMessage(result.assets[0].uri);
     }
   };
 
@@ -1134,6 +1218,16 @@ const handleMessageOption = (
                     resizeMode="cover"
                   />
                 </TouchableOpacity>
+              ) : null}
+
+                 {getMsgVideo(item) ? (
+                <ChatVideoBubble
+                  uri={getMsgVideo(item)}
+                  onExpand={() => {
+                    setViewerUri(getMsgVideo(item));
+                    setViewerVisible(true);
+                  }}
+                />
               ) : null}
 
               {getMsgText(item) ? (
@@ -1477,15 +1571,16 @@ const handleMessageOption = (
             pinchGestureEnabled
             centerContent
           >
-            {viewerUri && (
-              <Image
-                source={{ uri: viewerUri }}
-                style={{
-                  width: SCREEN_W,
-                  height: SCREEN_H * 0.8,
-                }}
-                resizeMode="contain"
-              />
+                        {viewerUri && (
+              viewerUri.match(/\.(mp4|mov|m4v|webm|3gp|mkv)(\?|$)/i) ? (
+                <ChatVideoBubble uri={viewerUri} onExpand={() => {}} />
+              ) : (
+                <Image
+                  source={{ uri: viewerUri }}
+                  style={{ width: SCREEN_W, height: SCREEN_H * 0.8 }}
+                  resizeMode="contain"
+                />
+              )
             )}
           </ScrollView>
         </View>

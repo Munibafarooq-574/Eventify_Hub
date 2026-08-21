@@ -14,16 +14,28 @@ export class Message extends Document {
     @Prop({ required: true })
     receiverId: string;
 
-    @Prop({
+   /* @Prop({
         required: function (this: Message) {
             return !this.imageUrl;
         },
         default: '',
     })
-    message: string;
+    message: string;*/
+
+    @Prop({
+    required: function (this: Message) {
+        return !this.imageUrl && !this.videoUrl;
+    },
+    default: '',
+})
+message: string;
 
     @Prop({ default: '' })
     imageUrl: string;
+
+    // 🆕 NEW (Video Sharing)
+@Prop({ default: '' })
+videoUrl: string;
 
     @Prop({ default: false })
     isRead: boolean;

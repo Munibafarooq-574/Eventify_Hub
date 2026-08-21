@@ -169,62 +169,45 @@ async handleRegisterUser(
 
     // User sends a message
     @SubscribeMessage('sendMessage')
-    async handleMessage(
-        client: Socket,
-        payload: {
-            user: string;
-            receiverId: string;
-            chatId: string;
-            content: string;
-            imageUrl?: string;
-            // 🟢 NEW (Reply feature) — optional reference to the message
-            // being replied to. Reuses the existing sendMessage payload
-            // instead of introducing a separate event.
-            repliedToMessageId?: string | null;
-        },
-    ) {
-        this.logger.log(
-            `Received message from ${payload.user} in chatId: ${payload.chatId}`,
-        );
+async handleMessage(
+    client: Socket,
+    payload: {
+        user: string;
+        receiverId: string;
+        chatId: string;
+        content: string;
+        imageUrl?: string;
+        videoUrl?: string; // 🆕 NEW (Video Sharing)
+        repliedToMessageId?: string | null;
+    },
+) {
+    this.logger.log(`Received message from ${payload.user} in chatId: ${payload.chatId}`);
 
-        // Create and save the message in the database
-        const message: any = await this.chatService.createMessage(
-            payload.chatId,
-            payload.user,
-            payload.receiverId,
-            payload.content,
-            payload.imageUrl || '',
-            payload.repliedToMessageId || null,
-        );
-
-        // 🔵 NEW: if the receiver already has an active socket connection,
-        // the message counts as "delivered" the instant it's broadcast.
-        if (this.isUserOnline(payload.receiverId)) {
-    const deliveredAt = new Date();
-
-    await this.chatService.markMessageDelivered(
-        message._id.toString(),
-        deliveredAt,
+    const message: any = await this.chatService.createMessage(
+        payload.chatId,
+        payload.user,
+        payload.receiverId,
+        payload.content,
+        payload.imageUrl || '',
+        payload.videoUrl || '', // 🆕 NEW
+        payload.repliedToMessageId || null,
     );
 
-    message.deliveredAt = deliveredAt;
+    if (this.isUserOnline(payload.receiverId)) {
+        const deliveredAt = new Date();
+        await this.chatService.markMessageDelivered(message._id.toString(), deliveredAt);
+        message.deliveredAt = deliveredAt;
+    }
+
+    this.server.to(payload.chatId).emit('newMessage', message);
+
+    if (this.isUserOnline(payload.receiverId)) {
+        this.server.to(payload.chatId).emit('messageDelivered', {
+            messageId: message._id.toString(),
+            deliveredAt: message.deliveredAt,
+        });
+    }
 }
-
-// Emit message to all users in the same conversation
-this.server.to(payload.chatId).emit('newMessage', message);
-
-this.logger.log(
-    `Delivery check: receiver=${payload.receiverId}, online=${this.isUserOnline(payload.receiverId)}`
-);
-
-// If receiver is online, also notify sender that the message was delivered
-if (this.isUserOnline(payload.receiverId)) {
-    this.server.to(payload.chatId).emit('messageDelivered', {
-        messageId: message._id.toString(),
-        deliveredAt: message.deliveredAt,
-    });
-    }
-    }
 
     // User joins a conversation
     /*@SubscribeMessage('joinConversation')
