@@ -863,7 +863,9 @@ useEffect(() => {
     }
   };
 
-    const openVideoPicker = async () => {
+ const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+
+const openVideoPicker = async () => {
   const { status } =
     await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -882,8 +884,48 @@ useEffect(() => {
     videoMaxDuration: 60,
   });
 
-  if (!result.canceled && result.assets?.[0]?.uri) {
-    await sendVideoMessage(result.assets[0].uri);
+  if (result.canceled || !result.assets?.[0]?.uri) {
+    return;
+  }
+
+  const videoUri = result.assets[0].uri;
+
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(videoUri);
+
+    if (!fileInfo.exists) {
+      Alert.alert(
+        "Video error",
+        "Could not access the selected video."
+      );
+      return;
+    }
+
+    const fileSize = fileInfo.size ?? 0;
+
+    // 50 MB limit
+    if (fileSize > MAX_VIDEO_SIZE) {
+      const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+
+      Alert.alert(
+        "Video too large",
+        `Selected video is ${sizeMB} MB.\n\nMaximum allowed size is 50 MB.\nPlease select a smaller video.`,
+        [{ text: "OK" }]
+      );
+
+      return;
+    }
+
+    // Video is within the allowed size
+    await sendVideoMessage(videoUri);
+
+  } catch (error) {
+    console.error("VIDEO SIZE CHECK ERROR:", error);
+
+    Alert.alert(
+      "Video error",
+      "Could not check the video size. Please try another video."
+    );
   }
 };
 
