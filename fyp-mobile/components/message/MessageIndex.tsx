@@ -313,6 +313,7 @@ useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
   const flatListRef = useRef<FlatList<any>>(null);
+  const pendingAttachActionRef = useRef<null | (() => void)>(null);
 
   const findMessageIndex = useCallback((messageId: string) => {
     const displayList = buildDisplayData(messagesRef.current);
@@ -865,72 +866,158 @@ useEffect(() => {
     }
   };
   
-  const handleAttachPress = () => {
+ const handleAttachPress = () => {
   setAttachMenuVisible(true);
 };
 
-const closeAttachMenu = () => setAttachMenuVisible(false);
+const closeAttachMenu = () => {
+  setAttachMenuVisible(false);
+};
 
-const handleAttachOption = (action: "photo" | "video" | "gallery") => {
-  closeAttachMenu();
-  if (action === "photo") openCamera();
-  else if (action === "video") openCameraVideo();
-  else openGallery();
+const runAttachAction = (fn: () => void) => {
+  if (Platform.OS === "ios") {
+    // iOS par pehle RN Modal completely dismiss hone do.
+    // Native camera/gallery picker ko onDismiss ke baad launch karenge.
+    pendingAttachActionRef.current = fn;
+    setAttachMenuVisible(false);
+  } else {
+    // Android par existing behavior same rakho.
+    setAttachMenuVisible(false);
+    fn();
+  }
+};
+
+const handleAttachOption = (
+  action: "photo" | "video" | "gallery"
+) => {
+  const actionFn =
+    action === "photo"
+      ? openCamera
+      : action === "video"
+      ? openCameraVideo
+      : openGallery;
+
+  runAttachAction(actionFn);
 };
 
   const openCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  try {
+    const { status } =
+      await ImagePicker.requestCameraPermissionsAsync();
+
     if (status !== "granted") {
-      Alert.alert("Permission needed", "Camera access is required to take photos.");
+      Alert.alert(
+        "Permission needed",
+        "Camera access is required to take photos."
+      );
       return;
     }
+
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.7,
     });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      sendImageMessage(result.assets[0].uri);
+
+    if (
+      !result.canceled &&
+      result.assets?.[0]?.uri
+    ) {
+      await sendImageMessage(result.assets[0].uri);
     }
-  };
+  } catch (error) {
+    console.error("OPEN CAMERA ERROR:", error);
 
-  const openCameraVideo = async () => {
-  const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== "granted") {
-    Alert.alert("Permission needed", "Camera access is required to record videos.");
-    return;
+    Alert.alert(
+      "Camera error",
+      "Could not open the camera. Please try again."
+    );
   }
-
-  const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ["videos"],
-    videoMaxDuration: 60, // optional cap, WhatsApp-status jaisa; hata bhi sakte ho
-  });
-
-  if (result.canceled || !result.assets?.[0]?.uri) return;
-
-  const asset = result.assets[0];
-  await processPickedVideo(asset.uri, asset.duration ?? 0);
 };
 
-  const openGallery = async () => {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== "granted") {
-    Alert.alert("Permission needed", "Gallery access is required to send media.");
-    return;
+ const openCameraVideo = async () => {
+  try {
+    const { status } =
+      await ImagePicker.requestCameraPermissionsAsync();
+
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Camera access is required to record videos."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["videos"],
+      videoMaxDuration: 60,
+    });
+
+    if (
+      result.canceled ||
+      !result.assets?.[0]?.uri
+    ) {
+      return;
+    }
+
+    const asset = result.assets[0];
+
+    await processPickedVideo(
+      asset.uri,
+      asset.duration ?? 0
+    );
+  } catch (error) {
+    console.error("OPEN VIDEO CAMERA ERROR:", error);
+
+    Alert.alert(
+      "Camera error",
+      "Could not open the video camera. Please try again."
+    );
   }
+};
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ["images", "videos"], // WhatsApp jaisa — dono ek hi gallery me
-    quality: 0.7,
-  });
+ const openGallery = async () => {
+  try {
+    const { status } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  if (result.canceled || !result.assets?.[0]?.uri) return;
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Gallery access is required to send media."
+      );
+      return;
+    }
 
-  const asset = result.assets[0];
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images", "videos"],
+        quality: 0.7,
+      });
 
-  if (asset.type === "video") {
-    await processPickedVideo(asset.uri, asset.duration ?? 0);
-  } else {
-    sendImageMessage(asset.uri);
+    if (
+      result.canceled ||
+      !result.assets?.[0]?.uri
+    ) {
+      return;
+    }
+
+    const asset = result.assets[0];
+
+    if (asset.type === "video") {
+      await processPickedVideo(
+        asset.uri,
+        asset.duration ?? 0
+      );
+    } else {
+      await sendImageMessage(asset.uri);
+    }
+  } catch (error) {
+    console.error("OPEN GALLERY ERROR:", error);
+
+    Alert.alert(
+      "Gallery error",
+      "Could not open the gallery. Please try again."
+    );
   }
 };
 
@@ -1969,6 +2056,22 @@ const handleMessageOption = (
   transparent
   animationType="fade"
   onRequestClose={closeAttachMenu}
+  onDismiss={() => {
+    if (Platform.OS !== "ios") return;
+
+    const action = pendingAttachActionRef.current;
+
+    pendingAttachActionRef.current = null;
+
+    if (action) {
+      // Next event-loop tick par native picker launch karo.
+      // Isse UIKit ko previous modal ko completely release
+      // karne ka extra chance milta hai.
+      setTimeout(() => {
+        action();
+      }, 0);
+    }
+  }}
 >
   <TouchableOpacity
     style={styles.messageOptionsBackdrop}
