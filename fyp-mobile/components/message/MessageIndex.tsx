@@ -510,34 +510,21 @@ useEffect(() => {
         )
       );
     });
-    const offMessagePinned = onMessagePinned((payload) => {
+      const offMessagePinned = onMessagePinned((payload) => {
   if (!isMounted || payload.chatId !== chatIdRef.current) return;
 
-  setPinnedMessages((prev) => {
-    const found = messagesRef.current.find(
-      (m) => idStr(m._id) === idStr(payload.messageId)
-    );
+  const found = messagesRef.current.find(
+    (m) => idStr(m._id) === idStr(payload.messageId)
+  );
 
-    const enriched = {
-      ...(found || { _id: payload.messageId }),
-      pinnedAt: payload.pinnedAt ?? null,
-      pinExpiresAt: payload.pinExpiresAt ?? null,
-    };
+  const enriched = {
+    ...(found || { _id: payload.messageId }),
+    pinnedAt: payload.pinnedAt ?? null,
+    pinExpiresAt: payload.pinExpiresAt ?? null,
+  };
 
-    const exists = prev.some(
-      (p) => idStr(p._id) === idStr(payload.messageId)
-    );
-
-    if (exists) {
-      return prev.map((p) =>
-        idStr(p._id) === idStr(payload.messageId)
-          ? { ...p, ...enriched }
-          : p
-      );
-    }
-
-    return [...prev, enriched];
-  });
+  // WhatsApp-style — sirf EK pin, isliye replace karo, append mat karo
+  setPinnedMessages([enriched]);
 });
 
     const offMessageUnpinned = onMessageUnpinned((payload) => {
@@ -1349,7 +1336,7 @@ const handleMessageOption = (
     ? "typing..."
     : formatPresence(presence.isOnline, presence.lastSeen);
 
-  const latestPinned = pinnedMessages[pinnedMessages.length - 1];
+  const latestPinned = pinnedMessages[0];
 
   return (
     <>

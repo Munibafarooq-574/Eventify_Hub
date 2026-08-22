@@ -53,13 +53,9 @@ chatId: string;   // Unique ID for the conversation (can be generated or mapped 
     @Prop({ default: Date.now })
     createdAt: Date;
 
-    // 🟢 NEW (Pin feature) — references to pinned messages for this
-    // conversation. Storing IDs only (not full message content) so we
-    // never duplicate data that can change/get deleted independently.
-    // Existing conversations simply have this default to [] — no
-    // migration required.
-    @Prop({ type: [Types.ObjectId], ref: 'Message', default: [] })
-    pinnedMessageIds: Types.ObjectId[];
+    @Prop({ type: Types.ObjectId, ref: 'Message', default: null })
+pinnedMessageId: Types.ObjectId | null;
+
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

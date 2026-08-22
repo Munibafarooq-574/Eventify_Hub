@@ -493,187 +493,114 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
     }
 
     // ---- Pin / Unpin ----
-    /*async pinMessage(chatId: string, messageId: string, userId: string): Promise<Conversation> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        const msg = await this.messageModel
-            .findOne({ _id: messageId, chatId })
-            .select('_id');
-        if (!msg) {
-            throw new NotFoundException('Message not found in this conversation');
-        }
-
-        // $addToSet prevents duplicate pin records for the same message.
-        const convo = await this.conversationModel.findOneAndUpdate(
-            { chatId },
-            { $addToSet: { pinnedMessageIds: new Types.ObjectId(messageId) } },
-            { new: true },
-        );
-        if (!convo) {
-            throw new NotFoundException('Conversation not found');
-        }
-        return convo;
-    }
-
-    async unpinMessage(chatId: string, messageId: string, userId: string): Promise<Conversation> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        const convo = await this.conversationModel.findOneAndUpdate(
-            { chatId },
-            { $pull: { pinnedMessageIds: new Types.ObjectId(messageId) } },
-            { new: true },
-        );
-        if (!convo) {
-            throw new NotFoundException('Conversation not found');
-        }
-        return convo;
-    }
-
-    async getPinnedMessages(chatId: string, userId: string): Promise<Message[]> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        const convo = await this.conversationModel
-            .findOne({ chatId })
-            .select('pinnedMessageIds')
-            .lean();
-
-        const pinnedIds = (convo as any)?.pinnedMessageIds || [];
-        if (!pinnedIds.length) return [];
-
-        // Deleted-for-everyone pinned messages are still returned (with the
-        // isDeletedForEveryone flag) so the mobile client can render a safe
-        // "Message deleted" placeholder instead of silently vanishing.
-        return this.messageModel
-            .find({ _id: { $in: pinnedIds } })
-            .select('message imageUrl senderId receiverId chatId timestamp isDeletedForEveryone')
-            .exec();
-    }*/
-
-                // ---- Pin / Unpin ----
     async pinMessage(
-        chatId: string,
-        messageId: string,
-        userId: string,
-        duration?: PinDuration | null,
-    ): Promise<Conversation> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        const msg = await this.messageModel.findOne({ _id: messageId, chatId });
-        if (!msg) {
-            throw new NotFoundException('Message not found in this conversation');
-        }
-
-        // Backend is the ONLY source of truth for the actual expiry Date.
-        // We never accept a timestamp from the client — only a duration
-        // keyword, which we validate and turn into a Date using the
-        // server's current time.
-        let pinExpiresAt: Date | null = null;
-        if (duration !== undefined && duration !== null) {
-            if (!isValidPinDuration(duration)) {
-                throw new BadRequestException(
-                    `Invalid pin duration "${duration}". Must be one of: 24h, 7d, 30d.`,
-                );
-            }
-            pinExpiresAt = new Date(Date.now() + PIN_DURATION_MS[duration]);
-        }
-        // duration omitted entirely => a pin with no expiration (kept for
-        // backward compatibility with any existing "manual pin" call sites).
-
-        msg.pinnedAt = new Date();
-        msg.pinExpiresAt = pinExpiresAt;
-        await msg.save();
-
-        // $addToSet prevents duplicate pin records for the same message.
-        const convo = await this.conversationModel.findOneAndUpdate(
-            { chatId },
-            { $addToSet: { pinnedMessageIds: new Types.ObjectId(messageId) } },
-            { new: true },
-        );
-        if (!convo) {
-            throw new NotFoundException('Conversation not found');
-        }
-        return convo;
+    chatId: string,
+    messageId: string,
+    userId: string,
+    duration?: PinDuration | null,
+): Promise<{ conversation: Conversation; previousPinnedMessageId: string | null }> {
+    const isMember = await this.isUserInConversation(chatId, userId);
+    if (!isMember) {
+        throw new ForbiddenException('You do not belong to this conversation');
     }
+
+    const msg = await this.messageModel.findOne({ _id: messageId, chatId });
+    if (!msg) {
+        throw new NotFoundException('Message not found in this conversation');
+    }
+
+    let pinExpiresAt: Date | null = null;
+    if (duration !== undefined && duration !== null) {
+        if (!isValidPinDuration(duration)) {
+            throw new BadRequestException(
+                `Invalid pin duration "${duration}". Must be one of: 24h, 7d, 30d.`,
+            );
+        }
+        pinExpiresAt = new Date(Date.now() + PIN_DURATION_MS[duration]);
+    }
+
+    const existingConvo = await this.conversationModel
+        .findOne({ chatId })
+        .select('pinnedMessageId')
+        .lean();
+
+    const previousPinnedMessageId = (existingConvo as any)?.pinnedMessageId
+        ? (existingConvo as any).pinnedMessageId.toString()
+        : null;
+
+    // WhatsApp-style: sirf ek hi pin allowed — purane message ka pin clear karo
+    if (previousPinnedMessageId && previousPinnedMessageId !== messageId) {
+        await this.messageModel.updateOne(
+            { _id: previousPinnedMessageId },
+            { $set: { pinnedAt: null, pinExpiresAt: null } },
+        );
+    }
+
+    msg.pinnedAt = new Date();
+    msg.pinExpiresAt = pinExpiresAt;
+    await msg.save();
+
+    const convo = await this.conversationModel.findOneAndUpdate(
+        { chatId },
+        { $set: { pinnedMessageId: new Types.ObjectId(messageId) } },
+        { new: true },
+    );
+    if (!convo) {
+        throw new NotFoundException('Conversation not found');
+    }
+
+    return { conversation: convo, previousPinnedMessageId };
+}
 
     async unpinMessage(chatId: string, messageId: string, userId: string): Promise<Conversation> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        const convo = await this.conversationModel.findOneAndUpdate(
-            { chatId },
-            { $pull: { pinnedMessageIds: new Types.ObjectId(messageId) } },
-            { new: true },
-        );
-        if (!convo) {
-            throw new NotFoundException('Conversation not found');
-        }
-
-        // Manual unpin always wins immediately, regardless of any duration
-        // that was selected — clear the expiry bookkeeping too.
-        await this.messageModel.updateOne(
-            { _id: messageId },
-            { $set: { pinnedAt: null, pinExpiresAt: null } },
-        );
-
-        return convo;
+    const isMember = await this.isUserInConversation(chatId, userId);
+    if (!isMember) {
+        throw new ForbiddenException('You do not belong to this conversation');
     }
 
-    // 🟢 NEW — lazy expiration. Called from getPinnedMessages() (REST read)
-    // and from ChatGateway.handleJoinConversation() (so a reconnect/open
-    // cleans things up and both participants can be notified over the
-    // socket). Messages with pinExpiresAt === null (old/manual pins) are
-    // NEVER touched here — they stay pinned until explicitly unpinned.
-    async expireStalePins(chatId: string): Promise<string[]> {
-        const convo = await this.conversationModel
-            .findOne({ chatId })
-            .select('pinnedMessageIds')
-            .lean();
-
-        const pinnedIds = (convo as any)?.pinnedMessageIds || [];
-        if (!pinnedIds.length) return [];
-
-        const now = new Date();
-        const expired = await this.messageModel
-            .find({
-                _id: { $in: pinnedIds },
-                pinExpiresAt: { $ne: null, $lte: now },
-            })
-            .select('_id')
-            .lean();
-
-        if (!expired.length) return [];
-
-        const expiredIds = expired.map((m) => m._id);
-
-        await this.conversationModel.updateOne(
-            { chatId },
-            { $pull: { pinnedMessageIds: { $in: expiredIds } } },
-        );
-        await this.messageModel.updateMany(
-            { _id: { $in: expiredIds } },
-            { $set: { pinnedAt: null, pinExpiresAt: null } },
-        );
-
-        return expiredIds.map((id) => id.toString());
+    const convo = await this.conversationModel.findOneAndUpdate(
+        { chatId, pinnedMessageId: new Types.ObjectId(messageId) },
+        { $set: { pinnedMessageId: null } },
+        { new: true },
+    );
+    if (!convo) {
+        throw new NotFoundException('Conversation not found or message not currently pinned');
     }
 
-    // Small helper so the gateway can echo the server-computed pinnedAt /
-    // pinExpiresAt back in the 'messagePinned' socket event without a
-    // second round trip from the client.
+    await this.messageModel.updateOne(
+        { _id: messageId },
+        { $set: { pinnedAt: null, pinExpiresAt: null } },
+    );
+
+    return convo;
+}
+     
+     async expireStalePins(chatId: string): Promise<string[]> {
+    const convo = await this.conversationModel
+        .findOne({ chatId })
+        .select('pinnedMessageId')
+        .lean();
+
+    const pinnedId = (convo as any)?.pinnedMessageId;
+    if (!pinnedId) return [];
+
+    const now = new Date();
+    const stillValid = await this.messageModel
+        .findOne({ _id: pinnedId, pinExpiresAt: { $ne: null, $lte: now } })
+        .select('_id')
+        .lean();
+
+    if (!stillValid) return [];
+
+    await this.conversationModel.updateOne({ chatId }, { $set: { pinnedMessageId: null } });
+    await this.messageModel.updateOne(
+        { _id: pinnedId },
+        { $set: { pinnedAt: null, pinExpiresAt: null } },
+    );
+
+    return [pinnedId.toString()];
+}
+
     async getPinnedMessageMeta(
         chatId: string,
         messageId: string,
@@ -685,30 +612,28 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
     }
 
     async getPinnedMessages(chatId: string, userId: string): Promise<Message[]> {
-        const isMember = await this.isUserInConversation(chatId, userId);
-        if (!isMember) {
-            throw new ForbiddenException('You do not belong to this conversation');
-        }
-
-        // Lazy expiration check on every read.
-        await this.expireStalePins(chatId);
-
-        const convo = await this.conversationModel
-            .findOne({ chatId })
-            .select('pinnedMessageIds')
-            .lean();
-
-        const pinnedIds = (convo as any)?.pinnedMessageIds || [];
-        if (!pinnedIds.length) return [];
-
-        // Deleted-for-everyone pinned messages are still returned (with the
-        // isDeletedForEveryone flag) so the mobile client can render a safe
-        // "Message deleted" placeholder instead of silently vanishing.
-        return this.messageModel
-            .find({ _id: { $in: pinnedIds } })
-            .select(
-    'message imageUrl videoUrl senderId receiverId chatId timestamp isDeletedForEveryone pinnedAt pinExpiresAt',
-)
-            .exec();
+    const isMember = await this.isUserInConversation(chatId, userId);
+    if (!isMember) {
+        throw new ForbiddenException('You do not belong to this conversation');
     }
+
+    await this.expireStalePins(chatId);
+
+    const convo = await this.conversationModel
+        .findOne({ chatId })
+        .select('pinnedMessageId')
+        .lean();
+
+    const pinnedId = (convo as any)?.pinnedMessageId;
+    if (!pinnedId) return [];
+
+    const msg = await this.messageModel
+        .findById(pinnedId)
+        .select(
+            'message imageUrl videoUrl senderId receiverId chatId timestamp isDeletedForEveryone pinnedAt pinExpiresAt',
+        )
+        .exec();
+
+    return msg ? [msg] : [];
+}
 }

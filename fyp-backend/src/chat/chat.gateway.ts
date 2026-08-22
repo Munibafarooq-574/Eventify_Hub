@@ -397,72 +397,53 @@ async handleJoinConversation(
             });
         }
     }
-
-    // 🟢 NEW (Pin feature) — pin a message for everyone in the conversation.
-    // Authorization (must belong to the conversation) is enforced inside
-    // chatService.pinMessage.
-   /* @SubscribeMessage('pinMessage')
-    async handlePinMessage(
-        client: Socket,
-        payload: { chatId: string; messageId: string; userId: string },
-    ) {
-        try {
-            await this.chatService.pinMessage(payload.chatId, payload.messageId, payload.userId);
-            this.server.to(payload.chatId).emit('messagePinned', {
-                chatId: payload.chatId,
-                messageId: payload.messageId,
-                pinnedBy: payload.userId,
-            });
-        } catch (err) {
-            client.emit('pinError', {
-                messageId: payload.messageId,
-                error: err instanceof Error ? err.message : 'Unknown error',
-            });
-        }
-    }  */
-
-
-            // 🟢 Pin feature with optional duration
+    // 🟢 Pin feature with optional duration
     @SubscribeMessage('pinMessage')
-    async handlePinMessage(
-        client: Socket,
-        payload: {
-            chatId: string;
-            messageId: string;
-            userId: string;
-            duration?: PinDuration | null;
-        },
-    ) {
-        try {
-            await this.chatService.pinMessage(
-                payload.chatId,
-                payload.messageId,
-                payload.userId,
-                payload.duration ?? null,
-            );
+async handlePinMessage(
+    client: Socket,
+    payload: {
+        chatId: string;
+        messageId: string;
+        userId: string;
+        duration?: PinDuration | null;
+    },
+) {
+    try {
+        const { previousPinnedMessageId } = await this.chatService.pinMessage(
+            payload.chatId,
+            payload.messageId,
+            payload.userId,
+            payload.duration ?? null,
+        );
 
-            // Get the values calculated by the backend.
-            // Clients must use these values instead of calculating expiry
-            // themselves.
-            const meta = await this.chatService.getPinnedMessageMeta(
-                payload.chatId,
-                payload.messageId,
-            );
-
-            this.server.to(payload.chatId).emit('messagePinned', {
+        // Naya pin announce karne se PEHLE, purane message ka unpin bhejo
+        if (previousPinnedMessageId && previousPinnedMessageId !== payload.messageId) {
+            this.server.to(payload.chatId).emit('messageUnpinned', {
                 chatId: payload.chatId,
-                messageId: payload.messageId,
-                pinnedBy: payload.userId,
-                pinnedAt: meta?.pinnedAt ?? null,
-                pinExpiresAt: meta?.pinExpiresAt ?? null,
-            });
-        } catch (err) {
-            client.emit('pinError', {
-                messageId: payload.messageId,
-                error: err instanceof Error ? err.message : 'Unknown error',
+                messageId: previousPinnedMessageId,
+                unpinnedBy: 'system',
             });
         }
+
+        const meta = await this.chatService.getPinnedMessageMeta(
+            payload.chatId,
+            payload.messageId,
+        );
+
+        this.server.to(payload.chatId).emit('messagePinned', {
+            chatId: payload.chatId,
+            messageId: payload.messageId,
+            pinnedBy: payload.userId,
+            pinnedAt: meta?.pinnedAt ?? null,
+            pinExpiresAt: meta?.pinExpiresAt ?? null,
+        });
+    } catch (err) {
+        client.emit('pinError', {
+            messageId: payload.messageId,
+            error: err instanceof Error ? err.message : 'Unknown error',
+        });
     }
+}
 
     // 🟢 NEW (Pin feature) — unpin a message for everyone in the conversation.
     @SubscribeMessage('unpinMessage')
