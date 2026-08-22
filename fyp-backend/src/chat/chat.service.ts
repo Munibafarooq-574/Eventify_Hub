@@ -66,7 +66,7 @@ export class ChatService {
             })
             .populate({
                 path: 'lastMessage',
-                select: 'message imageUrl videoUrl timestamp isDeletedForEveryone deliveredAt seenAt',
+                select: 'message imageUrl videoUrl audioUrl audioDurationMs timestamp isDeletedForEveryone deliveredAt seenAt',
             })
             .lean()
             .exec();

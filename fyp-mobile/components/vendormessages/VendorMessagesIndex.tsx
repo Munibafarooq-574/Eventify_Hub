@@ -82,7 +82,23 @@ const getMsgPreview = (m: any) => {
     if (isDeleted(m)) return 'This message was deleted';
     if (hasImage(m)) return 'Photo';
     if (hasVideo(m)) return 'Video';
-    if (hasAudio(m)) return 'Voice message';   
+
+    if (hasAudio(m)) {
+        const dur = m?.audioDurationMs;
+
+        if (dur) {
+            const totalSec = Math.round(dur / 1000);
+            const mm = Math.floor(totalSec / 60);
+            const ss = totalSec % 60;
+
+            return `Voice message · ${mm}:${ss
+                .toString()
+                .padStart(2, '0')}`;
+        }
+
+        return 'Voice message';
+    }
+
     return getMsgText(m);
 };
 
