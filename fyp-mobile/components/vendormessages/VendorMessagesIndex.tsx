@@ -50,12 +50,26 @@ const hasImage = (m: any) => {
     );
 };
 
+const hasVideo = (m: any) => {
+    return !!(
+        m?.videoUrl ||
+        m?.video ||
+        m?.videoUri ||
+        m?.videoUrl ||
+        (m?.mediaType === 'video' && (
+            m?.media ||
+            m?.attachment
+        ))
+    );
+};
+
 const isDeleted = (m: any) =>
     !!m?.isDeletedForEveryone;
 
 const getMsgPreview = (m: any) => {
     if (isDeleted(m)) return 'This message was deleted';
     if (hasImage(m)) return 'Photo';
+    if (hasVideo(m)) return 'Video';
     return getMsgText(m);
 };
 
@@ -838,25 +852,26 @@ const MessagesScreen: React.FC = () => {
                         }
                     >
                         {item.lastMessage &&
-                            hasImage(
-                                item.lastMessage
-                            ) &&
-                            !isDeleted(
-                                item.lastMessage
-                            ) && (
-                                <Ionicons
-                                    name="camera"
-                                    size={13}
-                                    color={
-                                        unread > 0
-                                            ? PRIMARY
-                                            : '#8A8A8A'
-                                    }
-                                    style={{
-                                        marginRight: 4,
-                                    }}
-                                />
-                            )}
+    !isDeleted(item.lastMessage) &&
+    (hasImage(item.lastMessage) ||
+        hasVideo(item.lastMessage)) && (
+        <Ionicons
+            name={
+                hasVideo(item.lastMessage)
+                    ? 'videocam'
+                    : 'camera'
+            }
+            size={13}
+            color={
+                unread > 0
+                    ? PRIMARY
+                    : '#8A8A8A'
+            }
+            style={{
+                marginRight: 4,
+            }}
+        />
+    )}
 
                         <Text
                             style={[
