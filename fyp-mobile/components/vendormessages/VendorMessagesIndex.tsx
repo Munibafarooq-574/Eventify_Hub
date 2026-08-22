@@ -63,6 +63,18 @@ const hasVideo = (m: any) => {
     );
 };
 
+const hasAudio = (m: any) => {
+    return !!(
+        m?.audioUrl ||
+        m?.audio ||
+        m?.audioUri ||
+        (m?.mediaType === 'audio' && (
+            m?.media ||
+            m?.attachment
+        ))
+    );
+};
+
 const isDeleted = (m: any) =>
     !!m?.isDeletedForEveryone;
 
@@ -70,6 +82,7 @@ const getMsgPreview = (m: any) => {
     if (isDeleted(m)) return 'This message was deleted';
     if (hasImage(m)) return 'Photo';
     if (hasVideo(m)) return 'Video';
+    if (hasAudio(m)) return 'Voice message';   
     return getMsgText(m);
 };
 
@@ -465,7 +478,7 @@ const MessagesScreen: React.FC = () => {
                         return prev;
                     }
 
-                    const updatedConvo = {
+                                        const updatedConvo = {
                         ...prev[idx],
 
                         lastMessage: {
@@ -483,6 +496,12 @@ const MessagesScreen: React.FC = () => {
                                 incoming?.attachment ||
                                 incoming?.photoUrl ||
                                 '',
+
+                            videoUrl:
+                                incoming?.videoUrl || '',   // 🆕 ADD
+
+                            audioUrl:
+                                incoming?.audioUrl || '',   // 🆕 ADD
 
                             timestamp:
                                 getMsgTime(
@@ -851,14 +870,17 @@ const MessagesScreen: React.FC = () => {
                             styles.subtitleRow
                         }
                     >
-                        {item.lastMessage &&
+                                             {item.lastMessage &&
     !isDeleted(item.lastMessage) &&
     (hasImage(item.lastMessage) ||
-        hasVideo(item.lastMessage)) && (
+        hasVideo(item.lastMessage) ||
+        hasAudio(item.lastMessage)) && (
         <Ionicons
             name={
                 hasVideo(item.lastMessage)
                     ? 'videocam'
+                    : hasAudio(item.lastMessage)
+                    ? 'mic'
                     : 'camera'
             }
             size={13}

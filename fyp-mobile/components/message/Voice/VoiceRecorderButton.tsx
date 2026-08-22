@@ -76,6 +76,11 @@ const VoiceRecorderButton: React.FC<Props> = ({ onSend, disabled }) => {
       setIsRecording(false);
 
       await recorder.stop();
+
+      await setAudioModeAsync({
+  allowsRecording: false,
+  playsInSilentMode: true,
+});
       const uri = recorder.uri;
 
       if (!uri) {
@@ -100,6 +105,10 @@ const VoiceRecorderButton: React.FC<Props> = ({ onSend, disabled }) => {
       if (tickRef.current) clearInterval(tickRef.current);
       setIsRecording(false);
       await recorder.stop();
+      await setAudioModeAsync({
+  allowsRecording: false,
+  playsInSilentMode: true,
+});
     } catch (error) {
       console.log("Cancel recording error (non-fatal):", error);
     }

@@ -2,7 +2,11 @@
 import React from "react";
 import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import {
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  setAudioModeAsync,
+} from "expo-audio";
 
 type Props = {
   uri: string;
@@ -22,16 +26,27 @@ const VoiceMessageBubble: React.FC<Props> = ({ uri, durationMs, isSender }) => {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
 
-  const togglePlay = () => {
-    if (status.playing) {
-      player.pause();
-    } else {
-      if (status.didJustFinish || status.currentTime >= status.duration) {
-        player.seekTo(0);
-      }
-      player.play();
-    }
-  };
+  const togglePlay = async () => {
+  if (status.playing) {
+    player.pause();
+    return;
+  }
+
+  try {
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+    });
+  } catch (e) {
+    console.log("setAudioModeAsync (playback) error:", e);
+  }
+
+  if (status.didJustFinish || status.currentTime >= status.duration) {
+    player.seekTo(0);
+  }
+
+  player.play();
+};
 
   const totalMs = status.duration ? status.duration * 1000 : durationMs || 0;
   const progress = totalMs > 0 ? Math.min(status.currentTime * 1000 / totalMs, 1) : 0;
