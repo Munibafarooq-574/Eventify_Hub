@@ -12,13 +12,19 @@ import { diskStorage } from 'multer';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { extname } from 'path';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
+import { VendorAnalyticsService } from './vendor-analytics.service';
 import { UpdatePackageDto } from './dto/update-package.dto';
 
 @Controller('vendor')
 export class VendorController {
     private readonly logger = new Logger("fyp")
-    constructor(private vendorService: VendorService, private fileUploadService: FileUploadService) { }
+    //constructor(private vendorService: VendorService, private fileUploadService: FileUploadService) { }
 
+    constructor(
+    private vendorService: VendorService,
+    private vendorAnalyticsService: VendorAnalyticsService,
+    private fileUploadService: FileUploadService,
+) { }
     @Get('getVendorsByCategoryId')
     getVendorsByCategoryId(@Request() req: any, @Query('categoryId') categoryId: string) {
         return this.vendorService.getAllVendorsByCategoryId(categoryId);
@@ -32,6 +38,11 @@ export class VendorController {
         }
         return vendor;
     }
+
+    @Get('analytics/:id')
+async getVendorAnalytics(@Param('id') id: string) {
+    return this.vendorAnalyticsService.getVendorAnalytics(id);
+}
 
     @Post('contactDetails')
     @UseInterceptors(FileInterceptor('file'))

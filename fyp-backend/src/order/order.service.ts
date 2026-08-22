@@ -148,40 +148,35 @@ export class OrderService {
 
     // Get order stats (pending, processing, completed) for Vendor or Organizer
     async getOrderStats(type: string, userId: string) {
-        let userIdObj;
-        if (typeof userId === 'string') {
-            userIdObj = new Types.ObjectId(userId);  // Convert userId to ObjectId
-        }
-
-        const query: any = {};
-
-        // Step 1: Apply filter based on type (Vendor or Organizer)
-        if (type === 'Organizer') {
-            query.organizerId = userIdObj;  // Filter by organizerId
-        } else if (type === 'Vendor') {
-            // Fetch VendorOrders that match the vendorId
-            const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
-
-            // Get the ObjectIds of matched VendorOrders
-            const vendorOrderIds = vendorOrders.map(order => order._id);
-
-            // Use the $in operator to query Orders with vendorOrders matching the vendorOrderIds
-            query.vendorOrders = { $in: vendorOrderIds };
-        }
-
-        // Step 2: Calculate stats based on the query
-        const totalOrders = await this.orderModel.countDocuments(query);
-        const pending = await this.orderModel.countDocuments({ ...query, status: 'pending' });
-        const processing = await this.orderModel.countDocuments({ ...query, status: 'processing' });
-        const completed = await this.orderModel.countDocuments({ ...query, status: 'completed' });
-
-        return {
-            totalOrders,
-            pending,
-            processing,
-            completed,
-        };
+    let userIdObj;
+    if (typeof userId === 'string') {
+        userIdObj = new Types.ObjectId(userId);
     }
+
+    const query: any = {};
+
+    if (type === 'Organizer') {
+        query.organizerId = userIdObj;
+    } else if (type === 'Vendor') {
+        const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
+        const vendorOrderIds = vendorOrders.map(order => order._id);
+        query.vendorOrders = { $in: vendorOrderIds };
+    }
+
+    const totalOrders = await this.orderModel.countDocuments(query);
+    const pending = await this.orderModel.countDocuments({ ...query, status: 'pending' });
+    const processing = await this.orderModel.countDocuments({ ...query, status: 'processing' });
+    const completed = await this.orderModel.countDocuments({ ...query, status: 'completed' });
+    const cancelled = await this.orderModel.countDocuments({ ...query, status: 'cancelled' }); // NEW
+
+    return {
+        totalOrders,
+        pending,
+        processing,
+        completed,
+        cancelled, // NEW
+    };
+}
 
 
     // Update the status of an order to "completed"
