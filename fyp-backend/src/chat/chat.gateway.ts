@@ -168,7 +168,7 @@ async handleRegisterUser(
     }
 
     // User sends a message
-    @SubscribeMessage('sendMessage')
+  @SubscribeMessage('sendMessage')
 async handleMessage(
     client: Socket,
     payload: {
@@ -177,20 +177,24 @@ async handleMessage(
         chatId: string;
         content: string;
         imageUrl?: string;
-        videoUrl?: string; // 🆕 NEW (Video Sharing)
+        videoUrl?: string;
+        thumbnailUrl?: string;      // 🆕 ADD
+        videoDurationMs?: number;   // 🆕 ADD
         repliedToMessageId?: string | null;
     },
-) {
+)  {
     this.logger.log(`Received message from ${payload.user} in chatId: ${payload.chatId}`);
 
-    const message: any = await this.chatService.createMessage(
+     const message: any = await this.chatService.createMessage(
         payload.chatId,
         payload.user,
         payload.receiverId,
         payload.content,
         payload.imageUrl || '',
-        payload.videoUrl || '', // 🆕 NEW
+        payload.videoUrl || '',
         payload.repliedToMessageId || null,
+        payload.thumbnailUrl || '',       // 🆕 ADD
+        payload.videoDurationMs || 0,     // 🆕 ADD
     );
 
     if (this.isUserOnline(payload.receiverId)) {

@@ -10,6 +10,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import uploadChatImage from "@/services/uploadChatImage";
 import uploadChatVideo from "@/services/uploadChatVideo";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { Image as ExpoImage } from "expo-image";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -70,6 +72,8 @@ const BACK_BTN_SIZE = 36;
 const getMsgText = (m: any) => m?.message ?? m?.content ?? "";
 const getMsgImage = (m: any) => m?.imageUrl ?? "";
 const getMsgVideo = (m: any) => m?.videoUrl ?? "";
+const getMsgThumbnail = (m: any) => m?.thumbnailUrl ?? "";
+const getMsgVideoDuration = (m: any) => m?.videoDurationMs ?? 0;
 const getMsgTime = (m: any) =>
   m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
@@ -195,33 +199,64 @@ const buildDisplayData = (messagesDesc: any[]) => {
   return out.reverse(); // back to newest -> oldest for inverted list
 };
 
-const ChatVideoBubble: React.FC<{
-  uri: string;
-  onExpand?: () => void;
-}> = ({ uri, onExpand }) => {
+// 🆕 ADD THIS — full player, ONLY used inside the full-screen viewer Modal.
+// Never used inside the FlatList, so no off-screen decoders ever run.
+const FullVideoPlayer: React.FC<{ uri: string }> = ({ uri }) => {
   const player = useVideoPlayer(uri, (player) => {
     player.loop = false;
     player.play();
   });
 
-  useEffect(() => {
-    console.log("CHAT VIDEO URI:", uri);
-  }, [uri]);
+  return (
+    <VideoView
+      player={player}
+      style={styles.fullScreenVideo}
+      nativeControls
+      allowsFullscreen
+      allowsPictureInPicture
+      contentFit="contain"
+    />
+  );
+};
+
+const VideoThumbBubble: React.FC<{
+  thumbnailUri?: string;
+  durationMs?: number;
+  onExpand: () => void;
+}> = ({ thumbnailUri, durationMs, onExpand }) => {
+  const formatDuration = (ms?: number) => {
+    if (!ms) return "";
+    const totalSec = Math.round(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.95}
+      activeOpacity={0.9}
       onPress={onExpand}
       style={styles.chatVideoContainer}
     >
-      <VideoView
-        player={player}
-        style={styles.chatVideo}
-        nativeControls
-        allowsFullscreen
-        allowsPictureInPicture
-        contentFit="contain"
-      />
+      {thumbnailUri ? (
+        <ExpoImage
+          source={{ uri: thumbnailUri }}
+          style={styles.chatVideo}
+          contentFit="cover"
+          transition={150}
+          cachePolicy="disk"
+        />
+      ) : (
+        <View style={[styles.chatVideo, { backgroundColor: "#1a1a1a" }]} />
+      )}
+      <View style={styles.videoPlayOverlay}>
+        <Ionicons name="play" size={26} color="#FFFFFF" />
+      </View>
+      {!!durationMs && (
+        <View style={styles.videoDurationBadge}>
+          <Text style={styles.videoDurationText}>{formatDuration(durationMs)}</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -232,6 +267,7 @@ const ChatScreen: React.FC = () => {
   const [receiverName, setReceiverName] = useState<string>("Conversation");
   const [loading, setLoading] = useState<boolean>(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -603,6 +639,8 @@ useEffect(() => {
           message: getMsgText(original),
           imageUrl: getMsgImage(original),
           videoUrl: getMsgVideo(original),
+          thumbnailUrl: getMsgThumbnail(original),
+          videoDurationMs: getMsgVideoDuration(original),
           senderId: getSenderId(original),
           isDeletedForEveryone: !!original.isDeletedForEveryone,
         }
@@ -682,22 +720,47 @@ useEffect(() => {
     }
   };
 
-    const sendVideoMessage = async (videoUri: string) => {
+  const sendVideoMessage = async (
+  videoUri: string,
+  durationMs: number = 0
+) => {
   if (!userRef.current) return;
 
   setUploading(true);
+  setUploadProgress(0);
 
   const replySnapshot = buildReplySnapshot(replyingTo);
   const replyId = replyingTo?._id ?? null;
 
   try {
-    const remoteUrl = await uploadChatVideo(videoUri);
+    // Generate lightweight thumbnail first
+    let thumbnailUrl = "";
+
+    try {
+      const { uri: localThumbUri } =
+        await VideoThumbnails.getThumbnailAsync(videoUri, {
+          time: 500,
+        });
+
+      thumbnailUrl = await uploadChatImage(localThumbUri);
+    } catch (thumbErr) {
+      console.log(
+        "Thumbnail generation failed, continuing without it",
+        thumbErr
+      );
+    }
+
+    // Upload actual video
+    const remoteUrl = await uploadChatVideo(
+      videoUri,
+      (percent) => {
+        setUploadProgress(percent);
+      }
+    );
 
     if (!remoteUrl) {
       throw new Error("Video upload did not return a URL");
     }
-
-    console.log("VIDEO UPLOAD SUCCESS:", remoteUrl);
 
     const tempId = `temp-${Date.now()}-${Math.random()
       .toString(36)
@@ -712,6 +775,8 @@ useEffect(() => {
       message: "",
       content: "",
       videoUrl: remoteUrl,
+      thumbnailUrl,
+      videoDurationMs: durationMs,
       timestamp: now,
       createdAt: now,
       temp: true,
@@ -731,6 +796,8 @@ useEffect(() => {
       chatId: chatIdRef.current,
       content: "",
       videoUrl: remoteUrl,
+      thumbnailUrl,
+      videoDurationMs: durationMs,
       repliedToMessageId: replyId || undefined,
     });
 
@@ -752,9 +819,9 @@ useEffect(() => {
     );
   } finally {
     setUploading(false);
+    setUploadProgress(null);
   }
 };
-
   const handleDownloadImage = async () => {
     if (!viewerUri) return;
 
@@ -863,7 +930,7 @@ useEffect(() => {
     }
   };
 
- const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+ const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
 
 const openVideoPicker = async () => {
   const { status } =
@@ -881,7 +948,6 @@ const openVideoPicker = async () => {
     mediaTypes: ImagePicker.MediaTypeOptions.Videos,
     allowsEditing: false,
     quality: 1,
-    videoMaxDuration: 60,
   });
 
   if (result.canceled || !result.assets?.[0]?.uri) {
@@ -889,6 +955,7 @@ const openVideoPicker = async () => {
   }
 
   const videoUri = result.assets[0].uri;
+  const durationMs = result.assets[0].duration ?? 0;
 
   try {
     const fileInfo = await FileSystem.getInfoAsync(videoUri);
@@ -903,22 +970,18 @@ const openVideoPicker = async () => {
 
     const fileSize = fileInfo.size ?? 0;
 
-    // 50 MB limit
     if (fileSize > MAX_VIDEO_SIZE) {
       const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
 
       Alert.alert(
         "Video too large",
-        `Selected video is ${sizeMB} MB.\n\nMaximum allowed size is 50 MB.\nPlease select a smaller video.`,
-        [{ text: "OK" }]
+        `Selected video is ${sizeMB} MB.\n\nMaximum allowed size is 200 MB.\nPlease select a smaller video.`
       );
 
       return;
     }
 
-    // Video is within the allowed size
-    await sendVideoMessage(videoUri);
-
+    await sendVideoMessage(videoUri, durationMs);
   } catch (error) {
     console.error("VIDEO SIZE CHECK ERROR:", error);
 
@@ -1214,17 +1277,25 @@ const handleMessageOption = (
                   onLongPress={() => handleLongPressMessage(item)}
                   delayLongPress={500}
                 >
-                  <Image
-                    source={{ uri: getMsgImage(item) }}
-                    style={styles.chatImage}
-                    resizeMode="cover"
-                  />
+                  <ExpoImage
+  source={{ uri: getMsgImage(item) }}
+  style={styles.chatImage}
+  contentFit="cover"
+  transition={150}
+  cachePolicy="disk"
+  placeholder={{
+    blurhash: "L5H2EC=PM+yV0g-mq.wG9c010J}I",
+  }}
+/>
                 </TouchableOpacity>
               ) : null}
 
-                 {getMsgVideo(item) ? (
-  <ChatVideoBubble
-    uri={getMsgVideo(item)}
+      {getMsgVideo(item) ? (
+  <VideoThumbBubble
+    thumbnailUri={
+      getMsgThumbnail(item) || getMsgVideo(item)
+    }
+    durationMs={getMsgVideoDuration(item)}
     onExpand={() => {
       setViewerUri(getMsgVideo(item));
       setViewerVisible(true);
@@ -1473,10 +1544,12 @@ const handleMessageOption = (
                   </Text>
                   <View style={styles.replyPreviewContentRow}>
                     {getMsgImage(replyingTo) ? (
-                      <Image
-                        source={{ uri: getMsgImage(replyingTo) }}
-                        style={styles.replyPreviewThumb}
-                      />
+                      <ExpoImage
+                      source={{ uri: getMsgImage(replyingTo) }}
+                      style={styles.replyPreviewThumb}
+                      contentFit="cover"
+                      cachePolicy="disk"
+                    />
                     ) : null}
                     <Text style={styles.replyPreviewText} numberOfLines={1}>
                       {getReplyPreviewText(replyingTo)}
@@ -1491,6 +1564,24 @@ const handleMessageOption = (
                 </TouchableOpacity>
               </View>
             )}
+
+            {uploading && uploadProgress !== null && (
+  <View
+    style={{
+      paddingHorizontal: 16,
+      paddingBottom: 4,
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 11,
+        color: PRIMARY,
+      }}
+    >
+      Uploading video... {uploadProgress}%
+    </Text>
+  </View>
+)}
 
             {/* Footer */}
             <View style={styles.footer}>
@@ -1563,17 +1654,19 @@ const handleMessageOption = (
             pinchGestureEnabled
             centerContent
           >
-                        {viewerUri && (
-              viewerUri.match(/\.(mp4|mov|m4v|webm|3gp|mkv)(\?|$)/i) ? (
-                <ChatVideoBubble uri={viewerUri} onExpand={() => {}} />
-              ) : (
-                <Image
-                  source={{ uri: viewerUri }}
-                  style={{ width: SCREEN_W, height: SCREEN_H * 0.8 }}
-                  resizeMode="contain"
-                />
-              )
-            )}
+          {viewerUri && (
+            viewerUri.match(/\.(mp4|mov|m4v|webm|3gp|mkv)(\?|$)/i) ? (
+              <View style={{ width: SCREEN_W, height: SCREEN_H * 0.8 }}>
+                <FullVideoPlayer uri={viewerUri} />
+              </View>
+            ) : (
+              <Image
+                source={{ uri: viewerUri }}
+                style={{ width: SCREEN_W, height: SCREEN_H * 0.8 }}
+                resizeMode="contain"
+              />
+            )
+          )}
           </ScrollView>
         </View>
       </Modal>
@@ -1908,7 +2001,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
   },
-
+  fullScreenVideo: {
+  width: "100%",
+  height: "100%",
+},
+videoPlayOverlay: {
+  position: "absolute",
+  top: 0, left: 0, right: 0, bottom: 0,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "rgba(0,0,0,0.15)",
+},
+videoDurationBadge: {
+  position: "absolute",
+  bottom: 6,
+  right: 6,
+  backgroundColor: "rgba(0,0,0,0.65)",
+  borderRadius: 6,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+},
+videoDurationText: {
+  color: "#fff",
+  fontSize: 11,
+  fontWeight: "600",
+},
   pinnedBannerExpiry: {
   fontSize: 11,
   color: "#B0839F",

@@ -106,8 +106,8 @@ export function sendChatMessage(payload: {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  // 🟢 NEW (Reply feature) — optional reference to the message being
-  // replied to. Reuses the existing sendMessage payload/event.
+  thumbnailUrl?: string;       // 🆕 ADD
+  videoDurationMs?: number;    // 🆕 ADD
   repliedToMessageId?: string | null;
 }) {
   socket?.emit("sendMessage", payload);

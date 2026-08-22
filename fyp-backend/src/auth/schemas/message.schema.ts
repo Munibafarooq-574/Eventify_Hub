@@ -28,14 +28,22 @@ export class Message extends Document {
     },
     default: '',
 })
-message: string;
+    message: string;
 
     @Prop({ default: '' })
     imageUrl: string;
 
     // 🆕 NEW (Video Sharing)
-@Prop({ default: '' })
-videoUrl: string;
+    @Prop({ default: '' })
+    videoUrl: string;
+
+// 🆕 ADD THIS — WhatsApp-style static preview, full video load kiye bina
+    @Prop({ default: '' })
+    thumbnailUrl: string;
+
+// 🆕 optional but recommended — duration badge ke liye
+    @Prop({ default: 0 })
+    videoDurationMs: number;
 
     @Prop({ default: false })
     isRead: boolean;

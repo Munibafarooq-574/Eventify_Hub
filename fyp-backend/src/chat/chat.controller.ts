@@ -62,15 +62,15 @@ export class ChatController {
   // ============================================================
 
   @Post('upload/video')
-  @UseInterceptors(
-    FileInterceptor('video', {
-      storage: chatImageStorage,
-      fileFilter: videoFileFilter,
-      limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
-      },
-    }),
-  )
+@UseInterceptors(
+  FileInterceptor('video', {
+    storage: chatImageStorage,
+    fileFilter: videoFileFilter,
+    limits: {
+      fileSize: 200 * 1024 * 1024, // 200MB (was 50MB)
+    },
+  }),
+)
   async uploadChatVideo(
     @UploadedFile() file: Express.Multer.File,
   ) {

@@ -129,14 +129,16 @@ export class ChatService {
     }
     // Create a new message for a conversation
     async createMessage(
-        chatId: string,
-        senderId: string,
-        receiverId: string,
-        content: string,
-       imageUrl: string = '',
-        videoUrl: string = '',
-       repliedToMessageId?: string | null,
-    ): Promise<Message> {
+    chatId: string,
+    senderId: string,
+    receiverId: string,
+    content: string,
+    imageUrl: string = '',
+    videoUrl: string = '',
+    repliedToMessageId?: string | null,
+    thumbnailUrl: string = '',        // 🆕 ADD
+    videoDurationMs: number = 0,      // 🆕 ADD
+): Promise<Message> {
 
         console.log("CHAT SERVICE createMessage CALLED");
 
@@ -154,17 +156,19 @@ export class ChatService {
             }
         }
 
-        const message = new this.messageModel({
-    chatId,
-    senderId,
-    receiverId,
-    message: content,
-    imageUrl,
-    videoUrl,
-    isRead: false,
-    isDeletedForEveryone: false,
-    repliedToMessageId: validReplyId,
-});
+      const message = new this.messageModel({
+        chatId,
+        senderId,
+        receiverId,
+        message: content,
+        imageUrl,
+        videoUrl,
+        thumbnailUrl,        // 🆕 ADD
+        videoDurationMs,     // 🆕 ADD
+        isRead: false,
+        isDeletedForEveryone: false,
+        repliedToMessageId: validReplyId,
+    });
 
         await message.save();
 
