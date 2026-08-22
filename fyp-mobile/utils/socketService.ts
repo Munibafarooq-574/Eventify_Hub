@@ -106,8 +106,10 @@ export function sendChatMessage(payload: {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  thumbnailUrl?: string;       // 🆕 ADD
-  videoDurationMs?: number;    // 🆕 ADD
+  thumbnailUrl?: string;
+  videoDurationMs?: number;
+  audioUrl?: string;           // 🆕 ADD
+  audioDurationMs?: number;    // 🆕 ADD
   repliedToMessageId?: string | null;
 }) {
   socket?.emit("sendMessage", payload);

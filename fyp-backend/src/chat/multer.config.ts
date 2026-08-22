@@ -99,3 +99,24 @@ export const videoFileFilter = (
     callback(new Error("Only video files are allowed!"), false);
   }
 };
+
+// ADD THIS BELOW videoFileFilter
+export const audioFileFilter = (
+  req: any,
+  file: any,
+  callback: any
+) => {
+  console.log("UPLOAD FILE (audio):", {
+    name: file.originalname,
+    type: file.mimetype,
+  });
+
+  if (
+    file.mimetype.startsWith("audio/") ||
+    /\.(m4a|mp3|aac|wav|caf|3gp)$/i.test(file.originalname)
+  ) {
+    callback(null, true);
+  } else {
+    callback(new Error("Only audio files are allowed!"), false);
+  }
+};

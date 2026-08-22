@@ -14,11 +14,8 @@ import axios from 'axios';
 import { User } from 'src/auth/schemas/user.schema';
 import { Notification } from 'src/auth/schemas/notification.schema';
 
-// Fields we're safe to expose when populating a "replied to" / "pinned"
-// message reference — never the full document, and never data that
-// leaks info about a different conversation.
 const REPLY_PREVIEW_FIELDS =
-    'message imageUrl videoUrl senderId chatId isDeletedForEveryone';
+    'message imageUrl videoUrl audioUrl senderId chatId isDeletedForEveryone';
 
 @Injectable()
 export class ChatService {
@@ -128,7 +125,7 @@ export class ChatService {
             .exec();
     }
     // Create a new message for a conversation
-    async createMessage(
+        async createMessage(
     chatId: string,
     senderId: string,
     receiverId: string,
@@ -136,8 +133,10 @@ export class ChatService {
     imageUrl: string = '',
     videoUrl: string = '',
     repliedToMessageId?: string | null,
-    thumbnailUrl: string = '',        // 🆕 ADD
-    videoDurationMs: number = 0,      // 🆕 ADD
+    thumbnailUrl: string = '',
+    videoDurationMs: number = 0,
+    audioUrl: string = '',           // 🆕 ADD
+    audioDurationMs: number = 0,     // 🆕 ADD
 ): Promise<Message> {
 
         console.log("CHAT SERVICE createMessage CALLED");
@@ -156,15 +155,17 @@ export class ChatService {
             }
         }
 
-      const message = new this.messageModel({
+            const message = new this.messageModel({
         chatId,
         senderId,
         receiverId,
         message: content,
         imageUrl,
         videoUrl,
-        thumbnailUrl,        // 🆕 ADD
-        videoDurationMs,     // 🆕 ADD
+        thumbnailUrl,
+        videoDurationMs,
+        audioUrl,             // 🆕 ADD
+        audioDurationMs,      // 🆕 ADD
         isRead: false,
         isDeletedForEveryone: false,
         repliedToMessageId: validReplyId,

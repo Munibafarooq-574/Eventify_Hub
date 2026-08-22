@@ -12,6 +12,9 @@ import uploadChatVideo from "@/services/uploadChatVideo";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { Image as ExpoImage } from "expo-image";
 import * as VideoThumbnails from "expo-video-thumbnails";
+import uploadChatAudio from "@/services/uploadChatAudio";
+import VoiceRecorderButton from "./Voice/VoiceRecorderButton";
+import VoiceMessageBubble from "./Voice/VoiceMessageBubble";
 import { Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -74,6 +77,8 @@ const getMsgImage = (m: any) => m?.imageUrl ?? "";
 const getMsgVideo = (m: any) => m?.videoUrl ?? "";
 const getMsgThumbnail = (m: any) => m?.thumbnailUrl ?? "";
 const getMsgVideoDuration = (m: any) => m?.videoDurationMs ?? 0;
+const getMsgAudio = (m: any) => m?.audioUrl ?? "";
+const getMsgAudioDuration = (m: any) => m?.audioDurationMs ?? 0;
 const getMsgTime = (m: any) =>
   m?.timestamp ?? m?.createdAt ?? m?.updatedAt ?? new Date().toISOString();
 const getSenderId = (m: any) => {
@@ -179,8 +184,9 @@ const getRepliedTo = (m: any) => m?.repliedToMessageId ?? null;
 const getReplyPreviewText = (r: any) => {
   if (!r) return "Message deleted";
   if (r?.isDeletedForEveryone) return "This message was deleted";
-  if (getMsgVideo(r)) return "🎥 Video";
-  if (getMsgImage(r)) return "📷 Photo";
+  if (getMsgVideo(r)) return " Video";
+  if (getMsgImage(r)) return " Photo";
+  if (getMsgAudio(r)) return " Voice message";   // 🆕 ADD
   const text = getMsgText(r);
   return text ? text : "Message";
 };
@@ -199,8 +205,6 @@ const buildDisplayData = (messagesDesc: any[]) => {
   return out.reverse(); // back to newest -> oldest for inverted list
 };
 
-// 🆕 ADD THIS — full player, ONLY used inside the full-screen viewer Modal.
-// Never used inside the FlatList, so no off-screen decoders ever run.
 const FullVideoPlayer: React.FC<{ uri: string }> = ({ uri }) => {
   const player = useVideoPlayer(uri, (player) => {
     player.loop = false;
@@ -630,6 +634,8 @@ useEffect(() => {
           videoUrl: getMsgVideo(original),
           thumbnailUrl: getMsgThumbnail(original),
           videoDurationMs: getMsgVideoDuration(original),
+          audioUrl: getMsgAudio(original),              //  ADD
+          audioDurationMs: getMsgAudioDuration(original),//  ADD
           senderId: getSenderId(original),
           isDeletedForEveryone: !!original.isDeletedForEveryone,
         }
@@ -811,6 +817,54 @@ useEffect(() => {
     setUploadProgress(null);
   }
 };
+
+  const sendVoiceMessage = async (audioUri: string, durationMs: number) => {
+    if (!userRef.current) return;
+    setUploading(true);
+    const replySnapshot = buildReplySnapshot(replyingTo);
+    const replyId = replyingTo?._id ?? null;
+
+    try {
+      const remoteUrl = await uploadChatAudio(audioUri);
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const now = new Date().toISOString();
+      const optimisticMsg = {
+        _id: tempId,
+        chatId: chatIdRef.current,
+        senderId: userRef.current._id,
+        message: "",
+        content: "",
+        audioUrl: remoteUrl,
+        audioDurationMs: durationMs,
+        timestamp: now,
+        createdAt: now,
+        temp: true,
+        status: "sending" as const,
+        repliedToMessageId: replySnapshot,
+      };
+
+      setMessages((prev) => sortDesc([optimisticMsg, ...prev]));
+      setReplyingTo(null);
+
+      sendChatMessage({
+        user: userRef.current._id,
+        receiverId: receiverIdRef.current,
+        chatId: chatIdRef.current,
+        content: "",
+        audioUrl: remoteUrl,
+        audioDurationMs: durationMs,
+        repliedToMessageId: replyId || undefined,
+      });
+
+      setMessages((prev) => prev.map((m) => (m._id === tempId ? { ...m, status: "sent" } : m)));
+      scheduleFailureCheck(tempId);
+    } catch (error) {
+      Alert.alert("Upload failed", "Could not send voice note. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  };
   const handleDownloadImage = async () => {
     if (!viewerUri) return;
 
@@ -1361,6 +1415,14 @@ const handleMessageOption = (
   />
 ) : null}
 
+{getMsgAudio(item) ? (
+  <VoiceMessageBubble
+    uri={getMsgAudio(item)}
+    durationMs={getMsgAudioDuration(item)}
+    isSender={isSender}
+  />
+) : null}
+
               {getMsgText(item) ? (
                 <Text
                   style={[
@@ -1663,13 +1725,19 @@ const handleMessageOption = (
                 multiline
                 onSubmitEditing={handleSendMessage}
               />
-              <TouchableOpacity
-                style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]}
-                onPress={handleSendMessage}
-                disabled={!message.trim()}
-              >
-                <Ionicons name="send" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
+                            {message.trim() ? (
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={handleSendMessage}
+                >
+                  <Ionicons name="send" size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+              ) : (
+                <VoiceRecorderButton
+                  disabled={uploading}
+                  onSend={(uri, durationMs) => sendVoiceMessage(uri, durationMs)}
+                />
+              )}
             </View>
             <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>
           </>

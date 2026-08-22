@@ -178,8 +178,10 @@ async handleMessage(
         content: string;
         imageUrl?: string;
         videoUrl?: string;
-        thumbnailUrl?: string;      // 🆕 ADD
-        videoDurationMs?: number;   // 🆕 ADD
+        thumbnailUrl?: string;      
+        videoDurationMs?: number;   
+         audioUrl?: string;           // ADD
+        audioDurationMs?: number;    // ADD
         repliedToMessageId?: string | null;
     },
 )  {
@@ -193,8 +195,10 @@ async handleMessage(
         payload.imageUrl || '',
         payload.videoUrl || '',
         payload.repliedToMessageId || null,
-        payload.thumbnailUrl || '',       // 🆕 ADD
-        payload.videoDurationMs || 0,     // 🆕 ADD
+        payload.thumbnailUrl || '',       
+        payload.videoDurationMs || 0,    
+         payload.audioUrl || '',            // 🆕 ADD
+        payload.audioDurationMs || 0,      // 🆕 ADD
     );
 
     if (this.isUserOnline(payload.receiverId)) {

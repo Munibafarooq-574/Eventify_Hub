@@ -19,6 +19,7 @@ import {
   chatImageStorage,
   imageFileFilter,
   videoFileFilter,
+  audioFileFilter, // 🆕 ADD
 } from './multer.config';
 
 @Controller('chat')
@@ -53,6 +54,37 @@ export class ChatController {
 
     return {
       imageUrl,
+    };
+  }
+
+    // ============================================================
+  // AUDIO (VOICE NOTE) UPLOAD
+  // IMPORTANT: This MUST be before :userId/:vendorId
+  // ============================================================
+
+  @Post('upload/audio')
+  @UseInterceptors(
+    FileInterceptor('audio', {
+      storage: chatImageStorage,
+      fileFilter: audioFileFilter,
+      limits: {
+        fileSize: 20 * 1024 * 1024, // 20MB — voice notes chhote hote hain
+      },
+    }),
+  )
+  async uploadChatAudio(
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Audio file is required');
+    }
+
+    const audioUrl = `/public/uploads/chat/${file.filename}`;
+
+    console.log('AUDIO UPLOAD CONTROLLER:', audioUrl);
+
+    return {
+      audioUrl,
     };
   }
 

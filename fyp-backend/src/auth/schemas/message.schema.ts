@@ -14,17 +14,9 @@ export class Message extends Document {
     @Prop({ required: true })
     receiverId: string;
 
-   /* @Prop({
-        required: function (this: Message) {
-            return !this.imageUrl;
-        },
-        default: '',
-    })
-    message: string;*/
-
     @Prop({
     required: function (this: Message) {
-        return !this.imageUrl && !this.videoUrl;
+        return !this.imageUrl && !this.videoUrl && !this.audioUrl;
     },
     default: '',
 })
@@ -44,6 +36,13 @@ export class Message extends Document {
 // 🆕 optional but recommended — duration badge ke liye
     @Prop({ default: 0 })
     videoDurationMs: number;
+
+    // 🆕 NEW (Voice Note)
+    @Prop({ default: '' })
+    audioUrl: string;
+
+    @Prop({ default: 0 })
+    audioDurationMs: number;
 
     @Prop({ default: false })
     isRead: boolean;
