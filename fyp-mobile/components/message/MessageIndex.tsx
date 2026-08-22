@@ -269,6 +269,7 @@ const ChatScreen: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
@@ -863,29 +864,19 @@ useEffect(() => {
       setContactLoading(false);
     }
   };
+  
+  const handleAttachPress = () => {
+  setAttachMenuVisible(true);
+};
 
-    const handleAttachPress = () => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Cancel", "Take Photo", "Choose from Gallery", "Choose Video"],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) openCamera();
-          else if (buttonIndex === 2) openGallery();
-          else if (buttonIndex === 3) openVideoPicker();
-        }
-      );
-    } else {
-      Alert.alert("Send Media", "", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Take Photo", onPress: openCamera },
-        { text: "Choose from Gallery", onPress: openGallery },
-        { text: "Choose Video", onPress: openVideoPicker },
-      ]);
-    }
-  };
+const closeAttachMenu = () => setAttachMenuVisible(false);
+
+const handleAttachOption = (action: "photo" | "video" | "gallery") => {
+  closeAttachMenu();
+  if (action === "photo") openCamera();
+  else if (action === "video") openCameraVideo();
+  else openGallery();
+};
 
   const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -902,56 +893,55 @@ useEffect(() => {
     }
   };
 
-  const openGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Gallery access is required to send photos.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      sendImageMessage(result.assets[0].uri);
-    }
-  };
-
- const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
-
-const openVideoPicker = async () => {
-  const { status } =
-    await ImagePicker.requestMediaLibraryPermissionsAsync();
-
+  const openCameraVideo = async () => {
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== "granted") {
-    Alert.alert(
-      "Permission needed",
-      "Gallery access is required to send videos."
-    );
+    Alert.alert("Permission needed", "Camera access is required to record videos.");
+    return;
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ["videos"],
+    videoMaxDuration: 60, // optional cap, WhatsApp-status jaisa; hata bhi sakte ho
+  });
+
+  if (result.canceled || !result.assets?.[0]?.uri) return;
+
+  const asset = result.assets[0];
+  await processPickedVideo(asset.uri, asset.duration ?? 0);
+};
+
+  const openGallery = async () => {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== "granted") {
+    Alert.alert("Permission needed", "Gallery access is required to send media.");
     return;
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-    allowsEditing: false,
-    quality: 1,
+    mediaTypes: ["images", "videos"], // WhatsApp jaisa — dono ek hi gallery me
+    quality: 0.7,
   });
 
-  if (result.canceled || !result.assets?.[0]?.uri) {
-    return;
+  if (result.canceled || !result.assets?.[0]?.uri) return;
+
+  const asset = result.assets[0];
+
+  if (asset.type === "video") {
+    await processPickedVideo(asset.uri, asset.duration ?? 0);
+  } else {
+    sendImageMessage(asset.uri);
   }
+};
 
-  const videoUri = result.assets[0].uri;
-  const durationMs = result.assets[0].duration ?? 0;
+ const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
 
+const processPickedVideo = async (videoUri: string, durationMs: number) => {
   try {
     const fileInfo = await FileSystem.getInfoAsync(videoUri);
 
     if (!fileInfo.exists) {
-      Alert.alert(
-        "Video error",
-        "Could not access the selected video."
-      );
+      Alert.alert("Video error", "Could not access the selected video.");
       return;
     }
 
@@ -959,23 +949,17 @@ const openVideoPicker = async () => {
 
     if (fileSize > MAX_VIDEO_SIZE) {
       const sizeMB = (fileSize / (1024 * 1024)).toFixed(1);
-
       Alert.alert(
         "Video too large",
         `Selected video is ${sizeMB} MB.\n\nMaximum allowed size is 200 MB.\nPlease select a smaller video.`
       );
-
       return;
     }
 
     await sendVideoMessage(videoUri, durationMs);
   } catch (error) {
     console.error("VIDEO SIZE CHECK ERROR:", error);
-
-    Alert.alert(
-      "Video error",
-      "Could not check the video size. Please try another video."
-    );
+    Alert.alert("Video error", "Could not check the video size. Please try another video.");
   }
 };
 
@@ -1977,6 +1961,44 @@ const handleMessageOption = (
           <Text style={styles.pinDurationConfirmText}>Pin</Text>
         </TouchableOpacity>
       </View>
+    </View>
+  </TouchableOpacity>
+</Modal>
+<Modal
+  visible={attachMenuVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={closeAttachMenu}
+>
+  <TouchableOpacity
+    style={styles.messageOptionsBackdrop}
+    activeOpacity={1}
+    onPress={closeAttachMenu}
+  >
+    <View style={styles.messageOptionsSheet} onStartShouldSetResponder={() => true}>
+      <View style={styles.messageOptionsHandle} />
+
+      <TouchableOpacity style={styles.messageOption} onPress={() => handleAttachOption("photo")}>
+        <Ionicons name="camera-outline" size={22} color={PRIMARY} />
+        <Text style={styles.messageOptionText}>Take Photo</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.messageOption} onPress={() => handleAttachOption("video")}>
+        <Ionicons name="videocam-outline" size={22} color={PRIMARY} />
+        <Text style={styles.messageOptionText}>Record Video</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.messageOption} onPress={() => handleAttachOption("gallery")}>
+        <Ionicons name="images-outline" size={22} color={PRIMARY} />
+        <Text style={styles.messageOptionText}>Choose from Gallery</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.messageOption, styles.messageOptionCancel]}
+        onPress={closeAttachMenu}
+      >
+        <Text style={styles.messageOptionCancelText}>Cancel</Text>
+      </TouchableOpacity>
     </View>
   </TouchableOpacity>
 </Modal>
