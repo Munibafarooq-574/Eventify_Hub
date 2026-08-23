@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards, Req, Patch, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Patch, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -27,9 +28,13 @@ export class AuthController {
     return this.authService.forgotPassword(forgotPasswordDto.email);
   }
 
-  @Patch('update')
-  async updateProfile(@Body() updateDto: UpdateUserProfileDto) {
-    return this.authService.updateUser(updateDto);
+    @Patch('update')
+  @UseInterceptors(FileInterceptor('file'))
+  async updateProfile(
+    @Body() updateDto: UpdateUserProfileDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.authService.updateUser(updateDto, file);
   }
 
   @Post('push-token')

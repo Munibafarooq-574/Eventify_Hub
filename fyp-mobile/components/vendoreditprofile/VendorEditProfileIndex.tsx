@@ -34,6 +34,7 @@ const EditProfileScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [avatar, setAvatar] = useState('');
+  const [avatarChanged, setAvatarChanged] = useState(false);
   const [address, setAddress] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const [refundPolicy, setRefundPolicy] = useState<string>("");
@@ -110,10 +111,11 @@ const EditProfileScreen: React.FC = () => {
 
   if (!result.canceled) {
     setAvatar(result.assets[0].uri);
+    setAvatarChanged(true); // local file selected — needs upload on save
   }
 };
 
-  const saveUserDetails = async () => {
+     const saveUserDetails = async () => {
     try {
       const userStr = await getSecureData('user');
       if (!userStr) {
@@ -128,21 +130,31 @@ const EditProfileScreen: React.FC = () => {
         return;
       }
 
-      const updateData = {
-  name,
-  email,
-  phoneNumber,
-  address,
-  userId,
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('phoneNumber', phoneNumber);
+      formData.append('address', address);
 
-  contactDetails: {
-    ...user.contactDetails,
-    brandLogo: avatar,
-  },
-};
+      // Only attach a file if the user actually picked a NEW local image.
+      // If avatar is unchanged (already a remote https:// URL, or empty),
+      // don't send a file — backend keeps the existing brandLogo as-is.
+      if (avatarChanged && avatar) {
+        const filename = avatar.split('/').pop()!;
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image';
 
-      const updatedUser = await patchUpdateProfile(userId, updateData);
+        formData.append('file', {
+          uri: avatar,
+          name: filename,
+          type,
+        } as any);
+      }
+
+      const updatedUser = await patchUpdateProfile(userId, formData);
       await saveSecureData('user', JSON.stringify(updatedUser));
+      setAvatarChanged(false);
       alert('Profile updated successfully');
     } catch (error) {
       console.error('Failed to save user data:', error);

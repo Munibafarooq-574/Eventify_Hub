@@ -13,6 +13,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
 import { Review, ReviewSchema } from '../schemas/review.schema';
 import { Notification, NotificationSchema } from '../schemas/notification.schema';
+import { FileUploadService } from '../file-upload/file-upload.service';
 
 @Module({
   imports: [
@@ -31,6 +32,12 @@ import { Notification, NotificationSchema } from '../schemas/notification.schema
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy, FacebookStrategy],
+  providers: [
+  AuthService,
+  FileUploadService,
+  JwtStrategy,
+  GoogleStrategy,
+  FacebookStrategy,
+],
 })
 export class AuthModule { }

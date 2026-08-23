@@ -12,6 +12,7 @@ import { UpdateUserProfileDto } from './dto/update-profile.dto';
 import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
 import { Review } from '../schemas/review.schema';
+import { FileUploadService } from 'src/file-upload/file-upload.service';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,7 @@ export class AuthService {
     @InjectModel(Category.name) private categoryModel: Model<Category>,
     @InjectModel(Review.name) private reviewModel: Model<Review>,
     private jwtService: JwtService,
+    private fileUploadService: FileUploadService,
   ) { }
 
   async register(registerDto: RegisterDto) {
@@ -122,7 +124,7 @@ export class AuthService {
     return { token };
   }
 
-  async updateUser(updateDto: UpdateUserProfileDto): Promise<User> {
+   async updateUser(updateDto: UpdateUserProfileDto, file?: Express.Multer.File): Promise<User> {
   console.log(updateDto);
 
   const updateData: any = {
@@ -132,10 +134,13 @@ export class AuthService {
     phone_number: updateDto.phoneNumber,
   };
 
-  // Update brand logo
-  if (updateDto.contactDetails?.brandLogo) {
-    updateData["contactDetails.brandLogo"] =
-      updateDto.contactDetails.brandLogo;
+  // Only upload + overwrite brandLogo if a NEW file was actually sent.
+  // Without a file, the existing brandLogo in the DB is left untouched —
+  // this is what makes the logo consistent across devices, since the DB
+  // always holds a real https:// URL instead of a local device path.
+  if (file) {
+    const uploaded = await this.fileUploadService.uploadFile(file);
+    updateData["contactDetails.brandLogo"] = uploaded?.Location || "";
   }
 
   const updatedUser = await this.userModel.findByIdAndUpdate(

@@ -1,27 +1,16 @@
+//fyp-mobile/services/patchUpdateProfile.ts
 import axios, { AxiosRequestConfig } from "axios";
 
-interface UpdateProfileDto {
-  name?: string;
-  email?: string;
-  phoneNumber?: string;
-  address?: string;
-
-  contactDetails?: {
-    brandLogo?: string;
-    address?: string;
-    [key: string]: any;
-  };
-
-  userId: string;
-}
-
-export default async function patchUpdateProfile(userId: string, data: UpdateProfileDto) {
-  const url = `https://eventify-hub.onrender.com/auth/update`; // Your backend update profile endpoint
+export default async function patchUpdateProfile(userId: string, formData: FormData) {
+  const url = `https://eventify-hub.onrender.com/auth/update`;
 
   const config: AxiosRequestConfig = {
     method: "PATCH",
     url,
-    data,
+    data: formData,
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   };
 
   try {
