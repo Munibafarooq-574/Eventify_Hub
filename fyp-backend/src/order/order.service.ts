@@ -191,7 +191,7 @@ export class OrderService {
         return order.save();
     }
 
-    async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {
+       async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {
         const updated = await this.orderModel.findByIdAndUpdate(
             orderId,
             { status: dto.status },
@@ -201,6 +201,24 @@ export class OrderService {
         if (!updated) {
             throw new NotFoundException('Order not found');
         }
+
+        // Keep VendorOrder.status in sync with Order.status so that
+        // dashboard analytics (which reads from VendorOrder) reflects
+        // the same state as the Order Summary screen.
+        const vendorOrderStatusMap: Record<string, string> = {
+            pending: 'pending',
+            confirmed: 'accepted',
+            completed: 'completed',
+            cancelled: 'cancelled',
+        };
+        const mappedStatus = vendorOrderStatusMap[dto.status];
+        if (mappedStatus) {
+            await this.vendorOrderModel.updateMany(
+                { _id: { $in: updated.vendorOrders } },
+                { $set: { status: mappedStatus } },
+            );
+        }
+
         try {
             await this.sendPushNotification("Order Update", `Your order has been ${dto.status}`, updated.organizerId.toString(), "ORDER_UPDATE");
         } catch (error) {
