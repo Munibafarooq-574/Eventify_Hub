@@ -8,12 +8,13 @@ import { UpdateOrderStatusDto } from "./dto/update-order-status-dto";
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
-    @Post()
+       @Post()
     async placeOrder(@Body() body: {
         organizerId: string;
         eventDate: string;
         eventTime: string;
         eventName: string;
+        eventType?: string;
         guests: number;
         services: {
             vendorId: string;
@@ -31,6 +32,7 @@ export class OrderController {
                 body.services,
                 body.eventName,
                 body.guests,
+                body.eventType,
             );
             return order;
         } catch (error) {

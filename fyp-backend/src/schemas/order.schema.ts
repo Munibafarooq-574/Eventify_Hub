@@ -13,6 +13,9 @@ export class Order extends Document {
     @Prop({ required: true })
     eventName: string;
 
+    @Prop()
+    eventType: string;
+
     @Prop({ required: true })
     guests: number;
 

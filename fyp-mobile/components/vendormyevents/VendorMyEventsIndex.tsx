@@ -322,7 +322,7 @@ const MyEventsScreen = () => {
                                 {isExpanded && (
     <View style={styles.expandedBlock}>
 
-        {/* Event Details */}
+               {/* Event Details */}
         <Text style={styles.expandedSubTitle}>Event Details</Text>
 
         {!!item.eventName && (
@@ -333,7 +333,7 @@ const MyEventsScreen = () => {
                     color={PRIMARY}
                 />
                 <Text style={styles.expandedText}>
-                    Event: {item.eventName}
+                    Event Name: {item.eventName}
                 </Text>
             </View>
         )}
@@ -346,7 +346,7 @@ const MyEventsScreen = () => {
                     color="#8A8A8A"
                 />
                 <Text style={styles.expandedText}>
-                    Type: {item.eventType}
+                    Event Type: {item.eventType}
                 </Text>
             </View>
         )}
@@ -364,19 +364,6 @@ const MyEventsScreen = () => {
             </View>
         )}
 
-        {!!item.eventTime && (
-            <View style={styles.eventMeta}>
-                <Ionicons
-                    name="time-outline"
-                    size={14}
-                    color="#8A8A8A"
-                />
-                <Text style={styles.expandedText}>
-                    Time: {item.eventTime}
-                </Text>
-            </View>
-        )}
-
         {!!item.guests && (
             <View style={styles.eventMeta}>
                 <Ionicons
@@ -389,33 +376,6 @@ const MyEventsScreen = () => {
                 </Text>
             </View>
         )}
-
-        {!!item.venue && (
-            <View style={styles.eventMeta}>
-                <Ionicons
-                    name="location-outline"
-                    size={14}
-                    color="#8A8A8A"
-                />
-                <Text style={styles.expandedText}>
-                    Venue: {item.venue}
-                </Text>
-            </View>
-        )}
-
-        {!!item.location && !item.venue && (
-            <View style={styles.eventMeta}>
-                <Ionicons
-                    name="location-outline"
-                    size={14}
-                    color="#8A8A8A"
-                />
-                <Text style={styles.expandedText}>
-                    Location: {item.location}
-                </Text>
-            </View>
-        )}
-
         {/* Organizer Details */}
         <Text style={styles.expandedSubTitle}>Organizer Details</Text>
 
@@ -428,32 +388,6 @@ const MyEventsScreen = () => {
                 />
                 <Text style={styles.expandedText}>
                     Name: {item.organizerId.name}
-                </Text>
-            </View>
-        )}
-
-        {!!item.organizerId?.phone && (
-            <View style={styles.eventMeta}>
-                <Ionicons
-                    name="call-outline"
-                    size={14}
-                    color="#8A8A8A"
-                />
-                <Text style={styles.expandedText}>
-                    Phone: {item.organizerId.phone}
-                </Text>
-            </View>
-        )}
-
-        {!!item.organizerId?.email && (
-            <View style={styles.eventMeta}>
-                <Ionicons
-                    name="mail-outline"
-                    size={14}
-                    color="#8A8A8A"
-                />
-                <Text style={styles.expandedText}>
-                    Email: {item.organizerId.email}
                 </Text>
             </View>
         )}

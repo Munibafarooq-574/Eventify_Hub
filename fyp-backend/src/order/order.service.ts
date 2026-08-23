@@ -19,7 +19,7 @@ export class OrderService {
     ) { }
 
     // Create a new order
-    async createOrder(
+    /*async createOrder(
         organizerId: string,
         eventDate: Date,
         eventTime: string,
@@ -37,6 +37,34 @@ export class OrderService {
             eventDate,
             eventTime,
             eventName,
+            guests,
+            totalAmount,
+            discount: 0, // You can modify this if needed
+            finalAmount,
+            status: 'pending', // Initial status
+        });*/
+
+            // Create a new order
+    async createOrder(
+        organizerId: string,
+        eventDate: Date,
+        eventTime: string,
+        services: { vendorId: string; serviceName: string; price: number }[],
+        eventName: string,
+        guests: number,
+        eventType?: string,
+    ): Promise<Order> {
+        // Calculate total and final amounts
+        const totalAmount = services.reduce((sum, service) => sum + service.price, 0);
+        const finalAmount = totalAmount; // Modify this if you want to apply discounts or other adjustments
+
+        // Create the order document
+        const order = new this.orderModel({
+            organizerId: new Types.ObjectId(organizerId),
+            eventDate,
+            eventTime,
+            eventName,
+            eventType,
             guests,
             totalAmount,
             discount: 0, // You can modify this if needed
