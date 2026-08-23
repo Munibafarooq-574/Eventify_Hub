@@ -19,23 +19,25 @@ export class FileUploadService {
             region: process.env.AWS_REGION,
         });
     }
+async uploadFile(file: Express.Multer.File) {
+  if (!file) {
+    return null;
+  }
 
-    async uploadFile(file: any) {
+  console.log('S3 UPLOAD FILE:', {
+    name: file.originalname,
+    type: file.mimetype,
+    size: file.size,
+  });
 
-    if (!file) {
-        return null;
-    }
+  const uniqueFileName = `${uuidv4()}${extname(file.originalname)}`;
 
-    console.log(file);
-
-    const { originalname } = file;
-
-    return await this.s3_upload(
-        file.buffer,
-        this.AWS_S3_BUCKET,
-        originalname,
-        file.mimetype,
-    );
+  return await this.s3_upload(
+    file.buffer,
+    this.AWS_S3_BUCKET,
+    uniqueFileName,
+    file.mimetype,
+  );
 }
 
     async s3_upload(file: any, bucket: any, name: any, mimetype: any) {

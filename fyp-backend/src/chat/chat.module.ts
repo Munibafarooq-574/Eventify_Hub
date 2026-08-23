@@ -6,6 +6,7 @@ import { ChatService } from './chat.service';
 import { Message, MessageSchema } from '../schemas/message.schema';
 import { Conversation, ConversationSchema } from 'src/schemas/conversation.schema';
 import { ChatController } from './chat.controller';
+import { FileUploadService } from '../file-upload/file-upload.service';
 import { User, UserSchema } from 'src/schemas/user.schema';
 import { Notification, NotificationSchema } from 'src/schemas/notification.schema';
 
@@ -18,7 +19,7 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
             { name: Notification.name, schema: NotificationSchema }
         ]),
     ],
-    providers: [ChatGateway, ChatService],
+    providers: [ChatGateway, ChatService, FileUploadService],
     controllers: [ChatController],
 })
 export class ChatModule { }

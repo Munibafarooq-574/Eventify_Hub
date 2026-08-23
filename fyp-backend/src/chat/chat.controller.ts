@@ -14,6 +14,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { ChatService } from './chat.service';
+import { FileUploadService } from '../file-upload/file-upload.service';
 
 import {
   chatImageStorage,
@@ -24,38 +25,45 @@ import {
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+  private readonly chatService: ChatService,
+  private readonly fileUploadService: FileUploadService,
+) {}
 
   // ============================================================
   // IMAGE UPLOAD
   // IMPORTANT: Keep static routes BEFORE :userId/:vendorId
   // ============================================================
 
-  @Post('upload')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: chatImageStorage,
-      fileFilter: imageFileFilter,
-      limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB
-      },
-    }),
-  )
-  async uploadChatImage(
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Image file is required');
-    }
-
-    const imageUrl = `/public/uploads/chat/${file.filename}`;
-
-    console.log('IMAGE UPLOAD CONTROLLER:', imageUrl);
-
-    return {
-      imageUrl,
-    };
+ @Post('upload')
+@UseInterceptors(
+  FileInterceptor('image', {
+    storage: chatImageStorage,
+    fileFilter: imageFileFilter,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
+  }),
+)
+async uploadChatImage(
+  @UploadedFile() file: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('Image file is required');
   }
+
+  const response = await this.fileUploadService.uploadFile(file);
+
+  if (!response?.Location) {
+    throw new BadRequestException('Image upload failed');
+  }
+
+  console.log('IMAGE S3 URL:', response.Location);
+
+  return {
+    imageUrl: response.Location,
+  };
+}
 
     // ============================================================
   // AUDIO (VOICE NOTE) UPLOAD
@@ -63,30 +71,34 @@ export class ChatController {
   // ============================================================
 
   @Post('upload/audio')
-  @UseInterceptors(
-    FileInterceptor('audio', {
-      storage: chatImageStorage,
-      fileFilter: audioFileFilter,
-      limits: {
-        fileSize: 20 * 1024 * 1024, // 20MB — voice notes chhote hote hain
-      },
-    }),
-  )
-  async uploadChatAudio(
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Audio file is required');
-    }
-
-    const audioUrl = `/public/uploads/chat/${file.filename}`;
-
-    console.log('AUDIO UPLOAD CONTROLLER:', audioUrl);
-
-    return {
-      audioUrl,
-    };
+@UseInterceptors(
+  FileInterceptor('audio', {
+    storage: chatImageStorage,
+    fileFilter: audioFileFilter,
+    limits: {
+      fileSize: 20 * 1024 * 1024,
+    },
+  }),
+)
+async uploadChatAudio(
+  @UploadedFile() file: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('Audio file is required');
   }
+
+  const response = await this.fileUploadService.uploadFile(file);
+
+  if (!response?.Location) {
+    throw new BadRequestException('Audio upload failed');
+  }
+
+  console.log('AUDIO S3 URL:', response.Location);
+
+  return {
+    audioUrl: response.Location,
+  };
+}
 
   // ============================================================
   // VIDEO UPLOAD
@@ -99,31 +111,35 @@ export class ChatController {
     storage: chatImageStorage,
     fileFilter: videoFileFilter,
     limits: {
-      fileSize: 200 * 1024 * 1024, // 200MB (was 50MB)
+      fileSize: 200 * 1024 * 1024,
     },
   }),
 )
-  async uploadChatVideo(
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new BadRequestException('Video file is required');
-    }
-
-    const videoUrl = `/public/uploads/chat/${file.filename}`;
-
-    console.log('VIDEO UPLOAD CONTROLLER:', videoUrl);
-    console.log('VIDEO FILE:', {
-      filename: file.filename,
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size,
-    });
-
-    return {
-      videoUrl,
-    };
+async uploadChatVideo(
+  @UploadedFile() file: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('Video file is required');
   }
+
+  console.log('VIDEO FILE:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+  });
+
+  const response = await this.fileUploadService.uploadFile(file);
+
+  if (!response?.Location) {
+    throw new BadRequestException('Video upload failed');
+  }
+
+  console.log('VIDEO S3 URL:', response.Location);
+
+  return {
+    videoUrl: response.Location,
+  };
+}
 
   // ============================================================
   // CREATE / GET CONVERSATION
