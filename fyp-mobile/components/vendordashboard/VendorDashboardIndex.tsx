@@ -39,7 +39,8 @@ const MONTH_NAMES = [
     "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec",
 ];
 
-type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
+//type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
+type OrderStats = { totalOrders: number; pending: number; processing: number; completed: number; cancelled: number };
 
 function formatPKR(amount: number): string {
     if (!amount) return "Rs. 0";
@@ -51,8 +52,15 @@ const DashboardScreen = () => {
 
     const [username, setUsername] = useState<string>("");
     const [vendorId, setVendorId] = useState<string | null>(null);
-    const [orderStats, setOrderStats] = useState<OrderStats>({
+    /*const [orderStats, setOrderStats] = useState<OrderStats>({
         totalOrders: 0,
+        processing: 0,
+        completed: 0,
+        cancelled: 0,
+    });*/
+        const [orderStats, setOrderStats] = useState<OrderStats>({
+        totalOrders: 0,
+        pending: 0,
         processing: 0,
         completed: 0,
         cancelled: 0,
@@ -82,9 +90,18 @@ const DashboardScreen = () => {
 
             setPackages(user.packages || []);
 
-            const statsData = await getVendorOrderStats("Vendor", user._id);
+            /*const statsData = await getVendorOrderStats("Vendor", user._id);
             setOrderStats({
                 totalOrders: statsData.totalOrders,
+                processing: statsData.processing,
+                completed: statsData.completed,
+                cancelled: (statsData as any).cancelled ?? 0,
+            });*/
+
+                        const statsData = await getVendorOrderStats("Vendor", user._id);
+            setOrderStats({
+                totalOrders: statsData.totalOrders,
+                pending: (statsData as any).pending ?? 0,
                 processing: statsData.processing,
                 completed: statsData.completed,
                 cancelled: (statsData as any).cancelled ?? 0,
@@ -205,7 +222,7 @@ const DashboardScreen = () => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.statsContainer}
                     >
-                        <StatBox
+                                                <StatBox
                             icon="receipt-outline"
                             value={orderStats.totalOrders}
                             label="Orders"
@@ -217,10 +234,10 @@ const DashboardScreen = () => {
                                 })
                             }
                         />
-                        <StatBox
+                         <StatBox
                             icon="time-outline"
-                            value={orderStats.processing}
-                            label="Processing"
+                            value={orderStats.pending}
+                            label="Pending"
                             accent="#F0A868"
                             onPress={() =>
                                 router.push({
@@ -229,6 +246,19 @@ const DashboardScreen = () => {
                                 })
                             }
                         />
+                        <StatBox
+                            icon="hourglass-outline"
+                            value={orderStats.processing}
+                            label="Processing"
+                            accent="#4A84BD"
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/vendorordersummary",
+                                    params: { selectedTab: "Processing" },
+                                })
+                            }
+                        />
+            
                         <StatBox
                             icon="checkmark-circle-outline"
                             value={orderStats.completed}

@@ -6,7 +6,7 @@ import { getSecureData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Dimensions, FlatList, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 // Order interface
@@ -37,6 +37,8 @@ const getCardColor = (label: string) => {
             return "#4A84BD"; // blue - confirmed, work in progress
         case "Completed":
             return "#63BE63"; // green - done
+        case "Cancelled":
+            return "#D9534F"; // red - cancelled
         default:
             return PRIMARY;
     }
@@ -52,7 +54,7 @@ const PROCESSING_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 
-type FilterType = "All" | "Pending" | "Processing" | "Completed";
+type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled";
 
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
@@ -82,16 +84,17 @@ const OrderSummary = () => {
     // Live-computed stats: recalculates automatically whenever `orders` changes
     // (e.g. after Mark Processing / Mark Completed / Delete), so the numbers
     // on the summary cards increment/decrement instantly.
-    const orderStats = useMemo(() => {
-        const nonCancelled = orders.filter((o) => o.status !== CANCELLED_STATUS);
+        const orderStats = useMemo(() => {
         const pending = orders.filter((o) => o.status === PENDING_STATUS).length;
         const processing = orders.filter((o) => o.status === PROCESSING_STATUS).length;
         const completed = orders.filter((o) => o.status === COMPLETED_STATUS).length;
+        const cancelled = orders.filter((o) => o.status === CANCELLED_STATUS).length;
         return {
-            totalOrders: nonCancelled.length,
+            totalOrders: orders.length, // matches dashboard's total (includes every status)
             pending,
             processing,
             completed,
+            cancelled,
         };
     }, [orders]);
 
@@ -115,13 +118,13 @@ const OrderSummary = () => {
     // - Pending -> newly placed orders only
     // - Processing -> confirmed orders only
     // - Completed -> completed orders only
-    const filteredOrders = useMemo(() => {
+        const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
-            if (order.status === CANCELLED_STATUS) return false;
             if (selectedFilter === "All") return true;
             if (selectedFilter === "Pending") return order.status === PENDING_STATUS;
             if (selectedFilter === "Processing") return order.status === PROCESSING_STATUS;
             if (selectedFilter === "Completed") return order.status === COMPLETED_STATUS;
+            if (selectedFilter === "Cancelled") return order.status === CANCELLED_STATUS;
             return true;
         });
     }, [orders, selectedFilter]);
@@ -192,10 +195,14 @@ const OrderSummary = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Order Status Summary */}
-                <View style={styles.summaryContainer}>
+                                {/* Order Status Summary */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.summaryScroll}
+                    contentContainerStyle={styles.summaryContainer}
+                >
                     <TouchableOpacity
-                        style={styles.summaryCardWrapper}
                         onPress={() => handleSummaryCardClick("All")}
                         activeOpacity={0.7}
                     >
@@ -207,8 +214,8 @@ const OrderSummary = () => {
                         />
                     </TouchableOpacity>
 
+
                     <TouchableOpacity
-                        style={styles.summaryCardWrapper}
                         onPress={() => handleSummaryCardClick("Pending")}
                         activeOpacity={0.7}
                     >
@@ -220,8 +227,7 @@ const OrderSummary = () => {
                         />
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        style={styles.summaryCardWrapper}
+<TouchableOpacity
                         onPress={() => handleSummaryCardClick("Processing")}
                         activeOpacity={0.7}
                     >
@@ -232,9 +238,8 @@ const OrderSummary = () => {
                             isActive={selectedFilter === "Processing"}
                         />
                     </TouchableOpacity>
-
+                    
                     <TouchableOpacity
-                        style={styles.summaryCardWrapper}
                         onPress={() => handleSummaryCardClick("Completed")}
                         activeOpacity={0.7}
                     >
@@ -245,7 +250,19 @@ const OrderSummary = () => {
                             isActive={selectedFilter === "Completed"}
                         />
                     </TouchableOpacity>
-                </View>
+
+                    <TouchableOpacity
+                        onPress={() => handleSummaryCardClick("Cancelled")}
+                        activeOpacity={0.7}
+                    >
+                        <SummaryCard
+                            label="Cancelled"
+                            value={orderStats.cancelled}
+                            icon="close-circle-outline"
+                            isActive={selectedFilter === "Cancelled"}
+                        />
+                    </TouchableOpacity>
+                </ScrollView>
 
                 {/* Orders List */}
                 <FlatList
@@ -354,14 +371,14 @@ const OrderSummary = () => {
                                         )}
                                     </View>
 
-                                    <View style={styles.actionButtons}>
-                                        {item.status !== "cancelled" && (
+                                                                        <View style={styles.actionButtons}>
+                                        {item.status !== "cancelled" && item.status !== "completed" && (
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
                                                 onPress={() => handleDelete(item._id)}
                                             >
                                                 <Ionicons name="close-circle-outline" size={14} color="#fff" />
-                                                <Text style={styles.buttonText}>Delete</Text>
+                                                <Text style={styles.buttonText}>Cancel Order</Text>
                                             </TouchableOpacity>
                                         )}
 
@@ -495,17 +512,17 @@ const styles = StyleSheet.create({
         color: "rgba(255,255,255,0.75)",
         marginTop: 2,
     },
+        summaryScroll: {
+        flexGrow: 0,
+        marginBottom: 18,
+    },
     summaryContainer: {
         flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 18,
+        alignItems: "flex-start",
         paddingHorizontal: 12,
     },
-    summaryCardWrapper: {
-        flex: 1,
-        marginHorizontal: 3,
-    },
     summaryCard: {
+        width: 92,
         paddingVertical: 12,
         paddingHorizontal: 6,
         borderRadius: 14,
@@ -513,12 +530,14 @@ const styles = StyleSheet.create({
         backgroundColor: "#FFFFFF",
         borderWidth: 1.5,
         borderColor: "#F0DDEA",
+        marginHorizontal: 3,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 6,
         elevation: 2,
     },
+
     summaryIconWrap: {
         width: 34,
         height: 34,
