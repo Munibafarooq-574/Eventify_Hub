@@ -147,7 +147,7 @@ export class OrderService {
 }
 
 
-    async getOrderStats(type: string, userId: string) {
+       async getOrderStats(type: string, userId: string) {
     let userIdObj;
     if (typeof userId === 'string') {
         userIdObj = new Types.ObjectId(userId);
@@ -156,22 +156,26 @@ export class OrderService {
     // Vendor stats now read straight from VendorOrder.status —
     // the same source vendor-analytics.service.ts already uses,
     // so cards + analytics stay consistent.
+    // NOTE: VendorOrder schema uses 'accepted' (not 'processing') for the
+    // "vendor confirmed, work in progress" state — this must match the
+    // mapping used in updateStatus() below.
     if (type === 'Vendor') {
         const vQuery = { vendorId: userIdObj };
         const totalOrders = await this.vendorOrderModel.countDocuments(vQuery);
         const pending = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'pending' });
-        const processing = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'processing' });
+        const processing = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'accepted' });
         const completed = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'completed' });
         const cancelled = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'cancelled' });
 
         return { totalOrders, pending, processing, completed, cancelled };
     }
 
-    // Organizer path unchanged
+    // Organizer path — Order schema uses 'confirmed' (not 'processing') for
+    // the "vendor confirmed, work in progress" state.
     const query: any = { organizerId: userIdObj };
     const totalOrders = await this.orderModel.countDocuments(query);
     const pending = await this.orderModel.countDocuments({ ...query, status: 'pending' });
-    const processing = await this.orderModel.countDocuments({ ...query, status: 'processing' });
+    const processing = await this.orderModel.countDocuments({ ...query, status: 'confirmed' });
     const completed = await this.orderModel.countDocuments({ ...query, status: 'completed' });
     const cancelled = await this.orderModel.countDocuments({ ...query, status: 'cancelled' });
 
