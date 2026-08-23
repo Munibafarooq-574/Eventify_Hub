@@ -14,7 +14,7 @@ const MyOrdersScreen = () => {
     const [guests, setGuests] = useState<number>(0);
 
     useEffect(() => {
-        const fetchCartData = async () => {
+      /* const fetchCartData = async () => { 
             try {
                 const storedCart = await getSecureData('cartData');
                 const eventDetails = JSON.parse(await getSecureData("eventDetails") || "");
@@ -22,6 +22,33 @@ const MyOrdersScreen = () => {
                 const categories = JSON.parse(await getSecureData("categories") || "");
                 const cateringCategory = categories.find((x: any) => x.name.toLowerCase() === "caterings");
                 setCateringCategory(cateringCategory);
+                if (storedCart) {
+                    setCartData(JSON.parse(storedCart));
+                } else {
+                    setCartData({ vendors: [] });
+                }
+            } catch (error) {
+                console.error("Error fetching cart data:", error);
+                Toast.show({
+                    type: "error",
+                    text1: "Error",
+                    text2: "Failed to load cart data. Please try again.",
+                    position: "bottom",
+                });
+            }
+        };*/
+                const fetchCartData = async () => {
+            try {
+                const storedCart = await getSecureData('cartData');
+                const eventDetailsRaw = await getSecureData("eventDetails");
+                const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
+                setGuests(eventDetails?.guests ? parseInt(eventDetails.guests.toString()) : 0);
+
+                const categoriesRaw = await getSecureData("categories");
+                const categories = categoriesRaw ? JSON.parse(categoriesRaw) : [];
+                const cateringCategory = categories.find((x: any) => x.name.toLowerCase() === "caterings");
+                setCateringCategory(cateringCategory);
+
                 if (storedCart) {
                     setCartData(JSON.parse(storedCart));
                 } else {
@@ -68,7 +95,7 @@ const MyOrdersScreen = () => {
     };
 
     // Handle Proceed to Checkout
-    const handleCheckout = async () => {
+   /* const handleCheckout = async () => {
         try {
             const storedCart = await getSecureData('cartData');
             const cart = JSON.parse(storedCart || "");
@@ -97,7 +124,41 @@ const MyOrdersScreen = () => {
                 }))
             );
             console.log({ organizerId, eventDate, eventTime, services, guests, eventName });
-            const response = await postPlaceOrder({ organizerId, eventDate, eventTime, services, guests, eventName });
+            const response = await postPlaceOrder({ organizerId, eventDate, eventTime, services, guests, eventName });*/
+                const handleCheckout = async () => {
+        try {
+            const storedCart = await getSecureData('cartData');
+            const cart = storedCart ? JSON.parse(storedCart) : null;
+
+            if (!cart || cart.vendors.length === 0) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Empty Cart',
+                    text2: 'Your cart is empty. Please add items to proceed.',
+                    position: 'bottom',
+                });
+                return;
+            }
+            const eventDetailsRaw = await getSecureData("eventDetails");
+            const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
+            const userRaw = await getSecureData("user");
+            const user = userRaw ? JSON.parse(userRaw) : null;
+            const eventDate = eventDetails?.eventDate; // Replace with your actual selected date
+            const eventTime = '18:00'; // Replace with your actual selected time
+            const organizerId = user?._id
+            const guests = eventDetails?.guests;
+            const eventName = eventDetails?.eventName;
+            const eventType = eventDetails?.eventType;
+            const services = cart.vendors.flatMap((vendor: any) =>
+                vendor.packages.map((pkg: any) => ({
+                    vendorId: vendor.vendor._id,
+                    serviceName: pkg.packageName,
+                    price: pkg.price,
+                }))
+            );
+            console.log({ organizerId, eventDate, eventTime, services, guests, eventName, eventType });
+            const response = await postPlaceOrder({ organizerId, eventDate, eventTime, services, guests, eventName, eventType });
+            
             if (response) {
                 Toast.show({
                     type: 'success',

@@ -1,3 +1,5 @@
+
+//fyp-mobile/services/postPlaceOrder.ts
 import axios, { AxiosRequestConfig } from "axios";
 
 interface ServiceItem {
@@ -12,6 +14,7 @@ interface PlaceOrderPayload {
     eventTime: string;
     services: ServiceItem[];
     eventName: string;
+    eventType?: string;
     guests: string;
 }
 
