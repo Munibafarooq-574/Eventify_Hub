@@ -19,7 +19,11 @@ export class FileUploadService {
             region: process.env.AWS_REGION,
         });
     }
-async uploadFile(file: Express.Multer.File) {
+async uploadFile(file: {
+  originalname: string;
+  buffer: Buffer;
+  mimetype: string;
+}) {
   if (!file) {
     return null;
   }
@@ -27,7 +31,7 @@ async uploadFile(file: Express.Multer.File) {
   console.log('S3 UPLOAD FILE:', {
     name: file.originalname,
     type: file.mimetype,
-    size: file.size,
+    size: file.buffer.length,
   });
 
   const uniqueFileName = `${uuidv4()}${extname(file.originalname)}`;
