@@ -338,35 +338,91 @@ const OrderSummary = () => {
                                             <Text style={styles.detailText}>Rs. {vendorTotal}</Text>
                                         </View>
 
-                                        {/* Expanded order details - shown only when the card is tapped */}
+                                                                                {/* Expanded order details - shown only when the card is tapped */}
                                         {isExpanded && (
                                             <View style={styles.expandedBlock}>
-                                                <View style={styles.detailRow}>
-                                                    <Ionicons name="receipt-outline" size={14} color="#8A8A8A" />
-                                                    <Text style={styles.detailText}>Order ID: {item._id}</Text>
+                                                {/* Order ID - highlighted, always first */}
+                                                <View style={styles.orderIdBadge}>
+                                                    <Ionicons name="receipt-outline" size={14} color={PRIMARY} />
+                                                    <Text style={styles.orderIdText}>Order ID: {item._id}</Text>
                                                 </View>
-                                                {item.organizerId?.email && (
+
+                                                {/* Event Details */}
+                                                <Text style={styles.expandedSubTitle}>Event Details</Text>
+                                                {!!item.eventName && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Event Name: {item.eventName}</Text>
+                                                    </View>
+                                                )}
+                                                {!!item.eventType && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="pricetag-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Event Type: {item.eventType}</Text>
+                                                    </View>
+                                                )}
+                                                {!!item.eventDate && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="calendar-number-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Date: {new Date(item.eventDate).toDateString()}</Text>
+                                                    </View>
+                                                )}
+                                                {!!item.guests && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="people-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Guests: {item.guests}</Text>
+                                                    </View>
+                                                )}
+
+                                                {/* Organizer Details */}
+                                                <Text style={styles.expandedSubTitle}>Organizer Details</Text>
+                                                {!!item.organizerId?.name && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="person-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Name: {item.organizerId.name}</Text>
+                                                    </View>
+                                                )}
+                                                {!!item.organizerId?.email && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="mail-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>{item.organizerId.email}</Text>
+                                                        <Text style={styles.detailText}>Email: {item.organizerId.email}</Text>
                                                     </View>
                                                 )}
-                                                {item.organizerId?.phone && (
+                                                {!!item.organizerId?.phone && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="call-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>{item.organizerId.phone}</Text>
+                                                        <Text style={styles.detailText}>Phone: {item.organizerId.phone}</Text>
                                                     </View>
                                                 )}
-                                                <Text style={styles.expandedSubTitle}>Services</Text>
-                                                {item.vendorOrders?.map((service: any, idx: number) => (
-                                                    <View key={idx} style={styles.detailRow}>
-                                                        <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
-                                                        <Text style={styles.detailText}>
-                                                            {service.serviceName}
-                                                            {service.price ? ` - Rs. ${service.price}` : ""}
-                                                        </Text>
+
+                                                {/* Booking Details */}
+                                                <Text style={styles.expandedSubTitle}>Booking Details</Text>
+                                                <View style={styles.detailRow}>
+                                                    <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+                                                    <Text style={styles.detailText}>Your Earnings: Rs. {vendorTotal}</Text>
+                                                </View>
+                                                {!!item.status && (
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {item.status}</Text>
                                                     </View>
-                                                ))}
+                                                )}
+
+                                                {/* Services */}
+                                                {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
+                                                    <>
+                                                        <Text style={styles.expandedSubTitle}>Services</Text>
+                                                        {item.vendorOrders.map((service: any, idx: number) => (
+                                                            <View key={idx} style={styles.detailRow}>
+                                                                <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
+                                                                <Text style={styles.detailText}>
+                                                                    {service.serviceName}
+                                                                    {service.price ? ` - Rs. ${service.price}` : ""}
+                                                                </Text>
+                                                            </View>
+                                                        ))}
+                                                    </>
+                                                )}
                                             </View>
                                         )}
                                     </View>
@@ -663,11 +719,27 @@ const styles = StyleSheet.create({
         color: "#4A4A4A",
         flexShrink: 1,
     },
-    expandedBlock: {
+        expandedBlock: {
         marginTop: 6,
         paddingTop: 8,
         borderTopWidth: 1,
         borderTopColor: "rgba(120,12,96,0.12)",
+    },
+    orderIdBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        backgroundColor: PRIMARY_LIGHT,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        marginBottom: 8,
+    },
+    orderIdText: {
+        marginLeft: 6,
+        fontSize: 11,
+        fontWeight: "800",
+        color: PRIMARY,
     },
     expandedSubTitle: {
         fontSize: 11,
