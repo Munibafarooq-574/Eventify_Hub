@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationService } from './notifications.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { User } from 'src/auth/schemas/user.schema';
-import { Notification } from 'src/auth/schemas/notification.schema';
+import { User } from 'src/schemas/user.schema';
+import { Notification } from 'src/schemas/notification.schema';
 import axios from 'axios';
 
 jest.mock('axios');

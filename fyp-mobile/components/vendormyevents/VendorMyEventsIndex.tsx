@@ -1,3 +1,4 @@
+//fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 import getVendorOrders from "@/services/getVendorOrders";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -319,49 +320,213 @@ const MyEventsScreen = () => {
                                 </View>
 
                                 {isExpanded && (
-                                    <View style={styles.expandedBlock}>
-                                        {!!item.organizerId?.name && (
-                                            <View style={styles.eventMeta}>
-                                                <Ionicons name="person-outline" size={14} color="#8A8A8A" />
-                                                <Text style={styles.expandedText}>{item.organizerId.name}</Text>
-                                            </View>
-                                        )}
-                                        {!!item.organizerId?.phone && (
-                                            <View style={styles.eventMeta}>
-                                                <Ionicons name="call-outline" size={14} color="#8A8A8A" />
-                                                <Text style={styles.expandedText}>{item.organizerId.phone}</Text>
-                                            </View>
-                                        )}
-                                        {!!vendorTotal && (
-                                            <View style={styles.eventMeta}>
-                                                <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                <Text style={styles.expandedText}>Rs. {vendorTotal}</Text>
-                                            </View>
-                                        )}
-                                        {!!item.status && (
-                                            <View style={styles.eventMeta}>
-                                                <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                <Text style={[styles.expandedText, { textTransform: "capitalize" }]}>
-                                                    {item.status}
-                                                </Text>
-                                            </View>
-                                        )}
-                                        {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
-                                            <>
-                                                <Text style={styles.expandedSubTitle}>Services</Text>
-                                                {item.vendorOrders.map((s: any, idx: number) => (
-                                                    <View key={idx} style={styles.eventMeta}>
-                                                        <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
-                                                        <Text style={styles.expandedText}>
-                                                            {s.serviceName}
-                                                            {s.price != null ? ` - Rs. ${s.price}` : ""}
-                                                        </Text>
-                                                    </View>
-                                                ))}
-                                            </>
-                                        )}
-                                    </View>
-                                )}
+    <View style={styles.expandedBlock}>
+
+        {/* Event Details */}
+        <Text style={styles.expandedSubTitle}>Event Details</Text>
+
+        {!!item.eventName && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="calendar-outline"
+                    size={14}
+                    color={PRIMARY}
+                />
+                <Text style={styles.expandedText}>
+                    Event: {item.eventName}
+                </Text>
+            </View>
+        )}
+
+        {!!item.eventType && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="pricetag-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Type: {item.eventType}
+                </Text>
+            </View>
+        )}
+
+        {!!item.eventDate && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="calendar-number-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Date: {new Date(item.eventDate).toDateString()}
+                </Text>
+            </View>
+        )}
+
+        {!!item.eventTime && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="time-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Time: {item.eventTime}
+                </Text>
+            </View>
+        )}
+
+        {!!item.guests && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="people-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Guests: {item.guests}
+                </Text>
+            </View>
+        )}
+
+        {!!item.venue && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="location-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Venue: {item.venue}
+                </Text>
+            </View>
+        )}
+
+        {!!item.location && !item.venue && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="location-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Location: {item.location}
+                </Text>
+            </View>
+        )}
+
+        {/* Organizer Details */}
+        <Text style={styles.expandedSubTitle}>Organizer Details</Text>
+
+        {!!item.organizerId?.name && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="person-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Name: {item.organizerId.name}
+                </Text>
+            </View>
+        )}
+
+        {!!item.organizerId?.phone && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="call-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Phone: {item.organizerId.phone}
+                </Text>
+            </View>
+        )}
+
+        {!!item.organizerId?.email && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="mail-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Email: {item.organizerId.email}
+                </Text>
+            </View>
+        )}
+
+        {/* Booking Details */}
+        <Text style={styles.expandedSubTitle}>Booking Details</Text>
+
+        {!!vendorTotal && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="cash-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text style={styles.expandedText}>
+                    Your Earnings: Rs. {vendorTotal}
+                </Text>
+            </View>
+        )}
+
+        {!!item.status && (
+            <View style={styles.eventMeta}>
+                <Ionicons
+                    name="information-circle-outline"
+                    size={14}
+                    color="#8A8A8A"
+                />
+                <Text
+                    style={[
+                        styles.expandedText,
+                        { textTransform: "capitalize" },
+                    ]}
+                >
+                    Status: {item.status}
+                </Text>
+            </View>
+        )}
+
+        {/* Services */}
+        {Array.isArray(item.vendorOrders) &&
+            item.vendorOrders.length > 0 && (
+                <>
+                    <Text style={styles.expandedSubTitle}>
+                        Services
+                    </Text>
+
+                    {item.vendorOrders.map(
+                        (s: any, idx: number) => (
+                            <View
+                                key={idx}
+                                style={styles.eventMeta}
+                            >
+                                <Ionicons
+                                    name="checkmark-circle-outline"
+                                    size={14}
+                                    color={PRIMARY}
+                                />
+
+                                <Text
+                                    style={styles.expandedText}
+                                >
+                                    {s.serviceName}
+                                    {s.price != null
+                                        ? ` - Rs. ${s.price}`
+                                        : ""}
+                                </Text>
+                            </View>
+                        )
+                    )}
+                </>
+            )}
+    </View>
+)}
                             </View>
 
                             <Ionicons

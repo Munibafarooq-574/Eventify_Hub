@@ -2,8 +2,8 @@ import { VendorService } from './vendor.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { Test, TestingModule } from '@nestjs/testing';
-import { User } from 'src/auth/schemas/user.schema';
-import { Category } from 'src/auth/schemas/category.schema';
+import { User } from 'src/schemas/user.schema';
+import { Category } from 'src/schemas/category.schema';
 
 describe('VendorService - Unit Tests', () => {
     let service: VendorService;

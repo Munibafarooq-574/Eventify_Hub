@@ -59,7 +59,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsService } from './reviews.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { Review } from 'src/auth/schemas/review.schema';
+import { Review } from 'src/schemas/review.schema';
 import { Types } from 'mongoose';
 
 const mockReviewModel = {

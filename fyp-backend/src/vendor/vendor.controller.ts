@@ -6,7 +6,7 @@ import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-detai
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
 import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
-import { User } from 'src/auth/schemas/user.schema';
+import { User } from 'src/schemas/user.schema';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { diskStorage } from 'multer';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';

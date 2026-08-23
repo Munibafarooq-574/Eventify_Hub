@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { User } from 'src/auth/schemas/user.schema';
-import { Order } from 'src/auth/schemas/order.schema';
-import { VendorOrder } from 'src/auth/schemas/vendor-order.schema';
-import { Notification } from 'src/auth/schemas/notification.schema';
+import { User } from 'src/schemas/user.schema';
+import { Order } from 'src/schemas/order.schema';
+import { VendorOrder } from 'src/schemas/vendor-order.schema';
+import { Notification } from 'src/schemas/notification.schema';
 import axios from 'axios';
 
 jest.mock('axios');

@@ -3,8 +3,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model } from 'mongoose';
-import { User } from 'src/auth/schemas/user.schema';
-import { Notification } from 'src/auth/schemas/notification.schema';
+import { User } from 'src/schemas/user.schema';
+import { Notification } from 'src/schemas/notification.schema';
 
 @Injectable()
 export class NotificationService {

@@ -3,8 +3,8 @@ import { Module } from '@nestjs/common';
 import { NotificationController } from './notifications.controller';
 import { NotificationService } from './notifications.service';
 import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from 'src/auth/schemas/user.schema';
-import { Notification, NotificationSchema } from 'src/auth/schemas/notification.schema';
+import { User, UserSchema } from 'src/schemas/user.schema';
+import { Notification, NotificationSchema } from 'src/schemas/notification.schema';
 
 @Module({
     imports: [MongooseModule.forFeature([

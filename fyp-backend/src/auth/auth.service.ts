@@ -4,14 +4,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
-import { User } from './schemas/user.schema';
+import { User } from '../schemas/user.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { Category } from './schemas/category.schema';
+import { Category } from '../schemas/category.schema';
 import { UpdateUserProfileDto } from './dto/update-profile.dto';
 import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
-import { Review } from './schemas/review.schema';
+import { Review } from '../schemas/review.schema';
 
 @Injectable()
 export class AuthService {

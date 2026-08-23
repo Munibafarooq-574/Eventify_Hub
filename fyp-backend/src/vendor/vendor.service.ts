@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails, SoundBusinessDetails } from '../auth/schemas/user.schema';
+import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails, SoundBusinessDetails } from '../schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
@@ -11,7 +11,7 @@ import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details
 import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
 import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
-import { Category } from 'src/auth/schemas/category.schema';
+import { Category } from 'src/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { UpdatePackageDto } from './dto/update-package.dto';
 

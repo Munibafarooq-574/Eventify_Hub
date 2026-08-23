@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { MessagesService } from './messages.service';
-import { Message, MessageSchema } from '../auth/schemas/message.schema';
+import { Message, MessageSchema } from '../schemas/message.schema';
 import { Model } from 'mongoose';
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';

@@ -8,11 +8,11 @@ import {
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Message } from './../auth/schemas/message.schema';
-import { Conversation } from 'src/auth/schemas/conversation.schema';
+import { Message } from '../schemas/message.schema';
+import { Conversation } from 'src/schemas/conversation.schema';
 import axios from 'axios';
-import { User } from 'src/auth/schemas/user.schema';
-import { Notification } from 'src/auth/schemas/notification.schema';
+import { User } from 'src/schemas/user.schema';
+import { Notification } from 'src/schemas/notification.schema';
 
 const REPLY_PREVIEW_FIELDS =
     'message imageUrl videoUrl audioUrl senderId chatId isDeletedForEveryone';

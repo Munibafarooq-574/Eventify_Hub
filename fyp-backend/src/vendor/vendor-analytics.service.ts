@@ -23,12 +23,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Order } from 'src/auth/schemas/order.schema';
-import { VendorOrder } from 'src/auth/schemas/vendor-order.schema';
-import { Review } from 'src/auth/schemas/review.schema';
-import { Message } from 'src/auth/schemas/message.schema';
-import { Conversation } from 'src/auth/schemas/conversation.schema';
-import { User } from 'src/auth/schemas/user.schema';
+import { Order } from 'src/schemas/order.schema';
+import { VendorOrder } from 'src/schemas/vendor-order.schema';
+import { Review } from 'src/schemas/review.schema';
+import { Message } from 'src/schemas/message.schema';
+import { Conversation } from 'src/schemas/conversation.schema';
+import { User } from 'src/schemas/user.schema';
 
 export interface VendorAnalytics {
     // Order overview (cancelled only — totalOrders/processing/completed

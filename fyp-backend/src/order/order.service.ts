@@ -1,12 +1,13 @@
+//fyp-backend/src/order/order.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Model, Types } from 'mongoose';
-import { Order } from 'src/auth/schemas/order.schema';
-import { VendorOrder } from 'src/auth/schemas/vendor-order.schema';
+import { Order } from 'src/schemas/order.schema';
+import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { UpdateOrderStatusDto } from './dto/update-order-status-dto';
-import { User } from 'src/auth/schemas/user.schema';
-import { Notification } from 'src/auth/schemas/notification.schema';
+import { User } from 'src/schemas/user.schema';
+import { Notification } from 'src/schemas/notification.schema';
 
 @Injectable()
 export class OrderService {
@@ -146,36 +147,35 @@ export class OrderService {
 }
 
 
-    // Get order stats (pending, processing, completed) for Vendor or Organizer
     async getOrderStats(type: string, userId: string) {
     let userIdObj;
     if (typeof userId === 'string') {
         userIdObj = new Types.ObjectId(userId);
     }
 
-    const query: any = {};
+    // Vendor stats now read straight from VendorOrder.status —
+    // the same source vendor-analytics.service.ts already uses,
+    // so cards + analytics stay consistent.
+    if (type === 'Vendor') {
+        const vQuery = { vendorId: userIdObj };
+        const totalOrders = await this.vendorOrderModel.countDocuments(vQuery);
+        const pending = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'pending' });
+        const processing = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'processing' });
+        const completed = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'completed' });
+        const cancelled = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'cancelled' });
 
-    if (type === 'Organizer') {
-        query.organizerId = userIdObj;
-    } else if (type === 'Vendor') {
-        const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
-        const vendorOrderIds = vendorOrders.map(order => order._id);
-        query.vendorOrders = { $in: vendorOrderIds };
+        return { totalOrders, pending, processing, completed, cancelled };
     }
 
+    // Organizer path unchanged
+    const query: any = { organizerId: userIdObj };
     const totalOrders = await this.orderModel.countDocuments(query);
     const pending = await this.orderModel.countDocuments({ ...query, status: 'pending' });
     const processing = await this.orderModel.countDocuments({ ...query, status: 'processing' });
     const completed = await this.orderModel.countDocuments({ ...query, status: 'completed' });
-    const cancelled = await this.orderModel.countDocuments({ ...query, status: 'cancelled' }); // NEW
+    const cancelled = await this.orderModel.countDocuments({ ...query, status: 'cancelled' });
 
-    return {
-        totalOrders,
-        pending,
-        processing,
-        completed,
-        cancelled, // NEW
-    };
+    return { totalOrders, pending, processing, completed, cancelled };
 }
 
 

@@ -2,10 +2,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatService } from './chat.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { Conversation } from '../auth/schemas/conversation.schema';
-import { Message } from '../auth/schemas/message.schema';
-import { User } from '../auth/schemas/user.schema';
-import { Notification } from '../auth/schemas/notification.schema';
+import { Conversation } from '../schemas/conversation.schema';
+import { Message } from '../schemas/message.schema';
+import { User } from '../schemas/user.schema';
+import { Notification } from '../schemas/notification.schema';
 import axios from 'axios';
 
 jest.mock('axios');

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { CreateReviewDto } from './dto/create-review.dto';
-import { Review } from 'src/auth/schemas/review.schema';
+import { Review } from 'src/schemas/review.schema';
 
 @Injectable()
 export class ReviewsService {

@@ -3,11 +3,11 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
-import { Message, MessageSchema } from './../auth/schemas/message.schema';
-import { Conversation, ConversationSchema } from 'src/auth/schemas/conversation.schema';
+import { Message, MessageSchema } from '../schemas/message.schema';
+import { Conversation, ConversationSchema } from 'src/schemas/conversation.schema';
 import { ChatController } from './chat.controller';
-import { User, UserSchema } from 'src/auth/schemas/user.schema';
-import { Notification, NotificationSchema } from 'src/auth/schemas/notification.schema';
+import { User, UserSchema } from 'src/schemas/user.schema';
+import { Notification, NotificationSchema } from 'src/schemas/notification.schema';
 
 @Module({
     imports: [

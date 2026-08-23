@@ -1,7 +1,7 @@
 import { Injectable, Post, UnauthorizedException, UseInterceptors } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Category } from '../auth/schemas/category.schema';
+import { Category } from '../schemas/category.schema';
 import { CreateDto } from './dto/create.dto';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 
