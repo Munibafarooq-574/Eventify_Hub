@@ -152,6 +152,13 @@ export default function VendorGrowthScreen() {
   });
   return;
 }
+if (item.key === 'badges') {
+  router.push({
+    pathname: '/vendorbadgesscreen',
+    params: { vendorId },
+  });
+  return;
+}
     // Remaining feature screens (FeaturedPackagesScreen, CouponsScreen,
     // etc.) ship in Phases 4-7 — wired here so the menu already reflects
     // the final structure, but they don't exist yet.

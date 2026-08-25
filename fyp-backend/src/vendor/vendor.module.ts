@@ -23,7 +23,7 @@ import {
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
-import { VendorGrowthModule } from './growth/vendor-growth.module';
+//import { VendorGrowthModule } from './growth/vendor-growth.module';
 
 @Module({
     imports: [
@@ -37,7 +37,7 @@ import { VendorGrowthModule } from './growth/vendor-growth.module';
             { name: Message.name, schema: MessageSchema },
             { name: Conversation.name, schema: ConversationSchema },
         ]),
-        VendorGrowthModule,
+        // VendorGrowthModule,
     ],
 
     controllers: [VendorController],
@@ -47,5 +47,6 @@ import { VendorGrowthModule } from './growth/vendor-growth.module';
         VendorAnalyticsService,
         FileUploadService,
     ],
+    exports: [VendorAnalyticsService],
 })
 export class VendorModule {}
