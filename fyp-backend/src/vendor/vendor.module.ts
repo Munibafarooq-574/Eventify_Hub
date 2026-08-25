@@ -23,6 +23,7 @@ import {
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
+import { VendorGrowthModule } from './growth/vendor-growth.module';
 
 @Module({
     imports: [
@@ -36,6 +37,7 @@ import { VendorAnalyticsService } from './vendor-analytics.service';
             { name: Message.name, schema: MessageSchema },
             { name: Conversation.name, schema: ConversationSchema },
         ]),
+        VendorGrowthModule,
     ],
 
     controllers: [VendorController],

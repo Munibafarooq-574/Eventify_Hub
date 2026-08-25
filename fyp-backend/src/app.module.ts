@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { CategoryModule } from './category/category.module';
 import { VendorModule } from './vendor/vendor.module';
+import { VendorGrowthModule } from './vendor/growth/vendor-growth.module';
 import { MessagesModule } from './messages/messages.module';
 import { ChatModule } from './chat/chat.module';
 import { OrderModule } from './order/order.module';
@@ -13,6 +14,8 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -20,6 +23,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AuthModule,
     CategoryModule,
     VendorModule,
+    VendorGrowthModule,
     MessagesModule,
     ChatModule,
     OrderModule,

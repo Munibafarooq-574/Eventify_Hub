@@ -206,14 +206,46 @@ const DashboardScreen = () => {
                             </View>
                         </View>
 
-                        <TouchableOpacity
-                            style={styles.notificationIcon}
-                            activeOpacity={0.7}
-                            onPress={() => router.push("/vendornotifications")}
-                        >
-                            <Ionicons name="notifications-outline" size={22} color="#fff" />
-                            {hasNotifications && <View style={styles.notificationDot} />}
-                        </TouchableOpacity>
+                       <View style={styles.headerActions}>
+
+    <TouchableOpacity
+        style={styles.headerActionButton}
+        activeOpacity={0.7}
+        onPress={() => {
+            if (vendorId) {
+                router.push({
+                    pathname: "/vendorgrowth",
+                    params: { vendorId },
+                });
+            } else {
+                Alert.alert("Error", "Vendor ID not found.");
+            }
+        }}
+    >
+        <Ionicons
+            name="rocket-outline"
+            size={22}
+            color="#fff"
+        />
+    </TouchableOpacity>
+
+    <TouchableOpacity
+        style={styles.headerActionButton}
+        activeOpacity={0.7}
+        onPress={() => router.push("/vendornotifications")}
+    >
+        <Ionicons
+            name="notifications-outline"
+            size={22}
+            color="#fff"
+        />
+
+        {hasNotifications && (
+            <View style={styles.notificationDot} />
+        )}
+    </TouchableOpacity>
+
+</View>
                     </View>
 
                     {/* ---------- Order Overview (4 cards) ---------- */}
@@ -760,6 +792,21 @@ const styles = StyleSheet.create({
         borderBottomRightRadius: 28,
         ...cardShadow(0.18),
     },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+},
+
+headerActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
     profileContainer: {
         flexDirection: "row",
         justifyContent: "space-between",
