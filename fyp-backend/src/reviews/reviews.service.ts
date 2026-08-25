@@ -1,5 +1,5 @@
 // src/reviews/reviews.service.ts
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -85,5 +85,88 @@ export class ReviewsService {
 
         return await this.reviewModel.aggregate(pipeline).exec();
     }
+
+    //new add
+    async getVendorReviewSummary(vendorId: string) {
+    if (!Types.ObjectId.isValid(vendorId)) {
+        throw new BadRequestException('Invalid vendorId');
+    }
+
+    const vendorObjectId = new Types.ObjectId(vendorId);
+
+    const pipeline: PipelineStage[] = [
+        { $match: { vendorId: vendorObjectId } },
+        {
+            $group: {
+                _id: '$vendorId',
+                averageRating: { $avg: '$rating' },
+                totalReviews: { $sum: 1 },
+                reviewsWithMedia: {
+                    $sum: {
+                        $cond: [
+                            {
+                                $gt: [
+                                    { $size: { $ifNull: ['$media', []] } },
+                                    0,
+                                ],
+                            },
+                            1,
+                            0,
+                        ],
+                    },
+                },
+                rating5: {
+                    $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] },
+                },
+                rating4: {
+                    $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] },
+                },
+                rating3: {
+                    $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] },
+                },
+                rating2: {
+                    $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] },
+                },
+                rating1: {
+                    $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] },
+                },
+            },
+        },
+        {
+            $project: {
+                _id: 0,
+                averageRating: { $round: ['$averageRating', 1] },
+                totalReviews: 1,
+                reviewsWithMedia: 1,
+                ratingBreakdown: {
+                    5: '$rating5',
+                    4: '$rating4',
+                    3: '$rating3',
+                    2: '$rating2',
+                    1: '$rating1',
+                },
+            },
+        },
+    ];
+
+    const result = await this.reviewModel.aggregate(pipeline).exec();
+
+    if (!result.length) {
+        return {
+            averageRating: 0,
+            totalReviews: 0,
+            reviewsWithMedia: 0,
+            ratingBreakdown: {
+                5: 0,
+                4: 0,
+                3: 0,
+                2: 0,
+                1: 0,
+            },
+        };
+    }
+
+    return result[0];
+}
 
 }

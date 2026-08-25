@@ -34,4 +34,10 @@ export class ReviewsController {
     async getTopVendors() {
         return this.reviewsService.getTopVendorsByRating();
     }
+    //new add
+
+    @Get('summary')
+async getSummary(@Query('vendorId') vendorId: string) {
+    return this.reviewsService.getVendorReviewSummary(vendorId);
+}
 }
