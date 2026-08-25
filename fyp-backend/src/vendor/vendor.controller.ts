@@ -30,6 +30,30 @@ export class VendorController {
         return this.vendorService.getAllVendorsByCategoryId(categoryId);
     }
 
+    @Get('packages')
+async getPackages(@Query('userId') userId: string) {
+    return this.vendorService.getPackages(userId);
+}
+
+@Get('analytics/:id')
+async getVendorAnalytics(@Param('id') id: string) {
+    return this.vendorAnalyticsService.getVendorAnalytics(id);
+}
+ @Get('contact-details/:userId')
+     async getContactDetails(@Param('userId') userId: string) {
+    return this.vendorService.getContactDetails(userId);
+     }
+    // Get Business Details
+    @Get('business-details')
+    async getBusinessDetails(@Param('userId') userId: string) {
+        return this.vendorService.getBusinessDetails(userId);
+    }
+    
+  @Get()
+    async getVendor(@Query('userId') userId: string) {
+        return this.vendorService.getVendor(userId);
+    }
+
     @Get(':id')
     async getVendorById(@Param('id') id: string) {
         const vendor = await this.vendorService.findVendorById(id);
@@ -39,10 +63,6 @@ export class VendorController {
         return vendor;
     }
 
-    @Get('analytics/:id')
-async getVendorAnalytics(@Param('id') id: string) {
-    return this.vendorAnalyticsService.getVendorAnalytics(id);
-}
 
     @Post('contactDetails')
     @UseInterceptors(FileInterceptor('file'))
@@ -106,27 +126,6 @@ async updateBusinessDetails(
     async getContactDetails(@Param('userId') userId: string) {
         return this.vendorService.getContactDetails(userId);
     } */
-
-    @Get('contact-details/:userId')
-     async getContactDetails(@Param('userId') userId: string) {
-    return this.vendorService.getContactDetails(userId);
-     }
-    // Get Business Details
-    @Get('business-details')
-    async getBusinessDetails(@Param('userId') userId: string) {
-        return this.vendorService.getBusinessDetails(userId);
-    }
-
-    // Get Packages
-    @Get('packages')
-    async getPackages(@Param('userId') userId: string) {
-        return this.vendorService.getPackages(userId);
-    }
-
-    @Get()
-    async getVendor(@Query('userId') userId: string) {
-        return this.vendorService.getVendor(userId);
-    }
 
     @Post('ai-package')
     async getSmartPackage(@Body() smartPackageDto: SmartPackageInput) {

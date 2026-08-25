@@ -85,7 +85,7 @@ export default function FeatureVendorScreen() {
     } finally {
       setLoading(false);
     }
-  }, [vendorId]);
+  }, [vendorIdValue]);
 
   useEffect(() => {
     loadData();

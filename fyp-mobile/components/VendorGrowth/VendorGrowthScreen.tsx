@@ -145,6 +145,13 @@ export default function VendorGrowthScreen() {
 });
       return;
     }
+    if (item.key === 'featuredPackages') {
+  router.push({
+  pathname: '/featuredpackagesscreen',
+  params: { vendorId: vendorIdValue },
+  });
+  return;
+}
     // Remaining feature screens (FeaturedPackagesScreen, CouponsScreen,
     // etc.) ship in Phases 4-7 — wired here so the menu already reflects
     // the final structure, but they don't exist yet.
