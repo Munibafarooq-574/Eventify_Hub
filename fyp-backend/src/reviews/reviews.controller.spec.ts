@@ -38,7 +38,9 @@ describe('ReviewsController', () => {
         const data = [{ message: 'Awesome' }];
         mockReviewsService.getVendorReviews.mockResolvedValue(data);
 
-        const result = await controller.getReviews('vendor123');
+        const result = await controller.getReviews({
+  vendorId: 'vendor123',
+});
         expect(result).toEqual(data);
     });
 

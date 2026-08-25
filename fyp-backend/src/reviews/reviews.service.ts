@@ -1,8 +1,9 @@
 // src/reviews/reviews.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, PipelineStage, Types } from 'mongoose';
+import { Model, PipelineStage, Types, FilterQuery } from 'mongoose';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { ReviewQueryDto, ReviewSortOption } from './dto/review-query.dto';
 import { Review } from 'src/schemas/review.schema';
 
 @Injectable()
@@ -17,12 +18,71 @@ export class ReviewsService {
         return this.reviewModel.create({ ...dto, userId: userIdLocal, vendorId: vendorId });
     }
 
-    async getVendorReviews(vendorId: string): Promise<Review[]> {
-        return this.reviewModel
-            .find({ vendorId: new Types.ObjectId(vendorId) })
-            .populate('userId', 'name')
-            .sort({ createdAt: -1 });
+   async getVendorReviews(query: ReviewQueryDto) {
+    const {
+    vendorId,
+    rating,
+    withMedia,
+    sort = ReviewSortOption.RECENT,
+    page = 1,
+    limit = 20,
+} = query;
+
+    const filter: FilterQuery<Review> = {
+        vendorId: new Types.ObjectId(vendorId),
+    };
+
+    if (rating) {
+        filter.rating = rating;
     }
+
+    if (withMedia === 'true') {
+        filter.media = {
+            $exists: true,
+            $not: { $size: 0 },
+        };
+    }
+
+    const sortMap: Record<
+        ReviewSortOption,
+        Record<string, 1 | -1>
+    > = {
+        [ReviewSortOption.RECENT]: { createdAt: -1 },
+        [ReviewSortOption.HIGHEST]: {
+            rating: -1,
+            createdAt: -1,
+        },
+        [ReviewSortOption.LOWEST]: {
+            rating: 1,
+            createdAt: -1,
+        },
+    };
+
+    const sortStage =
+        sortMap[sort] ?? sortMap[ReviewSortOption.RECENT];
+
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+        this.reviewModel
+            .find(filter)
+            .populate('userId', 'name')
+            .sort(sortStage)
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+
+        this.reviewModel.countDocuments(filter),
+    ]);
+
+    return {
+        reviews,
+        page,
+        limit,
+        total,
+        hasMore: skip + reviews.length < total,
+    };
+}
 
     async getTopVendorsByRating(limit = 5) {
         const pipeline: PipelineStage[] = [
