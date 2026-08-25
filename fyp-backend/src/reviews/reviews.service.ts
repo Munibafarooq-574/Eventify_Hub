@@ -1,95 +1,114 @@
 // src/reviews/reviews.service.ts
-import { BadRequestException, Injectable } from '@nestjs/common';
+
+import {
+    BadRequestException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types, FilterQuery } from 'mongoose';
+
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewQueryDto, ReviewSortOption } from './dto/review-query.dto';
+import { ReplyReviewDto } from './dto/reply-review.dto';
 import { Review } from 'src/schemas/review.schema';
 
 @Injectable()
 export class ReviewsService {
     constructor(
-        @InjectModel(Review.name) private reviewModel: Model<Review>,
-    ) { }
+        @InjectModel(Review.name)
+        private reviewModel: Model<Review>,
+    ) {}
 
-    async createReview(userId: string, dto: CreateReviewDto): Promise<Review> {
+    async createReview(
+        userId: string,
+        dto: CreateReviewDto,
+    ): Promise<Review> {
         const vendorId = new Types.ObjectId(dto.vendorId);
         const userIdLocal = new Types.ObjectId(userId);
-        return this.reviewModel.create({ ...dto, userId: userIdLocal, vendorId: vendorId });
+
+        return this.reviewModel.create({
+            ...dto,
+            userId: userIdLocal,
+            vendorId,
+        });
     }
 
-   async getVendorReviews(query: ReviewQueryDto) {
-    const {
-    vendorId,
-    rating,
-    withMedia,
-    sort = ReviewSortOption.RECENT,
-    page = 1,
-    limit = 20,
-} = query;
+    async getVendorReviews(query: ReviewQueryDto) {
+        const {
+            vendorId,
+            rating,
+            withMedia,
+            sort = ReviewSortOption.RECENT,
+            page = 1,
+            limit = 20,
+        } = query;
 
-    const filter: FilterQuery<Review> = {
-        vendorId: new Types.ObjectId(vendorId),
-    };
+        const filter: FilterQuery<Review> = {
+            vendorId: new Types.ObjectId(vendorId),
+        };
 
-    if (rating) {
-        filter.rating = rating;
-    }
+        if (rating) {
+            filter.rating = rating;
+        }
 
-    if (withMedia === 'true') {
-        filter.media = {
-            $exists: true,
-            $not: { $size: 0 },
+        if (withMedia === 'true') {
+            filter.media = {
+                $exists: true,
+                $not: { $size: 0 },
+            };
+        }
+
+        const sortMap: Record<
+            ReviewSortOption,
+            Record<string, 1 | -1>
+        > = {
+            [ReviewSortOption.RECENT]: {
+                createdAt: -1,
+            },
+            [ReviewSortOption.HIGHEST]: {
+                rating: -1,
+                createdAt: -1,
+            },
+            [ReviewSortOption.LOWEST]: {
+                rating: 1,
+                createdAt: -1,
+            },
+        };
+
+        const sortStage =
+            sortMap[sort] ?? sortMap[ReviewSortOption.RECENT];
+
+        const skip = (page - 1) * limit;
+
+        const [reviews, total] = await Promise.all([
+            this.reviewModel
+                .find(filter)
+                .populate('userId', 'name')
+                .sort(sortStage)
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+
+            this.reviewModel.countDocuments(filter),
+        ]);
+
+        return {
+            reviews,
+            page,
+            limit,
+            total,
+            hasMore: skip + reviews.length < total,
         };
     }
-
-    const sortMap: Record<
-        ReviewSortOption,
-        Record<string, 1 | -1>
-    > = {
-        [ReviewSortOption.RECENT]: { createdAt: -1 },
-        [ReviewSortOption.HIGHEST]: {
-            rating: -1,
-            createdAt: -1,
-        },
-        [ReviewSortOption.LOWEST]: {
-            rating: 1,
-            createdAt: -1,
-        },
-    };
-
-    const sortStage =
-        sortMap[sort] ?? sortMap[ReviewSortOption.RECENT];
-
-    const skip = (page - 1) * limit;
-
-    const [reviews, total] = await Promise.all([
-        this.reviewModel
-            .find(filter)
-            .populate('userId', 'name')
-            .sort(sortStage)
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-
-        this.reviewModel.countDocuments(filter),
-    ]);
-
-    return {
-        reviews,
-        page,
-        limit,
-        total,
-        hasMore: skip + reviews.length < total,
-    };
-}
 
     async getTopVendorsByRating(limit = 5) {
         const pipeline: PipelineStage[] = [
             {
                 $group: {
-                    _id: "$vendorId",
-                    averageRating: { $avg: "$rating" },
+                    _id: '$vendorId',
+                    averageRating: { $avg: '$rating' },
                     totalReviews: { $sum: 1 },
                 },
             },
@@ -104,27 +123,27 @@ export class ReviewsService {
             },
             {
                 $lookup: {
-                    from: "users", // correct collection name
-                    localField: "_id",
-                    foreignField: "_id",
-                    as: "vendor",
+                    from: 'users',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'vendor',
                 },
             },
             {
                 $unwind: {
-                    path: "$vendor",
+                    path: '$vendor',
                     preserveNullAndEmptyArrays: false,
                 },
             },
             {
                 $match: {
-                    "vendor.role": "Vendor",
+                    'vendor.role': 'Vendor',
                 },
             },
             {
                 $project: {
                     _id: 0,
-                    vendorId: "$_id",
+                    vendorId: '$_id',
                     averageRating: 1,
                     totalReviews: 1,
                     vendor: {
@@ -146,87 +165,166 @@ export class ReviewsService {
         return await this.reviewModel.aggregate(pipeline).exec();
     }
 
-    //new add
     async getVendorReviewSummary(vendorId: string) {
-    if (!Types.ObjectId.isValid(vendorId)) {
-        throw new BadRequestException('Invalid vendorId');
-    }
+        if (!Types.ObjectId.isValid(vendorId)) {
+            throw new BadRequestException('Invalid vendorId');
+        }
 
-    const vendorObjectId = new Types.ObjectId(vendorId);
+        const vendorObjectId = new Types.ObjectId(vendorId);
 
-    const pipeline: PipelineStage[] = [
-        { $match: { vendorId: vendorObjectId } },
-        {
-            $group: {
-                _id: '$vendorId',
-                averageRating: { $avg: '$rating' },
-                totalReviews: { $sum: 1 },
-                reviewsWithMedia: {
-                    $sum: {
-                        $cond: [
-                            {
-                                $gt: [
-                                    { $size: { $ifNull: ['$media', []] } },
-                                    0,
-                                ],
-                            },
-                            1,
-                            0,
-                        ],
+        const pipeline: PipelineStage[] = [
+            {
+                $match: {
+                    vendorId: vendorObjectId,
+                },
+            },
+            {
+                $group: {
+                    _id: '$vendorId',
+                    averageRating: {
+                        $avg: '$rating',
+                    },
+                    totalReviews: {
+                        $sum: 1,
+                    },
+                    reviewsWithMedia: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $gt: [
+                                        {
+                                            $size: {
+                                                $ifNull: ['$media', []],
+                                            },
+                                        },
+                                        0,
+                                    ],
+                                },
+                                1,
+                                0,
+                            ],
+                        },
+                    },
+                    rating5: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$rating', 5] },
+                                1,
+                                0,
+                            ],
+                        },
+                    },
+                    rating4: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$rating', 4] },
+                                1,
+                                0,
+                            ],
+                        },
+                    },
+                    rating3: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$rating', 3] },
+                                1,
+                                0,
+                            ],
+                        },
+                    },
+                    rating2: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$rating', 2] },
+                                1,
+                                0,
+                            ],
+                        },
+                    },
+                    rating1: {
+                        $sum: {
+                            $cond: [
+                                { $eq: ['$rating', 1] },
+                                1,
+                                0,
+                            ],
+                        },
                     },
                 },
-                rating5: {
-                    $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] },
-                },
-                rating4: {
-                    $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] },
-                },
-                rating3: {
-                    $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] },
-                },
-                rating2: {
-                    $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] },
-                },
-                rating1: {
-                    $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    averageRating: {
+                        $round: ['$averageRating', 1],
+                    },
+                    totalReviews: 1,
+                    reviewsWithMedia: 1,
+                    ratingBreakdown: {
+                        5: '$rating5',
+                        4: '$rating4',
+                        3: '$rating3',
+                        2: '$rating2',
+                        1: '$rating1',
+                    },
                 },
             },
-        },
-        {
-            $project: {
-                _id: 0,
-                averageRating: { $round: ['$averageRating', 1] },
-                totalReviews: 1,
-                reviewsWithMedia: 1,
+        ];
+
+        const result =
+            await this.reviewModel.aggregate(pipeline).exec();
+
+        if (!result.length) {
+            return {
+                averageRating: 0,
+                totalReviews: 0,
+                reviewsWithMedia: 0,
                 ratingBreakdown: {
-                    5: '$rating5',
-                    4: '$rating4',
-                    3: '$rating3',
-                    2: '$rating2',
-                    1: '$rating1',
+                    5: 0,
+                    4: 0,
+                    3: 0,
+                    2: 0,
+                    1: 0,
                 },
-            },
-        },
-    ];
+            };
+        }
 
-    const result = await this.reviewModel.aggregate(pipeline).exec();
-
-    if (!result.length) {
-        return {
-            averageRating: 0,
-            totalReviews: 0,
-            reviewsWithMedia: 0,
-            ratingBreakdown: {
-                5: 0,
-                4: 0,
-                3: 0,
-                2: 0,
-                1: 0,
-            },
-        };
+        return result[0];
     }
 
-    return result[0];
-}
+    // POST /reviews/:reviewId/reply
+    async replyToReview(
+        reviewId: string,
+        vendorId: string,
+        dto: ReplyReviewDto,
+    ) {
+        if (!Types.ObjectId.isValid(reviewId)) {
+            throw new NotFoundException('Review not found');
+        }
 
+        const review = await this.reviewModel.findById(reviewId);
+
+        if (!review) {
+            throw new NotFoundException('Review not found');
+        }
+
+        // Security: only the owner/vendor of this review can reply
+        if (review.vendorId.toString() !== vendorId.toString()) {
+            throw new ForbiddenException(
+                'You are not authorized to reply to this review',
+            );
+        }
+
+        review.vendorReply = {
+            text: dto.text,
+            repliedAt: new Date(),
+        };
+
+        await review.save();
+
+        return {
+            reviewId: review._id,
+            vendorReply: review.vendorReply,
+        };
+    }
 }
