@@ -1,3 +1,4 @@
+//vendor side detail section
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import getVendorReviewSummary from '@/services/getVendorReviewSummary';
 import ReviewCard from '@/components/Review/ReviewCard';
@@ -8,8 +9,9 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
+import replyToReview from '@/services/replyToReview';
 
 const PRIMARY = '#7B2869';
 const PRIMARY_LIGHT = '#9F4F8E';
@@ -34,6 +36,10 @@ const VendorProfileDetailsScreen: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const { id } = useGlobalSearchParams();
     const [reviews, setReviews] = useState<Review[]>([]);
+    const [replyingTo, setReplyingTo] = useState<string | null>(null);
+const [replyText, setReplyText] = useState('');
+const [submittingReply, setSubmittingReply] = useState(false);
+const [replyError, setReplyError] = useState<string | null>(null);
     const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
     const [selectedReviewMedia, setSelectedReviewMedia] = useState<ReviewMedia[]>([]);
     const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
@@ -118,6 +124,65 @@ const handleLoadMore = () => {
     if (!loadingMore && hasMoreReviews) {
         fetchReviews(false);
     }
+};
+const startReply = (reviewId: string) => {
+  setReplyingTo(reviewId);
+  setReplyText('');
+  setReplyError(null);
+};
+
+const cancelReply = () => {
+  setReplyingTo(null);
+  setReplyText('');
+  setReplyError(null);
+};
+
+const submitReply = async (reviewId: string) => {
+  if (!replyText.trim()) {
+    setReplyError('Reply cannot be empty.');
+    return;
+  }
+
+  setSubmittingReply(true);
+  setReplyError(null);
+
+  try {
+    const result = await replyToReview(reviewId, {
+      text: replyText.trim(),
+    });
+
+    setReviews(prev =>
+      prev.map(review =>
+        review._id === reviewId
+          ? {
+              ...review,
+              vendorReply: result.vendorReply,
+            }
+          : review,
+      ),
+    );
+
+    setReplyingTo(null);
+    setReplyText('');
+  } catch (error: any) {
+    console.error('Error submitting reply:', error);
+
+    const status = error?.response?.status;
+
+    if (status === 403) {
+      setReplyError(
+        'You are not authorized to reply to this review.',
+      );
+    } else if (status === 404) {
+      setReplyError('This review no longer exists.');
+    } else {
+      setReplyError(
+        'Failed to submit reply. Please try again.',
+      );
+    }
+  } finally {
+    setSubmittingReply(false);
+  }
 };
 const fetchReviewSummary = async () => {
     setSummaryLoading(true);
@@ -1225,12 +1290,32 @@ const category =
                         {/* Existing Review Cards */}
                                 {reviews.map((review: Review) => (
                     <ReviewCard
-                        key={review._id}
-                        review={review}
-                        onMediaPress={(media, index) =>
-                            openMediaViewer(review, index)
-                        }
-                    />
+  key={review._id}
+  review={review}
+  onMediaPress={(media, index) =>
+    openMediaViewer(review, index)
+  }
+  footer={
+    !review.vendorReply ? (
+      <TouchableOpacity
+        testID={`reply-trigger-${review._id}`}
+        style={styles.replyTriggerButton}
+        onPress={() => startReply(review._id)}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name="chatbubble-outline"
+          size={15}
+          color={PRIMARY}
+        />
+
+        <Text style={styles.replyTriggerText}>
+          Reply to Review
+        </Text>
+      </TouchableOpacity>
+    ) : null
+  }
+/>
                 ))}
                 {!reviewsLoading && reviews.length > 0 && (
     <>
@@ -1266,6 +1351,135 @@ const category =
                 )}
             </View>
         )}
+        <Modal
+  visible={replyingTo !== null}
+  transparent
+  animationType="fade"
+  onRequestClose={cancelReply}
+  testID="vendor-reply-modal"
+>
+  <View style={styles.replyModalOverlay}>
+    <View style={styles.replyModalContent}>
+
+      <View style={styles.replyModalHeader}>
+        <View style={styles.replyModalTitleRow}>
+          <View style={styles.replyModalIcon}>
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={22}
+              color={PRIMARY}
+            />
+          </View>
+
+          <View>
+            <Text style={styles.replyModalTitle}>
+              Reply to Review
+            </Text>
+
+            <Text style={styles.replyModalSubtitle}>
+              Respond professionally to your customer
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          testID="reply-modal-close"
+          onPress={cancelReply}
+          disabled={submittingReply}
+          style={styles.replyCloseButton}
+        >
+          <Ionicons
+            name="close"
+            size={22}
+            color="#7A7A7A"
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.replyInputSection}>
+        <Text style={styles.replyInputLabel}>
+          Your Response
+        </Text>
+
+        <TextInput
+          testID="reply-input"
+          placeholder="Write your response to this review..."
+          placeholderTextColor="#A89AA3"
+          multiline
+          value={replyText}
+          onChangeText={setReplyText}
+          maxLength={1000}
+          textAlignVertical="top"
+          style={styles.replyTextInput}
+        />
+
+        <Text style={styles.characterCount}>
+          {replyText.length}/1000
+        </Text>
+
+        {replyError && (
+          <View style={styles.replyErrorBox}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={16}
+              color="#C0392B"
+            />
+
+            <Text style={styles.replyErrorText}>
+              {replyError}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.replyModalActions}>
+        <TouchableOpacity
+          style={styles.replyCancelButton}
+          onPress={cancelReply}
+          disabled={submittingReply}
+        >
+          <Text style={styles.replyCancelText}>
+            Cancel
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.replySubmitButton,
+            submittingReply &&
+              styles.replySubmitButtonDisabled,
+          ]}
+          onPress={() => {
+            if (replyingTo) {
+              submitReply(replyingTo);
+            }
+          }}
+          disabled={submittingReply}
+        >
+          {submittingReply ? (
+            <ActivityIndicator
+              size="small"
+              color="#FFFFFF"
+            />
+          ) : (
+            <>
+              <Ionicons
+                name="send-outline"
+                size={15}
+                color="#FFFFFF"
+              />
+
+              <Text style={styles.replySubmitText}>
+                Send Reply
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+    </View>
+  </View>
+</Modal>
         <MediaViewerModal
     visible={mediaViewerVisible}
     media={selectedReviewMedia}
@@ -1274,7 +1488,6 @@ const category =
 />
     </View>
 )}
-
             <View style={{ height: 24 }} />
         </ScrollView>
     );
@@ -1852,6 +2065,167 @@ sortOptionText: {
 sortOptionTextActive: {
     color: PRIMARY,
     fontWeight: 'bold',
+},
+replyTriggerButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  marginTop: 8,
+  paddingVertical: 8,
+  paddingHorizontal: 10,
+  borderRadius: 8,
+  backgroundColor: PRIMARY_SOFT,
+},
+
+replyTriggerText: {
+  marginLeft: 6,
+  color: PRIMARY,
+  fontSize: 13,
+  fontWeight: '600',
+},
+
+replyModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+
+replyModalContent: {
+  width: '100%',
+  maxWidth: 500,
+  backgroundColor: CARD,
+  borderRadius: 18,
+  padding: 20,
+},
+
+replyModalHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 20,
+},
+
+replyModalTitleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+
+replyModalIcon: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: PRIMARY_SOFT,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 10,
+},
+
+replyModalTitle: {
+  fontSize: 17,
+  fontWeight: '700',
+  color: TEXT_DARK,
+},
+
+replyModalSubtitle: {
+  fontSize: 12,
+  color: TEXT_MUTED,
+  marginTop: 2,
+},
+
+replyCloseButton: {
+  padding: 4,
+},
+
+replyInputSection: {
+  marginBottom: 4,
+},
+
+replyInputLabel: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: TEXT_DARK,
+  marginBottom: 8,
+},
+
+replyTextInput: {
+  minHeight: 120,
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 12,
+  padding: 12,
+  fontSize: 14,
+  color: TEXT_DARK,
+  backgroundColor: '#FFFBFD',
+},
+
+characterCount: {
+  fontSize: 10,
+  color: TEXT_MUTED,
+  textAlign: 'right',
+  marginTop: 5,
+},
+
+replyErrorBox: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FDEDEC',
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 8,
+  marginTop: 8,
+},
+
+replyErrorText: {
+  color: '#C0392B',
+  fontSize: 11,
+  marginLeft: 6,
+  flex: 1,
+},
+
+replyModalActions: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+  marginTop: 18,
+},
+
+replyCancelButton: {
+  paddingVertical: 11,
+  paddingHorizontal: 18,
+  borderRadius: 10,
+  marginRight: 8,
+  backgroundColor: '#F5F1F3',
+},
+
+replyCancelText: {
+  color: '#6F626B',
+  fontSize: 13,
+  fontWeight: '700',
+},
+
+replySubmitButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: PRIMARY,
+  paddingVertical: 11,
+  paddingHorizontal: 18,
+  borderRadius: 10,
+  minWidth: 110,
+},
+
+replySubmitButtonDisabled: {
+  opacity: 0.7,
+},
+
+replySubmitText: {
+  color: '#FFFFFF',
+  fontSize: 13,
+  fontWeight: '700',
+  marginLeft: 6,
 },
 reviewsLoadingBox: {
     paddingVertical: 20,

@@ -27,20 +27,28 @@ const sortLabels: Record<ReviewSort, string> = {
   lowest: 'Lowest Rating',
 };
 
-const ReplyInput: React.FC<{ value: string; onChangeText: (t: string) => void; testID: string }> = ({
-  value,
-  onChangeText,
-  testID,
-}) => (
-  <TextInput
-    testID={testID}
-    placeholder="Thank you for your feedback..."
-    multiline
-    value={value}
-    onChangeText={onChangeText}
-    style={styles.replyTextInput}
-    maxLength={1000}
-  />
+const ReplyInput: React.FC<{
+  value: string;
+  onChangeText: (t: string) => void;
+  testID: string;
+}> = ({ value, onChangeText, testID }) => (
+  <View>
+    <TextInput
+      testID={testID}
+      placeholder="Write your response to this review..."
+      placeholderTextColor="#A89AA3"
+      multiline
+      value={value}
+      onChangeText={onChangeText}
+      style={styles.replyTextInput}
+      maxLength={1000}
+      textAlignVertical="top"
+    />
+
+    <Text style={styles.characterCount}>
+      {value.length}/1000
+    </Text>
+  </View>
 );
 
 const SortModal: React.FC<{
@@ -355,55 +363,34 @@ const VendorReviewsManagementIndex: React.FC = () => {
       )}
 
       {reviews.map((review) => (
-        <ReviewCard
-          key={review._id}
-          review={review}
-          onMediaPress={(media, index) => openMediaViewer(review, index)}
-          footer={
-            review.vendorReply ? null : replyingTo === review._id ? (
-              <View style={styles.replyBox} testID={`reply-box-${review._id}`}>
-                <Text style={styles.replyBoxLabel}>Reply to review</Text>
-                <ReplyInput value={replyText} onChangeText={setReplyText} testID={`reply-input-${review._id}`} />
-                {replyError && (
-                  <Text style={styles.replyErrorText} testID={`reply-error-${review._id}`}>
-                    {replyError}
-                  </Text>
-                )}
-                <View style={styles.replyActionsRow}>
-                  <TouchableOpacity
-                    testID={`reply-cancel-${review._id}`}
-                    style={styles.replyCancelButton}
-                    onPress={cancelReply}
-                    disabled={submittingReply}
-                  >
-                    <Text style={styles.replyCancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    testID={`reply-submit-${review._id}`}
-                    style={styles.replySubmitButton}
-                    onPress={() => submitReply(review._id)}
-                    disabled={submittingReply}
-                  >
-                    {submittingReply ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.replySubmitText}>Reply</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                testID={`reply-trigger-${review._id}`}
-                style={styles.replyTriggerButton}
-                onPress={() => startReply(review._id)}
-              >
-                <Text style={styles.replyTriggerText}>Reply</Text>
-              </TouchableOpacity>
-            )
-          }
-        />
-      ))}
+  <ReviewCard
+    key={review._id}
+    review={review}
+    onMediaPress={(media, index) =>
+      openMediaViewer(review, index)
+    }
+    footer={
+      !review.vendorReply ? (
+        <TouchableOpacity
+          testID={`reply-trigger-${review._id}`}
+          style={styles.replyTriggerButton}
+          onPress={() => startReply(review._id)}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="chatbubble-outline"
+            size={15}
+            color="#7B2869"
+          />
+
+          <Text style={styles.replyTriggerText}>
+            Reply to Review
+          </Text>
+        </TouchableOpacity>
+      ) : null
+    }
+  />
+))}
 
       {!reviewsLoading && reviews.length > 0 && hasMore && (
         <TouchableOpacity
@@ -422,6 +409,138 @@ const VendorReviewsManagementIndex: React.FC = () => {
         onSelect={(s) => { setActiveSort(s); setSortModalVisible(false); }}
         onClose={() => setSortModalVisible(false)}
       />
+
+      <Modal
+  visible={replyingTo !== null}
+  transparent
+  animationType="fade"
+  onRequestClose={cancelReply}
+  testID="vendor-reply-modal"
+>
+  <View style={styles.replyModalOverlay}>
+    <View style={styles.replyModalContent}>
+
+      {/* Header */}
+      <View style={styles.replyModalHeader}>
+        <View style={styles.replyModalTitleRow}>
+          <View style={styles.replyModalIcon}>
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={22}
+              color="#7B2869"
+            />
+          </View>
+
+          <View>
+            <Text style={styles.replyModalTitle}>
+              Reply to Review
+            </Text>
+
+            <Text style={styles.replyModalSubtitle}>
+              Respond professionally to your customer
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          testID="reply-modal-close"
+          onPress={cancelReply}
+          disabled={submittingReply}
+          style={styles.replyCloseButton}
+        >
+          <Ionicons
+            name="close"
+            size={22}
+            color="#7A7A7A"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Input */}
+      <View style={styles.replyInputSection}>
+        <Text style={styles.replyInputLabel}>
+          Your Response
+        </Text>
+
+        <ReplyInput
+          value={replyText}
+          onChangeText={setReplyText}
+          testID="reply-input"
+        />
+      </View>
+
+      {/* Error */}
+      {replyError && (
+        <View
+          style={styles.replyErrorBox}
+          testID="reply-error"
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={17}
+            color="#C0392B"
+          />
+
+          <Text style={styles.replyErrorText}>
+            {replyError}
+          </Text>
+        </View>
+      )}
+
+      {/* Buttons */}
+      <View style={styles.replyModalActions}>
+
+        <TouchableOpacity
+          testID="reply-cancel"
+          style={styles.replyCancelButton}
+          onPress={cancelReply}
+          disabled={submittingReply}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.replyCancelText}>
+            Cancel
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          testID="reply-submit"
+          style={[
+            styles.replySubmitButton,
+            submittingReply && styles.replySubmitButtonDisabled,
+          ]}
+          onPress={() => {
+            if (replyingTo) {
+              submitReply(replyingTo);
+            }
+          }}
+          disabled={submittingReply}
+          activeOpacity={0.8}
+        >
+          {submittingReply ? (
+            <ActivityIndicator
+              size="small"
+              color="#fff"
+            />
+          ) : (
+            <>
+              <Ionicons
+                name="send"
+                size={15}
+                color="#fff"
+              />
+
+              <Text style={styles.replySubmitText}>
+                Send Reply
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+      </View>
+
+    </View>
+  </View>
+</Modal>
 
       <MediaViewerModal
         visible={viewerVisible}
@@ -468,17 +587,186 @@ const styles = StyleSheet.create({
   reviewsLoadingBox: { paddingVertical: 20, alignItems: 'center' },
   loadMoreButton: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 20, borderWidth: 1, borderColor: '#7B2869', marginVertical: 16, minWidth: 120, alignItems: 'center' },
   loadMoreButtonText: { color: '#7B2869', fontWeight: 'bold', fontSize: 13 },
-  replyTriggerButton: { alignSelf: 'flex-start', marginTop: 4, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#F8EAF2' },
-  replyTriggerText: { color: '#7B2869', fontWeight: 'bold', fontSize: 12 },
-  replyBox: { marginTop: 8, backgroundColor: '#FAFAFA', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#E0E0E0' },
-  replyBoxLabel: { fontSize: 12, fontWeight: 'bold', color: '#333', marginBottom: 6 },
-  replyTextInput: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 8, minHeight: 60, backgroundColor: '#fff', textAlignVertical: 'top', fontSize: 13 },
-  replyErrorText: { color: '#C0392B', fontSize: 11, marginTop: 4 },
-  replyActionsRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 },
-  replyCancelButton: { paddingVertical: 8, paddingHorizontal: 14, marginRight: 8 },
-  replyCancelText: { color: '#7A7A7A', fontSize: 13, fontWeight: '600' },
-  replySubmitButton: { backgroundColor: '#7B2869', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 6, minWidth: 60, alignItems: 'center' },
-  replySubmitText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+ replyTriggerButton: {
+  alignSelf: 'flex-start',
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 6,
+  paddingVertical: 9,
+  paddingHorizontal: 15,
+  borderRadius: 20,
+  backgroundColor: '#F8EAF2',
+  borderWidth: 1,
+  borderColor: '#E8CADD',
+},
+
+replyTriggerText: {
+  color: '#7B2869',
+  fontWeight: '700',
+  fontSize: 12,
+  marginLeft: 6,
+},
+
+/* Reply Modal */
+
+replyModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(43, 27, 38, 0.55)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+
+replyModalContent: {
+  width: '100%',
+  backgroundColor: '#fff',
+  borderRadius: 18,
+  padding: 20,
+  elevation: 8,
+  shadowColor: '#000',
+  shadowOpacity: 0.15,
+  shadowRadius: 15,
+  shadowOffset: {
+    width: 0,
+    height: 6,
+  },
+},
+
+replyModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: 20,
+},
+
+replyModalTitleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+
+replyModalIcon: {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: '#F8EAF2',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 11,
+},
+
+replyModalTitle: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: '#2B1B26',
+},
+
+replyModalSubtitle: {
+  fontSize: 11,
+  color: '#8A7A85',
+  marginTop: 3,
+},
+
+replyCloseButton: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: '#F7F3F5',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+replyInputSection: {
+  marginBottom: 10,
+},
+
+replyInputLabel: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#2B1B26',
+  marginBottom: 7,
+},
+
+replyTextInput: {
+  borderWidth: 1,
+  borderColor: '#E2D6DE',
+  borderRadius: 12,
+  paddingHorizontal: 13,
+  paddingTop: 12,
+  paddingBottom: 10,
+  minHeight: 120,
+  backgroundColor: '#FCFAFB',
+  fontSize: 14,
+  color: '#2B1B26',
+  textAlignVertical: 'top',
+},
+
+characterCount: {
+  fontSize: 10,
+  color: '#9A8D96',
+  textAlign: 'right',
+  marginTop: 5,
+},
+
+replyErrorBox: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FDEDEC',
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 8,
+  marginTop: 5,
+},
+
+replyErrorText: {
+  color: '#C0392B',
+  fontSize: 11,
+  marginLeft: 6,
+  flex: 1,
+},
+
+replyModalActions: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+  marginTop: 18,
+},
+
+replyCancelButton: {
+  paddingVertical: 11,
+  paddingHorizontal: 18,
+  borderRadius: 10,
+  marginRight: 8,
+  backgroundColor: '#F5F1F3',
+},
+
+replyCancelText: {
+  color: '#6F626B',
+  fontSize: 13,
+  fontWeight: '700',
+},
+
+replySubmitButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#7B2869',
+  paddingVertical: 11,
+  paddingHorizontal: 18,
+  borderRadius: 10,
+  minWidth: 110,
+},
+
+replySubmitButtonDisabled: {
+  opacity: 0.7,
+},
+
+replySubmitText: {
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: '700',
+  marginLeft: 6,
+},
 });
 
 export default VendorReviewsManagementIndex;

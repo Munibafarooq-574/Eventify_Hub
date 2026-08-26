@@ -1,3 +1,6 @@
+//orgainzer side detail section 
+
+//fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import postVendorReview from '@/services/postVendorReview';
 import { uploadMultipleImages } from '@/services/uploadMultipleImages';
@@ -5,11 +8,15 @@ import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import ReviewCard from '@/components/Review/ReviewCard';
+import MediaViewerModal from '@/components/Review/MediaViewerModal';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,7 +24,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ReviewMedia } from '@/types/review';
+import {
+  Review,
+  ReviewFilter,
+  ReviewMedia,
+  ReviewSort,
+} from "@/types/review";
 import Toast from 'react-native-toast-message';
 
 
@@ -32,9 +44,14 @@ const VendorDetailsScreen: React.FC = () => {
   const [rating, setRating] = useState<number | null>(null);
 
 const [newReview, setNewReview] = useState('');
+const scrollViewRef = useRef<ScrollView>(null);
+
 
 const [selectedMedia, setSelectedMedia] = useState<ReviewMedia[]>([]);
 const [uploadingMedia, setUploadingMedia] = useState(false);
+const [viewerVisible, setViewerVisible] = useState(false);
+const [viewerMedia, setViewerMedia] = useState<ReviewMedia[]>([]);
+const [viewerIndex, setViewerIndex] = useState(0);
 
   const handlePickMedia = async () => {
   const permission =
@@ -100,32 +117,127 @@ const removeSelectedMedia = (index: number) => {
     prev.filter((_, i) => i !== index)
   );
 };
-const [reviews, setReviews] = useState<any[]>([]);
+const openMediaViewer = (review: Review, index: number) => {
+  if (!review.media || review.media.length === 0) {
+    return;
+  }
+
+  setViewerMedia(review.media);
+  setViewerIndex(index);
+  setViewerVisible(true);
+};
+const [reviews, setReviews] = useState<Review[]>([]);
 const [reviewsLoading, setReviewsLoading] = useState<boolean>(false);
+const [loadingMore, setLoadingMore] = useState<boolean>(false);
 const [reviewsError, setReviewsError] = useState<string | null>(null);
 
-const fetchReviews = async () => {
-  setReviewsLoading(true);
+const [activeFilter, setActiveFilter] =
+  useState<ReviewFilter['rating'] | 'all' | 'withMedia'>('all');
+
+const [activeSort, setActiveSort] =
+  useState<ReviewSort>('recent');
+
+const [reviewsPage, setReviewsPage] = useState<number>(1);
+const [hasMoreReviews, setHasMoreReviews] = useState<boolean>(true);
+
+const REVIEWS_LIMIT = 20;
+
+const fetchReviews = async (
+  page: number = 1,
+  append: boolean = false
+) => {
+  if (!vendorData?._id) {
+    return;
+  }
+
+  if (append) {
+    setLoadingMore(true);
+  } else {
+    setReviewsLoading(true);
+  }
+
   setReviewsError(null);
 
   try {
-    const data = await getVendorReviews(vendorData._id);
+    console.log('Fetching reviews for vendor:', vendorData._id);
 
-    console.log('reviews', data);
-    setReviews(data.reviews);
-  } catch (error) {
+   const data = await getVendorReviews({
+  vendorId: vendorData._id,
+  page,
+  limit: REVIEWS_LIMIT,
+  rating:
+    typeof activeFilter === 'number'
+      ? activeFilter
+      : undefined,
+  withMedia:
+    activeFilter === 'withMedia',
+  sort: activeSort,
+});
+
+    console.log('reviews response:', data);
+
+    const newReviews: Review[] = data.reviews || [];
+
+    if (append) {
+      setReviews(prev => [...prev, ...newReviews]);
+    } else {
+      setReviews(newReviews);
+    }
+
+    setReviewsPage(page);
+
+    setHasMoreReviews(
+      newReviews.length === REVIEWS_LIMIT
+    );
+  } catch (error: any) {
     console.error('Error fetching reviews:', error);
+    console.error('Status:', error?.response?.status);
+    console.error('Backend error:', error?.response?.data);
+
     setReviewsError(
       'Something went wrong loading reviews. Please try again.'
     );
   } finally {
-    setReviewsLoading(false);
+    if (append) {
+      setLoadingMore(false);
+    } else {
+      setReviewsLoading(false);
+    }
   }
 };
-  useEffect(() => { 
-    if (vendorData?._id) 
-      { fetchReviews(); } }, [vendorData]); 
-    
+  useEffect(() => {
+  if (vendorData?._id) {
+    setReviewsPage(1);
+    setHasMoreReviews(true);
+
+    fetchReviews(1, false);
+  }
+}, [vendorData?._id, activeFilter, activeSort]);
+
+const loadMoreReviews = async () => {
+  if (
+    reviewsLoading ||
+    loadingMore ||
+    !hasMoreReviews
+  ) {
+    return;
+  }
+
+  await fetchReviews(reviewsPage + 1, true);
+};
+const handleFilterChange = (
+  filter: ReviewFilter['rating'] | 'all' | 'withMedia'
+) => {
+  setActiveFilter(filter);
+  setReviewsPage(1);
+  setHasMoreReviews(true);
+};
+
+const handleSortChange = (sort: ReviewSort) => {
+  setActiveSort(sort);
+  setReviewsPage(1);
+  setHasMoreReviews(true);
+};
     const handleSubmitReview = async () => { 
       try { const user = await getSecureData('user'); 
         const userId = JSON.parse(user || '')?.['_id']; 
@@ -150,7 +262,9 @@ const fetchReviews = async () => {
                         setNewReview(''); 
                         setRating(null); 
                         setSelectedMedia([]); 
-                        await fetchReviews(); 
+                        setReviewsPage(1);
+                        setHasMoreReviews(true);
+                        await fetchReviews(1, false);
                       } catch (error) { 
                         console.error('Error submitting review:', error);
                          Toast.show({ type: 'error', text1: 'Error', 
@@ -199,8 +313,6 @@ const fetchReviews = async () => {
       });
     }
   };
-
-
   useEffect(() => {
     const fetchVendorDetails = async () => {
       try {
@@ -244,18 +356,22 @@ const fetchReviews = async () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+  <KeyboardAvoidingView
+    style={styles.keyboardContainer}
+    behavior="padding"
+    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+  >
+    <ScrollView
+     ref={scrollViewRef}
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={
+        Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+      }
+      showsVerticalScrollIndicator={false}
+    >
       <Toast />
-      {/* Header
-         Add test Id */}
-      {/* <View style={styles.header}>
-        <TouchableOpacity testID="back-button" onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Photographer Details</Text>
-      </View> */}
-
-
       <View style={styles.header}>
         {/* Back button */}
         <TouchableOpacity testID="back-button" onPress={() => router.back()}>
@@ -273,12 +389,6 @@ const fetchReviews = async () => {
           <Ionicons name="cart-outline" size={24} color="#7B2869" />
         </TouchableOpacity>
       </View>
-
-
-
-
-
-
       {/* Cover Image */}
       <Image
         testID="vendor-cover-image" // ✅ Added testID
@@ -318,33 +428,6 @@ const fetchReviews = async () => {
           </TouchableOpacity>
         ))}
       </View>
-
-      {/* Tab Content*/}
-
-      {/* {activeTab === 'Details' && (
-                <View style={styles.detailsContainer}>
-                    <Text style={styles.name}>{vendorData.name}</Text>
-                    <Text style={styles.address}>{vendorData.contactDetails.officialAddress}</Text>
-                    <Text style={styles.price}>Starting Price: Rs.{vendorData.photographerBusinessDetails.minimumPrice}/-</Text>
-
-
-                    <Text style={styles.perHead}>Per head</Text>
-
-                    <Text style={styles.sectionTitle}>Details</Text>
-
-                    <Text style={styles.detailLabel}>Staff</Text>
-                    <Text style={styles.detailValue}>{vendorData.photographerBusinessDetails.staff}</Text>
-
-                    <Text style={styles.detailLabel}>Cancellation Policy</Text>
-                    <Text style={styles.detailValue}>{vendorData.photographerBusinessDetails.covidRefundPolicy}</Text>
-
-                    <Text style={styles.detailLabel}>Cities Covered</Text>
-                    <Text style={styles.detailValue}>{vendorData.photographerBusinessDetails.cityCovered}</Text>
-
-                    <Text style={styles.detailLabel}>Description</Text>
-                    <Text style={styles.detailValue}>{vendorData.photographerBusinessDetails.description}</Text>
-                </View>
-            )} */}
       {activeTab === "Details" && (
         <View style={styles.detailsContainer}>
           {/* Top Row: Name and Price 
@@ -373,18 +456,6 @@ const fetchReviews = async () => {
             >
               <Text style={styles.sectionTitle}>Photos</Text>
             </TouchableOpacity>
-            {/* <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.photosScroll}
-                        >
-                            {/* Replace with dynamic images */}
-            {/* <Image source={{ uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&' }} style={styles.photo} />
-                            <Image source={{ uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&' }} style={styles.photo} />
-                            <Image source={{ uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&' }} style={styles.photo} />
-                            <Image source={{ uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&' }} style={styles.photo} />
-                        </ScrollView> */}
-            {/*add test id*/}
             <ScrollView
               testID="scroll-view"
               horizontal
@@ -486,34 +557,101 @@ const fetchReviews = async () => {
               </View>
             ))}
 
-          {/* <Calendar
-            testID="calendar-component"
-            onDayPress={(day: { dateString: string }) =>
-              console.log("Selected day:", day.dateString)
-            }
-            minDate={new Date().toISOString().split("T")[0]} // Disables past dates
-            markedDates={{
-              "2024-12-03": { selected: true, selectedColor: "#7B2869" },
-            }}
-            theme={{
-              selectedDayBackgroundColor: "#7B2869",
-              todayTextColor: "#7B2869",
-            }}
-          /> */}
+      
         </>
       )}
-
-      {/* {activeTab === 'Reviews' && (
-                <View style={styles.tabContent}>
-                    <Text>Reviews Tab Content (Static for now)</Text>
-                </View>
-            )} */}
       {activeTab === "Reviews" && (
         <View style={styles.tabContent}>
-          {/* Tab Navigation for Reviews 
-             add test id  */}
 
           {/* Eventify Reviews */}
+          <View style={styles.reviewControls}>
+
+  <Text style={styles.reviewControlTitle}>
+    Filter Reviews
+  </Text>
+
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.filterRow}
+  >
+  {([
+  { label: 'All', value: 'all' },
+  { label: 'With Media', value: 'withMedia' },
+  { label: '5 Stars', value: 5 },
+  { label: '4 Stars', value: 4 },
+  { label: '3 Stars', value: 3 },
+  { label: '2 Stars', value: 2 },
+  { label: '1 Star', value: 1 },
+] as Array<{
+  label: string;
+  value: ReviewFilter['rating'] | 'all' | 'withMedia';
+}>).map(option => (
+      <TouchableOpacity
+        key={String(option.value)}
+        style={[
+          styles.filterChip,
+          activeFilter === option.value &&
+            styles.activeFilterChip,
+        ]}
+        onPress={() =>
+          handleFilterChange(option.value)
+        }
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            activeFilter === option.value &&
+              styles.activeFilterChipText,
+          ]}
+        >
+          {option.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+
+  <Text style={styles.reviewControlTitle}>
+    Sort Reviews
+  </Text>
+
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={styles.filterRow}
+  >
+    {[
+      { label: 'Recent', value: 'recent' },
+      { label: 'Highest Rating', value: 'highest' },
+      { label: 'Lowest Rating', value: 'lowest' },
+    ].map(option => (
+      <TouchableOpacity
+        key={option.value}
+        style={[
+          styles.filterChip,
+          activeSort === option.value &&
+            styles.activeFilterChip,
+        ]}
+        onPress={() =>
+          handleSortChange(
+            option.value as ReviewSort
+          )
+        }
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            activeSort === option.value &&
+              styles.activeFilterChipText,
+          ]}
+        >
+          {option.label}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+
+</View>
           {activeReviewTab === "Eventify" && (
   <View>
     {reviewsLoading && (
@@ -540,7 +678,7 @@ const fetchReviews = async () => {
         <TouchableOpacity
           testID="retry-reviews-button"
           style={styles.retryButton}
-          onPress={fetchReviews}
+          onPress={() => fetchReviews(1, false)}
         >
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -565,24 +703,51 @@ const fetchReviews = async () => {
       )}
 
     {!reviewsLoading &&
-      !reviewsError &&
-      reviews.map((review, index) => (
-                <View key={index} style={styles.eventifyReview}>
-                  <Text style={styles.reviewerName}>{review.reviewerName || 'Anonymous'}</Text>
-                  <Text style={styles.reviewDate}>{new Date(review.createdAt).toDateString()}</Text>
-                  <Text style={styles.reviewText}>{review.reviewText}</Text>
-                  <View style={{ flexDirection: 'row', marginTop: 4 }}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons
-                        key={star}
-                        name={review.rating >= star ? 'star' : 'star-outline'}
-                        size={16}
-                        color="#FFD700"
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))}
+  !reviewsError &&
+  reviews.map((review) => (
+    <ReviewCard
+      key={review._id}
+      review={review}
+      onMediaPress={(_, index) =>
+        openMediaViewer(review, index)
+      }
+    />
+  ))}
+  {!reviewsLoading &&
+  !reviewsError &&
+  reviews.length > 0 &&
+  !hasMoreReviews && (
+    <Text style={styles.noMoreReviewsText}>
+      You have reached the end of the reviews.
+    </Text>
+  )}
+  {!reviewsLoading &&
+  !reviewsError &&
+  reviews.length > 0 &&
+  hasMoreReviews && (
+    <TouchableOpacity
+      testID="load-more-reviews-button"
+      style={styles.loadMoreButton}
+      onPress={loadMoreReviews}
+      disabled={loadingMore}
+    >
+      {loadingMore ? (
+        <>
+          <ActivityIndicator
+            size="small"
+            color="#7B2869"
+          />
+          <Text style={styles.loadMoreButtonText}>
+            Loading more...
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.loadMoreButtonText}>
+          Load More Reviews
+        </Text>
+      )}
+    </TouchableOpacity>
+  )}
 
               {/* Add Review Form */}
               <View style={styles.addReviewContainer}>
@@ -602,12 +767,19 @@ const fetchReviews = async () => {
                 </View>
 
                 <Text style={styles.sectionTitle}>Write a Review</Text>
-                <TextInput
+                 <TextInput
                   testID="review-input"
                   placeholder="Write your review here..."
                   multiline
                   value={newReview}
                   onChangeText={setNewReview}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({
+                        animated: true,
+                      });
+                    }, 300);
+                  }}
                   style={styles.reviewInput}
                 />
                 <Text style={styles.mediaLabel}>
@@ -680,19 +852,33 @@ const fetchReviews = async () => {
               </View>
             </View>
           )}
-
+            <MediaViewerModal
+            visible={viewerVisible}
+            media={viewerMedia}
+            initialIndex={viewerIndex}
+            onClose={() => setViewerVisible(false)}
+          />
         </View>
       )}
     </ScrollView>
+    
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+  flex: 1,
+},
+
+scrollContent: {
+  flexGrow: 1,
+  paddingBottom: 40,
+},
   container: {
-    flex: 1,
-    backgroundColor: '#F8EAF2',
-    paddingTop: 50,
-  },
+  flex: 1,
+  backgroundColor: '#F8EAF2',
+},
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1040,6 +1226,75 @@ retryButtonText: {
     fontSize: 14,
     color: '#000',
   },
+  reviewControls: {
+  marginBottom: 16,
+},
+
+reviewControlTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+  marginBottom: 8,
+  marginTop: 4,
+},
+
+filterRow: {
+  paddingBottom: 8,
+  paddingRight: 8,
+},
+
+filterChip: {
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: '#D8D8D8',
+  backgroundColor: '#FFFFFF',
+  marginRight: 8,
+},
+
+activeFilterChip: {
+  backgroundColor: '#7B2869',
+  borderColor: '#7B2869',
+},
+
+filterChipText: {
+  fontSize: 12,
+  color: '#666',
+  fontWeight: '500',
+},
+
+activeFilterChipText: {
+  color: '#FFFFFF',
+  fontWeight: '600',
+},
+
+loadMoreButton: {
+  minHeight: 42,
+  paddingHorizontal: 20,
+  borderRadius: 22,
+  borderWidth: 1,
+  borderColor: '#7B2869',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexDirection: 'row',
+  alignSelf: 'center',
+  marginVertical: 16,
+},
+
+loadMoreButtonText: {
+  color: '#7B2869',
+  fontSize: 13,
+  fontWeight: '600',
+  marginLeft: 8,
+},
+
+noMoreReviewsText: {
+  textAlign: 'center',
+  fontSize: 12,
+  color: '#999',
+  marginVertical: 16,
+},
   showMoreButton: {
     backgroundColor: '#E0E0E0',
     padding: 8,
