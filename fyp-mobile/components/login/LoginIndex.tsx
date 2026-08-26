@@ -1,5 +1,5 @@
 import Login from '@/services/login';
-import { saveSecureData } from '@/store';
+import { saveSecureData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
 import { router } from 'expo-router';
@@ -32,33 +32,37 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    try {
-      setIsLoading(true);
-      setIsDisabled(true);
-      const response = await Login(email, password);
-      saveSecureData("token", response.token);
-      saveSecureData("user", JSON.stringify(response.user));
-      console.log(response.user.role)
-      setIsLoading(false);
-      reset();
-      if (response.user.role === "Vendor") {
-        router.push("/vendordashboard"); //next screen
-      } else {
-        router.push("/dashboard"); //next screen
+  try {
+    setIsLoading(true);
+    setIsDisabled(true);
 
-      }
+    const response = await Login(email, password);
 
-    } catch (e: any) {
-      console.log(e);
-      setIsLoading(false);
-      setIsDisabled(false);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed',
-        text2: e,
-      });
+    await saveSecureData("token", response.token);
+    await saveUserData(response.user);
+
+    console.log(response.user.role);
+
+    setIsLoading(false);
+    reset();
+
+    if (response.user.role === "Vendor") {
+      router.push("/vendordashboard");
+    } else {
+      router.push("/dashboard");
     }
-  };
+  } catch (e: any) {
+    console.log(e);
+    setIsLoading(false);
+    setIsDisabled(false);
+
+    Toast.show({
+      type: "error",
+      text1: "Failed",
+      text2: e,
+    });
+  }
+};
 
   const reset = async () => {
     setEmail("");
