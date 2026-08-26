@@ -1,10 +1,14 @@
 import getVendorReviews from '@/services/getAllReviewsForVendor';
+import getVendorReviewSummary from '@/services/getVendorReviewSummary';
+import ReviewCard from '@/components/Review/ReviewCard';
+import MediaViewerModal from '@/components/Review/MediaViewerModal';
+import { Review, ReviewMedia, ReviewSummary, ReviewFilter, ReviewSort } from '@/types/review';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
 const PRIMARY = '#7B2869';
@@ -16,6 +20,12 @@ const TEXT_DARK = '#221A20';
 const TEXT_MUTED = '#8A7C86';
 const BORDER = '#EFE0EB';
 
+const sortLabels: Record<ReviewSort, string> = {
+    recent: 'Most Recent',
+    highest: 'Highest Rating',
+    lowest: 'Lowest Rating',
+};
+
 const VendorProfileDetailsScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
     const [activePackage, setActivePackage] = useState<number | null>(null);
@@ -23,8 +33,30 @@ const VendorProfileDetailsScreen: React.FC = () => {
     const [vendorData, setVendorData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const { id } = useGlobalSearchParams();
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
+    const [selectedReviewMedia, setSelectedReviewMedia] = useState<ReviewMedia[]>([]);
+    const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
-    const [reviews, setReviews] = useState<any[]>([]);
+    const openMediaViewer = (review: Review, index: number) => {
+    if (!review.media?.length) return;
+
+    setSelectedReviewMedia(review.media);
+    setSelectedMediaIndex(index);
+    setMediaViewerVisible(true);
+};
+    const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState<boolean>(true);
+
+    type MediaFilterOption = 'all' | 'withMedia' | 1 | 2 | 3 | 4 | 5;
+
+    const [activeFilter, setActiveFilter] = useState<MediaFilterOption>('all');
+    const [activeSort, setActiveSort] = useState<ReviewSort>('recent');
+    const [reviewsLoading, setReviewsLoading] = useState<boolean>(false);
+    const [sortModalVisible, setSortModalVisible] = useState<boolean>(false);
+    const [reviewPage, setReviewPage] = useState<number>(1);
+    const [hasMoreReviews, setHasMoreReviews] = useState<boolean>(false);
+    const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
 
     const getBusinessDetailsRoute = () => {
@@ -38,23 +70,79 @@ const VendorProfileDetailsScreen: React.FC = () => {
 
     return "/bdvenue"; // fallback
 };
-    const fetchReviews = async () => {
-        try {
-            const data = await getVendorReviews(vendorData._id);
-            console.log("reviews", data);
-            setReviews(data);
-        } catch (error) {
-            console.error('Error fetching reviews:', error);
-        }
+    const buildReviewFilter = (page: number): ReviewFilter => {
+    const filter: ReviewFilter = {
+        vendorId: vendorData._id,
+        sort: activeSort,
+        page,
+        limit: 20,
     };
 
-    // ✅ Call fetchReviews after vendorData loads
-    useEffect(() => {
-        if (vendorData?._id) {
-            fetchReviews();
-        }
-    }, [vendorData]);
+    if (activeFilter === 'withMedia') {
+        filter.withMedia = true;
+    } else if (typeof activeFilter === 'number') {
+        filter.rating = activeFilter;
+    }
 
+    return filter;
+};
+
+const fetchReviews = async (resetList: boolean = true) => {
+    if (!vendorData?._id) return;
+
+    if (resetList) {
+        setReviewsLoading(true);
+    } else {
+        setLoadingMore(true);
+    }
+
+    try {
+        const page = resetList ? 1 : reviewPage + 1;
+        const data = await getVendorReviews(buildReviewFilter(page));
+
+        setReviews((prev) =>
+            resetList ? data.reviews : [...prev, ...data.reviews]
+        );
+
+        setReviewPage(data.page);
+        setHasMoreReviews(data.hasMore);
+    } catch (error) {
+        console.error('Error fetching reviews:', error);
+    } finally {
+        setReviewsLoading(false);
+        setLoadingMore(false);
+    }
+};
+
+const handleLoadMore = () => {
+    if (!loadingMore && hasMoreReviews) {
+        fetchReviews(false);
+    }
+};
+const fetchReviewSummary = async () => {
+    setSummaryLoading(true);
+
+    try {
+        const data = await getVendorReviewSummary(vendorData._id);
+        setReviewSummary(data);
+    } catch (error) {
+        console.error('Error fetching review summary:', error);
+    } finally {
+        setSummaryLoading(false);
+    }
+};
+
+useEffect(() => {
+    if (vendorData?._id) {
+        fetchReviewSummary();
+    }
+}, [vendorData]);
+
+useEffect(() => {
+    if (vendorData?._id) {
+        fetchReviews(true);
+    }
+}, [activeFilter, activeSort, vendorData?._id]);
 
     const fetchVendorDetails = async () => {
     try {
@@ -742,48 +830,337 @@ const category =
     </View>
 )}
 
-            {activeTab === "Reviews" && (
+      {activeTab === "Reviews" && (
     <View style={styles.tabContent}>
+
+        {/* Ratings & Reviews Summary */}
+        {summaryLoading ? (
+            <View style={styles.summaryLoadingBox}>
+                <ActivityIndicator
+                    testID="summary-loading-indicator"
+                    size="small"
+                    color={PRIMARY}
+                />
+            </View>
+        ) : reviewSummary ? (
+            <View
+                testID="review-summary-card"
+                style={styles.summaryCard}
+            >
+                <Text style={styles.summaryHeading}>
+                    Ratings & Reviews ({reviewSummary.totalReviews})
+                </Text>
+
+                <View style={styles.summaryTopRow}>
+                    <Text
+                        testID="average-rating-value"
+                        style={styles.averageRatingText}
+                    >
+                        {reviewSummary.totalReviews > 0
+                            ? reviewSummary.averageRating.toFixed(1)
+                            : '0.0'}
+                    </Text>
+
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            marginLeft: 8,
+                        }}
+                    >
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <Ionicons
+                                key={star}
+                                name={
+                                    reviewSummary.averageRating >= star
+                                        ? 'star'
+                                        : reviewSummary.averageRating >= star - 0.5
+                                        ? 'star-half'
+                                        : 'star-outline'
+                                }
+                                size={18}
+                                color="#FFD700"
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {reviewSummary.totalReviews > 0 && (
+                    <View style={styles.breakdownContainer}>
+                        {([5, 4, 3, 2, 1] as const).map((star) => {
+                            const count =
+                                reviewSummary.ratingBreakdown[star];
+
+                            const pct =
+                                reviewSummary.totalReviews > 0
+                                    ? (count / reviewSummary.totalReviews) * 100
+                                    : 0;
+
+                            return (
+                                <View
+                                    key={star}
+                                    style={styles.breakdownRow}
+                                    testID={`breakdown-row-${star}`}
+                                >
+                                    <Text
+                                        style={styles.breakdownStarLabel}
+                                    >
+                                        {star} ★
+                                    </Text>
+
+                                    <View
+                                        style={styles.breakdownBarTrack}
+                                    >
+                                        <View
+                                            style={[
+                                                styles.breakdownBarFill,
+                                                { width: `${pct}%` },
+                                            ]}
+                                        />
+                                    </View>
+
+                                    <Text
+                                        style={styles.breakdownCount}
+                                    >
+                                        {count}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
+            </View>
+        ) : null}
+
+        {/* Review Filters */}
+        {reviewSummary && reviewSummary.totalReviews > 0 && (
+            <>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.filterChipsScroll}
+                    testID="review-filter-chips"
+                >
+                    {([
+                        { key: 'all', label: 'All' },
+                        { key: 'withMedia', label: 'With Images/Videos' },
+                        { key: 5, label: '5 Star' },
+                        { key: 4, label: '4 Star' },
+                        { key: 3, label: '3 Star' },
+                        { key: 2, label: '2 Star' },
+                        { key: 1, label: '1 Star' },
+                    ] as { key: MediaFilterOption; label: string }[]).map((chip) => (
+                        <TouchableOpacity
+                            key={String(chip.key)}
+                            testID={`filter-chip-${chip.key}`}
+                            style={[
+                                styles.filterChip,
+                                activeFilter === chip.key &&
+                                    styles.filterChipActive,
+                            ]}
+                            onPress={() => setActiveFilter(chip.key)}
+                        >
+                            <Text
+                                style={[
+                                    styles.filterChipText,
+                                    activeFilter === chip.key &&
+                                        styles.filterChipTextActive,
+                                ]}
+                            >
+                                {chip.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                {/* Sort By */}
+                <TouchableOpacity
+                    testID="sort-by-trigger"
+                    style={styles.sortByRow}
+                    onPress={() => setSortModalVisible(true)}
+                >
+                    <Text style={styles.sortByLabel}>
+                        Sort By:{' '}
+                        <Text style={styles.sortByValue}>
+                            {sortLabels[activeSort]}
+                        </Text>
+                    </Text>
+
+                    <Ionicons
+                        name="chevron-down"
+                        size={16}
+                        color="#7A7A7A"
+                    />
+                </TouchableOpacity>
+
+                <Modal
+                    testID="sort-modal"
+                    transparent
+                    animationType="fade"
+                    visible={sortModalVisible}
+                    onRequestClose={() => setSortModalVisible(false)}
+                >
+                    <TouchableOpacity
+                        style={styles.sortModalBackdrop}
+                        activeOpacity={1}
+                        onPress={() => setSortModalVisible(false)}
+                    >
+                        <View style={styles.sortModalContent}>
+                            {(Object.keys(sortLabels) as ReviewSort[]).map(
+                                (option) => (
+                                    <TouchableOpacity
+                                        key={option}
+                                        testID={`sort-option-${option}`}
+                                        style={styles.sortOptionRow}
+                                        onPress={() => {
+                                            setActiveSort(option);
+                                            setSortModalVisible(false);
+                                        }}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.sortOptionText,
+                                                activeSort === option &&
+                                                    styles.sortOptionTextActive,
+                                            ]}
+                                        >
+                                            {sortLabels[option]}
+                                        </Text>
+
+                                        {activeSort === option && (
+                                            <Ionicons
+                                                name="checkmark"
+                                                size={18}
+                                                color={PRIMARY}
+                                            />
+                                        )}
+                                    </TouchableOpacity>
+                                )
+                            )}
+                        </View>
+                    </TouchableOpacity>
+                </Modal>
+
+                {/* Filter/Sort Loading */}
+                {reviewsLoading && (
+                    <View
+                        style={styles.reviewsLoadingBox}
+                        testID="reviews-loading-indicator"
+                    >
+                        <ActivityIndicator
+                            size="small"
+                            color={PRIMARY}
+                        />
+                    </View>
+                )}
+
+                {/* No Matching Reviews */}
+                {!reviewsLoading &&
+                    reviews.length === 0 &&
+                    reviewSummary.totalReviews > 0 && (
+                        <View
+                            style={styles.emptyStateBox}
+                            testID="no-filtered-reviews-empty-state"
+                        >
+                            <Text style={styles.emptyStateTitle}>
+                                No reviews found
+                            </Text>
+
+                            <Text style={styles.emptyStateSubtitle}>
+                                There are no reviews matching this filter.
+                            </Text>
+                        </View>
+                    )}
+            </>
+        )}
+        {/* No reviews yet */}
+        {!summaryLoading &&
+            reviewSummary?.totalReviews === 0 && (
+                <View
+                    style={styles.emptyStateBox}
+                    testID="no-reviews-empty-state"
+                >
+                    <Text style={styles.emptyStateTitle}>
+                        No reviews yet
+                    </Text>
+
+                    <Text style={styles.emptyStateSubtitle}>
+                        Be the first customer to share your experience.
+                    </Text>
+                </View>
+            )}
+
+        {/* Existing Eventify reviews */}
         {activeReviewTab === "Eventify" && (
-            <View>
-                {reviews.length === 0 ? (
+    <View>
+        {!reviewsLoading && reviews.length === 0 && reviewSummary?.totalReviews === 0 ? (
                     <View style={styles.emptyReviewsCreative}>
                         <View style={styles.emptyReviewsIconWrap}>
-                            <Ionicons name="chatbubble-ellipses-outline" size={28} color={PRIMARY} />
+                            <Ionicons
+                                name="chatbubble-ellipses-outline"
+                                size={28}
+                                color={PRIMARY}
+                            />
                         </View>
-                        <Text style={styles.emptyReviewsTitle}>No reviews yet</Text>
+
+                        <Text style={styles.emptyReviewsTitle}>
+                            No reviews yet
+                        </Text>
+
                         <Text style={styles.emptyReviewsSubtext}>
                             Be the first to share your experience with this vendor
                         </Text>
                     </View>
                 ) : (
                     <>
-                        {/* Rating Summary Card */}
+                        {/* Existing Rating Summary Card */}
                         <View style={styles.ratingSummaryCard}>
                             <View style={styles.ratingSummaryLeft}>
                                 <Text style={styles.ratingBigNumber}>
                                     {(
-                                        reviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
-                                        reviews.length
+                                        reviews.reduce(
+                                            (sum, r) =>
+                                                sum + (r.rating || 0),
+                                            0
+                                        ) / reviews.length
                                     ).toFixed(1)}
                                 </Text>
-                                <View style={{ flexDirection: 'row', marginTop: 4 }}>
+
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        marginTop: 4,
+                                    }}
+                                >
                                     {[1, 2, 3, 4, 5].map((star) => {
                                         const avg =
-                                            reviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
-                                            reviews.length;
+                                            reviews.reduce(
+                                                (sum, r) =>
+                                                    sum + (r.rating || 0),
+                                                0
+                                            ) / reviews.length;
+
                                         return (
                                             <Ionicons
                                                 key={star}
-                                                name={avg >= star ? 'star' : avg >= star - 0.5 ? 'star-half' : 'star-outline'}
+                                                name={
+                                                    avg >= star
+                                                        ? 'star'
+                                                        : avg >= star - 0.5
+                                                        ? 'star-half'
+                                                        : 'star-outline'
+                                                }
                                                 size={14}
                                                 color="#FFC107"
                                             />
                                         );
                                     })}
                                 </View>
+
                                 <Text style={styles.ratingCountText}>
-                                    {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                                    {reviews.length}{' '}
+                                    {reviews.length === 1
+                                        ? 'review'
+                                        : 'reviews'}
                                 </Text>
                             </View>
 
@@ -792,61 +1169,109 @@ const category =
                             <View style={styles.ratingSummaryRight}>
                                 {[5, 4, 3, 2, 1].map((star) => {
                                     const count = reviews.filter(
-                                        (r) => Math.round(r.rating) === star
+                                        (r) =>
+                                            Math.round(r.rating) === star
                                     ).length;
-                                    const pct = reviews.length ? (count / reviews.length) * 100 : 0;
+
+                                    const pct = reviews.length
+                                        ? (count / reviews.length) * 100
+                                        : 0;
+
                                     return (
-                                        <View key={star} style={styles.ratingBarRow}>
-                                            <Text style={styles.ratingBarLabel}>{star}</Text>
-                                            <Ionicons name="star" size={10} color="#FFC107" />
-                                            <View style={styles.ratingBarTrack}>
+                                        <View
+                                            key={star}
+                                            style={styles.ratingBarRow}
+                                        >
+                                            <Text
+                                                style={styles.ratingBarLabel}
+                                            >
+                                                {star}
+                                            </Text>
+
+                                            <Ionicons
+                                                name="star"
+                                                size={10}
+                                                color="#FFC107"
+                                            />
+
+                                            <View
+                                                style={
+                                                    styles.ratingBarTrack
+                                                }
+                                            >
                                                 <View
                                                     style={[
                                                         styles.ratingBarFill,
-                                                        { width: `${pct}%` },
+                                                        {
+                                                            width: `${pct}%`,
+                                                        },
                                                     ]}
                                                 />
                                             </View>
-                                            <Text style={styles.ratingBarCount}>{count}</Text>
+
+                                            <Text
+                                                style={
+                                                    styles.ratingBarCount
+                                                }
+                                            >
+                                                {count}
+                                            </Text>
                                         </View>
                                     );
                                 })}
                             </View>
                         </View>
 
-                        {/* Review Cards */}
-                        {reviews.map((review, index) => (
-                            <View key={index} style={styles.eventifyReviewCreative}>
-                                <View style={styles.reviewTopRow}>
-                                    <View style={styles.avatarCircleCreative}>
-                                        <Text style={styles.avatarInitial}>
-                                            {(review.reviewerName || 'A').charAt(0).toUpperCase()}
-                                        </Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.reviewerName}>
-                                            {review.reviewerName || 'Anonymous'}
-                                        </Text>
-                                        <Text style={styles.reviewDate}>
-                                            {new Date(review.createdAt).toDateString()}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.reviewRatingPill}>
-                                        <Ionicons name="star" size={12} color="#FFC107" />
-                                        <Text style={styles.reviewRatingPillText}>
-                                            {review.rating || 0}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.reviewQuoteBar} />
-                                <Text style={styles.reviewTextCreative}>{review.reviewText}</Text>
-                            </View>
-                        ))}
+                        {/* Existing Review Cards */}
+                                {reviews.map((review: Review) => (
+                    <ReviewCard
+                        key={review._id}
+                        review={review}
+                        onMediaPress={(media, index) =>
+                            openMediaViewer(review, index)
+                        }
+                    />
+                ))}
+                {!reviewsLoading && reviews.length > 0 && (
+    <>
+        {hasMoreReviews ? (
+            <TouchableOpacity
+                testID="load-more-button"
+                style={styles.loadMoreButton}
+                onPress={handleLoadMore}
+                disabled={loadingMore}
+            >
+                {loadingMore ? (
+                    <ActivityIndicator
+                        size="small"
+                        color={PRIMARY}
+                        testID="load-more-loading-indicator"
+                    />
+                ) : (
+                    <Text style={styles.loadMoreButtonText}>
+                        Load More
+                    </Text>
+                )}
+            </TouchableOpacity>
+        ) : (
+            reviews.length >= 5 && (
+                <Text style={styles.endOfListText}>
+                    You've seen all reviews
+                </Text>
+            )
+        )}
+    </>
+)}
                     </>
                 )}
             </View>
         )}
+        <MediaViewerModal
+    visible={mediaViewerVisible}
+    media={selectedReviewMedia}
+    initialIndex={selectedMediaIndex}
+    onClose={() => setMediaViewerVisible(false)}
+/>
     </View>
 )}
 
@@ -1359,6 +1784,178 @@ customPackagePanelButtonText: {
     tabContent: {
         padding: 16,
     },
+    filterChipsScroll: {
+    flexDirection: 'row',
+    marginBottom: 12,
+},
+filterChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#fff',
+    marginRight: 8,
+},
+filterChipActive: {
+    backgroundColor: PRIMARY,
+    borderColor: PRIMARY,
+},
+filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7A7A7A',
+},
+filterChipTextActive: {
+    color: '#fff',
+},
+sortByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingVertical: 10,
+    marginBottom: 8,
+},
+sortByLabel: {
+    fontSize: 13,
+    color: '#7A7A7A',
+    marginRight: 4,
+},
+sortByValue: {
+    color: PRIMARY,
+    fontWeight: 'bold',
+},
+sortModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+},
+sortModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+},
+sortOptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+},
+sortOptionText: {
+    fontSize: 15,
+    color: '#333',
+},
+sortOptionTextActive: {
+    color: PRIMARY,
+    fontWeight: 'bold',
+},
+reviewsLoadingBox: {
+    paddingVertical: 20,
+    alignItems: 'center',
+},
+loadMoreButton: {
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: PRIMARY,
+    marginTop: 8,
+    marginBottom: 16,
+    minWidth: 120,
+    alignItems: 'center',
+},
+loadMoreButtonText: {
+    color: PRIMARY,
+    fontWeight: 'bold',
+    fontSize: 13,
+},
+endOfListText: {
+    textAlign: 'center',
+    color: '#7A7A7A',
+    fontSize: 12,
+    marginVertical: 16,
+},
+    summaryLoadingBox: {
+    paddingVertical: 24,
+    alignItems: 'center',
+},
+summaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+},
+summaryHeading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+},
+summaryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+},
+averageRatingText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: PRIMARY,
+},
+breakdownContainer: {
+    marginTop: 4,
+},
+breakdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+},
+breakdownStarLabel: {
+    width: 32,
+    fontSize: 12,
+    color: '#7A7A7A',
+},
+breakdownBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    marginHorizontal: 8,
+    overflow: 'hidden',
+},
+breakdownBarFill: {
+    height: '100%',
+    backgroundColor: '#FFC107',
+    borderRadius: 4,
+},
+breakdownCount: {
+    width: 28,
+    fontSize: 12,
+    color: '#7A7A7A',
+    textAlign: 'right',
+},
+emptyStateBox: {
+    padding: 24,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+},
+emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+},
+emptyStateSubtitle: {
+    fontSize: 13,
+    color: '#7A7A7A',
+    textAlign: 'center',
+},
     eventifyReview: {
         backgroundColor: CARD,
         padding: 16,

@@ -1,3 +1,4 @@
+//fyp-mobile/components/vendorreview/VendorReviewIndex.tsx
 import getVendorById from '@/services/getVendorById';
 import { getSecureData } from '@/store';
 import { router } from 'expo-router';

@@ -1,17 +1,27 @@
-
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import postVendorReview from '@/services/postVendorReview';
+import { uploadMultipleImages } from '@/services/uploadMultipleImages';
 import { getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Calendar } from 'react-native-calendars';
+import * as ImagePicker from 'expo-image-picker';
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { ReviewMedia } from '@/types/review';
 import Toast from 'react-native-toast-message';
 
 
-const PhotographerDetailsScreen: React.FC = () => {
+const VendorDetailsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
   const [activePackage, setActivePackage] = useState<number | null>(null);
   const [activeReviewTab, setActiveReviewTab] = useState<'Eventify' | 'Google'>('Eventify');
@@ -21,60 +31,130 @@ const PhotographerDetailsScreen: React.FC = () => {
 
   const [rating, setRating] = useState<number | null>(null);
 
-  const [newReview, setNewReview] = useState('');
+const [newReview, setNewReview] = useState('');
 
-  const handleSubmitReview = async () => {
-    if (!newReview.trim()) {
-      alert('Please write something before submitting.')
+const [selectedMedia, setSelectedMedia] = useState<ReviewMedia[]>([]);
+const [uploadingMedia, setUploadingMedia] = useState(false);
+
+  const handlePickMedia = async () => {
+  const permission =
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    alert('Permission to access media library is required.');
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    allowsMultipleSelection: true,
+    quality: 0.7,
+  });
+
+  if (result.canceled) return;
+
+  setUploadingMedia(true);
+
+  try {
+    const user = await getSecureData('user');
+    const userId = JSON.parse(user || '')?.['_id'];
+
+    if (!userId) {
+      throw new Error('User ID missing');
+    }
+
+    const imageUris = result.assets
+      .filter((asset) => asset.type === 'image')
+      .map((asset) => asset.uri);
+
+    if (imageUris.length === 0) {
+      alert('Please select at least one image.');
       return;
     }
 
-    if (!rating) {
-      alert('Please select a rating from 1 to 5.')
-    }
+    const uploadedUrls = await uploadMultipleImages(
+      userId,
+      imageUris
+    );
 
-    try {
-      const user = await getSecureData('user');
-      const userId = JSON.parse(user || "")?.['_id'];
-      if (!userId) throw new Error('User ID missing');
+    const uploadedMedia: ReviewMedia[] = uploadedUrls.map((url) => ({
+      type: 'image',
+      url,
+      thumbnailUrl: url,
+    }));
 
-      await postVendorReview(userId, {
-        vendorId: vendorData._id,
-        reviewText: newReview,
-        rating: rating || 0,
-        reviewerName: JSON.parse(user || "")?.['name']
-      });
+    setSelectedMedia((prev) => [
+      ...prev,
+      ...uploadedMedia,
+    ]);
+  } catch (error) {
+    console.error('Error uploading media:', error);
+    alert('Failed to upload media. Please try again.');
+  } finally {
+    setUploadingMedia(false);
+  }
+};
 
-      alert('success')
+const removeSelectedMedia = (index: number) => {
+  setSelectedMedia((prev) =>
+    prev.filter((_, i) => i !== index)
+  );
+};
+const [reviews, setReviews] = useState<any[]>([]);
+const [reviewsLoading, setReviewsLoading] = useState<boolean>(false);
+const [reviewsError, setReviewsError] = useState<string | null>(null);
 
-      setNewReview('');
-      setRating(null);
-      await getVendorReviews(vendorData._id);
-    } catch (error) {
-      console.error('Error submitting review:', error);
-      alert('Failed to submit review. Please try again.')
-    }
-  };
+const fetchReviews = async () => {
+  setReviewsLoading(true);
+  setReviewsError(null);
 
-  const [reviews, setReviews] = useState<any[]>([]);
+  try {
+    const data = await getVendorReviews(vendorData._id);
 
-  const fetchReviews = async () => {
-    try {
-      const data = await getVendorReviews(vendorData._id);
-      console.log("reviews", data);
-      setReviews(data);
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-    }
-  };
-
-  // ✅ Call fetchReviews after vendorData loads
-  useEffect(() => {
-    if (vendorData?._id) {
-      fetchReviews();
-    }
-  }, [vendorData]);
-
+    console.log('reviews', data);
+    setReviews(data.reviews);
+  } catch (error) {
+    console.error('Error fetching reviews:', error);
+    setReviewsError(
+      'Something went wrong loading reviews. Please try again.'
+    );
+  } finally {
+    setReviewsLoading(false);
+  }
+};
+  useEffect(() => { 
+    if (vendorData?._id) 
+      { fetchReviews(); } }, [vendorData]); 
+    
+    const handleSubmitReview = async () => { 
+      try { const user = await getSecureData('user'); 
+        const userId = JSON.parse(user || '')?.['_id']; 
+        if (!userId) { 
+          Toast.show({ type: 'error', text1: 'Error', text2: 'User ID not found.', }); 
+          return; } 
+          if (!vendorData?._id) 
+            { Toast.show({ type: 'error', text1: 'Error', text2: 'Vendor ID not found.', }); 
+          return; } 
+          if (!rating) 
+            { Toast.show({ type: 'error', text1: 'Rating Required', 
+              text2: 'Please select a rating.', }); 
+              return; }
+               if (!newReview.trim()) 
+                { Toast.show({ type: 'error', text1: 'Review Required', 
+                  text2: 'Please write a review.', });
+                   return; }
+                    await postVendorReview(
+                      userId, { vendorId: vendorData._id, reviewText: newReview, rating: rating, reviewerName: JSON.parse(user || '')?.['name'], media: selectedMedia, }); 
+                      Toast.show({ type: 'success', text1: 'Review Submitted', 
+                        text2: 'Your review has been submitted successfully.', }); 
+                        setNewReview(''); 
+                        setRating(null); 
+                        setSelectedMedia([]); 
+                        await fetchReviews(); 
+                      } catch (error) { 
+                        console.error('Error submitting review:', error);
+                         Toast.show({ type: 'error', text1: 'Error', 
+                          text2: 'Failed to submit review. Please try again.', }); } };
 
   const handleAddToCart = async (pkg: any) => {
     try {
@@ -435,8 +515,58 @@ const PhotographerDetailsScreen: React.FC = () => {
 
           {/* Eventify Reviews */}
           {activeReviewTab === "Eventify" && (
-            <View>
-              {reviews.map((review, index) => (
+  <View>
+    {reviewsLoading && (
+      <View style={styles.loadingReviewsBox} testID="reviews-loading-state">
+        <ActivityIndicator size="small" color="#7B2869" />
+        <Text style={styles.loadingReviewsText}>
+          Loading reviews...
+        </Text>
+      </View>
+    )}
+
+    {reviewsError && !reviewsLoading && (
+      <View style={styles.errorStateBox} testID="reviews-error-state">
+        <Ionicons
+          name="cloud-offline-outline"
+          size={28}
+          color="#C0392B"
+        />
+
+        <Text style={styles.errorStateText}>
+          {reviewsError}
+        </Text>
+
+        <TouchableOpacity
+          testID="retry-reviews-button"
+          style={styles.retryButton}
+          onPress={fetchReviews}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+
+    {!reviewsLoading &&
+      !reviewsError &&
+      reviews.length === 0 && (
+        <View
+          style={styles.emptyStateBox}
+          testID="no-reviews-empty-state"
+        >
+          <Text style={styles.emptyStateTitle}>
+            No reviews yet.
+          </Text>
+
+          <Text style={styles.emptyStateSubtitle}>
+            Be the first to review this vendor.
+          </Text>
+        </View>
+      )}
+
+    {!reviewsLoading &&
+      !reviewsError &&
+      reviews.map((review, index) => (
                 <View key={index} style={styles.eventifyReview}>
                   <Text style={styles.reviewerName}>{review.reviewerName || 'Anonymous'}</Text>
                   <Text style={styles.reviewDate}>{new Date(review.createdAt).toDateString()}</Text>
@@ -480,6 +610,66 @@ const PhotographerDetailsScreen: React.FC = () => {
                   onChangeText={setNewReview}
                   style={styles.reviewInput}
                 />
+                <Text style={styles.mediaLabel}>
+  Add Photos (optional)
+</Text>
+
+<TouchableOpacity
+  testID="pick-media-button"
+  style={styles.pickMediaButton}
+  onPress={handlePickMedia}
+  disabled={uploadingMedia}
+>
+  {uploadingMedia ? (
+    <ActivityIndicator
+      size="small"
+      color="#7B2869"
+      testID="media-upload-loading"
+    />
+  ) : (
+    <>
+      <Ionicons
+        name="images-outline"
+        size={20}
+        color="#7B2869"
+      />
+      <Text style={styles.pickMediaButtonText}>
+        Upload Photos
+      </Text>
+    </>
+  )}
+</TouchableOpacity>
+
+{selectedMedia.length > 0 && (
+  <View
+    style={styles.selectedMediaRow}
+    testID="selected-media-preview"
+  >
+    {selectedMedia.map((item, index) => (
+      <View
+        key={`${item.url}-${index}`}
+        style={styles.selectedMediaThumbWrapper}
+      >
+        <Image
+          source={{ uri: item.url }}
+          style={styles.selectedMediaThumb}
+        />
+
+        <TouchableOpacity
+          testID={`remove-media-${index}`}
+          style={styles.removeMediaButton}
+          onPress={() => removeSelectedMedia(index)}
+        >
+          <Ionicons
+            name="close-circle"
+            size={20}
+            color="#C0392B"
+          />
+        </TouchableOpacity>
+      </View>
+    ))}
+  </View>
+)}
                 <TouchableOpacity
                   testID="submit-review-button"
                   onPress={handleSubmitReview}
@@ -637,6 +827,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingReviewsBox: {
+  padding: 20,
+  alignItems: 'center',
+},
+
+loadingReviewsText: {
+  marginTop: 8,
+  fontSize: 13,
+  color: '#7A7A7A',
+},
+
+emptyStateBox: {
+  padding: 20,
+  alignItems: 'center',
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  marginBottom: 16,
+},
+
+emptyStateTitle: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#333',
+  textAlign: 'center',
+},
+
+emptyStateSubtitle: {
+  fontSize: 13,
+  color: '#7A7A7A',
+  textAlign: 'center',
+  marginTop: 6,
+},
+
+errorStateBox: {
+  padding: 20,
+  alignItems: 'center',
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  marginBottom: 16,
+},
+
+errorStateText: {
+  fontSize: 13,
+  color: '#7A7A7A',
+  textAlign: 'center',
+  marginTop: 8,
+  marginBottom: 10,
+},
+
+retryButton: {
+  paddingVertical: 8,
+  paddingHorizontal: 20,
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: '#7B2869',
+},
+
+retryButtonText: {
+  color: '#7B2869',
+  fontWeight: 'bold',
+  fontSize: 13,
+},
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -888,6 +1140,58 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
   },
+  mediaLabel: {
+  fontWeight: 'bold',
+  marginTop: 4,
+  marginBottom: 6,
+  color: '#333',
+},
+
+pickMediaButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: '#7B2869',
+  borderStyle: 'dashed',
+  borderRadius: 8,
+  paddingVertical: 12,
+  marginBottom: 10,
+},
+
+pickMediaButtonText: {
+  color: '#7B2869',
+  fontWeight: '600',
+  marginLeft: 6,
+  fontSize: 13,
+},
+
+selectedMediaRow: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  marginBottom: 10,
+},
+
+selectedMediaThumbWrapper: {
+  marginRight: 8,
+  marginBottom: 8,
+  position: 'relative',
+},
+
+selectedMediaThumb: {
+  width: 60,
+  height: 60,
+  borderRadius: 6,
+  backgroundColor: '#E0E0E0',
+},
+
+removeMediaButton: {
+  position: 'absolute',
+  top: -6,
+  right: -6,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 10,
+},
   reviewInput: {
     borderColor: '#ccc',
     borderWidth: 1,
@@ -912,4 +1216,4 @@ const styles = StyleSheet.create({
 
 });
 
-export default PhotographerDetailsScreen;
+export default VendorDetailsScreen;
