@@ -4,7 +4,7 @@
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import postVendorReview from '@/services/postVendorReview';
 import { uploadMultipleImages } from '@/services/uploadMultipleImages';
-import { getSecureData, saveSecureData } from '@/store';
+import { getUserData, saveSecureData,getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams } from 'expo-router';
@@ -81,33 +81,17 @@ const handlePickMedia = async () => {
 
     try {
 
-        const user = await getSecureData('user');
+      const user = await getUserData();
 
-        if (!user) {
-            throw new Error('User data not found');
-        }
+if (!user) {
+    throw new Error('User data not found');
+}
 
-        let parsedUser: any;
+const userId = user?._id;
 
-        try {
-
-            parsedUser = JSON.parse(user);
-
-        } catch (parseError) {
-
-            console.error(
-                'Failed to parse stored user:',
-                parseError,
-            );
-
-            throw new Error('Invalid stored user data');
-        }
-
-        const userId = parsedUser?._id;
-
-        if (!userId) {
-            throw new Error('User ID missing');
-        }
+if (!userId) {
+    throw new Error('User ID missing');
+}
 
         const uploadAssets = result.assets.map(
             (asset, index) => {
@@ -209,6 +193,8 @@ const handlePickMedia = async () => {
         setUploadingMedia(false);
     }
 };
+
+
 
 const removeSelectedMedia = (index: number) => {
   setSelectedMedia((prev) =>
@@ -336,37 +322,89 @@ const handleSortChange = (sort: ReviewSort) => {
   setReviewsPage(1);
   setHasMoreReviews(true);
 };
-    const handleSubmitReview = async () => { 
-      try { const user = await getSecureData('user'); 
-        const userId = JSON.parse(user || '')?.['_id']; 
-        if (!userId) { 
-          Toast.show({ type: 'error', text1: 'Error', text2: 'User ID not found.', }); 
-          return; } 
-          if (!vendorData?._id) 
-            { Toast.show({ type: 'error', text1: 'Error', text2: 'Vendor ID not found.', }); 
-          return; } 
-          if (!rating) 
-            { Toast.show({ type: 'error', text1: 'Rating Required', 
-              text2: 'Please select a rating.', }); 
-              return; }
-               if (!newReview.trim()) 
-                { Toast.show({ type: 'error', text1: 'Review Required', 
-                  text2: 'Please write a review.', });
-                   return; }
-                    await postVendorReview(
-                      userId, { vendorId: vendorData._id, reviewText: newReview, rating: rating, reviewerName: JSON.parse(user || '')?.['name'], media: selectedMedia, }); 
-                      Toast.show({ type: 'success', text1: 'Review Submitted', 
-                        text2: 'Your review has been submitted successfully.', }); 
-                        setNewReview(''); 
-                        setRating(null); 
-                        setSelectedMedia([]); 
-                        setReviewsPage(1);
-                        setHasMoreReviews(true);
-                        await fetchReviews(1, false);
-                      } catch (error) { 
-                        console.error('Error submitting review:', error);
-                         Toast.show({ type: 'error', text1: 'Error', 
-                          text2: 'Failed to submit review. Please try again.', }); } };
+const handleSubmitReview = async () => {
+  try {
+    const user = await getUserData();
+
+    if (!user) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'User data not found.',
+      });
+      return;
+    }
+
+    const userId = user?._id;
+
+    if (!userId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'User ID not found.',
+      });
+      return;
+    }
+
+    if (!vendorData?._id) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Vendor ID not found.',
+      });
+      return;
+    }
+
+    if (!rating) {
+      Toast.show({
+        type: 'error',
+        text1: 'Rating Required',
+        text2: 'Please select a rating.',
+      });
+      return;
+    }
+
+    if (!newReview.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Review Required',
+        text2: 'Please write a review.',
+      });
+      return;
+    }
+
+    await postVendorReview(userId, {
+      vendorId: vendorData._id,
+      reviewText: newReview,
+      rating: rating,
+      reviewerName: user?.name,
+      media: selectedMedia,
+    });
+
+    Toast.show({
+      type: 'success',
+      text1: 'Review Submitted',
+      text2: 'Your review has been submitted successfully.',
+    });
+
+    setNewReview('');
+    setRating(null);
+    setSelectedMedia([]);
+    setReviewsPage(1);
+    setHasMoreReviews(true);
+
+    await fetchReviews(1, false);
+
+  } catch (error) {
+    console.error('Error submitting review:', error);
+
+    Toast.show({
+      type: 'error',
+      text1: 'Error',
+      text2: 'Failed to submit review. Please try again.',
+    });
+  }
+};
 
   const handleAddToCart = async (pkg: any) => {
     try {
@@ -1021,23 +1059,13 @@ scrollContent: {
     color: '#7B2869',
     fontWeight: 'bold',
   },
-  // detailsContainer: {
-  //     padding: 16,
-  // },
-  // name: {
-  //     fontSize: 20,
-  //     fontWeight: 'bold',
-  // },
+ 
   address: {
     fontSize: 14,
     color: '#7A7A7A',
     marginVertical: 8,
   },
-  // price: {
-  //     fontSize: 18,
-  //     fontWeight: 'bold',
-  //     color: '#000',
-  // },
+
   description: {
     fontSize: 14,
     marginVertical: 8,
@@ -1182,11 +1210,7 @@ retryButtonText: {
     fontSize: 16,
     color: 'red',
   },
-  // sectionTitle: {
-  //     fontSize: 18,
-  //     fontWeight: 'bold',
-  //     marginBottom: 8,
-  // },
+
   tabContent: {
     padding: 16,
   },
@@ -1194,35 +1218,7 @@ retryButtonText: {
     fontSize: 14,
     marginBottom: 8,
   },
-  // detailLabel: {
-  //     fontWeight: 'bold',
-  // },
-  // detailsContainer: {
-  //     padding: 16,
-  //     //  backgroundColor: '#FDF6FA', // Light background color
-  // },
-  // sectionTitle: {
-  //     fontSize: 18,
-  //     fontWeight: 'bold',
-  //     marginBottom: 12,
-  //     color: '#000',
-  // },
-  // detailLabel: {
-  //     fontSize: 14,
-  //     fontWeight: 'bold',
-  //     marginTop: 8,
-  //     color: '#333',
-  // },
-  // detailValue: {
-  //     fontSize: 14,
-  //     marginTop: 4,
-  //     marginBottom: 8,
-  //     color: '#555',
-  // },
-  // perHead: {
-  //     fontSize: 14,
-  //     color: '#7A7A7A',
-  // },
+
   rowContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

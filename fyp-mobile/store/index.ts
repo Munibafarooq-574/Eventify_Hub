@@ -23,7 +23,7 @@ export async function deleteSecureData(key: string) {
     }
     await SecureStore.deleteItemAsync(key);
 }*/
-
+//fyp-mobile/store/index.ts
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
