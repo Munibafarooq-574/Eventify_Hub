@@ -1,139 +1,111 @@
-// uploadMultipleImages.ts
-/*import axios from 'axios';
-
-/**
- * Uploads multiple images to the backend in chunks.
- *
- * @param {string} userId - The ID of the user uploading the images.
- * @param {string[]} imageUris - An array of local image URIs to upload.
- * @returns {Promise<string[]>} - Returns an array of URLs of the uploaded images.
- * @throws Will throw an error if the upload fails.
- */
-
-/*export async function uploadMultipleImages(
-    userId: string,
-    imageUris: string[]
-): Promise<string[]> {
-
-    const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`;
-    const CHUNK_SIZE = 8;
-    let allUrls: string[] = [];
-
-    for (let i = 0; i < imageUris.length; i += CHUNK_SIZE) {
-        const chunk = imageUris.slice(i, i + CHUNK_SIZE);
-        const formData = new FormData();
-
-        chunk.forEach((uri, index) => {
-            const uriParts = uri.split('.');
-            const fileType = uriParts[uriParts.length - 1].toLowerCase();
-
-            formData.append('files', {
-                uri,
-                name: `photo_${i + index}.${fileType}`,
-                type: `image/${fileType}`,
-            } as any);
-        });
-
-        try {
-            const response = await axios.post(url, formData, {
-                headers: {
-                    Accept: 'application/json',
-                },
-                timeout: 1200000, // 20 minutes
-            });
-
-            allUrls = [...allUrls, ...(response.data.urls || [])];
-
-        } catch (error: any) {
-            console.error(
-                "Upload error:",
-                error?.response?.status,
-                error?.response?.data || error?.message || error
-            );
-            throw error;
-        }
-    }
-
-    return allUrls;
-}*/
-
-
+//fyp-mobile/services/uploadMultipleImages.ts
 import axios from 'axios';
 
 export interface UploadMediaAsset {
-    uri: string;
-    name: string;
-    type: string;
+  uri: string;
+  name: string;
+  type: string;
 }
 
-/**
- * Uploads multiple images/videos to the backend in chunks.
- *
- * @param userId - ID of the vendor/user
- * @param assets - Local image/video assets
- * @returns Array of uploaded URLs
- */
 export async function uploadMultipleImages(
-    userId: string,
-    assets: UploadMediaAsset[],
+  userId: string,
+  assets: UploadMediaAsset[],
+  onProgress?: (progress: number) => void,
 ): Promise<string[]> {
+  const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`;
 
-    const url = `https://eventify-hub.onrender.com/vendor/image?userId=${userId}`;
+  const CHUNK_SIZE = 8;
+  let allUrls: string[] = [];
 
-    const CHUNK_SIZE = 8;
-    let allUrls: string[] = [];
+  if (!assets.length) {
+    onProgress?.(100);
+    return [];
+  }
 
-    for (let i = 0; i < assets.length; i += CHUNK_SIZE) {
+  const totalFiles = assets.length;
+  let completedFiles = 0;
 
-        const chunk = assets.slice(i, i + CHUNK_SIZE);
+  // Start at 0%
+  onProgress?.(0);
 
-        const formData = new FormData();
+  for (let i = 0; i < assets.length; i += CHUNK_SIZE) {
+    const chunk = assets.slice(i, i + CHUNK_SIZE);
 
-        chunk.forEach((asset) => {
+    const formData = new FormData();
 
-            formData.append('files', {
-                uri: asset.uri,
-                name: asset.name,
-                type: asset.type,
-            } as any);
+    chunk.forEach((asset) => {
+      formData.append(
+        'files',
+        {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.type,
+        } as any,
+      );
+    });
 
-        });
+    try {
+      const response = await axios.post(url, formData, {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
 
-        try {
+        timeout: 1200000,
 
-            const response = await axios.post(url, formData, {
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'multipart/form-data',
-                },
+        onUploadProgress: (progressEvent) => {
+          const loaded = progressEvent.loaded || 0;
+          const total = progressEvent.total || 0;
 
-                // 20 minutes
-                timeout: 1200000,
-            });
+          if (!total) {
+            return;
+          }
 
-            if (!response.data?.urls) {
-                throw new Error(
-                    'Upload response does not contain URLs',
-                );
-            }
+          const chunkProgress = loaded / total;
 
-            allUrls = [
-                ...allUrls,
-                ...response.data.urls,
-            ];
+          const overallProgress =
+            ((completedFiles + chunkProgress * chunk.length) /
+              totalFiles) *
+            100;
 
-        } catch (error: any) {
+          onProgress?.(
+            Math.min(99, Math.round(overallProgress)),
+          );
+        },
+      });
 
-            console.error(
-                'Upload error:',
-                error?.response?.status,
-                error?.response?.data,
-                error?.message,
-            );
+      if (!response.data?.urls) {
+        throw new Error(
+          'Upload response does not contain URLs',
+        );
+      }
 
-            throw error;
-        }
+      allUrls = [
+        ...allUrls,
+        ...response.data.urls,
+      ];
+
+      completedFiles += chunk.length;
+
+      onProgress?.(
+        Math.min(
+          100,
+          Math.round((completedFiles / totalFiles) * 100),
+        ),
+      );
+    } catch (error: any) {
+      console.error(
+        'Upload error:',
+        error?.response?.status,
+        error?.response?.data,
+        error?.message,
+      );
+
+      throw error;
     }
+  }
 
-    return allUrls;
+  onProgress?.(100);
+
+  return allUrls;
 }

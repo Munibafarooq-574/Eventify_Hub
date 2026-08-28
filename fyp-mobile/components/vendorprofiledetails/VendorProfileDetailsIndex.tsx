@@ -49,6 +49,7 @@ const scrollViewRef = useRef<ScrollView>(null);
 
 const [selectedMedia, setSelectedMedia] = useState<ReviewMedia[]>([]);
 const [uploadingMedia, setUploadingMedia] = useState(false);
+const [uploadProgress, setUploadProgress] = useState(0);
 const [viewerVisible, setViewerVisible] = useState(false);
 const [viewerMedia, setViewerMedia] = useState<ReviewMedia[]>([]);
 const [viewerIndex, setViewerIndex] = useState(0);
@@ -78,6 +79,7 @@ const handlePickMedia = async () => {
     }
 
     setUploadingMedia(true);
+    setUploadProgress(0);
 
     try {
 
@@ -145,11 +147,13 @@ if (!userId) {
             })),
         );
 
-        const uploadedUrls =
-            await uploadMultipleImages(
-                userId,
-                uploadAssets,
-            );
+        const uploadedUrls = await uploadMultipleImages(
+  userId,
+  uploadAssets,
+  (progress) => {
+    setUploadProgress(progress);
+  },
+);
 
         const uploadedMedia: ReviewMedia[] =
             uploadedUrls.map(
@@ -189,9 +193,15 @@ if (!userId) {
         );
 
     } finally {
+  setUploadingMedia(false);
 
-        setUploadingMedia(false);
-    }
+  // Keep 100% visible briefly before resetting
+  setUploadProgress(100);
+
+  setTimeout(() => {
+    setUploadProgress(0);
+  }, 500);
+}
 };
 
 
@@ -924,16 +934,44 @@ const handleSubmitReview = async () => {
 
 <TouchableOpacity
   testID="pick-media-button"
-  style={styles.pickMediaButton}
+  style={[
+    styles.pickMediaButton,
+    uploadingMedia && styles.uploadingMediaButton,
+  ]}
   onPress={handlePickMedia}
   disabled={uploadingMedia}
 >
   {uploadingMedia ? (
-    <ActivityIndicator
-      size="small"
-      color="#7B2869"
-      testID="media-upload-loading"
-    />
+    <View style={styles.uploadProgressContainer}>
+      <View style={styles.uploadProgressHeader}>
+        <View style={styles.uploadProgressTitleRow}>
+          <ActivityIndicator
+            size="small"
+            color="#7B2869"
+            testID="media-upload-loading"
+          />
+
+          <Text style={styles.uploadProgressText}>
+            Uploading media...
+          </Text>
+        </View>
+
+        <Text style={styles.uploadPercentage}>
+          {uploadProgress}%
+        </Text>
+      </View>
+
+      <View style={styles.progressBarBackground}>
+        <View
+          style={[
+            styles.progressBarFill,
+            {
+              width: `${uploadProgress}%`,
+            },
+          ]}
+        />
+      </View>
+    </View>
   ) : (
     <>
       <Ionicons
@@ -941,8 +979,9 @@ const handleSubmitReview = async () => {
         size={20}
         color="#7B2869"
       />
+
       <Text style={styles.pickMediaButtonText}>
-        Upload Photos
+        Upload Photos / Videos
       </Text>
     </>
   )}
@@ -1278,6 +1317,52 @@ retryButtonText: {
     borderRadius: 8,
     marginRight: 8,
   },
+  uploadingMediaButton: {
+  paddingVertical: 12,
+},
+
+uploadProgressContainer: {
+  width: '100%',
+},
+
+uploadProgressHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 8,
+},
+
+uploadProgressTitleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+
+uploadProgressText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#7B2869',
+},
+
+uploadPercentage: {
+  fontSize: 13,
+  fontWeight: 'bold',
+  color: '#7B2869',
+},
+
+progressBarBackground: {
+  width: '100%',
+  height: 7,
+  backgroundColor: '#E8E8E8',
+  borderRadius: 4,
+  overflow: 'hidden',
+},
+
+progressBarFill: {
+  height: '100%',
+  backgroundColor: '#7B2869',
+  borderRadius: 4,
+},
   reviewTabContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
