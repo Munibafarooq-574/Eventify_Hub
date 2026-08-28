@@ -33,16 +33,45 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
   const { status } = useEvent(player, 'statusChange', { status: player.status });
 
   useEffect(() => {
+  let cancelled = false;
+
+  const loadVideo = async () => {
+    // Modal close hai → video immediately pause
+    if (!visible) {
+      player.pause();
+      return;
+    }
+
     if (isVideo && current?.url) {
-      player.replace({ uri: current.url });
-      player.play();
+      try {
+        await player.replaceAsync({ uri: current.url });
+
+        if (!cancelled && visible) {
+          player.play();
+        }
+      } catch (error) {
+        console.error('Error loading video:', error);
+      }
     } else {
       player.pause();
     }
-    // reset image state whenever we switch items (harmless no-op for video items)
-    setImageLoading(true);
-    setImageFailed(false);
-  }, [current?.url, isVideo]);
+
+    if (!cancelled) {
+      setImageLoading(true);
+      setImageFailed(false);
+    }
+  };
+
+  loadVideo();
+
+  return () => {
+    cancelled = true;
+
+    // Important:
+    // Stop video whenever media changes OR component/modal closes.
+    player.pause();
+  };
+}, [visible, current?.url, isVideo]);
 
   const goNext = () => {
     if (currentIndex < media.length - 1) setCurrentIndex(currentIndex + 1);
@@ -59,11 +88,27 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
   const failed = isVideo ? videoFailed : imageFailed;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} testID="media-viewer-modal">
+      <Modal
+  visible={visible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    player.pause();
+    onClose();
+  }}
+  testID="media-viewer-modal"
+>
       <View style={styles.backdrop}>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose} testID="media-viewer-close">
-          <Ionicons name="close" size={28} color="#fff" />
-        </TouchableOpacity>
+      <TouchableOpacity
+  style={styles.closeButton}
+  onPress={() => {
+    player.pause();
+    onClose();
+  }}
+  testID="media-viewer-close"
+>
+  <Ionicons name="close" size={28} color="#fff" />
+</TouchableOpacity>
 
         {media.length > 1 && (
           <Text style={styles.counter}>{currentIndex + 1} / {media.length}</Text>
@@ -81,13 +126,15 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
             </View>
           ) : isVideo ? (
             <VideoView
-              style={styles.fullVideo}
-              player={player}
-              nativeControls
-              allowsFullscreen
-              contentFit="contain"
-              testID="media-viewer-video"
-            />
+          style={styles.fullVideo}
+          player={player}
+          nativeControls
+          fullscreenOptions={{
+            enable: true,
+          }}
+          contentFit="contain"
+          testID="media-viewer-video"
+        />
           ) : (
             <Image
               source={{ uri: current.url }}
