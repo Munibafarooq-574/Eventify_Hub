@@ -53,63 +53,161 @@ const [viewerVisible, setViewerVisible] = useState(false);
 const [viewerMedia, setViewerMedia] = useState<ReviewMedia[]>([]);
 const [viewerIndex, setViewerIndex] = useState(0);
 
-  const handlePickMedia = async () => {
-  const permission =
-    await ImagePicker.requestMediaLibraryPermissionsAsync();
+const handlePickMedia = async () => {
 
-  if (!permission.granted) {
-    alert('Permission to access media library is required.');
-    return;
-  }
+    const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.All,
-    allowsMultipleSelection: true,
-    quality: 0.7,
-  });
-
-  if (result.canceled) return;
-
-  setUploadingMedia(true);
-
-  try {
-    const user = await getSecureData('user');
-    const userId = JSON.parse(user || '')?.['_id'];
-
-    if (!userId) {
-      throw new Error('User ID missing');
+    if (!permission.granted) {
+        alert('Permission to access media library is required.');
+        return;
     }
 
-    const imageUris = result.assets
-      .filter((asset) => asset.type === 'image')
-      .map((asset) => asset.uri);
+    const result =
+        await ImagePicker.launchImageLibraryAsync({
 
-    if (imageUris.length === 0) {
-      alert('Please select at least one image.');
-      return;
+            mediaTypes: ['images', 'videos'],
+
+            allowsMultipleSelection: true,
+
+            quality: 0.7,
+        });
+
+    if (result.canceled || !result.assets?.length) {
+        return;
     }
 
-    const uploadedUrls = await uploadMultipleImages(
-      userId,
-      imageUris
-    );
+    setUploadingMedia(true);
 
-    const uploadedMedia: ReviewMedia[] = uploadedUrls.map((url) => ({
-      type: 'image',
-      url,
-      thumbnailUrl: url,
-    }));
+    try {
 
-    setSelectedMedia((prev) => [
-      ...prev,
-      ...uploadedMedia,
-    ]);
-  } catch (error) {
-    console.error('Error uploading media:', error);
-    alert('Failed to upload media. Please try again.');
-  } finally {
-    setUploadingMedia(false);
-  }
+        const user = await getSecureData('user');
+
+        if (!user) {
+            throw new Error('User data not found');
+        }
+
+        let parsedUser: any;
+
+        try {
+
+            parsedUser = JSON.parse(user);
+
+        } catch (parseError) {
+
+            console.error(
+                'Failed to parse stored user:',
+                parseError,
+            );
+
+            throw new Error('Invalid stored user data');
+        }
+
+        const userId = parsedUser?._id;
+
+        if (!userId) {
+            throw new Error('User ID missing');
+        }
+
+        const uploadAssets = result.assets.map(
+            (asset, index) => {
+
+                const isVideo = asset.type === 'video';
+
+                let extension = isVideo
+                    ? 'mp4'
+                    : 'jpg';
+
+                if (asset.fileName) {
+
+                    const parts =
+                        asset.fileName.split('.');
+
+                    if (parts.length > 1) {
+
+                        extension =
+                            parts[
+                                parts.length - 1
+                            ].toLowerCase();
+                    }
+                }
+
+                const mimeType =
+                    asset.mimeType ||
+                    (
+                        isVideo
+                            ? 'video/mp4'
+                            : 'image/jpeg'
+                    );
+
+                return {
+
+                    uri: asset.uri,
+
+                    name:
+                        asset.fileName ||
+                        `${isVideo ? 'video' : 'photo'}_${Date.now()}_${index}.${extension}`,
+
+                    type: mimeType,
+                };
+            },
+        );
+
+        console.log(
+            'Uploading media:',
+            uploadAssets.map((item) => ({
+                name: item.name,
+                type: item.type,
+            })),
+        );
+
+        const uploadedUrls =
+            await uploadMultipleImages(
+                userId,
+                uploadAssets,
+            );
+
+        const uploadedMedia: ReviewMedia[] =
+            uploadedUrls.map(
+                (url, index) => ({
+
+                    type:
+                        result.assets[index]?.type === 'video'
+                            ? 'video'
+                            : 'image',
+
+                    url,
+
+                    thumbnailUrl:
+                        result.assets[index]?.type === 'video'
+                            ? undefined
+                            : url,
+                }),
+            );
+
+        setSelectedMedia((prev) => [
+            ...prev,
+            ...uploadedMedia,
+        ]);
+
+    } catch (error: any) {
+
+        console.error(
+            'Error uploading media:',
+            error?.response?.data ||
+            error?.message ||
+            error,
+        );
+
+        alert(
+            error?.response?.data?.message ||
+            'Failed to upload media. Please try again.',
+        );
+
+    } finally {
+
+        setUploadingMedia(false);
+    }
 };
 
 const removeSelectedMedia = (index: number) => {

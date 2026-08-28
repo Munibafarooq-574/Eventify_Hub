@@ -138,7 +138,7 @@ async updateBusinessDetails(
 @UseInterceptors(
     FilesInterceptor('files', 50, {
         limits: {
-            fileSize: 10 * 1024 * 1024, // 10MB per image
+            fileSize: 200 * 1024 * 1024, // 200 MB per file
         },
     }),
 )
@@ -147,7 +147,10 @@ async uploadImages(
     @UploadedFiles() files: Express.Multer.File[],
 ) {
     if (!files || files.length === 0) {
-        throw new HttpException('No files provided', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+            'No files provided',
+            HttpStatus.BAD_REQUEST,
+        );
     }
 
     const urls = await this.fileUploadService.uploadMultipleFiles(files);
@@ -155,7 +158,7 @@ async uploadImages(
     await this.vendorService.associateImagesWithUser(userId, urls);
 
     return {
-        message: 'Images uploaded successfully',
+        message: 'Media uploaded successfully',
         urls,
     };
 }
