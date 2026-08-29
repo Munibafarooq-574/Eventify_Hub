@@ -166,6 +166,18 @@ export class AuthService {
     }).exec();
   }
 
+  async searchOrganizers(keyword: string): Promise<User[]> {
+  return this.userModel.find({
+    role: 'Organizer',
+    $or: [
+      { name: { $regex: keyword, $options: 'i' } },
+      { email: { $regex: keyword, $options: 'i' } },
+    ],
+  })
+  .select('_id name email')
+  .limit(50)
+  .exec();
+}
   async searchVendorsByFilters(filters: SearchVendorsDto): Promise<any[]> {
     console.log("Filters", filters);
     const hasFilters = Object.values(filters || {}).some(v => v !== undefined && v !== null && v !== '');

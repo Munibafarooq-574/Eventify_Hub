@@ -23,6 +23,11 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Get('organizers')
+async searchOrganizers(@Query('q') query: string) {
+  return this.authService.searchOrganizers(query || '');
+}
+
   @Post('forgot-password')
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto.email);

@@ -1,4 +1,4 @@
-//fyp-backend/src/auth/schemas/user.schema.ts
+//fyp-backend/src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { ContactDetails, ContactDetailsSchema } from './contact-details.schema';
