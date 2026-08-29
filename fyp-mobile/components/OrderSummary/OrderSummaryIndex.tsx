@@ -90,16 +90,11 @@ const SummaryScreen = () => {
             `;
 
             // Generate PDF from HTML
-            const { uri } = await Print.printToFileAsync({ html: htmlContent });
+           const { uri } = await Print.printToFileAsync({
+                    html: htmlContent,
+                });
 
-            // Define the path where the PDF will be saved
-            const pdfPath = `${FileSystem.documentDirectory}receipt.pdf`;
-
-            // Move the generated PDF to the specified path
-            await FileSystem.moveAsync({
-                from: uri,
-                to: pdfPath,
-            });
+                const pdfPath = uri;
 
             // Notify the user
             Toast.show({
