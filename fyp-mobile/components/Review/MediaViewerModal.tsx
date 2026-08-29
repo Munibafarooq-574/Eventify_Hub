@@ -32,13 +32,35 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
 
   const { status } = useEvent(player, 'statusChange', { status: player.status });
 
+  // The native VideoPlayer can be released (by useVideoPlayer's own cleanup,
+  // or in-between an awaited replaceAsync() call) before some of our own
+  // pause()/play() calls run — e.g. on fast unmount or rapid media switches.
+  // Calling a method on a released shared object throws
+  // "Cannot use shared object that was already released", so every call
+  // into the player from here is wrapped defensively.
+  const safePause = () => {
+    try {
+      player.pause();
+    } catch (error) {
+      // Player already released (component unmounting/unmounted) — ignore.
+    }
+  };
+
+  const safePlay = () => {
+    try {
+      player.play();
+    } catch (error) {
+      // Player already released (component unmounting/unmounted) — ignore.
+    }
+  };
+
   useEffect(() => {
   let cancelled = false;
 
   const loadVideo = async () => {
     // Modal close hai → video immediately pause
     if (!visible) {
-      player.pause();
+      safePause();
       return;
     }
 
@@ -46,14 +68,19 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
       try {
         await player.replaceAsync({ uri: current.url });
 
-        if (!cancelled && visible) {
-          player.play();
+        // Component may have unmounted, or the media/visibility may have
+        // changed, while we were awaiting replaceAsync() above — bail out
+        // instead of touching a possibly-released player.
+        if (cancelled) return;
+
+        if (visible) {
+          safePlay();
         }
       } catch (error) {
         console.error('Error loading video:', error);
       }
     } else {
-      player.pause();
+      safePause();
     }
 
     if (!cancelled) {
@@ -69,7 +96,7 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
 
     // Important:
     // Stop video whenever media changes OR component/modal closes.
-    player.pause();
+    safePause();
   };
 }, [visible, current?.url, isVideo]);
 
@@ -93,7 +120,7 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
   transparent
   animationType="fade"
   onRequestClose={() => {
-    player.pause();
+    safePause();
     onClose();
   }}
   testID="media-viewer-modal"
@@ -102,7 +129,7 @@ const MediaViewerModal: React.FC<MediaViewerModalProps> = ({ visible, media, ini
       <TouchableOpacity
   style={styles.closeButton}
   onPress={() => {
-    player.pause();
+    safePause();
     onClose();
   }}
   testID="media-viewer-close"

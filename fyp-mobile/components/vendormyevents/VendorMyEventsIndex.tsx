@@ -1,6 +1,6 @@
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 import getVendorOrders from "@/services/getVendorOrders";
-import { getSecureData } from "@/store";
+import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -43,7 +43,7 @@ const MyEventsScreen = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const user = JSON.parse(await getSecureData("user") || "");
+                const user = await getUserData();
                 if (!user) {
                     throw "user not found";
                 }

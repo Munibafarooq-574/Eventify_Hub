@@ -2,7 +2,7 @@
 
 import getAllCategories from '@/services/getAllCategories';
 import patchUpdateProfile from '@/services/patchUpdateProfile'; // import your API function
-import { getSecureData, saveSecureData } from '@/store';
+import { getUserData, saveUserData } from '@/store';
 //import Ionicons from '@expo/vector-icons';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -51,12 +51,10 @@ const EditProfileScreen: React.FC = () => {
 
   const fetchUserDetails = async () => {
     try {
-      const userStr = await getSecureData('user');
-      // const categories = JSON.parse(await getSecureData(""))
+      const user = await getUserData();
       const categories = await getAllCategories();
 
-      if (userStr) {
-        const user = JSON.parse(userStr);
+      if (user) {
         const category = categories.find((x: any) => x._id === user.buisnessCategory);
         let objectLiteral = "";
         if (category) {
@@ -117,12 +115,11 @@ const EditProfileScreen: React.FC = () => {
 
      const saveUserDetails = async () => {
     try {
-      const userStr = await getSecureData('user');
-      if (!userStr) {
+      const user = await getUserData();
+      if (!user) {
         alert('User not found locally');
         return;
       }
-      const user = JSON.parse(userStr);
       const userId = user.userId || user._id;
 
       if (!userId) {
@@ -153,7 +150,7 @@ const EditProfileScreen: React.FC = () => {
       }
 
       const updatedUser = await patchUpdateProfile(userId, formData);
-      await saveSecureData('user', JSON.stringify(updatedUser));
+      await saveUserData(updatedUser);
       setAvatarChanged(false);
       alert('Profile updated successfully');
     } catch (error) {

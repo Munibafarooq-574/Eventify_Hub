@@ -2,7 +2,7 @@
 
 import getVendorContactDetails from '@/services/getVendorContactDetails';
 import updateContactDetails from '@/services/updateContactDetails';
-import { getSecureData, saveSecureData } from '@/store';
+import { getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, Stack } from 'expo-router';
@@ -70,8 +70,7 @@ const EditContactDetailsScreen = () => {
   useEffect(() => {
     const loadExisting = async () => {
       try {
-        const rawUser = await getSecureData("user");
-        const user = rawUser ? JSON.parse(rawUser) : null;
+        const user = await getUserData();
         if (!user) throw new Error("user not found");
         setUserId(user._id);
 
@@ -149,8 +148,7 @@ const EditContactDetailsScreen = () => {
       const response = await updateContactDetails(userId, formData);
 
       try {
-        const rawUser = await getSecureData("user");
-        const user = rawUser ? JSON.parse(rawUser) : null;
+        const user = await getUserData();
         if (user) {
           user.contactDetails = response?.contactDetails || {
             brandName,
@@ -164,7 +162,7 @@ const EditContactDetailsScreen = () => {
             officialGoogleLink: googleLink,
             brandLogo: response?.contactDetails?.brandLogo || existingLogoUrl,
           };
-          await saveSecureData("user", JSON.stringify(user));
+          await saveUserData(user);
         }
       } catch (e) {
         console.log("Failed to refresh cached user:", e);

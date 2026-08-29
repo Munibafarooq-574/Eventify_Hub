@@ -1,5 +1,5 @@
 import getConversationList from '@/services/getConversationList';
-import { getSecureData, saveSecureData } from '@/store';
+import { getSecureData, saveSecureData, getUserData } from '@/store';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -230,12 +230,7 @@ const MessagesScreen: React.FC = () => {
                     setLoading(true);
                 }
 
-                const rawUser =
-                    await getSecureData('user');
-
-                const user = rawUser
-                    ? JSON.parse(rawUser)
-                    : null;
+                const user = await getUserData();
 
                 if (!user) {
                     throw new Error('user not found');
@@ -416,12 +411,7 @@ const MessagesScreen: React.FC = () => {
         // Register current user
         (async () => {
             try {
-                const rawUser =
-                    await getSecureData('user');
-
-                const user = rawUser
-                    ? JSON.parse(rawUser)
-                    : null;
+                const user = await getUserData();
 
                 if (user?._id) {
                     myUserIdRef.current =

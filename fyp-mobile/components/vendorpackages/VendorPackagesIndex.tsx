@@ -1,48 +1,97 @@
 import deletePackage from '@/services/deletePackage';
-import { getSecureData, saveSecureData } from '@/store';
+import { getSecureData, saveSecureData, getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons'; // For icons
 import { useRoute } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 const PackageScreen = () => {
     const [isModalVisible, setModalVisible] = useState(false);
     const [packageDetails, setPackageDetails] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
 
+    const route = useRoute();
 
-     const route = useRoute();
+    const params = route.params as
+        | { packageId?: string }
+        | undefined;
 
-const params = route.params as
-    | { packageId?: string }
-    | undefined;
-
-const packageId = params?.packageId;
+    const packageId = params?.packageId;
 
     useEffect(() => {
-        console.log("packageId", packageId)
+        console.log("packageId", packageId);
         if (packageId) {
-            fetchPackageDetails(packageId);  // Then fetch package details
+            fetchPackageDetails(packageId);
+        } else {
+            setLoading(false);
         }
     }, [packageId]);
 
+    // Helper: reads user object from whichever storage actually has it
+    const readUser = async (): Promise<any | null> => {
+        try {
+            const userRaw = await getSecureData("user");
+            if (userRaw) {
+                return JSON.parse(userRaw);
+            }
+        } catch (err) {
+            console.error("Failed to parse user from getSecureData:", err);
+        }
+
+        try {
+            const userObj = await getUserData(); // already parsed by store/index.ts
+            if (userObj) {
+                return userObj;
+            }
+        } catch (err) {
+            console.error("Failed to read user from getUserData:", err);
+        }
+
+        return null;
+    };
+
+    // Helper: writes user object back to whichever storage it came from
+    const writeUser = async (user: any) => {
+        const userRaw = await getSecureData("user");
+        if (userRaw) {
+            await saveSecureData('user', JSON.stringify(user));
+        } else {
+            await saveUserData(user);
+        }
+    };
 
     const fetchPackageDetails = async (packageId: string) => {
+        setLoading(true);
         try {
-            const user = JSON.parse(await getSecureData("user") || "");
+            const user = await readUser();
             if (!user) {
-                throw "user not found";
+                console.error('User not found in any storage');
+                setPackageDetails(null);
+                return;
             }
+
+            if (!user.packages || !Array.isArray(user.packages)) {
+                console.error('User has no packages array');
+                setPackageDetails(null);
+                return;
+            }
+
             const packageObj = user.packages.find((x: any) => x._id === packageId);
-            setPackageDetails(user.packages.find((x: any) => x._id === packageId));
+            if (!packageObj) {
+                console.error('Package not found for id:', packageId);
+            }
+            setPackageDetails(packageObj || null);
         } catch (error) {
             console.error('Error fetching package details:', error);
+            setPackageDetails(null);
+        } finally {
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        console.log(packageDetails);
+        console.log("packageDetails updated:", packageDetails);
     }, [packageDetails]);
 
     const confirmLogout = async () => {
@@ -54,39 +103,59 @@ const packageId = params?.packageId;
 
         setModalVisible(false);
         console.log('Deleting Package...');
-        await deletePackage(packageId);
-        const user = JSON.parse((await getSecureData('user')) || '');
-        if (!user || !user.packages) throw 'User or packages not found';
 
-        user.packages = user.packages.filter((pkg: any) => pkg._id !== packageId);
+        try {
+            await deletePackage(packageId);
 
-        await saveSecureData('user', JSON.stringify(user));
-        router.push('/vendordashboard'); // Redirect after confirming delete
+            const user = await readUser();
+            if (!user || !user.packages) {
+                console.error('User or packages not found');
+                return;
+            }
+
+            user.packages = user.packages.filter((pkg: any) => pkg._id !== packageId);
+
+            await writeUser(user);
+
+            router.push('/vendordashboard'); // Redirect after confirming delete
+        } catch (error) {
+            console.error('Error deleting package:', error);
+        }
     };
 
     const cancelLogout = () => {
         setModalVisible(false);
     };
 
+    const handleBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+        } else {
+            // No previous screen in the stack (e.g. deep link or replaced route)
+            router.replace('/vendordashboard');
+        }
+    };
+
     if (!packageId) {
-    return (
-        <View
-            style={{
-                flex: 1,
-                justifyContent: "center",
-                alignItems: "center",
-            }}
-        >
-            <Text>No package selected.</Text>
-        </View>
-    );
-}
+        return (
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                <Text>No package selected.</Text>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={handleBack}
                     style={styles.headerIconButton}
                     activeOpacity={0.75}
                 >
@@ -112,7 +181,7 @@ const packageId = params?.packageId;
                 <TouchableOpacity
                     style={styles.editButton}
                     onPress={() =>
-                        router.push({
+                        router.replace({
                             pathname: '/editpackage',
                             params: { packageId: packageDetails?._id },
                         })
@@ -126,7 +195,11 @@ const packageId = params?.packageId;
 
             {/* Content */}
             <View style={styles.content}>
-                {packageDetails ? (
+                {loading ? (
+                    <View style={styles.loadingBox}>
+                        <Text style={styles.sectionText}>Loading package details...</Text>
+                    </View>
+                ) : packageDetails ? (
                     <View style={styles.card}>
 
                         <View style={styles.priceHero}>
@@ -161,15 +234,10 @@ const packageId = params?.packageId;
                     </View>
                 ) : (
                     <View style={styles.loadingBox}>
-                        <Text style={styles.sectionText}>Loading package details...</Text>
+                        <Text style={styles.sectionText}>Package not found.</Text>
                     </View>
                 )}
             </View>
-
-
-            {/* Bottom Navigation */}
-
-            <BottomNavigationFinal />
 
             {/* Delete Confirmation Modal */}
             <Modal
@@ -453,71 +521,7 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: '700',
     },
-    footer: {
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-        height: 80,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-    },
-    footerIcon: {
-        alignItems: 'center',
-    },
-    footerText: {
-        color: '#780C60',
-        fontSize: 12,
-        marginTop: 4,
-    },
-
-    homeButton: {
-        transform: [{ translateY: -10 }],
-    },
-    bottomNavigation: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        height: 80,
-        backgroundColor: '#fff',
-        borderTopWidth: 1,
-        borderTopColor: '#E0E0E0',
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-    },
-    navItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    iconContainer: {
-        backgroundColor: '#780C60',
-        width: 30,
-        height: 30,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    iconImage: {
-        width: 37,
-        height: 37,
-        marginBottom: 5,
-    },
-    navText: {
-        fontSize: 10,
-        color: '#000000',
-    },
-    homeButtonIconContainer: {
-        backgroundColor: '#780C60',
-        width: 55,
-        height: 55,
-        borderRadius: 27.5,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
+    
 
 });
 

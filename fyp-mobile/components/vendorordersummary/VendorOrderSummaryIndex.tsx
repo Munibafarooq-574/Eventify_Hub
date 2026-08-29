@@ -2,7 +2,7 @@ import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorOrders from "@/services/getVendorOrders";
 import patchUpdateOrderStatus from "@/services/patchUpdateOrderStatus";
-import { getSecureData, saveSecureData } from "@/store";
+import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -67,7 +67,7 @@ const OrderSummary = () => {
         // so they always match the current list (no separate stale stats call needed).
         const fetchData = async () => {
             try {
-                const user = JSON.parse(await getSecureData("user") || "");
+                const user = await getUserData();
                 if (!user) {
                     throw "user not found";
                 }
@@ -156,7 +156,7 @@ const OrderSummary = () => {
     // Create or get existing conversation/chat
     const handleMessageButtonClick = async (vendorId: string) => {
         try {
-            const user = JSON.parse(await getSecureData("user") || "");
+            const user = await getUserData();
             if (!user) {
                 throw "User not found";
             }

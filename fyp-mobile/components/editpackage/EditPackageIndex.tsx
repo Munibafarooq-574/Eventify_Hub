@@ -1,11 +1,13 @@
+import deletePackage from '@/services/deletePackage';
 import updatePackage from '@/services/updatePackage';
-import { getSecureData, saveSecureData } from '@/store';
+import { getSecureData, saveSecureData, getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, KeyboardAvoidingView,
   Platform, TextInput, TouchableOpacity, View ,Keyboard } from 'react-native';
-import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
+
 
 const PRIMARY = '#7B2869';
 const PRIMARY_LIGHT = '#9F4F8E';
@@ -18,9 +20,12 @@ const BORDER = '#EFE0EB';
 const DANGER = '#D9534F';
 
 const PackageScreen = () => {
+  const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isModalVisible, setModalVisible] = useState(false);
   const [packageDetails, setPackageDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   const { packageId } = useLocalSearchParams();
   const [servicesInputHeight, setServicesInputHeight] = useState(140);
@@ -30,34 +35,83 @@ const PackageScreen = () => {
   const [editableServices, setEditableServices] = useState('');
 
   useEffect(() => {
-  const show = Keyboard.addListener('keyboardDidShow', () => {
-    setKeyboardVisible(true);
-  });
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
 
-  const hide = Keyboard.addListener('keyboardDidHide', () => {
-    setKeyboardVisible(false);
-  });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
 
-  return () => {
-    show.remove();
-    hide.remove();
-  };
-}, []);
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (packageId) {
       fetchPackageDetails(packageId as string);
+    } else {
+      setLoading(false);
     }
   }, [packageId]);
 
-  const fetchPackageDetails = async (id: string) => {
+  // ===============================
+  // Storage helpers (handles both SecureStore/localStorage AND AsyncStorage,
+  // since different parts of the app may have saved "user" differently)
+  // ===============================
+
+  const readUser = async (): Promise<any | null> => {
     try {
-      const user = JSON.parse((await getSecureData('user')) || '');
-      if (!user || !user.packages) throw 'User or packages not found';
+      const userRaw = await getSecureData('user');
+      if (userRaw) {
+        return JSON.parse(userRaw);
+      }
+    } catch (err) {
+      console.error('Failed to parse user from getSecureData:', err);
+    }
+
+    try {
+      const userObj = await getUserData(); // already parsed
+      if (userObj) {
+        return userObj;
+      }
+    } catch (err) {
+      console.error('Failed to read user from getUserData:', err);
+    }
+
+    return null;
+  };
+
+  const writeUser = async (user: any) => {
+    const userRaw = await getSecureData('user');
+    if (userRaw) {
+      await saveSecureData('user', JSON.stringify(user));
+    } else {
+      await saveUserData(user);
+    }
+  };
+
+  const fetchPackageDetails = async (id: string) => {
+    setLoading(true);
+    try {
+      const user = await readUser();
+      if (!user || !user.packages) {
+        console.error('User or packages not found');
+        setPackageDetails(null);
+        return;
+      }
       const pkg = user.packages.find((x: any) => x._id === id);
-      setPackageDetails(pkg);
+      if (!pkg) {
+        console.error('Package not found for id:', id);
+      }
+      setPackageDetails(pkg || null);
     } catch (error) {
       console.error('Error fetching package details:', error);
+      setPackageDetails(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,16 +136,22 @@ const PackageScreen = () => {
       const updatedPackage = await updatePackage(packageId as string, updatedData);
       setPackageDetails(updatedPackage);
 
-      const user = JSON.parse((await getSecureData('user')) || '');
+      const user = await readUser();
       if (!user || !user.packages) throw 'User or packages not found';
       const pkgIndex = user.packages.findIndex((x: any) => x._id === packageId);
 
-      user.packages[pkgIndex] = updatedPackage;
-
-      saveSecureData("user", JSON.stringify(user));
+      if (pkgIndex === -1) {
+        console.error('Package not found in local user data, cannot sync cache');
+      } else {
+        user.packages[pkgIndex] = updatedPackage;
+        await writeUser(user);
+      }
 
       alert('Package updated successfully!');
-      router.push({
+      // Use replace (not push) so this Edit screen is removed from the
+      // navigation stack instead of staying underneath the package index.
+      // Otherwise pressing back from the package index would land back here.
+      router.replace({
         pathname: '/vendorpackages',
         params: { packageId: packageId },
       });
@@ -101,14 +161,46 @@ const PackageScreen = () => {
     }
   };
 
-  const confirmLogout = () => {
-    setModalVisible(false);
-    console.log('Deleting Package...');
-    router.push('/vendordashboard');
+  const confirmLogout = async () => {
+    if (!packageId) {
+      console.error('Package ID is missing');
+      setModalVisible(false);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      console.log('Deleting Package...');
+      await deletePackage(packageId as string);
+
+      const user = await readUser();
+      if (user && user.packages) {
+        user.packages = user.packages.filter((pkg: any) => pkg._id !== packageId);
+        await writeUser(user);
+      }
+
+      setModalVisible(false);
+      // Same reasoning: replace so this Edit screen doesn't linger in the stack.
+      router.replace('/vendordashboard');
+    } catch (error) {
+      console.error('Error deleting package:', error);
+      alert('Failed to delete package');
+      setModalVisible(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const cancelLogout = () => {
     setModalVisible(false);
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/vendordashboard');
+    }
   };
 
   return (
@@ -120,7 +212,7 @@ const PackageScreen = () => {
   <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={handleBack} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color={TEXT_DARK} />
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
@@ -130,6 +222,15 @@ const PackageScreen = () => {
   
       </View>
 
+    {loading ? (
+      <View style={styles.loadingBox}>
+        <Text style={styles.sectionText}>Loading package details...</Text>
+      </View>
+    ) : !packageDetails ? (
+      <View style={styles.loadingBox}>
+        <Text style={styles.sectionText}>Package not found.</Text>
+      </View>
+    ) : (
     <ScrollView
   style={{ flex: 1 }}
   showsVerticalScrollIndicator={false}
@@ -218,11 +319,17 @@ const PackageScreen = () => {
         </View>
 <View style={{ height: keyboardVisible ? 20 : 120 }} />
       </ScrollView>
+    )}
 
       {/* Save Button */}
-      {!keyboardVisible && (
+    {!keyboardVisible && !loading && packageDetails && (
   <TouchableOpacity
-    style={styles.saveButton}
+    style={[
+      styles.saveButton,
+      {
+        bottom: insets.bottom + 12,
+      },
+    ]}
     onPress={updatePackageDetails}
     activeOpacity={0.85}
   >
@@ -231,36 +338,8 @@ const PackageScreen = () => {
   </TouchableOpacity>
 )}
 
-      {/* Bottom Navigation */}
-      {!keyboardVisible && <BottomNavigationFinal />}
 
-      {/* Delete Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={cancelLogout}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconWrap}>
-              <Ionicons name="alert-circle-outline" size={30} color={DANGER} />
-            </View>
-            <Text style={styles.modalTitle}>Delete this package?</Text>
-            <Text style={styles.modalMessage}>
-              This action can't be undone. Clients will no longer be able to book this package.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={cancelLogout} activeOpacity={0.8}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={confirmLogout} activeOpacity={0.8}>
-                <Text style={styles.confirmButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
     </View>
     </KeyboardAvoidingView>
   );
@@ -308,6 +387,19 @@ const styles = StyleSheet.create({
   padding: 16,
   paddingBottom: 220,
 },
+
+  loadingBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 30,
+  },
+  sectionText: {
+    color: TEXT_DARK,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '500',
+  },
 
   summaryCard: {
     flexDirection: 'row',
@@ -422,6 +514,9 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
+  position: 'absolute',
+  left: 16,
+  right: 16,
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
@@ -429,8 +524,12 @@ const styles = StyleSheet.create({
   backgroundColor: PRIMARY,
   padding: 15,
   borderRadius: 14,
-  marginHorizontal: 16,
-  marginBottom: 100,
+
+  shadowColor: '#000',
+  shadowOpacity: 0.12,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 3 },
+  elevation: 5,
 },
   saveButtonText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
 
