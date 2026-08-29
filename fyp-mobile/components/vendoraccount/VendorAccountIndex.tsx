@@ -1,4 +1,4 @@
-import { deleteSecureData, getSecureData } from '@/store';
+import { deleteSecureData, deleteUserData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,16 +35,26 @@ const AccountScreen: React.FC = () => {
 );
 
   const fetchUserDetails = async () => {
-  const storedUser = (await getSecureData("user")) || "Guest";
-  const parsedUser = JSON.parse(storedUser);
+  try {
+    const user = await getUserData();
 
-  setUsername(parsedUser.name);
-  setEmail(parsedUser.email);
+    if (!user) {
+      setUsername("Guest");
+      setEmail("");
+      setAvatar("");
+      return;
+    }
 
-  // Dashboard wali DP
-  setAvatar(parsedUser?.contactDetails?.brandLogo || "");
+    setUsername(user?.name || "Guest");
+    setEmail(user?.email || "");
+    setAvatar(user?.contactDetails?.brandLogo || "");
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+    setUsername("Guest");
+    setEmail("");
+    setAvatar("");
+  }
 };
-
   const handleMenuPress = (menuTitle: string) => {
     switch (menuTitle) {
       case 'Edit Profile':
@@ -91,20 +101,29 @@ const AccountScreen: React.FC = () => {
   };
 
   const confirmLogout = async () => {
-    setModalVisible(false);
-    try {
-      await deleteSecureData("user");
-      await deleteSecureData("cartData");
-      console.log("Secure data deleted");
-    } catch (error) {
-      console.error("Failed to delete secure data:", error);
-    }
-    router.push('/intro'); // Navigate to login/intro page
-  };
+  setModalVisible(false);
 
-  const cancelLogout = () => {
-    setModalVisible(false);
-  };
+  try {
+    // Token is stored in SecureStore
+    await deleteSecureData("token");
+
+    // User data is stored in AsyncStorage
+    await deleteUserData();
+
+    // Cart data is also stored in SecureStore
+    await deleteSecureData("cartData");
+
+    console.log("Logout data deleted successfully");
+  } catch (error) {
+    console.error("Failed to clear logout data:", error);
+  }
+
+  router.replace('/intro');
+};
+
+const cancelLogout = () => {
+  setModalVisible(false);
+};
 
   // Each menu option now carries its own icon + a short subtitle so the
   // cards read like the event cards on MyEventsScreen.

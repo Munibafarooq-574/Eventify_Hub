@@ -2,7 +2,7 @@ import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
 import { VendorAnalytics } from "@/types/vendorAnalytics";
-import { getSecureData } from "@/store";
+import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -77,50 +77,82 @@ const DashboardScreen = () => {
     }, []);
 
     const fetchData = React.useCallback(async () => {
-        try {
-            const userRaw = await getSecureData("user");
-            const user = JSON.parse(userRaw || "");
-            if (!user) throw "user not found";
+    try {
+        const user = await getUserData();
 
-            setPackages(user.packages || []);
+if (!user?._id) {
+    console.warn("No user data found.");
+    setPackages([]);
+    return;
+}
 
-                        const statsData = await getVendorOrderStats("Vendor", user._id);
-            setOrderStats({
-                totalOrders: statsData.totalOrders,
-                pending: (statsData as any).pending ?? 0,
-                processing: statsData.processing,
-                completed: statsData.completed,
-                cancelled: (statsData as any).cancelled ?? 0,
-            });
-
-            const response = await getOrderStatsMonthly(user._id);
-            setOrderAmountArray(response.map((item: any) => item.totalAmount));
-            setOrderCountArray(response.map((item: any) => item.orderCount));
-            setMonthNameArray(response.map((item: any) => MONTH_NAMES[item.month]));
-        } catch (error) {
-            console.error("Error fetching data:", error);
-        } finally {
-            setLoading(false);
+        if (!user?._id) {
+            console.warn("User ID not found in stored user data.");
+            setPackages([]);
+            return;
         }
-    }, []);
 
-    const fetchAnalytics = React.useCallback(async () => {
-        try {
-            const userRaw = await getSecureData("user");
-            const user = JSON.parse(userRaw || "");
-            if (!user?._id) return;
+        setPackages(user.packages || []);
 
-            setAnalyticsError(false);
-            setAnalyticsLoading(true);
-            const data = await getVendorAnalytics(user._id);
-            setAnalytics(data);
-        } catch (error) {
-            console.error("Error fetching vendor analytics:", error);
+        const statsData = await getVendorOrderStats("Vendor", user._id);
+
+        setOrderStats({
+            totalOrders: statsData.totalOrders ?? 0,
+            pending: (statsData as any).pending ?? 0,
+            processing: statsData.processing ?? 0,
+            completed: statsData.completed ?? 0,
+            cancelled: (statsData as any).cancelled ?? 0,
+        });
+
+        const response = await getOrderStatsMonthly(user._id);
+
+        setOrderAmountArray(
+            Array.isArray(response)
+                ? response.map((item: any) => item.totalAmount ?? 0)
+                : []
+        );
+
+        setOrderCountArray(
+            Array.isArray(response)
+                ? response.map((item: any) => item.orderCount ?? 0)
+                : []
+        );
+
+        setMonthNameArray(
+            Array.isArray(response)
+                ? response.map((item: any) => MONTH_NAMES[item.month] ?? "")
+                : []
+        );
+
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    } finally {
+        setLoading(false);
+    }
+}, []);
+
+   const fetchAnalytics = React.useCallback(async () => {
+    try {
+        const user = await getUserData();
+
+        if (!user?._id) {
+            console.warn("No user data found for analytics.");
             setAnalyticsError(true);
-        } finally {
-            setAnalyticsLoading(false);
+            return;
         }
-    }, []);
+
+        setAnalyticsError(false);
+        setAnalyticsLoading(true);
+
+        const data = await getVendorAnalytics(user._id);
+        setAnalytics(data);
+    } catch (error) {
+        console.error("Error fetching vendor analytics:", error);
+        setAnalyticsError(true);
+    } finally {
+        setAnalyticsLoading(false);
+    }
+}, []);
 
     useFocusEffect(
         React.useCallback(() => {
@@ -129,18 +161,22 @@ const DashboardScreen = () => {
         }, [fetchData, fetchAnalytics]),
     );
 
-    const fetchUsername = async () => {
-        const storedUser = await getSecureData("user");
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
+   const fetchUsername = async () => {
+    try {
+        const user = await getUserData();
+
+        if (user) {
             setAvatar(user?.contactDetails?.brandLogo || "");
-            setUsername(user.name);
-            setVendorId(user._id);
+            setUsername(user?.name || "Guest");
+            setVendorId(user?._id || null);
         } else {
             setUsername("Guest");
         }
-    };
-
+    } catch (error) {
+        console.error("Error reading user data:", error);
+        setUsername("Guest");
+    }
+};
     const initials = username
         ? username
               .trim()
