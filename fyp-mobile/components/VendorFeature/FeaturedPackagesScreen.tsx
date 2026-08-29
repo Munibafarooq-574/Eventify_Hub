@@ -16,16 +16,23 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import {
   View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
+Text,
+StyleSheet,
+ScrollView,
+TouchableOpacity,
+ActivityIndicator,
+Alert,
+Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, Package, Star, AlertTriangle, X } from 'lucide-react-native';
-
+import {
+  ChevronLeft,
+  Package,
+  Star,
+  AlertTriangle,
+  X,
+  Clock,
+} from 'lucide-react-native';
 import { getVendorPackagesList, VendorPackageListItem } from '../../services/getVendorPackagesList';
 import { getMyFeaturedPackages } from '../../services/getMyFeaturedPackages';
 import { activateFeaturedPackage } from '../../services/activateFeaturedPackage';
@@ -57,11 +64,19 @@ const COLORS = {
   danger: '#DC2626',
   dangerBg: '#FEF2F2',
 };
-
-
-
 function isPromotionLive(p: VendorPromotion): boolean {
-  return p.status === PromotionStatus.ACTIVE;
+  if (p.status !== PromotionStatus.ACTIVE) {
+    return false;
+  }
+
+  if (
+    p.endDate &&
+    new Date(p.endDate).getTime() <= Date.now()
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export default function FeaturedPackagesScreen() {
@@ -79,6 +94,10 @@ const insets = useSafeAreaInsets();
   const [limit, setLimit] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [busyPackageId, setBusyPackageId] = useState<string | null>(null);
+  const [durationModalVisible, setDurationModalVisible] = useState(false);
+const [selectedPackage, setSelectedPackage] =
+  useState<VendorPackageListItem | null>(null);
+const [selectedDuration, setSelectedDuration] = useState<number>(15);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -121,17 +140,30 @@ const insets = useSafeAreaInsets();
   const activeCount = activePromotionByPackageId.size;
   const atLimit = activeCount >= limit;
 
-  const handleFeature = async (pkg: VendorPackageListItem) => {
-    try {
-      setBusyPackageId(pkg._id);
-      await activateFeaturedPackage(vendorIdValue, pkg._id);
-      await loadData();
-    } catch (e: any) {
-      Alert.alert('Could not feature package', e?.message || 'Something went wrong');
-    } finally {
-      setBusyPackageId(null);
-    }
-  };
+  const formatPromotionDate = (
+  date: string | null | undefined,
+): string => {
+  if (!date) {
+    return '—';
+  }
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '—';
+  }
+
+  return parsed.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+const handleFeature = (pkg: VendorPackageListItem) => {
+  setSelectedPackage(pkg);
+  setSelectedDuration(15);
+  setDurationModalVisible(true);
+};
 
   const handleUnfeature = (pkg: VendorPackageListItem, promotion: VendorPromotion) => {
     Alert.alert('Unfeature Package', `Stop featuring "${pkg.packageName}"?`, [
@@ -153,6 +185,35 @@ const insets = useSafeAreaInsets();
       },
     ]);
   };
+
+  const durationOptions = [7, 15, 30];
+
+  const confirmFeature = async () => {
+  if (!vendorIdValue || !selectedPackage) {
+    return;
+  }
+
+  try {
+    setDurationModalVisible(false);
+    setBusyPackageId(selectedPackage._id);
+
+    await activateFeaturedPackage(
+      vendorIdValue,
+      selectedPackage._id,
+      selectedDuration,
+    );
+
+    await loadData();
+  } catch (e: any) {
+    Alert.alert(
+      'Could not feature package',
+      e?.message || 'Something went wrong',
+    );
+  } finally {
+    setBusyPackageId(null);
+    setSelectedPackage(null);
+  }
+};
 const Header = () => (
   <View
     style={[
@@ -255,9 +316,9 @@ const Header = () => (
           </View>
         ) : (
           packages.map((pkg) => {
-            const activePromotion = activePromotionByPackageId.get(pkg._id);
-            const isFeatured = !!activePromotion;
-            const isBusy = busyPackageId === pkg._id;
+  const activePromotion = activePromotionByPackageId.get(pkg._id);
+  const isFeatured = !!activePromotion;
+  const isBusy = busyPackageId === pkg._id;
 
             return (
               <View key={pkg._id} style={[styles.card, isFeatured && styles.cardFeatured]}>
@@ -265,12 +326,30 @@ const Header = () => (
                   <View style={{ flex: 1 }}>
                     <Text style={styles.packageName}>{pkg.packageName}</Text>
                     <Text style={styles.packagePrice}>Rs. {pkg.price.toLocaleString()}</Text>
-                    {isFeatured && (
-                      <View style={styles.featuredTag}>
-                        <Star size={11} color={COLORS.featuredText} strokeWidth={2.5} />
-                        <Text style={styles.featuredTagText}>Featured</Text>
-                      </View>
-                    )}
+                     {isFeatured && activePromotion && (
+  <>
+    <View style={styles.featuredTag}>
+      <Star
+        size={11}
+        color={COLORS.featuredText}
+        strokeWidth={2.5}
+      />
+      <Text style={styles.featuredTagText}>Featured</Text>
+    </View>
+
+    <View style={styles.featuredDates}>
+      <Text style={styles.featuredDateText}>
+        Start: {formatPromotionDate(activePromotion.startDate)}
+      </Text>
+
+      <Text style={styles.featuredDateSeparator}>•</Text>
+
+      <Text style={styles.featuredDateText}>
+        Expires: {formatPromotionDate(activePromotion.endDate)}
+      </Text>
+    </View>
+  </>
+)}
                   </View>
 
                   {isFeatured ? (
@@ -306,7 +385,97 @@ const Header = () => (
             );
           })
         )}
-      </ScrollView>
+           </ScrollView>
+
+      <Modal
+        visible={durationModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDurationModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.durationModal}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Feature Package</Text>
+                <Text style={styles.modalSubtitle}>
+                  {selectedPackage?.packageName}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setDurationModalVisible(false)}
+              >
+                <X size={18} color={COLORS.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.durationTitleRow}>
+              <Clock size={17} color={COLORS.primary} />
+              <Text style={styles.durationTitle}>
+                Select feature duration
+              </Text>
+            </View>
+
+            <Text style={styles.durationDescription}>
+              Choose how long this package should receive featured placement.
+            </Text>
+
+            <View style={styles.durationOptions}>
+              {durationOptions.map((days) => {
+                const selected = selectedDuration === days;
+
+                return (
+                  <TouchableOpacity
+                    key={days}
+                    style={[
+                      styles.durationOption,
+                      selected && styles.durationOptionSelected,
+                    ]}
+                    onPress={() => setSelectedDuration(days)}
+                  >
+                    <Text
+                      style={[
+                        styles.durationOptionText,
+                        selected && styles.durationOptionTextSelected,
+                      ]}
+                    >
+                      {days} Days
+                    </Text>
+
+                    {selected && (
+                      <Star
+                        size={15}
+                        color={COLORS.primary}
+                        strokeWidth={2.5}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setDurationModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={confirmFeature}
+              >
+                <Text style={styles.confirmButtonText}>
+                  Feature Package
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -419,8 +588,7 @@ headerSubtitle: {
   packageRow: { flexDirection: 'row', alignItems: 'center' },
   packageName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   packagePrice: { fontSize: 13, color: COLORS.muted, marginTop: 2 },
-
-  featuredTag: {
+   featuredTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -432,7 +600,25 @@ headerSubtitle: {
     marginTop: 7,
   },
   featuredTagText: { fontSize: 11, fontWeight: '700', color: COLORS.featuredText },
+  
+featuredDates: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 6,
+},
 
+featuredDateText: {
+  fontSize: 11.5,
+  color: COLORS.muted,
+  fontWeight: '500',
+},
+
+featuredDateSeparator: {
+  fontSize: 11,
+  color: COLORS.border,
+},
   featureButton: { backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   featureButtonDisabled: { backgroundColor: '#D1D5DB' },
   featureButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
@@ -447,4 +633,133 @@ headerSubtitle: {
     backgroundColor: COLORS.dangerBg,
   },
   unfeatureButtonText: { color: COLORS.danger, fontSize: 12.5, fontWeight: '700' },
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  paddingHorizontal: 20,
+},
+
+durationModal: {
+  backgroundColor: COLORS.card,
+  borderRadius: 20,
+  padding: 18,
+},
+
+modalHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: COLORS.text,
+},
+
+modalSubtitle: {
+  fontSize: 12.5,
+  color: COLORS.muted,
+  marginTop: 3,
+},
+
+modalCloseButton: {
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  backgroundColor: '#F3F4F6',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+durationTitleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 7,
+  marginTop: 22,
+},
+
+durationTitle: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: COLORS.text,
+},
+
+durationDescription: {
+  fontSize: 12.5,
+  color: COLORS.muted,
+  lineHeight: 18,
+  marginTop: 6,
+},
+
+durationOptions: {
+  gap: 9,
+  marginTop: 16,
+},
+
+durationOption: {
+  minHeight: 46,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: '#FFFFFF',
+},
+
+durationOptionSelected: {
+  borderColor: COLORS.primary,
+  backgroundColor: COLORS.primaryLight,
+},
+
+durationOptionText: {
+  fontSize: 13.5,
+  fontWeight: '600',
+  color: COLORS.text,
+},
+
+durationOptionTextSelected: {
+  color: COLORS.primary,
+  fontWeight: '800',
+},
+
+modalActions: {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 20,
+},
+
+cancelButton: {
+  flex: 1,
+  minHeight: 44,
+  borderRadius: 11,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+cancelButtonText: {
+  color: COLORS.muted,
+  fontSize: 13,
+  fontWeight: '700',
+},
+
+confirmButton: {
+  flex: 1.4,
+  minHeight: 44,
+  borderRadius: 11,
+  backgroundColor: COLORS.primary,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+confirmButtonText: {
+  color: '#FFFFFF',
+  fontSize: 13,
+  fontWeight: '800',
+},
 });

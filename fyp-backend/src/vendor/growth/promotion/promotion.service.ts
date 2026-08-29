@@ -187,9 +187,10 @@ export class PromotionService {
   // ---------------------------------------------------------------
 
   async activateFeaturedPackage(
-    vendorId: string,
-    packageId: string,
-  ): Promise<VendorPromotion> {
+  vendorId: string,
+  packageId: string,
+  durationDays: number,
+): Promise<VendorPromotion> {
     this.assertValidId(vendorId);
 
     if (!Types.ObjectId.isValid(packageId)) {
@@ -260,24 +261,34 @@ export class PromotionService {
       );
     }
 
-    return this.promotionModel.create({
-      vendorId: new Types.ObjectId(vendorId),
-      type: PromotionType.FEATURED_PACKAGE,
-      packageId,
-      durationDays: null,
-      startDate: new Date(),
-      endDate: null,
-      status: PromotionStatus.ACTIVE,
-    });
+   const now = new Date();
+
+const endDate = new Date(now);
+endDate.setDate(endDate.getDate() + durationDays);
+
+return this.promotionModel.create({
+  vendorId: new Types.ObjectId(vendorId),
+  type: PromotionType.FEATURED_PACKAGE,
+  packageId,
+  durationDays,
+  startDate: now,
+  endDate,
+  status: PromotionStatus.ACTIVE,
+});
   }
 
   async getVendorFeaturedPackages(
-    vendorId: string,
-  ): Promise<VendorPromotion[]> {
-    this.assertValidId(vendorId);
+  vendorId: string,
+): Promise<VendorPromotion[]> {
+  this.assertValidId(vendorId);
 
-    return this.promotionModel
-      .find({
+  await this.expireStalePromotions(
+    vendorId,
+    PromotionType.FEATURED_PACKAGE,
+  );
+
+  return this.promotionModel
+    .find({
         vendorId: new Types.ObjectId(vendorId),
         type: PromotionType.FEATURED_PACKAGE,
       })
@@ -361,12 +372,14 @@ export class PromotionService {
   async getActiveFeaturedPackages(
     limit = 20,
   ): Promise<FeaturedPackagePublicEntry[]> {
-    // Most recently featured first.
-    const activePromotions = await this.promotionModel
-      .find({
-        type: PromotionType.FEATURED_PACKAGE,
-        status: PromotionStatus.ACTIVE,
-      })
+    const now = new Date();
+
+const activePromotions = await this.promotionModel
+  .find({
+    type: PromotionType.FEATURED_PACKAGE,
+    status: PromotionStatus.ACTIVE,
+    endDate: { $gt: now },
+  })
       .sort({ startDate: -1 })
       .limit(limit)
       .lean();
@@ -469,11 +482,14 @@ export class PromotionService {
   }
 
   async getActiveFeaturedPackageIds(): Promise<Set<string>> {
-    const promotions = await this.promotionModel
-      .find({
-        type: PromotionType.FEATURED_PACKAGE,
-        status: PromotionStatus.ACTIVE,
-      })
+  const now = new Date();
+
+  const promotions = await this.promotionModel
+    .find({
+      type: PromotionType.FEATURED_PACKAGE,
+      status: PromotionStatus.ACTIVE,
+      endDate: { $gt: now },
+    })
       .select('packageId')
       .lean();
 
