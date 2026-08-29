@@ -52,12 +52,6 @@ const DashboardScreen = () => {
 
     const [username, setUsername] = useState<string>("");
     const [vendorId, setVendorId] = useState<string | null>(null);
-    /*const [orderStats, setOrderStats] = useState<OrderStats>({
-        totalOrders: 0,
-        processing: 0,
-        completed: 0,
-        cancelled: 0,
-    });*/
         const [orderStats, setOrderStats] = useState<OrderStats>({
         totalOrders: 0,
         pending: 0,
@@ -89,14 +83,6 @@ const DashboardScreen = () => {
             if (!user) throw "user not found";
 
             setPackages(user.packages || []);
-
-            /*const statsData = await getVendorOrderStats("Vendor", user._id);
-            setOrderStats({
-                totalOrders: statsData.totalOrders,
-                processing: statsData.processing,
-                completed: statsData.completed,
-                cancelled: (statsData as any).cancelled ?? 0,
-            });*/
 
                         const statsData = await getVendorOrderStats("Vendor", user._id);
             setOrderStats({

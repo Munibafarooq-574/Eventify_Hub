@@ -2,6 +2,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { DiscountService } from './discount.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
+import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 
@@ -34,6 +35,7 @@ export class DiscountController {
     return this.discountService.updateCoupon(vendorId, couponId, dto);
   }
 
+  
   // DELETE /vendor/growth/discount/coupon/:couponId?vendorId=...
   // Soft-deletes (status -> cancelled) — history is kept, same as
   // subscriptions/promotions.
@@ -46,9 +48,12 @@ export class DiscountController {
 
   // POST /vendor/growth/discount/discount-code?vendorId=...
   @Post('discount-code')
-  createDiscountCode(@Query('vendorId') vendorId: string, @Body() dto: CreateCouponDto) {
-    return this.discountService.createDiscountCode(vendorId, dto);
-  }
+createDiscountCode(
+  @Query('vendorId') vendorId: string,
+  @Body() dto: CreateDiscountCodeDto,
+) {
+  return this.discountService.createDiscountCode(vendorId, dto);
+}
 
   // GET /vendor/growth/discount/discount-code/mine/:vendorId
   @Get('discount-code/mine/:vendorId')

@@ -1,7 +1,12 @@
 // fyp-backend/src/schemas/vendor-discount.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { DiscountEntryType, DiscountKind, DiscountStatus } from './../vendor/growth/discount/discount.types';
+import {
+  DiscountEntryType,
+  DiscountKind,
+  DiscountStatus,
+  DiscountAudience,
+} from './../vendor/growth/discount/discount.types';
 
 // One document per coupon / discount code. History is kept (never
 // deleted) — "deleting" sets status to CANCELLED, same pattern as
@@ -37,6 +42,21 @@ export class VendorDiscount extends Document {
   // null means the coupon applies to any of the vendor's packages.
   @Prop({ type: String, default: null })
   packageId: string | null;
+
+  @Prop({
+  type: String,
+  enum: DiscountAudience,
+  default: DiscountAudience.ALL,
+  required: true,
+})
+audience: DiscountAudience;
+
+@Prop({
+  type: [MongooseSchema.Types.ObjectId],
+  ref: 'User',
+  default: [],
+})
+selectedOrganizerIds: MongooseSchema.Types.ObjectId[];
 
   @Prop({ type: Date, required: true })
   startDate: Date;

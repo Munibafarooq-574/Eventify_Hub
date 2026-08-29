@@ -1,11 +1,8 @@
 // fyp-mobile/types/discount.types.ts
-//
-// Mirrors fyp-backend/src/vendor/growth/discount/discount.types.ts
-// Shared between Coupons (this phase) and Discount Codes (Phase 7).
 
 export enum DiscountEntryType {
   COUPON = 'coupon',
-  DISCOUNT_CODE = 'discountCode', // Phase 7
+  DISCOUNT_CODE = 'discountCode',
 }
 
 export enum DiscountKind {
@@ -20,6 +17,12 @@ export enum DiscountStatus {
   EXHAUSTED = 'exhausted',
 }
 
+export enum DiscountAudience {
+  ALL = 'all',
+  NEW_ORGANIZERS = 'newOrganizers',
+  SELECTED_ORGANIZERS = 'selectedOrganizers',
+}
+
 export interface VendorDiscount {
   _id: string;
   vendorId: string;
@@ -30,6 +33,11 @@ export interface VendorDiscount {
   minimumOrderAmount: number;
   maximumDiscountAmount: number | null;
   packageId: string | null;
+
+  // Discount Code audience targeting
+  audience: DiscountAudience;
+  selectedOrganizerIds: string[];
+
   startDate: string;
   endDate: string;
   usageLimit: number;
@@ -47,14 +55,17 @@ export interface CreateCouponPayload {
   minimumOrderAmount?: number;
   maximumDiscountAmount?: number;
   packageId?: string;
-  startDate: string; // ISO date string
-  endDate: string; // ISO date string
+  startDate: string;
+  endDate: string;
   usageLimit: number;
 }
 
-// Same shape — reused for Discount Codes (Phase 7) too, just posted to a
-// different endpoint.
-export type CreateDiscountCodePayload = CreateCouponPayload;
+// Discount Code supports targeted audience.
+export interface CreateDiscountCodePayload
+  extends CreateCouponPayload {
+  audience: DiscountAudience;
+  selectedOrganizerIds?: string[];
+}
 
 export interface UpdateCouponPayload {
   minimumOrderAmount?: number;

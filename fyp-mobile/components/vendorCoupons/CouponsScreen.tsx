@@ -148,11 +148,13 @@ export default function CouponsScreen() {
     ]);
   };
 
- const handleCreatePress = () => {
+const handleCreatePress = () => {
   if (atLimit) {
     Alert.alert(
       'Limit reached',
-      `You can have up to ${limit} active ${TAB_CONFIG[activeTab].label.toLowerCase()} on your plan. Cancel one or upgrade for more.`,
+      `You can have up to ${limit} active ${TAB_CONFIG[
+        activeTab
+      ].label.toLowerCase()} on your plan. Cancel one or upgrade for more.`,
       [
         { text: 'OK', style: 'cancel' },
         {
@@ -168,13 +170,21 @@ export default function CouponsScreen() {
     return;
   }
 
-  router.push({
-    pathname: '/createcouponscreen',
-    params: {
-      vendorId: vendorIdValue,
-      entryType: activeTab,
-    },
-  });
+  if (activeTab === 'coupon') {
+    router.push({
+      pathname: '/createcouponscreen',
+      params: {
+        vendorId: vendorIdValue,
+      },
+    });
+  } else {
+    router.push({
+      pathname: '/creatediscountcodescreen',
+      params: {
+        vendorId: vendorIdValue,
+      },
+    });
+  }
 };
 
   return (

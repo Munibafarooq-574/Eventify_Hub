@@ -31,3 +31,9 @@ export interface DiscountCalculation {
   discountAmount: number;
   finalAmount: number;
 }
+
+export enum DiscountAudience {
+  ALL = 'all',
+  NEW_ORGANIZERS = 'newOrganizers',
+  SELECTED_ORGANIZERS = 'selectedOrganizers',
+}
