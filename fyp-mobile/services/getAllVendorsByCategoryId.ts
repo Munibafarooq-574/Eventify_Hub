@@ -1,3 +1,4 @@
+//fyp-mobile/services/getAllVendorsByCategoryId.ts
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function getAllVendorsByCategoryId(categoryId: string) {

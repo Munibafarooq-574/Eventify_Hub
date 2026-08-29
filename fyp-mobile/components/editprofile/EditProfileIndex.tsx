@@ -47,37 +47,42 @@ const EditProfileScreen: React.FC = () => {
     }
   };
 
-  const saveUserDetails = async () => {
-    try {
-      const userStr = await getSecureData('user');
-      if (!userStr) {
-        alert('User not found locally');
-        return;
-      }
-      const user = JSON.parse(userStr);
-      const userId = user.userId || user._id;
+const saveUserDetails = async () => {
+  try {
+    const userStr = await getSecureData('user');
 
-      if (!userId) {
-        alert('User ID not available');
-        return;
-      }
-
-      const updateData = {
-        name,
-        email,
-        phoneNumber,
-        address,
-        userId,
-      };
-
-      const updatedUser = await patchUpdateProfile(userId, updateData);
-      await saveSecureData('user', JSON.stringify(updatedUser));
-      alert('Profile updated successfully');
-    } catch (error) {
-      console.error('Failed to save user data:', error);
-      alert('Failed to save profile. Please try again.');
+    if (!userStr) {
+      alert('User not found locally');
+      return;
     }
-  };
+
+    const user = JSON.parse(userStr);
+    const userId = user.userId || user._id;
+
+    if (!userId) {
+      alert('User ID not available');
+      return;
+    }
+
+    const formData = new FormData();
+
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('phoneNumber', phoneNumber);
+    formData.append('address', address);
+    formData.append('userId', String(userId));
+
+    const updatedUser = await patchUpdateProfile(userId, formData);
+
+    await saveSecureData('user', JSON.stringify(updatedUser));
+
+    alert('Profile updated successfully');
+    router.back();
+  } catch (error) {
+    console.error('Failed to save user data:', error);
+    alert('Failed to save profile. Please try again.');
+  }
+};
 
   return (
     <View style={styles.container} testID="screen-container">

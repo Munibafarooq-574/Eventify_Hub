@@ -4,6 +4,8 @@ import Header from './Header';
 //import SearchBar from './SearchBar';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
+import  FeaturedVendorsSection  from '../VendorFeature/FeatureVendorScreen';
+import  FeaturedPackagesSection  from '../VendorFeature/FeaturedPackagesScreen';
 import BottomNavigationFinal from './BottomNavigationFinal';
 
 const COLORS = {
@@ -20,7 +22,12 @@ const DashboardIndex: React.FC = () => {
         <Header />
         <View style={styles.content}>
           <CategoryGrid />
-          <VenueList />
+
+<FeaturedVendorsSection />
+
+<FeaturedPackagesSection />
+
+<VenueList />
         </View>
       </ScrollView>
       <BottomNavigationFinal />

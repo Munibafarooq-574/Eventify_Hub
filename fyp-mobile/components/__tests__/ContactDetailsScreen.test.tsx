@@ -2,9 +2,9 @@ import React from "react";
 import { render, fireEvent, waitFor } from "@testing-library/react-native";
 import ContactDetailsScreen from "../vendorcontactdetails/VendorContactDetailsIndex";
 import { router } from "expo-router";
-// eslint-disable-next-line import/no-unresolved
+ 
 import postContactDetails from "@/services/postContactDetails";
-// eslint-disable-next-line import/no-unresolved
+ 
 import { getSecureData } from "@/store";
 import { Alert } from "react-native";
 

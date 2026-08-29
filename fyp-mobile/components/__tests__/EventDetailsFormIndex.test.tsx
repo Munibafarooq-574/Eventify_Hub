@@ -1,7 +1,7 @@
 
 // __tests__/PersonalizedExperienceScreen.test.tsx
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import getAllCategories from "@/services/getAllCategories";
 import { saveSecureData } from "@/store";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";

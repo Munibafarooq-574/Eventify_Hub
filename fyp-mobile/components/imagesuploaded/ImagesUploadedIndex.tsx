@@ -1,5 +1,8 @@
 // ImageUploadScreen.tsx
-import { uploadMultipleImages } from "@/services/uploadMultipleImages";
+import {
+  uploadMultipleImages,
+  UploadMediaAsset,
+} from "@/services/uploadMultipleImages";
 import { getSecureData } from "@/store";
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,7 +21,7 @@ import {
 
 const ImageUploadScreen: React.FC = () => {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [images, setImages] = useState<string[]>([]);
+    const [images, setImages] = useState<UploadMediaAsset[]>([]);
     const [uploading, setUploading] = useState<boolean>(false);
     const navigation = useNavigation();
 
@@ -33,28 +36,54 @@ const ImageUploadScreen: React.FC = () => {
     }, []);
 
     const handleFileUpload = async () => {
-        try {
-            // Launch image picker
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsMultipleSelection: true, // Allows multiple image selection
-                quality: 0.7, // Adjust image quality as needed
-            });
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.All,
+    allowsMultipleSelection: true,
+    quality: 0.7,
+});
 
-            if (!result.canceled) {
-                const selectedUris = result.assets.map((asset: { uri: any; }) => asset.uri);
-                // Enforce a maximum of 30 images
-                if (images.length + selectedUris.length > 30) {
-                    Alert.alert('Limit Exceeded', 'You can upload up to 30 images.');
-                    return;
-                }
-                setImages(prevImages => [...prevImages, ...selectedUris]);
-            }
-        } catch (error) {
-            console.error("Error picking images:", error);
-            Alert.alert('Error', 'An error occurred while picking images.');
-        }
-    };
+    if (result.canceled) {
+      return;
+    }
+
+    const remainingSlots = 30 - images.length;
+
+    if (result.assets.length > remainingSlots) {
+      Alert.alert(
+        'Limit Exceeded',
+        `You can upload up to 30 images/videos. Only ${remainingSlots} more can be selected.`
+      );
+      return;
+    }
+
+    const selectedMedia: UploadMediaAsset[] = result.assets.map((asset) => ({
+      uri: asset.uri,
+      name:
+        asset.fileName ||
+        `media-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)}.${
+          asset.type === 'video' ? 'mp4' : 'jpg'
+        }`,
+      type:
+        asset.mimeType ||
+        (asset.type === 'video' ? 'video/mp4' : 'image/jpeg'),
+    }));
+
+    setImages((prevImages) => [
+      ...prevImages,
+      ...selectedMedia,
+    ]);
+  } catch (error) {
+    console.error("Error picking media:", error);
+
+    Alert.alert(
+      'Error',
+      'An error occurred while selecting photos/videos.'
+    );
+  }
+};
 
     const handleDeleteImage = (index: number) => {
         setImages(prevImages => {
@@ -69,18 +98,8 @@ const ImageUploadScreen: React.FC = () => {
             setUploading(true);
             const user = JSON.parse(await getSecureData("user") || "");
             await uploadMultipleImages(user._id, images);
-            // Retrieve the token from AsyncStorage
-            // const token = await AsyncStorage.getItem('access_token');
-            // if (!token) {
-            //     Alert.alert('Authentication Error', 'No access token found. Please log in again.');
-            //     return;
-            // }
-
-            // // Call the API to upload contact details and images
-            // const response = await postContactDetails(contactDetails, images, token);
+    
             router.push("/vendorreview");
-            // // Navigate to the next screen   
-            // navigation.navigate("/VendorReview"); // Adjust the route name as per your navigation setup
         } catch (error: any) {
             console.error("Failed to upload images:", error?.response?.status, error?.response?.data || error?.message || error);
             Alert.alert(
@@ -113,14 +132,13 @@ const ImageUploadScreen: React.FC = () => {
 
 
     <View style={styles.limitBadge}>
-        <Text style={styles.coverText}>
-            ✨ Upload up to 30 images
-        </Text>
-    </View>
+    <Text style={styles.coverText}>
+         Upload up to 30 photos or videos
+    </Text>
+</View>
 
 
 </View>
-
 
         {/* Upload Box */}
         <TouchableOpacity
@@ -172,42 +190,49 @@ const ImageUploadScreen: React.FC = () => {
                     showsHorizontalScrollIndicator={false}
                 >
 
-                    {images.map((imgUri,index)=>(
-                        <View 
-                            key={index}
-                            style={styles.imageContainer}
-                        >
+                    {images.map((media, index) => (
+  <View
+    key={`${media.uri}-${index}`}
+    style={styles.imageContainer}
+  >
+    <TouchableOpacity
+      onPress={() => {
+        if (media.type.startsWith('image/')) {
+          setSelectedImage(media.uri);
+        }
+      }}
+    >
+      {media.type.startsWith('video/') ? (
+        <View style={styles.videoPreview}>
+          <Text style={styles.videoIcon}>▶</Text>
+          <Text style={styles.videoText}>VIDEO</Text>
+        </View>
+      ) : (
+        <Image
+          source={{ uri: media.uri }}
+          style={styles.photo}
+        />
+      )}
+    </TouchableOpacity>
 
-                            <TouchableOpacity
-                                onPress={()=>setSelectedImage(imgUri)}
-                            >
-                                <Image
-                                    source={{uri:imgUri}}
-                                    style={styles.photo}
-                                />
-                            </TouchableOpacity>
+    <TouchableOpacity
+      style={styles.deleteButton}
+      onPress={() => handleDeleteImage(index)}
+    >
+      <Text style={styles.deleteButtonText}>
+        ×
+      </Text>
+    </TouchableOpacity>
 
-
-                            <TouchableOpacity
-                                style={styles.deleteButton}
-                                onPress={()=>handleDeleteImage(index)}
-                            >
-                                <Text style={styles.deleteButtonText}>
-                                    ×
-                                </Text>
-                            </TouchableOpacity>
-
-
-                            {index===0 && (
-                                <View style={styles.coverBadge}>
-                                    <Text style={styles.coverBadgeText}>
-                                        Cover
-                                    </Text>
-                                </View>
-                            )}
-
-                        </View>
-                    ))}
+    {index === 0 && (
+      <View style={styles.coverBadge}>
+        <Text style={styles.coverBadgeText}>
+          Cover
+        </Text>
+      </View>
+    )}
+  </View>
+))}
 
                 </ScrollView>
 
@@ -295,21 +320,16 @@ const ImageUploadScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-
 container:{
     flex:1,
     backgroundColor:"#FDF5FA",
     paddingHorizontal:20,
     paddingTop:65,
 },
-
-
 headerContainer:{
     alignItems:"center",
     marginBottom:25,
 },
-
-
 header:{
     fontSize:30,
     fontWeight:"800",
@@ -317,8 +337,6 @@ header:{
     marginBottom:10,
     textAlign:"center",
 },
-
-
 subHeader:{
     fontSize:15,
     color:"#666",
@@ -326,8 +344,6 @@ subHeader:{
     textAlign:"center",
     paddingHorizontal:10,
 },
-
-
 limitBadge:{
     marginTop:15,
     backgroundColor:"#F9E7F3",
@@ -335,16 +351,11 @@ limitBadge:{
     paddingVertical:8,
     borderRadius:20,
 },
-
-
 coverText:{
     fontSize:14,
     color:"#780C60",
     fontWeight:"600",
 },
-
-
-
 uploadCard:{
     backgroundColor:"#fff",
     borderRadius:22,
@@ -355,9 +366,6 @@ uploadCard:{
     borderStyle:"dashed",
     elevation:4,
 },
-
-
-
 iconCircle:{
     height:75,
     width:75,
@@ -367,30 +375,20 @@ iconCircle:{
     alignItems:"center",
     marginBottom:15,
 },
-
-
 icon:{
     fontSize:38,
 },
-
-
-
 uploadTitle:{
     fontSize:18,
     fontWeight:"700",
     color:"#2B1025",
 },
-
-
 uploadText:{
     marginTop:8,
     textAlign:"center",
     color:"#777",
     lineHeight:22,
 },
-
-
-
 chooseFileButton:{
     marginTop:20,
     backgroundColor:"#780C60",
@@ -398,21 +396,32 @@ chooseFileButton:{
     paddingVertical:13,
     borderRadius:30,
 },
-
-
 chooseFileButtonText:{
     color:"#fff",
     fontWeight:"700",
 },
-
-
-
-
 photosWrapper:{
     marginTop:25,
 },
+videoPreview: {
+  width: 105,
+  height: 105,
+  borderRadius: 18,
+  backgroundColor: "#2B1025",
+  justifyContent: "center",
+  alignItems: "center",
+},
 
-
+videoIcon: {
+  color: "#fff",
+  fontSize: 30,
+  marginBottom: 5,
+},
+videoText: {
+  color: "#fff",
+  fontSize: 11,
+  fontWeight: "700",
+},
 sectionTitle:{
     fontSize:16,
     fontWeight:"700",

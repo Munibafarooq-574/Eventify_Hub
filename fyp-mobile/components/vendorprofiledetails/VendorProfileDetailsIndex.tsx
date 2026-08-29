@@ -729,10 +729,10 @@ const handleSubmitReview = async () => {
   { label: '3 Stars', value: 3 },
   { label: '2 Stars', value: 2 },
   { label: '1 Star', value: 1 },
-] as Array<{
+] as {
   label: string;
   value: ReviewFilter['rating'] | 'all' | 'withMedia';
-}>).map(option => (
+}[]).map(option => (
       <TouchableOpacity
         key={String(option.value)}
         style={[

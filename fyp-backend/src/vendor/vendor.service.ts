@@ -488,15 +488,16 @@ async updateContactDetails(
 
         // Flatten all packages with vendor info
         const packages = filteredVendors.flatMap(vendor =>
-            vendor.packages.map((pkg: any) => ({
-                vendorId: vendor._id.toString(),
-                vendorName: vendor.name,
-                packageName: pkg.packageName,
-                price: pkg.price,
-                services: pkg.services,
-                maximumCapacity: vendor.BusinessDetails?.maximumPeopleCapacity ?? Infinity,
-            }))
-        );
+    vendor.packages.map((pkg: any) => ({
+        packageId: pkg._id.toString(),
+        vendorId: vendor._id.toString(),
+        vendorName: vendor.name,
+        packageName: pkg.packageName,
+        price: pkg.price,
+        services: pkg.services,
+        maximumCapacity: vendor.BusinessDetails?.maximumPeopleCapacity ?? Infinity,
+    }))
+);
 
         return packages;
     }

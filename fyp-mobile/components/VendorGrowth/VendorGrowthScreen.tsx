@@ -159,9 +159,27 @@ if (item.key === 'badges') {
   });
   return;
 }
-    // Remaining feature screens (FeaturedPackagesScreen, CouponsScreen,
-    // etc.) ship in Phases 4-7 — wired here so the menu already reflects
-    // the final structure, but they don't exist yet.
+if (item.key === 'coupons') {
+  router.push({
+    pathname: '/couponsscreen',
+    params: {
+      vendorId: vendorIdValue,
+      initialTab: 'coupon',
+    },
+  });
+  return;
+}
+
+if (item.key === 'discountCodes') {
+  router.push({
+    pathname: '/couponsscreen',
+    params: {
+      vendorId: vendorIdValue,
+      initialTab: 'discountCode',
+    },
+  });
+  return;
+}
   };
 
   if (loading) {
@@ -268,27 +286,58 @@ if (item.key === 'badges') {
         })}
       </View>
 
-      {/* Analytics preview (real data, existing endpoint) */}
+             {/* Analytics preview (real data, existing endpoint) */}
       <Text style={styles.sectionTitle}>Analytics</Text>
+
       <View style={styles.card}>
         {analytics ? (
           <View style={styles.statsGrid}>
-            <StatBox label="Total Revenue" value={`Rs. ${analytics.totalRevenue.toLocaleString()}`} />
+            <StatBox
+              label="Total Revenue"
+              value={`Rs. ${analytics.totalRevenue.toLocaleString()}`}
+            />
+
             <StatBox
               label="This Month"
               value={`Rs. ${analytics.monthlyRevenue.toLocaleString()}`}
               change={analytics.monthlyRevenueChangePct}
             />
+
             <StatBox
               label="Rating"
-              value={analytics.averageRating != null ? `${analytics.averageRating} ★` : 'No reviews yet'}
+              value={
+                analytics.averageRating != null
+                  ? `${analytics.averageRating} ★`
+                  : 'No reviews yet'
+              }
             />
-            <StatBox label="Repeat Customers" value={`${analytics.repeatCustomers}`} />
+
+            <StatBox
+              label="Repeat Customers"
+              value={`${analytics.repeatCustomers}`}
+            />
           </View>
         ) : (
-          <Text style={styles.menuSubtitle}>Analytics will appear once you have order history.</Text>
+          <Text style={styles.menuSubtitle}>
+            Analytics will appear once you have order history.
+          </Text>
         )}
+
+        <TouchableOpacity
+          style={styles.analyticsButton}
+          onPress={() =>
+            router.push({
+              pathname: '/GrowthAnalytics',
+              params: { vendorId: vendorIdValue },
+            })
+          }
+        >
+          <Text style={styles.analyticsButtonText}>
+            View Full Analytics →
+          </Text>
+        </TouchableOpacity>
       </View>
+      
     </ScrollView>
   );
 }
@@ -341,6 +390,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   manageButtonText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+    analyticsButton: {
+    marginTop: 14,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+
+  analyticsButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
 
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   menuItemBorder: { borderBottomWidth: 1, borderBottomColor: COLORS.border },

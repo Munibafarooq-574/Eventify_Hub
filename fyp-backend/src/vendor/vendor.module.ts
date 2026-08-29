@@ -47,6 +47,6 @@ import { VendorAnalyticsService } from './vendor-analytics.service';
         VendorAnalyticsService,
         FileUploadService,
     ],
-    exports: [VendorAnalyticsService],
+    exports: [VendorService, VendorAnalyticsService],
 })
 export class VendorModule {}

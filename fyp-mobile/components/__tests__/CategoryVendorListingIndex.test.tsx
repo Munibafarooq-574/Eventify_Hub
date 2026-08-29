@@ -1,10 +1,10 @@
 import React from "react";
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
-import { router } from "expo-router";
+import { router , useLocalSearchParams } from "expo-router";
 import App from "../categoryvendorlisting/CategoryVendorListingIndex";
 import * as SecureStore from "@/store";
 import getAllVendorsByCategoryId from "@/services/getAllVendorsByCategoryId";
-import { useLocalSearchParams } from "expo-router";
+
 
 
 jest.mock("@/store", () => ({

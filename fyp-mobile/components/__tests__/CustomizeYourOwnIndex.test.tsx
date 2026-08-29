@@ -3,7 +3,7 @@ import { saveSecureData } from "@/store";
 import { fireEvent, render } from "@testing-library/react-native";
 import React from "react";
 import CustomizeYourOwnIndex from "../customizeyourown/CustomizeYourOwnIndex";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { useLocalSearchParams } from "expo-router";
 
 // 🔧 Mocks
