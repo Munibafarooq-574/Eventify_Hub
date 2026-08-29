@@ -1,10 +1,4 @@
 // fyp-mobile/components/vendorCoupons/CouponsScreen.tsx
-// Handles BOTH Coupons and Discount Codes via a tab switcher — per the
-// product spec's own suggestion ("a separate screen isn't necessary,
-// tabs inside one Coupons/Promotions screen is enough"). Same list UI,
-// different backend endpoints/limits underneath depending on which tab
-// is selected.
-// TODO: same navigation/vendorId/theme notes as the earlier screens apply.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -16,6 +10,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronLeft, Ticket, Percent, Plus } from 'lucide-react-native';
 
 import { getVendorCoupons } from '../../services/getVendorCoupons';
 import { deleteVendorCoupon } from '../../services/deleteVendorCoupon';
@@ -24,18 +21,24 @@ import { deleteVendorDiscountCode } from '../../services/deleteVendorDiscountCod
 import { getVendorSubscription } from '../../services/getVendorSubscription';
 import { getSubscriptionPlans } from '../../services/getSubscriptionPlans';
 import { DiscountKind, DiscountStatus, VendorDiscount } from '../../types/discount.types';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+
+// TODO: swap these for EventifyHub's existing theme constants if you have
+// a theme/colors file already (e.g. src/theme/colors.ts).
+// Brand color (used only for header + primary buttons, as requested):
+const tintColorLight = '#7D0C72';
+const tintColorDark = '#7D0C72';
 
 const COLORS = {
-  primary: '#7C3AED',
-  primaryLight: '#F3E8FF',
+  primary: tintColorLight,
+  primaryDark: '#57084F',
+  primaryLight: '#F8E9F6',
   text: '#1F2937',
   muted: '#6B7280',
-  border: '#E5E7EB',
-  background: '#FAFAFA',
+  border: '#ECE7EA',
+  background: '#FAF7F9',
   card: '#FFFFFF',
   success: '#059669',
-  warning: '#D97706',
+  warning: '#B45309',
   danger: '#DC2626',
 };
 
@@ -48,9 +51,9 @@ const STATUS_COLOR: Record<DiscountStatus, string> = {
 
 type EntryTab = 'coupon' | 'discountCode';
 
-const TAB_CONFIG: Record<EntryTab, { label: string; emptyText: string }> = {
-  coupon: { label: 'Coupons', emptyText: "No coupons yet. Create one to attract more bookings." },
-  discountCode: { label: 'Discount Codes', emptyText: 'No discount codes yet. Create one to run a promotion.' },
+const TAB_CONFIG: Record<EntryTab, { label: string; Icon: typeof Ticket; emptyText: string }> = {
+  coupon: { label: 'Coupons', Icon: Ticket, emptyText: 'No coupons yet. Create one to attract more bookings.' },
+  discountCode: { label: 'Discount Codes', Icon: Percent, emptyText: 'No discount codes yet. Create one to run a promotion.' },
 };
 
 function formatDate(dateStr: string): string {
@@ -65,6 +68,7 @@ function discountSummary(entry: VendorDiscount): string {
 
 export default function CouponsScreen() {
   const router = useRouter();
+const insets = useSafeAreaInsets();
 
   const { vendorId, initialTab, refresh } = useLocalSearchParams<{
     vendorId?: string;
@@ -74,13 +78,9 @@ export default function CouponsScreen() {
 
   const vendorIdValue = Array.isArray(vendorId) ? vendorId[0] : vendorId;
 
-  const initialTabValue = Array.isArray(initialTab)
-    ? initialTab[0]
-    : initialTab;
+  const initialTabValue = Array.isArray(initialTab) ? initialTab[0] : initialTab;
 
-  const [activeTab, setActiveTab] = useState<EntryTab>(
-    initialTabValue === 'discountCode' ? 'discountCode' : 'coupon'
-  );
+  const [activeTab, setActiveTab] = useState<EntryTab>(initialTabValue === 'discountCode' ? 'discountCode' : 'coupon');
 
   const [entries, setEntries] = useState<VendorDiscount[]>([]);
   const [limit, setLimit] = useState(0);
@@ -113,17 +113,13 @@ export default function CouponsScreen() {
   }, [vendorIdValue, activeTab]);
 
   useEffect(() => {
-  loadData();
-}, [loadData, refresh]);
+    loadData();
+  }, [loadData, refresh]);
 
-  const activeCount = useMemo(
-    () => entries.filter((e) => e.status === DiscountStatus.ACTIVE).length,
-    [entries],
-  );
+  const activeCount = useMemo(() => entries.filter((e) => e.status === DiscountStatus.ACTIVE).length, [entries]);
   const atLimit = activeCount >= limit;
 
   const handleCancel = (entry: VendorDiscount) => {
-    const noun = activeTab === 'coupon' ? 'coupon' : 'discount code';
     Alert.alert(`Cancel ${TAB_CONFIG[activeTab].label.slice(0, -1)}`, `Deactivate "${entry.code}"? Customers won't be able to use it anymore.`, [
       { text: 'Keep it', style: 'cancel' },
       {
@@ -148,60 +144,117 @@ export default function CouponsScreen() {
     ]);
   };
 
-const handleCreatePress = () => {
-  if (atLimit) {
-    Alert.alert(
-      'Limit reached',
-      `You can have up to ${limit} active ${TAB_CONFIG[
-        activeTab
-      ].label.toLowerCase()} on your plan. Cancel one or upgrade for more.`,
-      [
-        { text: 'OK', style: 'cancel' },
+  const handleCreatePress = () => {
+    if (atLimit) {
+      Alert.alert(
+        'Limit reached',
+        `You can have up to ${limit} active ${TAB_CONFIG[activeTab].label.toLowerCase()} on your plan. Cancel one or upgrade for more.`,
+        [
+          { text: 'OK', style: 'cancel' },
+          {
+            text: 'View Plans',
+            onPress: () =>
+              router.push({
+                pathname: '/subscriptionscreen',
+                params: { vendorId: vendorIdValue },
+              }),
+          },
+        ],
+      );
+      return;
+    }
+
+    if (activeTab === 'coupon') {
+      router.push({
+        pathname: '/createcouponscreen',
+        params: { vendorId: vendorIdValue },
+      });
+    } else {
+      router.push({
+        pathname: '/creatediscountcodescreen',
+        params: { vendorId: vendorIdValue },
+      });
+    }
+  };
+const Header = () => (
+  <View style={styles.headerContainer}>
+    {/* Purple Header */}
+    <View
+      style={[
+        styles.header,
         {
-          text: 'View Plans',
-          onPress: () =>
-            router.push({
-              pathname: '/subscriptionscreen',
-              params: { vendorId: vendorIdValue },
-            }),
+          paddingTop: insets.top + 40,
         },
-      ],
-    );
-    return;
-  }
+      ]}
+    >
+      <View style={styles.headerTopRow}>
+        <TouchableOpacity
+          style={styles.headerIconBtn}
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <ChevronLeft
+            size={22}
+            color="#FFFFFF"
+            strokeWidth={2.5}
+          />
+        </TouchableOpacity>
 
-  if (activeTab === 'coupon') {
-    router.push({
-      pathname: '/createcouponscreen',
-      params: {
-        vendorId: vendorIdValue,
-      },
-    });
-  } else {
-    router.push({
-      pathname: '/creatediscountcodescreen',
-      params: {
-        vendorId: vendorIdValue,
-      },
-    });
-  }
-};
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {TAB_CONFIG[activeTab].label}
+          </Text>
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.tabRow}>
-        {(Object.keys(TAB_CONFIG) as EntryTab[]).map((tab) => (
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            Manage your promotional codes
+          </Text>
+        </View>
+
+        {/* Keeps title perfectly centered */}
+        <View style={styles.headerIconBtnPlaceholder} />
+      </View>
+    </View>
+
+    {/* Separate tabs with spacing below purple header */}
+    <View style={styles.tabRow}>
+      {(Object.keys(TAB_CONFIG) as EntryTab[]).map((tab) => {
+        const selected = activeTab === tab;
+        const TabIcon = TAB_CONFIG[tab].Icon;
+
+        return (
           <TouchableOpacity
             key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
+            style={[
+              styles.tab,
+              selected && styles.tabActive,
+            ]}
             onPress={() => setActiveTab(tab)}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'coupon' ? '🎟 Coupons' : '💸 Discount Codes'}
+            <TabIcon
+              size={15}
+              color={selected ? COLORS.primary : COLORS.muted}
+              strokeWidth={2.25}
+            />
+
+            <Text
+              style={[
+                styles.tabText,
+                selected && styles.tabTextActive,
+              ]}
+            >
+              {TAB_CONFIG[tab].label}
             </Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        );
+      })}
+    </View>
+  </View>
+);
+  return (
+    <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header />
 
       {loading ? (
         <View style={styles.centered}>
@@ -215,11 +268,15 @@ const handleCreatePress = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.headerRow}>
-            <Text style={styles.subtitle}>{activeCount}/{limit} active</Text>
-            <TouchableOpacity style={styles.createButton} onPress={handleCreatePress}>
-              <Text style={styles.createButtonText}>+ Create</Text>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryText}>
+              <Text style={styles.summaryCount}>{activeCount}</Text>
+              <Text style={styles.summaryTotal}> / {limit} active</Text>
+            </Text>
+            <TouchableOpacity style={styles.createButton} onPress={handleCreatePress} activeOpacity={0.85}>
+              <Plus size={15} color="#fff" strokeWidth={2.5} />
+              <Text style={styles.createButtonText}>Create</Text>
             </TouchableOpacity>
           </View>
 
@@ -232,10 +289,8 @@ const handleCreatePress = () => {
               <View key={entry._id} style={styles.card}>
                 <View style={styles.entryHeaderRow}>
                   <Text style={styles.entryCode}>{entry.code}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: STATUS_COLOR[entry.status] + '22' }]}>
-                    <Text style={[styles.statusPillText, { color: STATUS_COLOR[entry.status] }]}>
-                      {entry.status}
-                    </Text>
+                  <View style={[styles.statusPill, { backgroundColor: STATUS_COLOR[entry.status] + '1A' }]}>
+                    <Text style={[styles.statusPillText, { color: STATUS_COLOR[entry.status] }]}>{entry.status}</Text>
                   </View>
                 </View>
                 <Text style={styles.entryDiscount}>{discountSummary(entry)}</Text>
@@ -251,11 +306,7 @@ const handleCreatePress = () => {
                 </Text>
 
                 {entry.status === DiscountStatus.ACTIVE && (
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => handleCancel(entry)}
-                    disabled={cancellingId === entry._id}
-                  >
+                  <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancel(entry)} disabled={cancellingId === entry._id}>
                     {cancellingId === entry._id ? (
                       <ActivityIndicator size="small" color={COLORS.danger} />
                     ) : (
@@ -273,31 +324,124 @@ const handleCreatePress = () => {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: 16, paddingBottom: 32 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  errorText: { color: COLORS.muted, marginBottom: 12 },
-  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
+  root: { flex: 1, backgroundColor: COLORS.background },
 
-  tabRow: { flexDirection: 'row', backgroundColor: COLORS.card, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: COLORS.primary },
-  tabText: { fontSize: 13.5, fontWeight: '600', color: COLORS.muted },
+  headerContainer: {
+  backgroundColor: COLORS.background,
+},
+
+header: {
+  backgroundColor: COLORS.primary,
+  borderBottomLeftRadius: 26,
+  borderBottomRightRadius: 26,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 6,
+},
+
+headerTopRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 18,
+  paddingBottom: 22,
+},
+
+headerIconBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.15)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+headerIconBtnPlaceholder: {
+  width: 40,
+  height: 40,
+},
+
+headerTitleWrap: {
+  flex: 1,
+  alignItems: 'center',
+},
+
+headerTitle: {
+  fontSize: 19,
+  fontWeight: '800',
+  color: '#FFFFFF',
+},
+
+headerSubtitle: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.75)',
+  marginTop: 2,
+  textAlign: 'center',
+},
+
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.background,
+  },
+  tabActive: { backgroundColor: COLORS.primaryLight },
+  tabText: { fontSize: 13, fontWeight: '600', color: COLORS.muted },
   tabTextActive: { color: COLORS.primary },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  subtitle: { fontSize: 12.5, color: COLORS.muted },
-  createButton: { backgroundColor: COLORS.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  content: { padding: 16, paddingBottom: 32 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
+  errorText: { color: COLORS.muted, marginBottom: 12 },
+  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  retryButtonText: { color: '#fff', fontWeight: '600' },
+
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  summaryText: { fontSize: 13 },
+  summaryCount: { fontWeight: '800', color: COLORS.text },
+  summaryTotal: { color: COLORS.muted },
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
   createButtonText: { color: '#fff', fontWeight: '700', fontSize: 13.5 },
 
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 12,
+    shadowColor: '#3B0836',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   emptyText: { fontSize: 13.5, color: COLORS.muted, textAlign: 'center' },
 

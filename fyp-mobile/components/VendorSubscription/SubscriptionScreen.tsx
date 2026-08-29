@@ -1,13 +1,7 @@
 //fyp-mobile/components/VendorSubscription/SubscriptionScreen.tsx
-//
-// Free / Growth / Premium plan comparison + Demo Activation.
-// Per the product spec: NO real payment gateway yet. Every activation is
-// clearly labeled "Demo Activation" — the UI never says "Payment Successful".
-//
-// TODO: same navigation/vendorId notes as VendorGrowthScreen.tsx apply here.
-
 import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import {
   View,
   Text,
@@ -17,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { ChevronLeft, Star, Crown, Check } from 'lucide-react-native';
 
 import { getSubscriptionPlans } from '../../services/getSubscriptionPlans';
 import { getVendorSubscription } from '../../services/getVendorSubscription';
@@ -24,16 +19,23 @@ import { activateDemoSubscription } from '../../services/activateDemoSubscriptio
 import { cancelSubscription } from '../../services/cancelSubscription';
 import { PlanDefinition, SubscriptionPlan, VendorSubscription } from '../../types/subscription.types';
 
+// TODO: swap these for EventifyHub's existing theme constants if you have
+// a theme/colors file already (e.g. src/theme/colors.ts).
+// Primary brand color as given: tintColorLight / tintColorDark = '#7D0C72'.
 const COLORS = {
-  primary: '#7C3AED',
-  primaryLight: '#F3E8FF',
+  primary: '#7D0C72',
+  primaryDark: '#57084F',
+  primaryLight: '#F8E9F6',
+  primarySoft: '#F1D3EC',
   text: '#1F2937',
   muted: '#6B7280',
-  border: '#E5E7EB',
-  background: '#FAFAFA',
+  border: '#E9E4E8',
+  background: '#FAF6F9',
   card: '#FFFFFF',
   popularBg: '#FEF3C7',
   popularText: '#92400E',
+  gold: '#B8860B',
+  danger: '#DC2626',
 };
 
 // Bullet copy per plan, matching the product spec's SubscriptionScreen mockup.
@@ -45,10 +47,18 @@ const PLAN_HIGHLIGHTS: Record<SubscriptionPlan, string[]> = {
   [SubscriptionPlan.PREMIUM]: ['More visibility', 'Advanced promotions', 'Advanced analytics', 'Business insights'],
 };
 
-const PLAN_ICON: Record<SubscriptionPlan, string> = {
-  [SubscriptionPlan.FREE]: '',
-  [SubscriptionPlan.GROWTH]: '⭐',
-  [SubscriptionPlan.PREMIUM]: '💎',
+// Plan icon + tint, replacing the old emoji (⭐ / 💎) which rendered in the
+// phone's full-color emoji font instead of the app's theme color.
+const PLAN_ICON: Record<SubscriptionPlan, React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }> | null> = {
+  [SubscriptionPlan.FREE]: null,
+  [SubscriptionPlan.GROWTH]: Star,
+  [SubscriptionPlan.PREMIUM]: Crown,
+};
+
+const PLAN_ICON_TINT: Record<SubscriptionPlan, { bg: string; color: string }> = {
+  [SubscriptionPlan.FREE]: { bg: '#F3F4F6', color: COLORS.muted },
+  [SubscriptionPlan.GROWTH]: { bg: COLORS.primaryLight, color: COLORS.primary },
+  [SubscriptionPlan.PREMIUM]: { bg: '#FBF0D9', color: COLORS.gold },
 };
 
 function formatDate(dateStr: string | null): string {
@@ -58,11 +68,11 @@ function formatDate(dateStr: string | null): string {
 
 export default function SubscriptionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const { vendorId } = useLocalSearchParams<{
     vendorId?: string;
   }>();
-
   const vendorIdValue = Array.isArray(vendorId) ? vendorId[0] : vendorId;
 
   const [plans, setPlans] = useState<PlanDefinition[]>([]);
@@ -143,22 +153,61 @@ export default function SubscriptionScreen() {
       ],
     );
   };
+const Header = () => (
+  <View
+    style={[
+      styles.header,
+      {
+        paddingTop: insets.top + 40,
+      },
+    ]}
+  >
+    <TouchableOpacity
+      style={styles.headerIconBtn}
+      onPress={() => router.back()}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <ChevronLeft
+        size={22}
+        color="#FFFFFF"
+        strokeWidth={2.5}
+      />
+    </TouchableOpacity>
 
+    <View style={styles.headerTitleWrap}>
+      <Text style={styles.headerTitle}>Subscription</Text>
+      <Text style={styles.headerSubtitle}>
+        Compare plans & activate demo access
+      </Text>
+    </View>
+
+    {/* Empty space keeps the title perfectly centered */}
+    <View style={styles.headerIconBtnPlaceholder} />
+  </View>
+);
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.root}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -166,105 +215,212 @@ export default function SubscriptionScreen() {
   const currentPlan = subscription?.plan;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.screenTitle}>Subscription</Text>
+    <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header />
 
-      {currentPlan && currentPlan !== SubscriptionPlan.FREE && subscription?.endDate && (
-        <Text style={styles.currentPlanNote}>
-          Current plan active until {formatDate(subscription.endDate)}
-        </Text>
-      )}
+      <ScrollView
+  style={styles.container}
+  contentContainerStyle={styles.content}
+  showsVerticalScrollIndicator={false}
+>
 
-      {plans.map((plan) => {
-        const isCurrent = plan.key === currentPlan;
-        const isActivating = activatingPlan === plan.key;
-
-        return (
-          <View
-            key={plan.key}
-            style={[styles.planCard, plan.isMostPopular && styles.planCardPopular]}
-          >
-            {plan.isMostPopular && (
-              <View style={styles.popularTag}>
-                <Text style={styles.popularTagText}>MOST POPULAR</Text>
-              </View>
-            )}
-
-            <View style={styles.planHeaderRow}>
-              <Text style={styles.planIcon}>{PLAN_ICON[plan.key]}</Text>
-              <Text style={styles.planName}>{plan.name}</Text>
-            </View>
-            <Text style={styles.planPrice}>{plan.priceLabel}</Text>
-            <Text style={styles.planDescription}>{plan.description}</Text>
-
-            <View style={styles.highlightsWrap}>
-              {PLAN_HIGHLIGHTS[plan.key].map((h) => (
-                <View key={h} style={styles.highlightRow}>
-                  <Text style={styles.checkMark}>✓</Text>
-                  <Text style={styles.highlightText}>{h}</Text>
-                </View>
-              ))}
-            </View>
-
-            {isCurrent ? (
-              <View style={styles.currentPlanButton}>
-                <Text style={styles.currentPlanButtonText}>Current Plan</Text>
-              </View>
-            ) : plan.key === SubscriptionPlan.FREE ? (
-              // Free has no activation action — vendors land here automatically
-              // by cancelling a paid plan.
-              <View style={{ height: 4 }} />
-            ) : (
-              <TouchableOpacity
-                style={styles.activateButton}
-                onPress={() => handleActivate(plan)}
-                disabled={isActivating}
-              >
-                {isActivating ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.activateButtonText}>Activate Demo Plan</Text>
-                )}
-              </TouchableOpacity>
-            )}
+  {currentPlan &&
+    currentPlan !== SubscriptionPlan.FREE &&
+    subscription?.endDate && (
+          <View style={styles.activeBanner}>
+            <View style={styles.activeDot} />
+            <Text style={styles.currentPlanNote}>Current plan active until {formatDate(subscription.endDate)}</Text>
           </View>
-        );
-      })}
+        )}
 
-      {currentPlan && currentPlan !== SubscriptionPlan.FREE && (
-        <TouchableOpacity style={styles.cancelLink} onPress={handleCancel} disabled={cancelling}>
-          <Text style={styles.cancelLinkText}>
-            {cancelling ? 'Cancelling…' : 'Cancel subscription & return to Free'}
-          </Text>
-        </TouchableOpacity>
-      )}
+        {plans.map((plan) => {
+          const isCurrent = plan.key === currentPlan;
+          const isActivating = activatingPlan === plan.key;
+          const PlanIcon = PLAN_ICON[plan.key];
+          const tint = PLAN_ICON_TINT[plan.key];
 
-      <Text style={styles.demoDisclaimer}>
-        Demo mode: activating a paid plan here does not charge any money. A real payment
-        method will be added in a future update.
-      </Text>
-    </ScrollView>
+          return (
+            <View key={plan.key} style={[styles.planCard, plan.isMostPopular && styles.planCardPopular]}>
+              {plan.isMostPopular && (
+                <View style={styles.popularTag}>
+                  <Text style={styles.popularTagText}>MOST POPULAR</Text>
+                </View>
+              )}
+
+              <View style={styles.planHeaderRow}>
+                {PlanIcon && (
+                  <View style={[styles.planIconBadge, { backgroundColor: tint.bg }]}>
+                    <PlanIcon size={16} color={tint.color} strokeWidth={2.25} />
+                  </View>
+                )}
+                <View>
+                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={styles.planPrice}>{plan.priceLabel}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.planDescription}>{plan.description}</Text>
+
+              <View style={styles.highlightsWrap}>
+                {PLAN_HIGHLIGHTS[plan.key].map((h) => (
+                  <View key={h} style={styles.highlightRow}>
+                    <View style={styles.checkCircle}>
+                      <Check size={11} color={COLORS.primary} strokeWidth={3} />
+                    </View>
+                    <Text style={styles.highlightText}>{h}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {isCurrent ? (
+                <View style={styles.currentPlanButton}>
+                  <Text style={styles.currentPlanButtonText}>Current Plan</Text>
+                </View>
+              ) : plan.key === SubscriptionPlan.FREE ? (
+                // Free has no activation action — vendors land here automatically
+                // by cancelling a paid plan.
+                <View style={{ height: 4 }} />
+              ) : (
+                <TouchableOpacity
+                  style={styles.activateButton}
+                  onPress={() => handleActivate(plan)}
+                  disabled={isActivating}
+                  activeOpacity={0.85}
+                >
+                  {isActivating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.activateButtonText}>Activate Demo Plan</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+
+        {currentPlan && currentPlan !== SubscriptionPlan.FREE && (
+          <TouchableOpacity style={styles.cancelLink} onPress={handleCancel} disabled={cancelling}>
+            <Text style={styles.cancelLinkText}>{cancelling ? 'Cancelling…' : 'Cancel subscription & return to Free'}</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.demoDisclaimer}>
+          Demo mode: activating a paid plan here does not charge any money. A real payment
+          method will be added in a future update.
+        </Text>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: 16, paddingBottom: 32 },
+  root: { flex: 1, backgroundColor: COLORS.background },
+
+ header: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  backgroundColor: COLORS.primary,
+  paddingHorizontal: 18,
+  paddingBottom: 22,
+  borderBottomLeftRadius: 26,
+  borderBottomRightRadius: 26,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 6,
+  marginBottom: 18,
+},
+headerIconBtn: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.15)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+headerIconBtnPlaceholder: {
+  width: 40,
+  height: 40,
+},
+
+headerTitleWrap: {
+  flex: 1,
+  alignItems: 'center',
+},
+
+headerTitle: {
+  fontSize: 19,
+  fontWeight: '800',
+  color: '#FFFFFF',
+},
+
+headerSubtitle: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.75)',
+  marginTop: 2,
+  textAlign: 'center',
+},
+container: {
+  flex: 1,
+},
+
+content: {
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  paddingBottom: 32,
+},
+
+pageTitleWrap: {
+  marginBottom: 12,
+  alignItems: 'center',
+},
+
+pageTitle: {
+  fontSize: 24,
+  fontWeight: '700',
+  color: COLORS.text,
+  textAlign: 'center',
+},
+
+pageSubtitle: {
+  fontSize: 13,
+  color: COLORS.muted,
+  marginTop: 4,
+  textAlign: 'center',
+},
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
   errorText: { color: COLORS.muted, marginBottom: 12 },
-  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryButtonText: { color: '#fff', fontWeight: '600' },
 
-  screenTitle: { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  currentPlanNote: { fontSize: 13, color: COLORS.muted, marginBottom: 16 },
+  activeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 16,
+  },
+  activeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: COLORS.primary, marginRight: 8 },
+  currentPlanNote: { fontSize: 12.5, color: COLORS.primaryDark, fontWeight: '600' },
 
   planCard: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginTop: 16,
+    shadowColor: '#3B0836',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   planCardPopular: { borderColor: COLORS.primary, borderWidth: 2 },
 
@@ -279,21 +435,36 @@ const styles = StyleSheet.create({
   },
   popularTagText: { fontSize: 10, fontWeight: '800', color: COLORS.popularText, letterSpacing: 0.5 },
 
-  planHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  planIcon: { fontSize: 18 },
-  planName: { fontSize: 19, fontWeight: '700', color: COLORS.text },
-  planPrice: { fontSize: 14, fontWeight: '600', color: COLORS.primary, marginTop: 2 },
-  planDescription: { fontSize: 12.5, color: COLORS.muted, marginTop: 4 },
+  planHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+  planIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  planName: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  planPrice: { fontSize: 13.5, fontWeight: '600', color: COLORS.primary, marginTop: 1 },
+  planDescription: { fontSize: 12.5, color: COLORS.muted, marginTop: 10 },
 
-  highlightsWrap: { marginTop: 12, gap: 6 },
+  highlightsWrap: { marginTop: 14, gap: 9 },
   highlightRow: { flexDirection: 'row', alignItems: 'center' },
-  checkMark: { color: COLORS.primary, fontWeight: '700', marginRight: 8 },
+  checkCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 9,
+  },
   highlightText: { fontSize: 13.5, color: COLORS.text },
 
   currentPlanButton: {
-    marginTop: 16,
+    marginTop: 18,
     backgroundColor: COLORS.background,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 11,
     alignItems: 'center',
     borderWidth: 1,
@@ -302,16 +473,16 @@ const styles = StyleSheet.create({
   currentPlanButtonText: { color: COLORS.muted, fontWeight: '700', fontSize: 14 },
 
   activateButton: {
-    marginTop: 16,
+    marginTop: 18,
     backgroundColor: COLORS.primary,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   activateButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   cancelLink: { marginTop: 20, alignItems: 'center' },
-  cancelLinkText: { color: '#DC2626', fontSize: 13.5, fontWeight: '600' },
+  cancelLinkText: { color: COLORS.danger, fontSize: 13.5, fontWeight: '600' },
 
   demoDisclaimer: { fontSize: 11.5, color: COLORS.muted, textAlign: 'center', marginTop: 24, lineHeight: 16 },
 });

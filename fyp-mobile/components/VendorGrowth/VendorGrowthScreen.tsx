@@ -12,6 +12,18 @@
 // TODO: `vendorId` is read from `route.params.vendorId`. If EventifyHub
 // already has an auth context / hook that exposes the logged-in vendor's
 // id, use that instead and drop the route param.
+//
+// TODO — new dependencies used by this redesign (add if not already in the
+// project, both are standard in Expo apps):
+//   npx expo install expo-linear-gradient
+//   npm install lucide-react-native react-native-svg
+// These replace the old emoji icons (⭐📦🏆🎟💸💎) with flat, single-color
+// vector icons that pick up the app's theme colors instead of the phone's
+// emoji font — that's what was making the old menu look "AI generated".
+//
+// TODO: if this screen already sits inside a SafeAreaView / SafeAreaProvider
+// higher up your navigation tree, you can drop the manual `paddingTop` on
+// `header` below and use `useSafeAreaInsets()` instead.
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -23,40 +35,102 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Crown,
+  Star,
+  Package,
+  Award,
+  Ticket,
+  Percent,
+  TrendingUp,
+  Users,
+  Wallet,
+} from 'lucide-react-native';
 
 import { getVendorSubscription } from '../../services/getVendorSubscription';
 import { getVendorAnalyticsSummary, VendorAnalyticsSummary } from '../../services/getVendorAnalyticsSummary';
 import { SubscriptionPlan, VendorSubscription } from '../../types/subscription.types';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 
 // TODO: swap these for EventifyHub's existing theme constants if you have
 // a theme/colors file already (e.g. src/theme/colors.ts).
 const COLORS = {
-  primary: '#7C3AED',
+  primary: '#7D0C72',
+  primaryDark: '#5A0852',
   primaryLight: '#F3E8FF',
-  text: '#1F2937',
+  primarySoft: '#EDE9FE',
+  text: '#18181B',
   muted: '#6B7280',
-  border: '#E5E7EB',
-  background: '#FAFAFA',
+  border: '#ECEAF3',
+  background: '#F7F6FB',
   card: '#FFFFFF',
   success: '#059669',
+  danger: '#DC2626',
   locked: '#9CA3AF',
+  gold: '#B8860B',
 };
 
 interface GrowthMenuItem {
   key: string;
-  icon: string;
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  iconBg: string;
+  iconColor: string;
   title: string;
   subtitle: string;
   requiresPaidPlan: boolean;
 }
 
 const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
-  { key: 'featureVendor', icon: '⭐', title: 'Feature Your Business', subtitle: 'Get top placement in search', requiresPaidPlan: true },
-  { key: 'featuredPackages', icon: '📦', title: 'Featured Packages', subtitle: 'Highlight your best packages', requiresPaidPlan: true },
-  { key: 'badges', icon: '🏆', title: 'Promotional Badges', subtitle: 'Top Rated, Fast Response & more', requiresPaidPlan: false },
-  { key: 'coupons', icon: '🎟', title: 'Coupons', subtitle: 'Create discount coupons', requiresPaidPlan: true },
-  { key: 'discountCodes', icon: '💸', title: 'Discount Codes', subtitle: 'Run promotional campaigns', requiresPaidPlan: true },
+  {
+    key: 'featureVendor',
+    Icon: Star,
+    iconBg: '#FDF2E9',
+    iconColor: '#C2703D',
+    title: 'Feature Your Business',
+    subtitle: 'Get top placement in search',
+    requiresPaidPlan: true,
+  },
+  {
+    key: 'featuredPackages',
+    Icon: Package,
+    iconBg: COLORS.primarySoft,
+    iconColor: COLORS.primary,
+    title: 'Featured Packages',
+    subtitle: 'Highlight your best packages',
+    requiresPaidPlan: true,
+  },
+  {
+    key: 'badges',
+    Icon: Award,
+    iconBg: '#ECFDF5',
+    iconColor: '#047857',
+    title: 'Promotional Badges',
+    subtitle: 'Top Rated, Fast Response & more',
+    requiresPaidPlan: false,
+  },
+  {
+    key: 'coupons',
+    Icon: Ticket,
+    iconBg: '#FDF2F8',
+    iconColor: '#BE185D',
+    title: 'Coupons',
+    subtitle: 'Create discount coupons',
+    requiresPaidPlan: true,
+  },
+  {
+    key: 'discountCodes',
+    Icon: Percent,
+    iconBg: '#EFF6FF',
+    iconColor: '#2563EB',
+    title: 'Discount Codes',
+    subtitle: 'Run promotional campaigns',
+    requiresPaidPlan: true,
+  },
 ];
 
 function formatDate(dateStr: string | null): string {
@@ -73,6 +147,7 @@ function planDisplayName(plan: SubscriptionPlan): string {
 
 export default function VendorGrowthScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const { vendorId } = useLocalSearchParams<{
     vendorId?: string;
@@ -87,37 +162,35 @@ export default function VendorGrowthScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-  if (!vendorIdValue) {
-    setError('Missing vendorId');
-    setLoading(false);
-    return;
-  }
+    if (!vendorIdValue) {
+      setError('Missing vendorId');
+      setLoading(false);
+      return;
+    }
 
-  try {
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const [sub, analyticsSummary] = await Promise.all([
-      getVendorSubscription(vendorIdValue),
-      getVendorAnalyticsSummary(vendorIdValue).catch((analyticsError) => {
-        console.warn('[Vendor Growth] Analytics failed:', analyticsError);
-        return null;
-      }),
-    ]);
+      const [sub, analyticsSummary] = await Promise.all([
+        getVendorSubscription(vendorIdValue),
+        getVendorAnalyticsSummary(vendorIdValue).catch((analyticsError) => {
+          console.warn('[Vendor Growth] Analytics failed:', analyticsError);
+          return null;
+        }),
+      ]);
 
-    setSubscription(sub);
-    setAnalytics(analyticsSummary);
-  } catch (e: any) {
-    console.error('[Vendor Growth] Subscription failed:', e);
+      setSubscription(sub);
+      setAnalytics(analyticsSummary);
+    } catch (e: any) {
+      console.error('[Vendor Growth] Subscription failed:', e);
 
-    setError(
-      e?.message || 'Failed to load Vendor Growth data',
-    );
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, [vendorIdValue]);
+      setError(e?.message || 'Failed to load Vendor Growth data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [vendorIdValue]);
 
   useEffect(() => {
     loadData();
@@ -129,226 +202,279 @@ export default function VendorGrowthScreen() {
   };
 
   const isPaidPlan = subscription ? subscription.plan !== SubscriptionPlan.FREE : false;
+  const isPremium = subscription?.plan === SubscriptionPlan.PREMIUM;
 
   const handleMenuItemPress = (item: GrowthMenuItem) => {
     if (item.requiresPaidPlan && !isPaidPlan) {
       router.push({
-  pathname: '/subscriptionscreen',
-  params: { vendorId: vendorIdValue },
-});
+        pathname: '/subscriptionscreen',
+        params: { vendorId: vendorIdValue },
+      });
       return;
     }
     if (item.key === 'featureVendor') {
       router.push({
-  pathname: '/featurevendorscreen',
-  params: { vendorId: vendorIdValue },
-});
+        pathname: '/featurevendorscreen',
+        params: { vendorId: vendorIdValue },
+      });
       return;
     }
     if (item.key === 'featuredPackages') {
-  router.push({
-  pathname: '/featuredpackagesscreen',
-  params: { vendorId: vendorIdValue },
-  });
-  return;
-}
-if (item.key === 'badges') {
-  router.push({
-    pathname: '/vendorbadgesscreen',
-    params: { vendorId },
-  });
-  return;
-}
-if (item.key === 'coupons') {
-  router.push({
-    pathname: '/couponsscreen',
-    params: {
-      vendorId: vendorIdValue,
-      initialTab: 'coupon',
-    },
-  });
-  return;
-}
-
-if (item.key === 'discountCodes') {
-  router.push({
-    pathname: '/couponsscreen',
-    params: {
-      vendorId: vendorIdValue,
-      initialTab: 'discountCode',
-    },
-  });
-  return;
-}
+      router.push({
+        pathname: '/featuredpackagesscreen',
+        params: { vendorId: vendorIdValue },
+      });
+      return;
+    }
+    if (item.key === 'badges') {
+      router.push({
+        pathname: '/vendorbadgesscreen',
+        params: { vendorId: vendorIdValue },
+      });
+      return;
+    }
+    if (item.key === 'coupons') {
+      router.push({
+        pathname: '/couponsscreen',
+        params: { vendorId: vendorIdValue, initialTab: 'coupon' },
+      });
+      return;
+    }
+    if (item.key === 'discountCodes') {
+      router.push({
+        pathname: '/couponsscreen',
+        params: { vendorId: vendorIdValue, initialTab: 'discountCode' },
+      });
+      return;
+    }
   };
 
+  const Header = () => (
+  <View
+    style={[
+      styles.header,
+      {
+        paddingTop: insets.top,
+      },
+    ]}
+  >
+    <View style={styles.headerRow}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <ChevronLeft
+          size={22}
+          color={COLORS.text}
+          strokeWidth={2.5}
+        />
+      </TouchableOpacity>
+
+      <View style={styles.headerTextWrap}>
+        <Text style={styles.headerTitle}>
+          Vendor Growth
+        </Text>
+
+        <Text style={styles.headerSubtitle}>
+          Boost visibility & manage promotions
+        </Text>
+      </View>
+
+      <View style={styles.headerSideSpacer} />
+    </View>
+  </View>
+);
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.root}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadData}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Header />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
-    >
-      <Text style={styles.screenTitle}>Vendor Growth</Text>
+    <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Header />
 
-      
-      {/* Current Plan */}
-<View style={styles.card}>
-  <Text style={styles.sectionLabel}>Current Plan</Text>
-
-  <View style={styles.planRow}>
-    <View>
-      {subscription ? (
-        <>
-          <Text style={styles.planName}>
-            {planDisplayName(subscription.plan)}
-          </Text>
-
-          {subscription.plan !== SubscriptionPlan.FREE &&
-          subscription.endDate ? (
-            <Text style={styles.planMeta}>
-              Active until {formatDate(subscription.endDate)}
-            </Text>
-          ) : (
-            <Text style={styles.planMeta}>
-              Upgrade to grow your business
-            </Text>
-          )}
-        </>
-      ) : (
-        <>
-          <Text style={styles.planName}>No Active Plan</Text>
-
-          <Text style={styles.planMeta}>
-            Choose a subscription plan to unlock growth features.
-          </Text>
-        </>
-      )}
-    </View>
-
-    {subscription?.plan === SubscriptionPlan.PREMIUM && (
-      <Text style={styles.badgeEmoji}>💎</Text>
-    )}
-  </View>
-
-  <TouchableOpacity
-    style={styles.manageButton}
-    onPress={() =>
-      router.push({
-        pathname: '/subscriptionscreen',
-        params: { vendorId: vendorIdValue },
-      })
-    }
-  >
-    <Text style={styles.manageButtonText}>
-      Manage Subscription
-    </Text>
-  </TouchableOpacity>
-</View>
-
-      {/* Grow Your Business */}
-      <Text style={styles.sectionTitle}>Grow Your Business</Text>
-      <View style={styles.card}>
-        {GROWTH_MENU_ITEMS.map((item, index) => {
-          const locked = item.requiresPaidPlan && !isPaidPlan;
-          return (
-            <TouchableOpacity
-              key={item.key}
-              style={[styles.menuItem, index < GROWTH_MENU_ITEMS.length - 1 && styles.menuItemBorder]}
-              onPress={() => handleMenuItemPress(item)}
-            >
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-              <View style={styles.menuTextWrap}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Current Plan */}
+        {subscription && isPaidPlan ? (
+          <LinearGradient
+  colors={[COLORS.primary, COLORS.primaryDark]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={styles.planCard}
+>
+            <Text style={styles.planLabelOnDark}>Current Plan</Text>
+            <View style={styles.planRow}>
+              <View>
+                <View style={styles.planNameRow}>
+                  <Text style={styles.planNameOnDark}>{planDisplayName(subscription.plan)}</Text>
+                  {isPremium && <Crown size={18} color="#FDE68A" style={{ marginLeft: 6 }} />}
+                </View>
+                <Text style={styles.planMetaOnDark}>
+                  {subscription.endDate ? `Active until ${formatDate(subscription.endDate)}` : 'Your plan is active'}
+                </Text>
               </View>
-              {locked && <Text style={styles.lockIcon}>🔒</Text>}
+            </View>
+
+            <TouchableOpacity
+              style={styles.manageButtonOnDark}
+              onPress={() => router.push({ pathname: '/subscriptionscreen', params: { vendorId: vendorIdValue } })}
+            >
+              <Text style={styles.manageButtonTextOnDark}>Manage Subscription</Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
-
-             {/* Analytics preview (real data, existing endpoint) */}
-      <Text style={styles.sectionTitle}>Analytics</Text>
-
-      <View style={styles.card}>
-        {analytics ? (
-          <View style={styles.statsGrid}>
-            <StatBox
-              label="Total Revenue"
-              value={`Rs. ${analytics.totalRevenue.toLocaleString()}`}
-            />
-
-            <StatBox
-              label="This Month"
-              value={`Rs. ${analytics.monthlyRevenue.toLocaleString()}`}
-              change={analytics.monthlyRevenueChangePct}
-            />
-
-            <StatBox
-              label="Rating"
-              value={
-                analytics.averageRating != null
-                  ? `${analytics.averageRating} ★`
-                  : 'No reviews yet'
-              }
-            />
-
-            <StatBox
-              label="Repeat Customers"
-              value={`${analytics.repeatCustomers}`}
-            />
-          </View>
+          </LinearGradient>
         ) : (
-          <Text style={styles.menuSubtitle}>
-            Analytics will appear once you have order history.
-          </Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionLabel}>Current Plan</Text>
+            <View style={styles.planRow}>
+              <View>
+                <Text style={styles.planName}>{subscription ? 'Free' : 'No Active Plan'}</Text>
+                <Text style={styles.planMeta}>Upgrade to unlock growth features</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.manageButton}
+              onPress={() => router.push({ pathname: '/subscriptionscreen', params: { vendorId: vendorIdValue } })}
+            >
+              <Text style={styles.manageButtonText}>Choose a Plan</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
-        <TouchableOpacity
-          style={styles.analyticsButton}
-          onPress={() =>
-            router.push({
-              pathname: '/GrowthAnalytics',
-              params: { vendorId: vendorIdValue },
-            })
-          }
-        >
-          <Text style={styles.analyticsButtonText}>
-            View Full Analytics →
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
-    </ScrollView>
+        {/* Grow Your Business */}
+        <Text style={styles.sectionTitle}>Grow Your Business</Text>
+        <View style={styles.card}>
+          {GROWTH_MENU_ITEMS.map((item, index) => {
+            const locked = item.requiresPaidPlan && !isPaidPlan;
+            const ItemIcon = item.Icon;
+            return (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  styles.menuItem,
+                  index < GROWTH_MENU_ITEMS.length - 1 && styles.menuItemBorder,
+                  locked && styles.menuItemLocked,
+                ]}
+                onPress={() => handleMenuItemPress(item)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.iconBadge, { backgroundColor: locked ? '#F3F4F6' : item.iconBg }]}>
+                  <ItemIcon size={20} color={locked ? COLORS.locked : item.iconColor} strokeWidth={2} />
+                </View>
+
+                <View style={styles.menuTextWrap}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+
+                {locked ? (
+                  <View style={styles.lockPill}>
+                    <Lock size={11} color={COLORS.locked} strokeWidth={2.5} />
+                    <Text style={styles.lockPillText}>Upgrade</Text>
+                  </View>
+                ) : (
+                  <ChevronRight size={18} color={COLORS.muted} strokeWidth={2} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Analytics preview (real data, existing endpoint) */}
+        <Text style={styles.sectionTitle}>Analytics</Text>
+
+        <View style={styles.card}>
+          {analytics ? (
+            <View style={styles.statsGrid}>
+              <StatBox
+                icon={<Wallet size={16} color={COLORS.primary} strokeWidth={2} />}
+                label="Total Revenue"
+                value={`Rs. ${analytics.totalRevenue.toLocaleString()}`}
+              />
+
+              <StatBox
+                icon={<TrendingUp size={16} color={COLORS.primary} strokeWidth={2} />}
+                label="This Month"
+                value={`Rs. ${analytics.monthlyRevenue.toLocaleString()}`}
+                change={analytics.monthlyRevenueChangePct}
+              />
+
+              <StatBox
+                icon={<Star size={16} color={COLORS.primary} strokeWidth={2} />}
+                label="Rating"
+                value={analytics.averageRating != null ? `${analytics.averageRating} / 5` : 'No reviews yet'}
+              />
+
+              <StatBox
+                icon={<Users size={16} color={COLORS.primary} strokeWidth={2} />}
+                label="Repeat Customers"
+                value={`${analytics.repeatCustomers}`}
+              />
+            </View>
+          ) : (
+            <Text style={styles.menuSubtitle}>Analytics will appear once you have order history.</Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.analyticsButton}
+            onPress={() => router.push({ pathname: '/GrowthAnalytics', params: { vendorId: vendorIdValue } })}
+          >
+            <Text style={styles.analyticsButtonText}>View Full Analytics</Text>
+            <ChevronRight size={16} color="#FFFFFF" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-function StatBox({ label, value, change }: { label: string; value: string; change?: number | null }) {
+function StatBox({
+  icon,
+  label,
+  value,
+  change,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  change?: number | null;
+}) {
   return (
     <View style={styles.statBox}>
+      <View style={styles.statIconWrap}>{icon}</View>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
       {change != null && (
-        <Text style={[styles.statChange, { color: change >= 0 ? COLORS.success : '#DC2626' }]}>
+        <Text style={[styles.statChange, { color: change >= 0 ? COLORS.success : COLORS.danger }]}>
           {change >= 0 ? '+' : ''}
           {change.toFixed(1)}%
         </Text>
@@ -358,63 +484,177 @@ function StatBox({ label, value, change }: { label: string; value: string; chang
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  root: { flex: 1, backgroundColor: COLORS.background },
+
+  header: {
+  backgroundColor: COLORS.card,
+  borderBottomWidth: 1,
+  borderBottomColor: COLORS.border,
+},
+
+headerRow: {
+  height: 58,
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+},
+
+backButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: COLORS.background,
+},
+
+headerTextWrap: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+headerSideSpacer: {
+  width: 36,
+  height: 36,
+},
+
+headerTitle: {
+  fontSize: 17,
+  fontWeight: '700',
+  color: COLORS.text,
+},
+
+headerSubtitle: {
+  fontSize: 11.5,
+  color: COLORS.muted,
+  marginTop: 2,
+},
+  container: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
   errorText: { color: COLORS.muted, marginBottom: 12 },
-  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
+  retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryButtonText: { color: '#fff', fontWeight: '600' },
 
-  screenTitle: { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginTop: 20, marginBottom: 8 },
-  sectionLabel: { fontSize: 12, fontWeight: '600', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginTop: 22, marginBottom: 10 },
+  sectionLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: COLORS.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
 
   card: {
     backgroundColor: COLORS.card,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
+    shadowColor: '#1F1147',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
 
+  planCard: {
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: COLORS.primaryDark,
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  planLabelOnDark: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.75)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
   planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  planName: { fontSize: 20, fontWeight: '700', color: COLORS.text },
-  planMeta: { fontSize: 13, color: COLORS.muted, marginTop: 2 },
-  badgeEmoji: { fontSize: 28 },
+  planNameRow: { flexDirection: 'row', alignItems: 'center' },
+  planName: { fontSize: 21, fontWeight: '700', color: COLORS.text },
+  planNameOnDark: { fontSize: 22, fontWeight: '700', color: '#FFFFFF' },
+  planMeta: { fontSize: 13, color: COLORS.muted, marginTop: 3 },
+  planMetaOnDark: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 3 },
 
   manageButton: {
-    marginTop: 14,
+    marginTop: 16,
     backgroundColor: COLORS.primaryLight,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  manageButtonText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
-    analyticsButton: {
-    marginTop: 14,
-    backgroundColor: COLORS.primary,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingVertical: 11,
     alignItems: 'center',
   },
-
-  analyticsButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 14,
+  manageButtonText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+  manageButtonOnDark: {
+    marginTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center',
   },
+  manageButtonTextOnDark: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
 
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  analyticsButton: {
+  marginTop: 16,
+  backgroundColor: COLORS.primary,
+  borderRadius: 12,
+  paddingVertical: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+},
+  analyticsButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
+
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13 },
   menuItemBorder: { borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  menuIcon: { fontSize: 22, width: 36 },
+  menuItemLocked: { opacity: 0.9 },
+  iconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 13,
+  },
   menuTextWrap: { flex: 1 },
   menuTitle: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   menuSubtitle: { fontSize: 12.5, color: COLORS.muted, marginTop: 1 },
-  lockIcon: { fontSize: 14, color: COLORS.locked },
+  lockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  lockPillText: { fontSize: 10.5, fontWeight: '700', color: COLORS.locked },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  statBox: { width: '47%', backgroundColor: COLORS.background, borderRadius: 10, padding: 12 },
+  statBox: {
+    width: '47%',
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    padding: 13,
+  },
+  statIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: COLORS.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   statValue: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   statLabel: { fontSize: 11.5, color: COLORS.muted, marginTop: 2 },
-  statChange: { fontSize: 11, fontWeight: '700', marginTop: 2 },
+  statChange: { fontSize: 11, fontWeight: '700', marginTop: 3 },
 });
