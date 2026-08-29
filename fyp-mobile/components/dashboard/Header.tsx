@@ -1,9 +1,15 @@
 import searchVendors from '@/services/searchVendors';
-import { getSecureData } from '@/store';
+import { getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // ---- Theme tokens (kept local so no new files/deps are introduced) ----
 const COLORS = {
@@ -38,10 +44,22 @@ const Header: React.FC = () => {
     fetchUsername(); // Fetch username on component mount
   }, []);
 
-  const fetchUsername = async () => {
-    const storedUsername = (await getSecureData("user")) || "Guest"; // Retrieve username or set default
-    setUsername(JSON.parse(storedUsername).name);
-  };
+ const fetchUsername = async () => {
+  try {
+    const user = await getUserData();
+
+    if (!user) {
+      console.warn('No user data found in storage.');
+      setUsername('Guest');
+      return;
+    }
+
+    setUsername(user?.name || user?.username || 'Guest');
+  } catch (error) {
+    console.error('fetchUsername error:', error);
+    setUsername('Guest');
+  }
+};
 
   return (
     <View style={styles.container}>

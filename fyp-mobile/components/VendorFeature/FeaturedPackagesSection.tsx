@@ -1,5 +1,4 @@
-
-// fyp-mobile/components/VendorFeature/FeaturedVendorsSection.tsx
+//fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -11,8 +10,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
-import { FeaturedVendorPublicEntry } from '../../types/promotion.types';
+import { getActiveFeaturedPackages } from '../../services/getActiveFeaturedPackages';
+import { FeaturedPackagePublicEntry } from '../../types/promotion.types';
 
 const COLORS = {
   text: '#1F2937',
@@ -21,27 +20,25 @@ const COLORS = {
   card: '#FFFFFF',
   badge: '#FEF3C7',
   badgeText: '#92400E',
+  price: '#059669',
 };
 
-export function FeaturedVendorsSection() {
+export function FeaturedPackagesSection() {
   const router = useRouter();
 
-  const [vendors, setVendors] = useState<FeaturedVendorPublicEntry[]>([]);
+  const [packages, setPackages] = useState<FeaturedPackagePublicEntry[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    getActiveFeaturedVendors(10)
+    getActiveFeaturedPackages(10)
       .then((result) => {
         if (!cancelled) {
-          setVendors(result);
+          setPackages(result);
         }
       })
       .catch((error) => {
-        console.error(
-          '[Featured Vendors] Failed to load:',
-          error,
-        );
+        console.error('[Featured Packages] Failed to load:', error);
       });
 
     return () => {
@@ -49,75 +46,61 @@ export function FeaturedVendorsSection() {
     };
   }, []);
 
-  if (vendors.length === 0) {
+  if (packages.length === 0) {
     return null;
   }
 
-  const handleVendorPress = (vendor: FeaturedVendorPublicEntry) => {
-    router.push({
-      pathname: '/vendorprofiledetails',
-      params: {
-        id: vendor.vendorId,
-      },
-    });
-  };
+  const handlePackagePress = (pkg: FeaturedPackagePublicEntry) => {
+  router.push({
+    pathname: '/vendorprofiledetails',
+    params: {
+      id: pkg.vendorId,
+    },
+  });
+};
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        ⭐ Featured Vendors
-      </Text>
+      <Text style={styles.sectionTitle}>📦 Featured Packages</Text>
 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
       >
-        {vendors.map((vendor) => (
+        {packages.map((pkg) => (
           <TouchableOpacity
-            key={vendor.promotionId}
+            key={pkg.promotionId}
             style={styles.card}
             activeOpacity={0.85}
-            onPress={() => handleVendorPress(vendor)}
+            onPress={() => handlePackagePress(pkg)}
           >
-            {vendor.coverImage ? (
+            {pkg.coverImage ? (
               <Image
-                source={{ uri: vendor.coverImage }}
+                source={{ uri: pkg.coverImage }}
                 style={styles.image}
               />
             ) : (
-              <View
-                style={[
-                  styles.image,
-                  styles.imagePlaceholder,
-                ]}
-              />
+              <View style={[styles.image, styles.imagePlaceholder]}>
+                <Text style={styles.placeholderText}>📦</Text>
+              </View>
             )}
 
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                ⭐ Featured
-              </Text>
+              <Text style={styles.badgeText}>⭐ Featured</Text>
             </View>
 
-            <Text
-              style={styles.vendorName}
-              numberOfLines={1}
-            >
-              {vendor.vendorName}
+            <Text style={styles.packageName} numberOfLines={2}>
+              {pkg.packageName}
             </Text>
 
-            {vendor.businessCategoryName && (
-              <Text
-                style={styles.vendorMeta}
-                numberOfLines={1}
-              >
-                {vendor.businessCategoryName}
-                {vendor.city
-                  ? ` · ${vendor.city}`
-                  : ''}
-              </Text>
-            )}
+            <Text style={styles.vendorName} numberOfLines={1}>
+              {pkg.vendorName}
+            </Text>
+
+            <Text style={styles.price}>
+              Rs. {Number(pkg.price || 0).toLocaleString()}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -144,12 +127,13 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    width: 150,
+    width: 170,
     backgroundColor: COLORS.card,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
+    paddingBottom: 10,
   },
 
   image: {
@@ -159,6 +143,12 @@ const styles = StyleSheet.create({
 
   imagePlaceholder: {
     backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  placeholderText: {
+    fontSize: 30,
   },
 
   badge: {
@@ -177,7 +167,7 @@ const styles = StyleSheet.create({
     color: COLORS.badgeText,
   },
 
-  vendorName: {
+  packageName: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,
@@ -185,12 +175,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
-  vendorMeta: {
+  vendorName: {
     fontSize: 11,
     color: COLORS.muted,
-    marginTop: 2,
+    marginTop: 3,
     marginHorizontal: 8,
-    marginBottom: 8,
+  },
+
+  price: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.price,
+    marginTop: 5,
+    marginHorizontal: 8,
   },
 });
 

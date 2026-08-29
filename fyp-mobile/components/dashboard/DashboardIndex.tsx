@@ -4,9 +4,9 @@ import Header from './Header';
 //import SearchBar from './SearchBar';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
-import  FeaturedVendorsSection  from '../VendorFeature/FeatureVendorScreen';
-import  FeaturedPackagesSection  from '../VendorFeature/FeaturedPackagesScreen';
 import BottomNavigationFinal from './BottomNavigationFinal';
+import { FeaturedVendorsSection } from '../VendorFeature/FeaturedVendorsSection';
+import { FeaturedPackagesSection } from '../VendorFeature/FeaturedPackagesSection';
 
 const COLORS = {
   bg: '#FDF2F8',
@@ -22,10 +22,9 @@ const DashboardIndex: React.FC = () => {
         <Header />
         <View style={styles.content}>
           <CategoryGrid />
+          <FeaturedVendorsSection />
 
-<FeaturedVendorsSection />
-
-<FeaturedPackagesSection />
+         <FeaturedPackagesSection />
 
 <VenueList />
         </View>
