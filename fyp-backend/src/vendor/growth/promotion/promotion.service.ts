@@ -23,6 +23,7 @@ export interface FeaturedVendorPublicEntry {
   coverImage: string | null;
   businessCategoryName: string | null;
   city: string | null;
+  rating: number | null;
   featuredUntil: Date;
 }
 
@@ -328,8 +329,8 @@ return this.promotionModel.create({
       .find({
         _id: { $in: vendorIds },
       })
-      .select('name coverImage city buisnessCategory')
-      .populate('buisnessCategory')
+      .select('name coverImage city buisnessCategory rating')
+        .populate('buisnessCategory')
       .lean();
 
     const vendorById = new Map(

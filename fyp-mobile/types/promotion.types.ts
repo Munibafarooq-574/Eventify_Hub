@@ -41,7 +41,8 @@ export interface FeaturedVendorPublicEntry {
   coverImage: string | null;
   businessCategoryName: string | null;
   city: string | null;
-  featuredUntil: string;
+    rating: number | null;
+    featuredUntil: string;
 }
 
 export interface FeaturedPackagePublicEntry {

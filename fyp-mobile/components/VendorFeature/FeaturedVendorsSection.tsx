@@ -1,6 +1,8 @@
 
 // fyp-mobile/components/VendorFeature/FeaturedVendorsSection.tsx
+
 import React, { useEffect, useState } from 'react';
+
 import {
   View,
   Text,
@@ -9,6 +11,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
+
 import { useRouter } from 'expo-router';
 
 import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
@@ -21,6 +24,7 @@ const COLORS = {
   card: '#FFFFFF',
   badge: '#FEF3C7',
   badgeText: '#92400E',
+  rating: '#F59E0B',
 };
 
 export function FeaturedVendorsSection() {
@@ -38,10 +42,7 @@ export function FeaturedVendorsSection() {
         }
       })
       .catch((error) => {
-        console.error(
-          '[Featured Vendors] Failed to load:',
-          error,
-        );
+        console.error('[Featured Vendors] Failed to load:', error);
       });
 
     return () => {
@@ -107,16 +108,27 @@ export function FeaturedVendorsSection() {
               {vendor.vendorName}
             </Text>
 
-            {vendor.businessCategoryName && (
-              <Text
-                style={styles.vendorMeta}
-                numberOfLines={1}
-              >
-                {vendor.businessCategoryName}
-                {vendor.city
-                  ? ` · ${vendor.city}`
-                  : ''}
-              </Text>
+            {/* Rating */}
+            {vendor.rating !== null && vendor.rating !== undefined && (
+              <View style={styles.ratingRow}>
+                <Text style={styles.ratingStar}>★</Text>
+                <Text style={styles.ratingText}>
+                  {Number(vendor.rating).toFixed(1)}
+                </Text>
+              </View>
+            )}
+
+            {/* Location */}
+            {vendor.city && (
+              <View style={styles.locationRow}>
+                <Text style={styles.locationIcon}>📍</Text>
+                <Text
+                  style={styles.vendorMeta}
+                  numberOfLines={1}
+                >
+                 {vendor.city}
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
         ))}
@@ -150,6 +162,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
+    paddingBottom: 8,
   },
 
   image: {
@@ -185,12 +198,40 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    marginHorizontal: 8,
+  },
+
+  ratingStar: {
+    fontSize: 13,
+    color: COLORS.rating,
+    marginRight: 3,
+  },
+
+  ratingText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    marginHorizontal: 8,
+  },
+
+  locationIcon: {
+    fontSize: 11,
+    marginRight: 3,
+  },
+
   vendorMeta: {
+    flex: 1,
     fontSize: 11,
     color: COLORS.muted,
-    marginTop: 2,
-    marginHorizontal: 8,
-    marginBottom: 8,
   },
 });
-
