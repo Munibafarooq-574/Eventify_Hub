@@ -108,66 +108,67 @@ export class OrderService {
     }
 
 
-    async getOrders(
+   async getOrders(
     type: string,
     userId: string,
     status?: string,
     limit = 10,
     skip = 0,
-): Promise<Order[]> {
-    let userIdObj;
-    if (typeof userId === 'string') {
-        userIdObj = new Types.ObjectId(userId);  // Convert userId to ObjectId
-    }
+): Promise<any[]> {
+    const userIdObj = new Types.ObjectId(userId);
 
     const query: any = {
-        ...(status && { status }),  // Optional status filter
+        ...(status && { status }),
     };
 
-    // Step 1: Fetch VendorOrders that match the vendorId
     if (type === 'Vendor') {
-        const vendorOrders = await this.vendorOrderModel.find({ vendorId: userIdObj });
+        const vendorOrders = await this.vendorOrderModel.find({
+            vendorId: userIdObj,
+        });
 
-        // Get the ObjectIds of matched VendorOrders
         const vendorOrderIds = vendorOrders.map(order => order._id);
 
-        // Use the $in operator to query Orders with vendorOrders matching the vendorOrderIds
         query.vendorOrders = { $in: vendorOrderIds };
     } else if (type === 'Organizer') {
-        // Step 2: For 'Organizer', filter orders by organizerId
-        query.organizerId = userIdObj;  // Filter by organizerId
+        query.organizerId = userIdObj;
     }
 
-    console.log('Final query:', query);  // Log the final query for debugging
+    console.log('Final query:', query);
 
-    // Step 3: Execute the query
     const orders = await this.orderModel
         .find(query)
-        .skip(skip)
-        .limit(limit)
-        .populate('organizerId')  // Populate organizer details
+        .sort({ createdAt: -1 })
+        .skip(Number(skip))
+        .limit(Number(limit))
         .populate({
-            path: 'vendorOrders',  // Populate vendorOrders subdocument
+            path: 'organizerId',
+            select: 'name email phone contactDetails',
+        })
+        .populate({
+            path: 'vendorOrders',
             populate: {
-                path: 'vendorId',  // Populate vendor details inside each vendorOrder
-                model: 'User',  // Specify the 'Vendor' model to populate vendor info
+                path: 'vendorId',
+                model: 'User',
+                select: 'name email phone contactDetails',
             },
         })
+        .lean()
         .exec();
 
-    // IMPORTANT: an Order can contain vendorOrders belonging to several different
-    // vendors (e.g. a cake vendor AND a makeup vendor on the same booking).
-    // populate('vendorOrders') pulls back the WHOLE array regardless of which
-    // vendor is asking, so we filter it down here to just this vendor's own
-    // service line-items before returning the data.
     if (type === 'Vendor') {
-        return orders.map((order) => {
-            const plain: any = order.toObject ? order.toObject() : order;
-            plain.vendorOrders = (plain.vendorOrders || []).filter((vo: any) => {
-                const vendorIdOnItem = vo.vendorId?._id ?? vo.vendorId;
-                return vendorIdOnItem?.toString() === userId;
-            });
-            return plain;
+        return orders.map((order: any) => {
+            order.vendorOrders = (order.vendorOrders || []).filter(
+                (vo: any) => {
+                    const vendorIdOnItem =
+                        vo.vendorId?._id ?? vo.vendorId;
+
+                    return (
+                        vendorIdOnItem?.toString() === userId
+                    );
+                },
+            );
+
+            return order;
         });
     }
 

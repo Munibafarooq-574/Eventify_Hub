@@ -1,7 +1,7 @@
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
-import { getSecureData, saveSecureData } from '@/store';
+import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -31,22 +31,53 @@ const statusStyleMap: Record<string, { bg: string; text: string; icon: any }> = 
   Cancelled: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
 };
 
+const vendorStatusStyleMap: Record<string, { bg: string; text: string; icon: any }> = {
+  pending: { bg: '#FFF3CD', text: '#B8860B', icon: 'time-outline' },
+  accepted: { bg: '#E7F0FF', text: '#007AFF', icon: 'checkmark-outline' },
+  completed: { bg: '#E6F7EA', text: '#28a745', icon: 'checkmark-circle-outline' },
+  rejected: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
+  cancelled: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
+};
+
 const MyEventsScreen = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Safely get the logged-in user, trying AsyncStorage first (where login
+  // saves it via saveUserData), then falling back to SecureStore in case
+  // some part of the app still saves it there.
+  const resolveUser = async () => {
+    const userFromAsync = await getUserData(); // already parsed, or null
+    if (userFromAsync) return userFromAsync;
+
+    const raw = await getSecureData('user');
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error('Failed to parse user from SecureStore:', e);
+      return null;
+    }
+  };
 
   const fetchData = useCallback(async () => {
+    setErrorMsg(null);
     try {
-      const user = JSON.parse((await getSecureData('user')) || '');
-      if (!user) {
-        throw 'user not found';
+      const user = await resolveUser();
+      if (!user || !user._id) {
+        console.warn('No logged-in user found, cannot fetch events.');
+        setErrorMsg('You need to be logged in to see your events.');
+        setEvents([]);
+        return;
       }
       const fetchedEvents = await getVendorOrders('Organizer', user._id);
       setEvents(fetchedEvents || []);
     } catch (error) {
       console.error('Error fetching events:', error);
+      setErrorMsg('Something went wrong while loading your events.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,19 +124,28 @@ const MyEventsScreen = () => {
   };
 
   const handleMessage = async (vendor: any) => {
-    try {
-      const user = JSON.parse((await getSecureData('user')) || '');
-      if (!user) {
-        throw 'User not found';
-      }
-      const { chatId } = await createConversation(user._id, vendor?.vendorId?._id);
-      await saveSecureData('chatId', chatId);
-      await saveSecureData('receiverId', vendor?.vendorId?._id);
-      router.push(`/message`);
-    } catch (error) {
-      console.error('Error initiating conversation:', error);
+  try {
+    const user = await resolveUser();
+    if (!user || !user._id) {
+      throw new Error('User not found');
     }
-  };
+    const { chatId } = await createConversation(user._id, vendor?.vendorId?._id);
+
+    const displayName =
+      vendor?.vendorId?.contactDetails?.brandName ||   // brand name (agar backend business info bhi populate karta ho)
+      vendor?.vendorId?.name ||                         // fallback personal name
+      'Conversation';
+
+    await saveSecureData('chatId', chatId);
+    await saveSecureData('receiverId', vendor?.vendorId?._id);
+    await saveSecureData('receiverName', displayName);   // 🆕 yeh line add karo
+    await saveSecureData('receiverAvatar', vendor?.vendorId?.contactDetails?.brandLogo || ''); // optional, consistency ke liye
+
+    router.push(`/message`);
+  } catch (error) {
+    console.error('Error initiating conversation:', error);
+  }
+};
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8EAF2' }}>
@@ -140,6 +180,21 @@ const MyEventsScreen = () => {
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color="#7B2869" />
             <Text style={styles.centerStateText}>Loading your events...</Text>
+          </View>
+        ) : errorMsg ? (
+          <View style={styles.centerState}>
+            <Ionicons name="alert-circle-outline" size={56} color="#dc3545" />
+            <Text style={styles.emptyTitle}>Couldn't load events</Text>
+            <Text style={styles.centerStateText}>{errorMsg}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => {
+                setLoading(true);
+                fetchData();
+              }}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : events.length === 0 ? (
           <View style={styles.centerState}>
@@ -181,29 +236,47 @@ const MyEventsScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Status pill */}
-                <View style={[styles.statusPill, { backgroundColor: statusInfo.bg }]}>
-                  <Ionicons name={statusInfo.icon} size={14} color={statusInfo.text} />
-                  <Text style={[styles.statusPillText, { color: statusInfo.text }]}>
-                    {event.status}
-                  </Text>
-                </View>
-
                 <View style={styles.divider} />
 
                 <Text style={styles.sectionTitle}>Vendors</Text>
 
-                {event.vendorOrders.map((vendor: any, index: number) => (
-                  <View key={index} style={styles.vendorCard}>
+              {event.vendorOrders.map((vendor: any, index: number) => {
+        const vStatus =
+          vendorStatusStyleMap[vendor.status] || vendorStatusStyleMap.pending;
+
+        return (
+          <View key={index} style={styles.vendorCard}>
                     <View style={styles.vendorAvatar}>
                       <Ionicons name="person-outline" size={16} color="#7B2869" />
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.vendorText}>{vendor?.vendorId?.name}</Text>
+                      <Text style={styles.vendorText}>
+  {vendor?.vendorId?.contactDetails?.brandName || vendor?.vendorId?.name}
+</Text>
                       <Text style={styles.packageText}>
                         {vendor.serviceName} · Rs. {vendor.price}
                       </Text>
+                      <View
+  style={[
+    styles.statusPill,
+    { backgroundColor: vStatus.bg, marginTop: 4 },
+  ]}
+>
+  <Ionicons
+    name={vStatus.icon}
+    size={12}
+    color={vStatus.text}
+  />
+  <Text
+    style={[
+      styles.statusPillText,
+      { color: vStatus.text, fontSize: 11 },
+    ]}
+  >
+    {vendor.status}
+  </Text>
+</View>
                     </View>
 
                     <TouchableOpacity
@@ -213,8 +286,9 @@ const MyEventsScreen = () => {
                       <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
                       <Text style={styles.messageButtonText}>Message</Text>
                     </TouchableOpacity>
-                  </View>
-                ))}
+                     </View>
+  );
+})}
 
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total Event Price</Text>
@@ -278,6 +352,18 @@ const styles = StyleSheet.create({
     color: '#8B7188',
     textAlign: 'center',
     marginTop: 6,
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#7B2869',
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   card: {
     backgroundColor: '#fff',

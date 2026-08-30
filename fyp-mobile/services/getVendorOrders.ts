@@ -2,16 +2,41 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 export interface GetOrdersResponse {
-    totalAmount: string;
-    orderId: string;
+    _id: string;
+    organizerId: {
+        _id: string;
+        name?: string;
+        email?: string;
+        phone?: string;
+        contactDetails?: any;
+    } | string | null;
+    vendorOrders: {
+        _id: string;
+        vendorId: {
+            _id: string;
+            name?: string;
+            email?: string;
+            phone?: string;
+            contactDetails?: any;
+        } | string;
+        serviceName: string;
+        price: number;
+        packageId?: string | null;
+        status: string;
+        message?: string;
+        confirmationTime?: string;
+    }[];
     eventName: string;
-    clientName: string;
+    eventType?: string;
+    guests: number;
     eventDate: string;
-    package: string;
-    price: number;
+    eventTime: string;
+    totalAmount: number;
+    discount: number;
+    finalAmount: number;
     status: string;
-    organizerId: any;
-    vendorOrders: any;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 export default async function getVendorOrders(type: string, userId: string, status?: string, limit = 10, skip = 0): Promise<GetOrdersResponse[]> {

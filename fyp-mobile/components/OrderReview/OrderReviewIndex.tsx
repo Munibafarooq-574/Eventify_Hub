@@ -1,5 +1,9 @@
 import postPlaceOrder from '@/services/postPlaceOrder';
-import { deleteSecureData, getSecureData } from '@/store'; // Assuming you have this function to get data from local storage
+import {
+    deleteSecureData,
+    getSecureData,
+    getUserData,
+} from '@/store';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -93,97 +97,102 @@ const MyOrdersScreen = () => {
         });
         return totalAmount;
     };
+const handleCheckout = async () => {
+    try {
+        const user = await getUserData();
 
-    // Handle Proceed to Checkout
-   /* const handleCheckout = async () => {
-        try {
-            const storedCart = await getSecureData('cartData');
-            const cart = JSON.parse(storedCart || "");
+        console.log("========== ORDER DEBUG ==========");
+        console.log("parsed user:", user);
+        console.log("organizerId:", user?._id);
+        console.log("=================================");
 
-            if (cart.vendors.length === 0) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Empty Cart',
-                    text2: 'Your cart is empty. Please add items to proceed.',
-                    position: 'bottom',
-                });
-                return;
-            }
-            const eventDetails = JSON.parse(await getSecureData("eventDetails") || "");
-            const user = JSON.parse(await getSecureData("user") || "");
-            const eventDate = eventDetails?.eventDate; // Replace with your actual selected date
-            const eventTime = '18:00'; // Replace with your actual selected time
-            const organizerId = user?._id
-            const guests = eventDetails?.guests;
-            const eventName = eventDetails?.eventName;
-            const services = cart.vendors.flatMap((vendor: any) =>
-                vendor.packages.map((pkg: any) => ({
-                    vendorId: vendor.vendor._id,
-                    serviceName: pkg.packageName,
-                    price: pkg.price,
-                }))
-            );
-            console.log({ organizerId, eventDate, eventTime, services, guests, eventName });
-            const response = await postPlaceOrder({ organizerId, eventDate, eventTime, services, guests, eventName });*/
-                const handleCheckout = async () => {
-        try {
-            const storedCart = await getSecureData('cartData');
-            const cart = storedCart ? JSON.parse(storedCart) : null;
-
-            if (!cart || cart.vendors.length === 0) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Empty Cart',
-                    text2: 'Your cart is empty. Please add items to proceed.',
-                    position: 'bottom',
-                });
-                return;
-            }
-            const eventDetailsRaw = await getSecureData("eventDetails");
-            const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
-            const userRaw = await getSecureData("user");
-            const user = userRaw ? JSON.parse(userRaw) : null;
-            const eventDate = eventDetails?.eventDate; // Replace with your actual selected date
-            const eventTime = '18:00'; // Replace with your actual selected time
-            const organizerId = user?._id
-            const guests = eventDetails?.guests;
-            const eventName = eventDetails?.eventName;
-            const eventType = eventDetails?.eventType;
-            const services = cart.vendors.flatMap((vendor: any) =>
-                vendor.packages.map((pkg: any) => ({
-                    vendorId: vendor.vendor._id,
-                    serviceName: pkg.packageName,
-                    price: pkg.price,
-                }))
-            );
-            console.log({ organizerId, eventDate, eventTime, services, guests, eventName, eventType });
-            const response = await postPlaceOrder({ organizerId, eventDate, eventTime, services, guests, eventName, eventType });
-            
-            if (response) {
-                Toast.show({
-                    type: 'success',
-                    text1: 'Order Placed',
-                    text2: 'Your order has been successfully placed!',
-                    position: 'bottom',
-                });
-                // Optionally, clear the cart after order is placed
-                // saveSecureData('cartData', JSON.stringify({ vendors: [] }));
-                await deleteSecureData("cartData");
-                await deleteSecureData("eventDetails");
-                router.push("/OrderSummary");
-            } else {
-                throw new Error('Failed to place order');
-            }
-        } catch (error) {
-            console.error('Error placing order:', error);
+        if (!user?._id) {
             Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: 'Failed to place order. Please try again.',
-                position: 'bottom',
+                type: "error",
+                text1: "Organizer ID Missing",
+                text2: "Please login again.",
+                position: "bottom",
             });
+            return;
         }
-    };
+
+        const storedCart = await getSecureData("cartData");
+        const cart = storedCart ? JSON.parse(storedCart) : null;
+
+        if (!cart || cart.vendors.length === 0) {
+            Toast.show({
+                type: "error",
+                text1: "Empty Cart",
+                text2: "Your cart is empty. Please add items to proceed.",
+                position: "bottom",
+            });
+            return;
+        }
+
+        const eventDetailsRaw = await getSecureData("eventDetails");
+        const eventDetails = eventDetailsRaw
+            ? JSON.parse(eventDetailsRaw)
+            : null;
+
+        const eventDate = eventDetails?.eventDate;
+        const eventTime = "18:00";
+        const organizerId = user._id;
+        const guests = eventDetails?.guests;
+        const eventName = eventDetails?.eventName;
+        const eventType = eventDetails?.eventType;
+
+        const services = cart.vendors.flatMap((vendor: any) =>
+            vendor.packages.map((pkg: any) => ({
+                vendorId: vendor.vendor._id,
+                serviceName: pkg.packageName,
+                price: pkg.price,
+            }))
+        );
+
+        console.log("ORDER PAYLOAD:", {
+            organizerId,
+            eventDate,
+            eventTime,
+            services,
+            guests,
+            eventName,
+            eventType,
+        });
+
+        const response = await postPlaceOrder({
+            organizerId,
+            eventDate,
+            eventTime,
+            services,
+            guests,
+            eventName,
+            eventType,
+        });
+
+        if (response) {
+            Toast.show({
+                type: "success",
+                text1: "Order Placed",
+                text2: "Your order has been successfully placed!",
+                position: "bottom",
+            });
+
+            await deleteSecureData("cartData");
+            await deleteSecureData("eventDetails");
+
+            router.push("/OrderSummary");
+        }
+    } catch (error) {
+        console.error("Error placing order:", error);
+
+        Toast.show({
+            type: "error",
+            text1: "Error",
+            text2: "Failed to place order. Please try again.",
+            position: "bottom",
+        });
+    }
+};
 
     if (!cartData) {
         return (
