@@ -109,29 +109,28 @@ export function FeaturedVendorsSection() {
             </Text>
 
             {/* Rating */}
-            {vendor.rating !== null && vendor.rating !== undefined && (
+            {/*{vendor.rating !== null && vendor.rating !== undefined && (
               <View style={styles.ratingRow}>
                 <Text style={styles.ratingStar}>★</Text>
                 <Text style={styles.ratingText}>
                   {Number(vendor.rating).toFixed(1)}
                 </Text>
               </View>
-            )}
-                        {/* Location */}
-            {vendor.city && (
-              <View style={styles.locationRow}>
-                <Text style={styles.locationIcon}>📍</Text>
-                <Text
-                  style={styles.vendorMeta}
-                  numberOfLines={1}
-                >
-                 {vendor.city}
-                </Text>
-              </View>
-            )}
+            )}*/}
+            <View style={styles.ratingRow}>
+              <Text style={styles.ratingStar}>
+                {vendor.rating !== null && vendor.rating !== undefined ? '★' : '☆'}
+              </Text>
+
+              <Text style={styles.ratingText}>
+                {vendor.rating !== null && vendor.rating !== undefined
+                  ? Number(vendor.rating).toFixed(1)
+                  : 'No reviews yet'}
+              </Text>
+            </View>
 
             {/* Customer Count */}
-            {vendor.customerCount > 0 && (
+            {/*{vendor.customerCount > 0 && (
               <View style={styles.locationRow}>
                 <Text style={styles.locationIcon}>👥</Text>
                 <Text
@@ -141,7 +140,15 @@ export function FeaturedVendorsSection() {
                   {vendor.customerCount} customers
                 </Text>
               </View>
-            )}
+            )}*/}
+                    <View style={styles.locationRow}>
+          <Text style={styles.locationIcon}>👥</Text>
+          <Text style={styles.vendorMeta} numberOfLines={1}>
+            {vendor.customerCount > 0
+              ? `${vendor.customerCount} customers`
+              : 'New vendor'}
+          </Text>
+        </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
