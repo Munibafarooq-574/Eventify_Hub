@@ -2,7 +2,7 @@ import getConversationMessages from "@/services/getConversationMessages";
 import getVendorContactDetails from "@/services/getVendorContactDetails";
 import getUserPresence from "@/services/getUserPresence";
 import getPinnedMessages from "@/services/getPinnedMessages";
-import { getSecureData } from "@/store";
+import { getSecureData, getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
@@ -541,8 +541,7 @@ useEffect(() => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        const rawUser = await getSecureData("user");
-        const user = rawUser ? JSON.parse(rawUser) : null;
+        const user = await getUserData();
         if (!user) throw new Error("user not found");
         userRef.current = user;
 
