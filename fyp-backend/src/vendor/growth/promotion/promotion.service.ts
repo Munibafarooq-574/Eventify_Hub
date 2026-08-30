@@ -11,12 +11,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { VendorPromotion } from '../../../schemas/vendor-promotion.schema';
+import { Review } from '../../../schemas/review.schema';
+import { VendorOrder } from '../../../schemas/vendor-order.schema';
 import { PromotionStatus, PromotionType } from './promotion.types';
 import { FeatureAccessService } from '../feature-access.service';
 import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
 
-export interface FeaturedVendorPublicEntry {
+/*export interface FeaturedVendorPublicEntry {
   promotionId: string;
   vendorId: string;
   vendorName: string;
@@ -25,8 +27,19 @@ export interface FeaturedVendorPublicEntry {
   city: string | null;
   rating: number | null;
   featuredUntil: Date;
+}*/
+export interface FeaturedVendorPublicEntry {
+  promotionId: string;
+  vendorId: string;
+  vendorName: string;
+  coverImage: string | null;
+  businessCategoryName: string | null;
+  city: string | null;
+  rating: number | null;
+  totalReviews: number;
+  customerCount: number;
+  featuredUntil: Date;
 }
-
 export interface FeaturedPackagePublicEntry {
   promotionId: string;
   vendorId: string;
@@ -43,8 +56,14 @@ export class PromotionService {
     @InjectModel(VendorPromotion.name)
     private readonly promotionModel: Model<VendorPromotion>,
 
-    @InjectModel(User.name)
+       @InjectModel(User.name)
     private readonly userModel: Model<User>,
+
+        @InjectModel(Review.name)
+    private readonly reviewModel: Model<Review>,
+
+    @InjectModel(VendorOrder.name)
+    private readonly vendorOrderModel: Model<VendorOrder>,
 
     private readonly featureAccessService: FeatureAccessService,
   ) {}
@@ -325,12 +344,12 @@ return this.promotionModel.create({
       (promotion) => promotion.vendorId,
     );
 
-    const vendors = await this.userModel
+        const vendors = await this.userModel
       .find({
         _id: { $in: vendorIds },
       })
-      .select('name coverImage city buisnessCategory rating')
-        .populate('buisnessCategory')
+      .select('name coverImage city buisnessCategory')
+      .populate('buisnessCategory')
       .lean();
 
     const vendorById = new Map(
@@ -340,16 +359,72 @@ return this.promotionModel.create({
       ]),
     );
 
+    // Average rating per vendor — computed from Review collection
+    const ratingAgg = await this.reviewModel.aggregate([
+      {
+        $match: {
+          vendorId: { $in: vendorIds.map((id) => new Types.ObjectId(id.toString())) },
+        },
+      },
+      {
+        $group: {
+          _id: '$vendorId',
+          averageRating: { $avg: '$rating' },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+        const ratingByVendor = new Map(
+      ratingAgg.map((r: any) => [r._id.toString(), r]),
+    );
+
+    // Distinct customer (organizer) count per vendor — via VendorOrder -> Order join
+    const customerAgg = await this.vendorOrderModel.aggregate([
+      {
+        $match: {
+          vendorId: { $in: vendorIds.map((id) => new Types.ObjectId(id.toString())) },
+        },
+      },
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'orderId',
+          foreignField: '_id',
+          as: 'order',
+        },
+      },
+      { $unwind: '$order' },
+      {
+        $group: {
+          _id: '$vendorId',
+          customers: { $addToSet: '$order.organizerId' },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          customerCount: { $size: '$customers' },
+        },
+      },
+    ]);
+
+    const customerCountByVendor = new Map(
+      customerAgg.map((c: any) => [c._id.toString(), c.customerCount]),
+    );
+
     return activePromotions
       .map((promo: any) => {
         const vendor = vendorById.get(
           promo.vendorId.toString(),
         );
 
-        if (!vendor) {
+                if (!vendor) {
           // Vendor deleted/deactivated — skip.
           return null;
         }
+
+        const ratingInfo = ratingByVendor.get(vendor._id.toString());
 
         return {
           promotionId: promo._id.toString(),
@@ -359,6 +434,11 @@ return this.promotionModel.create({
           businessCategoryName:
             vendor.buisnessCategory?.name || null,
           city: vendor.city || null,
+          rating: ratingInfo
+            ? Math.round(ratingInfo.averageRating * 10) / 10
+            : null,
+          totalReviews: ratingInfo ? ratingInfo.totalReviews : 0,
+          customerCount: customerCountByVendor.get(vendor._id.toString()) || 0,
           featuredUntil: promo.endDate,
         };
       })

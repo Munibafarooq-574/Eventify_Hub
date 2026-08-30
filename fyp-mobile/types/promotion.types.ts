@@ -42,6 +42,8 @@ export interface FeaturedVendorPublicEntry {
   businessCategoryName: string | null;
   city: string | null;
     rating: number | null;
+    totalReviews: number;
+  customerCount: number;
     featuredUntil: string;
 }
 

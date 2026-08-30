@@ -117,8 +117,7 @@ export function FeaturedVendorsSection() {
                 </Text>
               </View>
             )}
-
-            {/* Location */}
+                        {/* Location */}
             {vendor.city && (
               <View style={styles.locationRow}>
                 <Text style={styles.locationIcon}>📍</Text>
@@ -127,6 +126,19 @@ export function FeaturedVendorsSection() {
                   numberOfLines={1}
                 >
                  {vendor.city}
+                </Text>
+              </View>
+            )}
+
+            {/* Customer Count */}
+            {vendor.customerCount > 0 && (
+              <View style={styles.locationRow}>
+                <Text style={styles.locationIcon}>👥</Text>
+                <Text
+                  style={styles.vendorMeta}
+                  numberOfLines={1}
+                >
+                  {vendor.customerCount} customers
                 </Text>
               </View>
             )}

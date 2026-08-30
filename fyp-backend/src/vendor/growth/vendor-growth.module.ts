@@ -65,6 +65,9 @@ import {
   VendorOrderSchema,
 } from 'src/schemas/vendor-order.schema';
 
+// Review schema (for average rating on Featured Vendors)
+import { Review, ReviewSchema } from 'src/schemas/review.schema';
+
 // Vendor module
 import { VendorModule } from 'src/vendor/vendor.module';
 
@@ -101,13 +104,19 @@ import { VendorModule } from 'src/vendor/vendor.module';
         schema: UserSchema,
       },
 
-      // Vendor Orders
+            // Vendor Orders
       {
         name: VendorOrder.name,
         schema: VendorOrderSchema,
       },
-    ]),
 
+      // Reviews
+      {
+        name: Review.name,
+        schema: ReviewSchema,
+      },
+    ]),
+    
     // Provides VendorAnalyticsService used by
     // BadgeService and AnalyticsService.
     VendorModule,
