@@ -50,11 +50,12 @@ export function FeaturedPackagesSection() {
     return null;
   }
 
-  const handlePackagePress = (pkg: FeaturedPackagePublicEntry) => {
+ const handlePackagePress = (pkg: FeaturedPackagePublicEntry) => {
   router.push({
     pathname: '/vendorprofiledetails',
     params: {
       id: pkg.vendorId,
+      packageId: pkg.packageId,   // NEW
     },
   });
 };
@@ -100,6 +101,16 @@ export function FeaturedPackagesSection() {
 
             <Text style={styles.price}>
               Rs. {Number(pkg.price || 0).toLocaleString()}
+            </Text>
+            <Text style={styles.rating}>
+              {pkg.rating !== null
+                ? `⭐ ${pkg.rating.toFixed(1)} (${pkg.totalReviews})`
+                : 'No reviews yet'}
+            </Text>
+            <Text style={styles.orders}>
+              {pkg.orderCount > 0
+                ? `${pkg.orderCount} orders`
+                : 'No orders yet'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -189,5 +200,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginHorizontal: 8,
   },
+  rating: { fontSize: 11, color: COLORS.muted, marginTop: 3, marginHorizontal: 8 },
+orders: { fontSize: 11, color: COLORS.muted, marginHorizontal: 8 },
 });
 

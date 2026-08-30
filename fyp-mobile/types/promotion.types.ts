@@ -55,4 +55,7 @@ export interface FeaturedPackagePublicEntry {
   packageId: string;
   packageName: string;
   price: number;
+  rating: number | null;
+  totalReviews: number;
+  orderCount: number;
 }

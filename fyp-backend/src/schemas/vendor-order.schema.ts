@@ -15,6 +15,9 @@ export class VendorOrder extends Document {
     @Prop({ required: true })
     price: number;
 
+    @Prop({ type: String, default: null })  //new add
+    packageId: string | null;
+
     @Prop({ default: 'pending' })
     status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'completed';
 

@@ -34,13 +34,17 @@ import Toast from 'react-native-toast-message';
 
 
 const VendorDetailsScreen: React.FC = () => {
+    const { id, packageId } = useGlobalSearchParams();
   const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
   const [activePackage, setActivePackage] = useState<number | null>(null);
+  useEffect(() => {
+  if (typeof packageId === 'string' && packageId) {
+    setActiveTab('Packages');
+  }
+}, [packageId]);
   const [activeReviewTab, setActiveReviewTab] = useState<'Eventify' | 'Google'>('Eventify');
   const [vendorData, setVendorData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const { id } = useGlobalSearchParams();
-
   const [rating, setRating] = useState<number | null>(null);
 
 const [newReview, setNewReview] = useState('');
@@ -464,7 +468,13 @@ const handleSubmitReview = async () => {
       try {
         const response = await axios.get(`https://eventify-hub.onrender.com/vendor?userId=${id}`);
         setVendorData(response.data);
-        setActivePackage(response.data.packages?.[0]?._id || null); // Set the first package as active by default
+        // Agar packageId param se aaya hai to wahi select karo, warna pehla package
+        const targetPackageId =
+          typeof packageId === 'string' && packageId
+            ? packageId
+            : response.data.packages?.[0]?._id || null;
+
+        setActivePackage(targetPackageId);
       } catch (error) {
         console.error('Error fetching vendor data:', error);
       } finally {

@@ -13,6 +13,9 @@ export class Reviews extends Document {
   @Prop()
   user_id: string; 
 
+  @Prop({ type: String, default: null }) //new add
+  packageId: string | null;
+
   @Prop()
   comments: string; 
 
