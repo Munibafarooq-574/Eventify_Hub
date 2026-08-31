@@ -56,6 +56,24 @@ const PROCESSING_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 
+// VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
+const mapVendorStatus = (status: string) => (status === "accepted" ? "confirmed" : status);
+
+// IMPORTANT: don't use order.status here — that's the PARENT order's
+// aggregate status across ALL vendors on the order, and can differ from
+// what THIS vendor's own service actually is (e.g. this vendor is
+// completed/cancelled but another vendor on the same order is still
+// active, so the parent flips to "confirmed").
+const getVendorStatus = (order: any) => {
+    const vOrders = order.vendorOrders || [];
+    if (vOrders.length === 0) return order.status; // fallback safety
+    const statuses = vOrders.map((v: any) => mapVendorStatus(v.status));
+    if (statuses.every((s: string) => s === "completed")) return "completed";
+    if (statuses.every((s: string) => s === "cancelled")) return "cancelled";
+    if (statuses.some((s: string) => s === "confirmed" || s === "completed")) return "confirmed";
+    return "pending";
+};
+
 type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled";
 
 const OrderSummary = () => {
@@ -87,10 +105,10 @@ const OrderSummary = () => {
     // (e.g. after Mark Processing / Mark Completed / Delete), so the numbers
     // on the summary cards increment/decrement instantly.
         const orderStats = useMemo(() => {
-        const pending = orders.filter((o) => o.status === PENDING_STATUS).length;
-        const processing = orders.filter((o) => o.status === PROCESSING_STATUS).length;
-        const completed = orders.filter((o) => o.status === COMPLETED_STATUS).length;
-        const cancelled = orders.filter((o) => o.status === CANCELLED_STATUS).length;
+        const pending = orders.filter((o) => getVendorStatus(o) === PENDING_STATUS).length;
+        const processing = orders.filter((o) => getVendorStatus(o) === PROCESSING_STATUS).length;
+        const completed = orders.filter((o) => getVendorStatus(o) === COMPLETED_STATUS).length;
+        const cancelled = orders.filter((o) => getVendorStatus(o) === CANCELLED_STATUS).length;
         return {
             totalOrders: orders.length, // matches dashboard's total (includes every status)
             pending,
@@ -123,10 +141,10 @@ const OrderSummary = () => {
         const filteredOrders = useMemo(() => {
         return orders.filter((order) => {
             if (selectedFilter === "All") return true;
-            if (selectedFilter === "Pending") return order.status === PENDING_STATUS;
-            if (selectedFilter === "Processing") return order.status === PROCESSING_STATUS;
-            if (selectedFilter === "Completed") return order.status === COMPLETED_STATUS;
-            if (selectedFilter === "Cancelled") return order.status === CANCELLED_STATUS;
+            if (selectedFilter === "Pending") return getVendorStatus(order) === PENDING_STATUS;
+            if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
+            if (selectedFilter === "Completed") return getVendorStatus(order) === COMPLETED_STATUS;
+            if (selectedFilter === "Cancelled") return getVendorStatus(order) === CANCELLED_STATUS;
             return true;
         });
     }, [orders, selectedFilter]);
@@ -136,26 +154,65 @@ const OrderSummary = () => {
         setOrders(prevOrders => prevOrders.map(order => order._id === id ? { ...order, status: "cancelled" } : order));
         alert("Order Cancelled");
     };*/
-
-    const handleDelete = async (id: string) => {
+   
+   const handleDelete = async (
+    orderId: string,
+    vendorOrderId: string
+) => {
     try {
-        await patchUpdateVendorOrderStatus(id, "cancelled");
+        console.log("Cancelling Main Order ID:", orderId);
+        console.log("Cancelling Vendor Order ID:", vendorOrderId);
 
+        if (!vendorOrderId) {
+            alert("Vendor order ID not found");
+            return;
+        }
+
+        // 1. Backend par vendor order cancel karo
+        await patchUpdateVendorOrderStatus(
+            vendorOrderId,
+            "cancelled"
+        );
+
+        // 2. Local state bhi update karo
         setOrders(prevOrders =>
-            prevOrders.map(order =>
-                order._id === id
-                    ? { ...order, status: "cancelled" }
-                    : order
-            )
+            prevOrders.map(order => {
+                if (order._id !== orderId) {
+                    return order;
+                }
+
+                return {
+                    ...order,
+
+                    // IMPORTANT:
+                    // Parent order ka status bhi update karo
+                    status: "cancelled",
+
+                    // Vendor order ka status bhi update karo
+                    vendorOrders: order.vendorOrders?.map(
+                        (vendorOrder: any) =>
+                            vendorOrder._id === vendorOrderId
+                                ? {
+                                    ...vendorOrder,
+                                    status: "cancelled",
+                                }
+                                : vendorOrder
+                    ),
+                };
+            })
         );
 
         alert("Order Cancelled");
+
     } catch (error) {
-        console.error("Error cancelling order:", error);
+        console.error(
+            "Error cancelling vendor order:",
+            error
+        );
+
         alert("Failed to cancel order");
     }
 };
-
     /*const mark = async (id: string, status: "completed" | "pending" | "confirmed" | "cancelled") => {
         console.log(id);
         await patchUpdateOrderStatus(id, status);
@@ -165,28 +222,62 @@ const OrderSummary = () => {
         alert("Order Updated");
     };*/
 
-    const mark = async (
-    id: string,
+   const mark = async (
+    orderId: string,
+    vendorOrderId: string,
     status: "completed" | "pending" | "confirmed" | "cancelled"
 ) => {
     try {
-        console.log("Vendor Order ID:", id);
+        console.log("Main Order ID:", orderId);
+        console.log("Vendor Order ID:", vendorOrderId);
         console.log("New Status:", status);
 
-        await patchUpdateVendorOrderStatus(id, status);
+        if (!vendorOrderId) {
+            alert("Vendor order ID not found");
+            return;
+        }
 
+        // Backend: update vendor order
+        await patchUpdateVendorOrderStatus(
+            vendorOrderId,
+            status
+        );
+
+        // Frontend: update the order shown on screen
         setOrders(prevOrders =>
-            prevOrders.map(order =>
-                order._id === id
-                    ? { ...order, status }
-                    : order
-            )
+            prevOrders.map(order => {
+                if (order._id !== orderId) {
+                    return order;
+                }
+
+                return {
+                    ...order,
+
+                    // THIS IS THE IMPORTANT FIX
+                    status: status,
+
+                    vendorOrders: order.vendorOrders?.map(
+                        (vendorOrder: any) =>
+                            vendorOrder._id === vendorOrderId
+                                ? {
+                                      ...vendorOrder,
+                                      status: status,
+                                  }
+                                : vendorOrder
+                    ),
+                };
+            })
         );
 
         alert("Order Updated");
+
     } catch (error) {
-        console.error("Error updating order status:", error);
-        alert("Failed to update order");
+        console.error(
+            "Error updating vendor order status:",
+            error
+        );
+
+        alert("Failed to update order status");
     }
 };
     // Handler for summary card clicks
@@ -346,7 +437,7 @@ const OrderSummary = () => {
                                 onPress={() => toggleExpand(item._id)}
                                 style={styles.orderCard}
                             >
-                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
+                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(getVendorStatus(item)) }]} />
                                 <View style={styles.orderInfo}>
                                     <View style={styles.orderCardHeader}>
                                         <View style={styles.eventIconWrap}>
@@ -357,7 +448,7 @@ const OrderSummary = () => {
                                             <Text style={styles.orderName}>{item.organizerId?.name}</Text>
                                         </View>
                                         <View style={styles.statusBadge}>
-                                            <Text style={styles.statusBadgeText}>{item.status}</Text>
+                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item)}</Text>
                                         </View>
                                         <Ionicons
                                             name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -449,7 +540,7 @@ const OrderSummary = () => {
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {item.status}</Text>
+                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item)}</Text>
                                                     </View>
                                                 )}
 
@@ -473,11 +564,16 @@ const OrderSummary = () => {
                                     </View>
 
                                                                         <View style={styles.actionButtons}>
-                                        {item.status !== "cancelled" && item.status !== "completed" && (
+                                        {getVendorStatus(item) !== "cancelled" && getVendorStatus(item) !== "completed" && (
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
                                                // onPress={() => handleDelete(item._id)}
-                                               onPress={() => handleDelete(item)}
+                                            onPress={() =>
+                                        handleDelete(
+                                            item._id,
+                                            item.vendorOrders?.[0]?._id
+                                        )
+                                    }
                                             >
                                                 <Ionicons name="close-circle-outline" size={14} color="#fff" />
                                                 <Text style={styles.buttonText}>Cancel Order</Text>
@@ -485,11 +581,17 @@ const OrderSummary = () => {
                                         )}
 
                                         {item.status !== "completed" && item.status !== "cancelled" && (
-                                            item.status === "pending" ? (
+                                            getVendorStatus(item) === "pending" ? (
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
                                                    // onPress={() => mark(item._id, "confirmed")}
-                                                   onPress={() => mark(item, "confirmed")}
+                                                   onPress={() =>
+                                                        mark(
+                                                            item._id,
+                                                            item.vendorOrders?.[0]?._id,
+                                                            "confirmed"
+                                                        )
+                                                    }
                                                 >
                                                     <Ionicons name="time-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Processing</Text>
@@ -498,7 +600,13 @@ const OrderSummary = () => {
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
                                                     //onPress={() => mark(item._id, "completed")}
-                                                    onPress={() => mark(item, "completed")}
+                                                    onPress={() =>
+                                                    mark(
+                                                        item._id,
+                                                        item.vendorOrders?.[0]?._id,
+                                                        "completed"
+                                                    )
+                                                }
                                                 >
                                                     <Ionicons name="checkmark-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Completed</Text>
