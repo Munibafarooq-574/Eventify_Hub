@@ -6,12 +6,13 @@
 // service is the only thing that decides who has one.
 
 import { Injectable } from '@nestjs/common';
+import { Types } from 'mongoose'; // ADD this import /\
 import { VendorAnalyticsService } from 'src/vendor/vendor-analytics.service';
 import { PromotionService } from '../promotion/promotion.service';
 import { FeatureAccessService } from '../feature-access.service';
 import { FeatureKey } from '../subscription/subscription.types';
 import { BADGE_CONFIG } from './badge-config';
-import { BADGE_DEFINITIONS, BadgeKey, VendorBadgeResult } from './badge.types';
+import { BADGE_DEFINITIONS, BadgeKey, VendorBadgeResult,VendorBadgeSummary,  } from './badge.types';
 
 @Injectable()
 export class BadgeService {
@@ -63,5 +64,29 @@ export class BadgeService {
   async getEarnedVendorBadges(vendorId: string): Promise<VendorBadgeResult[]> {
     const all = await this.getVendorBadges(vendorId);
     return all.filter((b) => b.earned);
+  }
+
+   async getBadgeSummariesForVendors(
+    vendorIds: string[],
+  ): Promise<VendorBadgeSummary[]> {
+    const uniqueIds = [...new Set(vendorIds)].filter((id) =>
+      Types.ObjectId.isValid(id),
+    );
+
+    return Promise.all(
+      uniqueIds.map(async (vendorId) => {
+        try {
+          const earnedBadges = await this.getEarnedVendorBadges(vendorId);
+          return {
+            vendorId,
+            earnedBadges,
+            hasBadges: earnedBadges.length > 0,
+          };
+        } catch {
+          // One bad/missing vendorId must never break the whole search list.
+          return { vendorId, earnedBadges: [], hasBadges: false };
+        }
+      }),
+    );
   }
 }

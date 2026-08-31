@@ -1,4 +1,6 @@
 import searchVendors from '@/services/searchVendors';
+import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
+import { VendorBadgeSummary } from '@/types/badge.types';
 import { getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -29,16 +31,55 @@ const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [badgeMap, setBadgeMap] = useState<Record<string, VendorBadgeSummary>>({});
 
-  const handleSearch = async (text: string) => {
+  /*const handleSearch = async (text: string) => {
     if (text.trim().length < 2) return;
 
     const results = await searchVendors(text);
     console.log(results);
     setResults(results);
     setShowDropdown(true);
-  };
+  };*/
 
+  const handleSearch = async (text: string) => {
+  if (text.trim().length < 2) {
+    setResults([]);
+    setBadgeMap({});
+    setShowDropdown(false);
+    return;
+  }
+
+  const results = await searchVendors(text);
+  console.log(results);
+
+  setResults(results);
+  setShowDropdown(true);
+
+  try {
+    const ids = results
+      .map((item: any) => item._id)
+      .filter(Boolean);
+
+    if (ids.length === 0) {
+      setBadgeMap({});
+      return;
+    }
+
+    const summaries = await getVendorBadgesBulk(ids);
+
+    setBadgeMap(
+      Object.fromEntries(
+        summaries.map((summary) => [summary.vendorId, summary])
+      )
+    );
+  } catch (error) {
+    console.error('Badge lookup failed:', error);
+
+    // Badge failure should never break vendor search
+    setBadgeMap({});
+  }
+};
 
   useEffect(() => {
     fetchUsername(); // Fetch username on component mount
@@ -159,12 +200,29 @@ const Header: React.FC = () => {
                     {item.name ? item.name.charAt(0).toUpperCase() : '?'}
                   </Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                {/*<View style={{ flex: 1 }}>
                   <Text style={styles.dropdownName}>{item.name}</Text>
                   {!!item.contactDetails?.brandName && (
                     <Text style={styles.dropdownBrand}>{item.contactDetails?.brandName}</Text>
                   )}
+                </View>*/}
+                          <View style={{ flex: 1 }}>
+            <View style={styles.dropdownNameRow}>
+              <Text style={styles.dropdownName}>{item.name}</Text>
+
+              {badgeMap[item._id]?.hasBadges && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeIcon}>🏅</Text>
                 </View>
+              )}
+            </View>
+
+            {!!item.contactDetails?.brandName && (
+              <Text style={styles.dropdownBrand}>
+                {item.contactDetails?.brandName}
+              </Text>
+            )}
+          </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
               </TouchableOpacity>
             ))}
@@ -246,6 +304,24 @@ searchInput: {
     fontWeight: '600',
     color: COLORS.textDark,
   },
+  dropdownNameRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+
+badgeDot: {
+  backgroundColor: COLORS.bg,
+  borderRadius: 8,
+  paddingHorizontal: 4,
+  paddingVertical: 1,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+},
+
+badgeIcon: {
+  fontSize: 10,
+},
   dropdownBrand: {
     fontSize: 12,
     color: COLORS.textMuted,

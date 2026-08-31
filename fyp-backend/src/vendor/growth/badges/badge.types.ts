@@ -57,3 +57,10 @@ export interface VendorBadgeResult {
   earned: boolean;
   howToEarn: string;
 }
+
+//add new
+export interface VendorBadgeSummary {
+  vendorId: string;
+  earnedBadges: VendorBadgeResult[];
+  hasBadges: boolean;
+}

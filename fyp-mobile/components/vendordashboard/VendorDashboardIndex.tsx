@@ -1,6 +1,7 @@
 import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
+import { VendorBadgeChips } from "../VendorFeature/VendorBadgeChips";
 import { VendorAnalytics } from "@/types/vendorAnalytics";
 import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -351,6 +352,35 @@ if (!user?._id) {
                     </View>
                 )}
 
+
+                {/* ---------- Vendor Badges ---------- */}
+                    <View style={styles.sectionContainer}>
+                        <View style={styles.statisticsHeader}>
+                            <View>
+                                <Text style={styles.sectionTitle}>Your Badges</Text>
+                                <Text style={styles.sectionSubtitle}>
+                                    Achievements you've earned
+                                </Text>
+                            </View>
+                        </View>
+
+                        {vendorId ? (
+                            <View
+                                style={{
+                                    backgroundColor: "#fff",
+                                    borderRadius: 16,
+                                    padding: 14,
+                                    ...cardShadow(0.05),
+                                }}
+                            >
+                                <VendorBadgeChips
+                                    vendorId={vendorId}
+                                    showEmptyState
+                                    emptyStateText="No badges earned yet — keep growing to unlock badges!"
+                                />
+                            </View>
+                        ) : null}
+                    </View>
                 {/* ---------- Revenue Overview ---------- */}
                 <View style={styles.sectionContainer}>
                     {analyticsLoading ? (

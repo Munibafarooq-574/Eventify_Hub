@@ -52,7 +52,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react-native';
-
+import { VendorBadgeChips } from '../VendorFeature/VendorBadgeChips';
 import { getVendorSubscription } from '../../services/getVendorSubscription';
 import { getVendorAnalyticsSummary, VendorAnalyticsSummary } from '../../services/getVendorAnalyticsSummary';
 import { SubscriptionPlan, VendorSubscription } from '../../types/subscription.types';
@@ -370,6 +370,35 @@ export default function VendorGrowthScreen() {
           </View>
         )}
 
+                  {/* Your Badges */}
+          <Text style={styles.sectionTitle}>Your Badges</Text>
+
+          <View style={styles.card}>
+            <VendorBadgeChips
+              vendorId={vendorIdValue ?? ''}
+              showEmptyState
+            />
+
+            <TouchableOpacity
+              style={{ marginTop: 12 }}
+              onPress={() =>
+                router.push({
+                  pathname: '/vendorbadgesscreen',
+                  params: { vendorId: vendorIdValue },
+                })
+              }
+            >
+              <Text
+                style={{
+                  color: COLORS.primary,
+                  fontWeight: '700',
+                  fontSize: 13,
+                }}
+              >
+                View all badges →
+              </Text>
+            </TouchableOpacity>
+          </View>
         {/* Grow Your Business */}
         <Text style={styles.sectionTitle}>Grow Your Business</Text>
         <View style={styles.card}>

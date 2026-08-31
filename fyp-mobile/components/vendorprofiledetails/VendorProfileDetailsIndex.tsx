@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import ReviewCard from '@/components/Review/ReviewCard';
 import MediaViewerModal from '@/components/Review/MediaViewerModal';
+import VendorBadgesSection from './VendorBadgesSection';
 import {
   ActivityIndicator,
   Image,
@@ -588,18 +589,24 @@ const handleSubmitReview = async () => {
         <View style={styles.detailsContainer}>
           {/* Top Row: Name and Price 
              add test id */}
-          <View style={styles.rowContainer}>
+                  <View style={styles.rowContainer}>
+          <View style={{ flex: 1 }}>
             <Text testID="vendor-name" style={styles.name}>
               {vendorData.name}
             </Text>
-            <View style={styles.priceContainer}>
-              <Text testID="vendor-price" style={styles.price}>
-                Starting Price: Rs.
-                {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
-              </Text>
-              <Text style={styles.perHead}>Per head</Text>
-            </View>
+
+            <VendorBadgesSection vendorId={vendorData._id} />
           </View>
+
+          <View style={styles.priceContainer}>
+            <Text testID="vendor-price" style={styles.price}>
+              Starting Price: Rs.
+              {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
+            </Text>
+
+            <Text style={styles.perHead}>Per head</Text>
+          </View>
+        </View>
           {/*add test id */}
           <Text testID="vendor-address" style={styles.address}>
             {vendorData.contactDetails.officialAddress}
@@ -653,6 +660,7 @@ const handleSubmitReview = async () => {
           <Text style={styles.detailValue}>
             {vendorData?.BusinessDetails?.description || "N/A"}
           </Text>
+          
         </View>
       )}
 

@@ -1,4 +1,5 @@
-//fyp-mobile/types/badge.types.ts
+
+// fyp-mobile/types/badge.types.ts
 //
 // Mirrors fyp-backend/src/vendor/growth/badges/badge.types.ts
 
@@ -17,3 +18,10 @@ export interface VendorBadge {
   earned: boolean;
   howToEarn: string;
 }
+
+export interface VendorBadgeSummary {
+  vendorId: string;
+  earnedBadges: VendorBadge[];
+  hasBadges: boolean;
+}
+
