@@ -589,28 +589,31 @@ const handleSubmitReview = async () => {
         <View style={styles.detailsContainer}>
           {/* Top Row: Name and Price 
              add test id */}
-                  <View style={styles.rowContainer}>
-          <View style={{ flex: 1 }}>
-            <Text testID="vendor-name" style={styles.name}>
-              {vendorData.name}
-            </Text>
+                {/* Vendor Name */}
+<Text testID="vendor-name" style={styles.name}>
+  {vendorData.name}
+</Text>
 
-            <VendorBadgesSection vendorId={vendorData._id} />
-          </View>
+{/* Vendor Address */}
+<Text testID="vendor-address" style={styles.address}>
+  {vendorData.contactDetails.officialAddress}
+</Text>
 
-          <View style={styles.priceContainer}>
-            <Text testID="vendor-price" style={styles.price}>
-              Starting Price: Rs.
-              {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
-            </Text>
+{/* Starting Price */}
+<View style={styles.priceContainer}>
+  <Text testID="vendor-price" style={styles.price}>
+    Starting Price: Rs.
+    {vendorData?.BusinessDetails?.minimumPrice || "N/A"}/-
+  </Text>
 
-            <Text style={styles.perHead}>Per head</Text>
-          </View>
-        </View>
-          {/*add test id */}
-          <Text testID="vendor-address" style={styles.address}>
-            {vendorData.contactDetails.officialAddress}
-          </Text>
+  <Text style={styles.perHead}>
+    Per head
+  </Text>
+</View>
+
+{/* Vendor Badges - after all basic vendor information */}
+<VendorBadgesSection vendorId={vendorData._id} />
+          
 
           {/* Photos Section */}
           <View style={styles.photosSection}>

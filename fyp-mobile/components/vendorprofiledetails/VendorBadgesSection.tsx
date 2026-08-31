@@ -1,6 +1,14 @@
-// fyp-mobile/components/vendorprofiledetails/VendorBadgesSection.tsx — NEW FILE
+
+// fyp-mobile/components/vendorprofiledetails/VendorBadgesSection.tsx
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+
 import { getVendorBadges } from '../../services/getVendorBadges';
 import { VendorBadge } from '../../types/badge.types';
 
@@ -10,79 +18,169 @@ const COLORS = {
   text: '#1F2937',
   muted: '#6B7280',
   border: '#ECE7EA',
-  locked: '#9CA3AF',
-  lockedBg: '#F3F4F6',
 };
 
-export default function VendorBadgesSection({ vendorId }: { vendorId: string }) {
+export default function VendorBadgesSection({
+  vendorId,
+}: {
+  vendorId: string;
+}) {
   const [badges, setBadges] = useState<VendorBadge[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (!vendorId) { setLoading(false); return; }
+
+    if (!vendorId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
 
     getVendorBadges(vendorId)
-      .then((data) => { if (!cancelled) setBadges(data); })
-      .catch((e) => { if (!cancelled) setError(e?.message || 'Failed to load badges'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .then((data) => {
+        if (!cancelled) {
+          setBadges(data || []);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          console.error('Failed to load vendor badges:', e);
+          setError(e?.message || 'Failed to load badges');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [vendorId]);
 
+  // Loading state
   if (loading) {
     return (
       <View style={styles.loadingRow}>
-        <ActivityIndicator size="small" color={COLORS.primary} />
+        <ActivityIndicator
+          size="small"
+          color={COLORS.primary}
+        />
       </View>
     );
   }
 
+  // Error state
   if (error) {
-    return <Text style={styles.errorText}>Badges unavailable right now.</Text>;
+    return (
+      <Text style={styles.errorText}>
+        Badges unavailable right now.
+      </Text>
+    );
   }
 
-  const earnedCount = badges.filter((b) => b.earned).length;
+  // Only earned badges are shown.
+  const earnedBadges = badges.filter(
+    (badge) => badge.earned === true
+  );
 
-  if (badges.length === 0) {
-    return null; // no badge system configured — don't show an empty section
+  // If no badges are earned, show nothing.
+  if (earnedBadges.length === 0) {
+    return null;
   }
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.sectionTitle}>Badges ({earnedCount}/{badges.length})</Text>
-      {badges.map((badge) => (
-        <View key={badge.key} style={[styles.row, badge.earned && styles.rowEarned]}>
-          <View style={[styles.iconWrap, badge.earned ? styles.iconEarned : styles.iconLocked]}>
-            <Text style={{ fontSize: 20, opacity: badge.earned ? 1 : 0.4 }}>{badge.emoji}</Text>
+      <Text style={styles.sectionTitle}>
+        Badges ({earnedBadges.length})
+      </Text>
+
+      <View style={styles.badgesContainer}>
+        {earnedBadges.map((badge) => (
+          <View
+            key={badge.key}
+            style={styles.badgeItem}
+          >
+            <View style={styles.iconWrap}>
+              <Text style={styles.badgeEmoji}>
+                {badge.emoji}
+              </Text>
+            </View>
+
+            <Text style={styles.label}>
+              {badge.label}
+            </Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.label, !badge.earned && styles.labelLocked]}>{badge.label}</Text>
-            <Text style={styles.howTo}>{badge.howToEarn}</Text>
-          </View>
-          {badge.earned && <Text style={styles.earnedTag}>Earned</Text>}
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginTop: 16 },
-  loadingRow: { paddingVertical: 12, alignItems: 'center' },
-  errorText: { fontSize: 12.5, color: COLORS.muted },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, color: '#333' },
-  row: {
-    flexDirection: 'row', alignItems: 'center', padding: 10,
-    borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: 8, opacity: 0.75,
+  wrap: {
+    marginTop: 8,
+    marginBottom: 8,
   },
-  rowEarned: { opacity: 1, borderColor: COLORS.primary },
-  iconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  iconEarned: { backgroundColor: COLORS.primaryLight },
-  iconLocked: { backgroundColor: COLORS.lockedBg },
-  label: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  labelLocked: { color: COLORS.muted },
-  howTo: { fontSize: 11.5, color: COLORS.muted, marginTop: 2 },
-  earnedTag: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
+
+  loadingRow: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+
+  errorText: {
+    fontSize: 12.5,
+    color: COLORS.muted,
+    marginTop: 8,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+
+  badgesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  badgeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+
+  iconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primaryLight,
+    marginRight: 6,
+  },
+
+  badgeEmoji: {
+    fontSize: 17,
+  },
+
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
 });
+
