@@ -343,8 +343,37 @@ return this.promotionModel.create({
       return [];
     }
 
-    const vendorIds = activePromotions.map(
+    /*const vendorIds = activePromotions.map(
       (promotion) => promotion.vendorId,
+    );
+
+        const vendors = await this.userModel
+      .find({
+        _id: { $in: vendorIds },
+      })*/
+         const vendorIds = activePromotions.map(
+      (promotion) => promotion.vendorId,
+    );
+
+    // Guard: a promotion row can outlive the subscription that created it
+    // (vendor cancels/downgrades before the 7/15/30-day campaign's endDate
+    // naturally arrives). Re-check current plan here so a vendor stops
+    // appearing as Featured the moment they drop to Free, instead of
+    // waiting for the promotion row to expire on its own.
+    const eligibilityChecks = await Promise.all(
+      vendorIds.map(async (id) => {
+        const idStr = id.toString();
+        const allowed = await this.featureAccessService.canUseFeature(
+          idStr,
+          FeatureKey.FEATURED_VENDOR,
+        );
+        return [idStr, allowed] as const;
+      }),
+    );
+    const eligibleVendorIds = new Set(
+      eligibilityChecks
+        .filter(([, allowed]) => allowed)
+        .map(([idStr]) => idStr),
     );
 
         const vendors = await this.userModel
@@ -422,12 +451,26 @@ return this.promotionModel.create({
           promo.vendorId.toString(),
         );
 
-                if (!vendor) {
+             /*   if (!vendor) {
           // Vendor deleted/deactivated — skip.
           return null;
         }
 
+        const ratingInfo = ratingByVendor.get(vendor._id.toString());*/
+
+                        if (!vendor) {
+          // Vendor deleted/deactivated — skip.
+          return null;
+        }
+
+        if (!eligibleVendorIds.has(vendor._id.toString())) {
+          // Plan no longer includes Featured Vendor (downgraded/cancelled)
+          // even though this promotion row is still technically "active".
+          return null;
+        }
+
         const ratingInfo = ratingByVendor.get(vendor._id.toString());
+      
 
         return {
           promotionId: promo._id.toString(),
@@ -548,7 +591,7 @@ return this.promotionModel.create({
   // making a database query for every search result.
   // ---------------------------------------------------------------
 
-  async getActiveFeaturedVendorIds(): Promise<Set<string>> {
+  /*async getActiveFeaturedVendorIds(): Promise<Set<string>> {
     const now = new Date();
 
     const promotions = await this.promotionModel
@@ -565,6 +608,41 @@ return this.promotionModel.create({
         (promotion: any) =>
           promotion.vendorId.toString(),
       ),
+    );
+  }*/
+
+      async getActiveFeaturedVendorIds(): Promise<Set<string>> {
+    const now = new Date();
+
+    const promotions = await this.promotionModel
+      .find({
+        type: PromotionType.FEATURED_VENDOR,
+        status: PromotionStatus.ACTIVE,
+        endDate: { $gt: now },
+      })
+      .select('vendorId')
+      .lean();
+
+    // Same guard as getActiveFeaturedVendors(): a promotion row can
+    // outlive the subscription that created it (vendor cancels/downgrades
+    // before the campaign's own endDate). Re-check current plan so
+    // Discovery/search doesn't keep boosting a vendor who dropped to Free.
+    const candidateIds = promotions.map((p: any) => p.vendorId.toString());
+
+    const eligibilityChecks = await Promise.all(
+      candidateIds.map(async (idStr) => {
+        const allowed = await this.featureAccessService.canUseFeature(
+          idStr,
+          FeatureKey.FEATURED_VENDOR,
+        );
+        return [idStr, allowed] as const;
+      }),
+    );
+
+    return new Set(
+      eligibilityChecks
+        .filter(([, allowed]) => allowed)
+        .map(([idStr]) => idStr),
     );
   }
 
