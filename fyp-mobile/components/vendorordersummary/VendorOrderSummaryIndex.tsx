@@ -1,7 +1,9 @@
 import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorOrders from "@/services/getVendorOrders";
-import patchUpdateOrderStatus from "@/services/patchUpdateOrderStatus";
+import patchUpdateOrderStatus, {
+    patchUpdateVendorOrderStatus,
+} from "@/services/patchUpdateOrderStatus";
 import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -129,21 +131,64 @@ const OrderSummary = () => {
         });
     }, [orders, selectedFilter]);
 
-    const handleDelete = async (id: string) => {
+    /*const handleDelete = async (id: string) => {
         await patchUpdateOrderStatus(id, "cancelled");
         setOrders(prevOrders => prevOrders.map(order => order._id === id ? { ...order, status: "cancelled" } : order));
         alert("Order Cancelled");
-    };
+    };*/
 
-    const mark = async (id: string, status: "completed" | "pending" | "confirmed" | "cancelled") => {
+    const handleDelete = async (id: string) => {
+    try {
+        await patchUpdateVendorOrderStatus(id, "cancelled");
+
+        setOrders(prevOrders =>
+            prevOrders.map(order =>
+                order._id === id
+                    ? { ...order, status: "cancelled" }
+                    : order
+            )
+        );
+
+        alert("Order Cancelled");
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        alert("Failed to cancel order");
+    }
+};
+
+    /*const mark = async (id: string, status: "completed" | "pending" | "confirmed" | "cancelled") => {
         console.log(id);
         await patchUpdateOrderStatus(id, status);
         setOrders(prevOrders =>
             prevOrders.map(order => order._id === id ? { ...order, status: status } : order)
         );
         alert("Order Updated");
-    };
+    };*/
 
+    const mark = async (
+    id: string,
+    status: "completed" | "pending" | "confirmed" | "cancelled"
+) => {
+    try {
+        console.log("Vendor Order ID:", id);
+        console.log("New Status:", status);
+
+        await patchUpdateVendorOrderStatus(id, status);
+
+        setOrders(prevOrders =>
+            prevOrders.map(order =>
+                order._id === id
+                    ? { ...order, status }
+                    : order
+            )
+        );
+
+        alert("Order Updated");
+    } catch (error) {
+        console.error("Error updating order status:", error);
+        alert("Failed to update order");
+    }
+};
     // Handler for summary card clicks
     const handleSummaryCardClick = (filterType: FilterType) => {
         setSelectedFilter(filterType);
@@ -431,7 +476,8 @@ const OrderSummary = () => {
                                         {item.status !== "cancelled" && item.status !== "completed" && (
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
-                                                onPress={() => handleDelete(item._id)}
+                                               // onPress={() => handleDelete(item._id)}
+                                               onPress={() => handleDelete(item)}
                                             >
                                                 <Ionicons name="close-circle-outline" size={14} color="#fff" />
                                                 <Text style={styles.buttonText}>Cancel Order</Text>
@@ -442,7 +488,8 @@ const OrderSummary = () => {
                                             item.status === "pending" ? (
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
-                                                    onPress={() => mark(item._id, "confirmed")}
+                                                   // onPress={() => mark(item._id, "confirmed")}
+                                                   onPress={() => mark(item, "confirmed")}
                                                 >
                                                     <Ionicons name="time-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Processing</Text>
@@ -450,7 +497,8 @@ const OrderSummary = () => {
                                             ) : (
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
-                                                    onPress={() => mark(item._id, "completed")}
+                                                    //onPress={() => mark(item._id, "completed")}
+                                                    onPress={() => mark(item, "completed")}
                                                 >
                                                     <Ionicons name="checkmark-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Completed</Text>

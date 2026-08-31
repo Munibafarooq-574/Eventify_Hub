@@ -31,12 +31,33 @@ const statusStyleMap: Record<string, { bg: string; text: string; icon: any }> = 
   Cancelled: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
 };
 
-const vendorStatusStyleMap: Record<string, { bg: string; text: string; icon: any }> = {
-  pending: { bg: '#FFF3CD', text: '#B8860B', icon: 'time-outline' },
-  accepted: { bg: '#E7F0FF', text: '#007AFF', icon: 'checkmark-outline' },
-  completed: { bg: '#E6F7EA', text: '#28a745', icon: 'checkmark-circle-outline' },
-  rejected: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
-  cancelled: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
+const vendorStatusStyleMap: Record<
+  string,
+  { bg: string; text: string; icon: any }
+> = {
+  pending: {
+    bg: '#FFF3CD',
+    text: '#B8860B',
+    icon: 'time-outline',
+  },
+
+  processing: {
+    bg: '#E7F0FF',
+    text: '#007AFF',
+    icon: 'sync-outline',
+  },
+
+  completed: {
+    bg: '#E6F7EA',
+    text: '#28a745',
+    icon: 'checkmark-circle-outline',
+  },
+
+  cancelled: {
+    bg: '#FDEAEC',
+    text: '#dc3545',
+    icon: 'close-circle-outline',
+  },
 };
 
 const MyEventsScreen = () => {
@@ -239,10 +260,12 @@ const MyEventsScreen = () => {
                 <View style={styles.divider} />
 
                 <Text style={styles.sectionTitle}>Vendors</Text>
+                {event.vendorOrders.map((vendor: any, index: number) => {
 
-              {event.vendorOrders.map((vendor: any, index: number) => {
-        const vStatus =
-          vendorStatusStyleMap[vendor.status] || vendorStatusStyleMap.pending;
+  const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
+
+const vStatus =
+  vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
 
         return (
           <View key={index} style={styles.vendorCard}>
@@ -274,7 +297,7 @@ const MyEventsScreen = () => {
       { color: vStatus.text, fontSize: 11 },
     ]}
   >
-    {vendor.status}
+   {vendorStatus}
   </Text>
 </View>
                     </View>

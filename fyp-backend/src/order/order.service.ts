@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Model, Types } from 'mongoose';
 import { Order } from 'src/schemas/order.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
-import { UpdateOrderStatusDto } from './dto/update-order-status-dto';
+import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
 
@@ -260,6 +260,70 @@ export class OrderService {
         return updated;
     }
 
+    async updateVendorOrderStatus(
+    vendorOrderId: string,
+    status: 'pending' | 'confirmed' | 'completed' | 'cancelled',
+) {
+    const statusMap: Record<
+        'pending' | 'confirmed' | 'completed' | 'cancelled',
+        'pending' | 'accepted' | 'completed' | 'cancelled'
+    > = {
+        pending: 'pending',
+        confirmed: 'accepted',
+        completed: 'completed',
+        cancelled: 'cancelled',
+    };
+
+    const mappedStatus = statusMap[status];
+
+    const vendorOrder = await this.vendorOrderModel.findByIdAndUpdate(
+        vendorOrderId,
+        { status: mappedStatus },
+        { new: true },
+    );
+
+    if (!vendorOrder) {
+        throw new NotFoundException('Vendor order not found');
+    }
+
+    // Find the parent Order
+    const order = await this.orderModel.findOne({
+        vendorOrders: vendorOrder._id,
+    });
+
+    if (order) {
+        // Get all vendor orders belonging to this parent order
+        const siblings = await this.vendorOrderModel.find({
+            _id: { $in: order.vendorOrders },
+        });
+
+        const allCompleted =
+            siblings.length > 0 &&
+            siblings.every((vendor) => vendor.status === 'completed');
+
+        const anyActive = siblings.some(
+            (vendor) =>
+                vendor.status === 'accepted' ||
+                vendor.status === 'completed',
+        );
+
+        const newOrderStatus = allCompleted
+            ? 'completed'
+            : anyActive
+                ? 'confirmed'
+                : order.status;
+
+        // Only update parent Order if its overall status actually changed
+        if (newOrderStatus !== order.status) {
+            await this.orderModel.findByIdAndUpdate(
+                order._id,
+                { status: newOrderStatus },
+            );
+        }
+    }
+
+    return vendorOrder;
+}
     // Update vendor order status (accepted/rejected)
     async updateVendorResponse(vendorOrderId: string, status: 'accepted' | 'rejected', message?: string) {
         const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);

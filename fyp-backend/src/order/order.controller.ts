@@ -2,7 +2,7 @@
 //fyp-backend/src/order/order.controller.ts
 import { Controller, Post, Body, Patch, Param, Get, Delete, Query } from "@nestjs/common";
 import { OrderService } from "./order.service";
-import { UpdateOrderStatusDto } from "./dto/update-order-status-dto";
+import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
 @Controller('orders')
 export class OrderController {
@@ -49,11 +49,24 @@ export class OrderController {
         return this.orderService.updateVendorResponse(vendorOrderId, body.status, body.message);
     }
 
+    @Patch('vendor-order/:id/status')
+async updateVendorOrderStatus(
+    @Param('id') vendorOrderId: string,
+    @Body()
+    body: {
+        status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+    },
+) {
+    return this.orderService.updateVendorOrderStatus(
+        vendorOrderId,
+        body.status,
+    );
+}
+
     @Patch('complete-vendor/:id')
     async completeVendor(@Param('id') vendorOrderId: string) {
         return this.orderService.completeVendorOrder(vendorOrderId);
     }
-
     @Patch('complete-order/:id')
     async completeOrder(@Param('id') orderId: string) {
         return this.orderService.confirmOrderCompletion(orderId);
