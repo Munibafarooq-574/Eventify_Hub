@@ -513,7 +513,7 @@ return this.promotionModel.create({
 
   const vendors = await this.userModel
     .find({ _id: { $in: vendorIds.map((id) => new Types.ObjectId(id)) } })
-    .select('name coverImage packages')
+     .select('name coverImage packages contactDetails')
     .lean();
 
   const vendorById = new Map(
@@ -559,7 +559,7 @@ return this.promotionModel.create({
       return {
         promotionId: promo._id.toString(),
         vendorId: vendor._id.toString(),
-        vendorName: vendor.name,
+        vendorName: vendor.contactDetails?.brandName || vendor.name,
         coverImage: vendor.coverImage || null,
         packageId: pkg._id.toString(),
         packageName: pkg.packageName,

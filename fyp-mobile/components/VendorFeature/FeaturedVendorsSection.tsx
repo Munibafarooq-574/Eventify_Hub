@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   image: {
     width: '100%',
-    height: 90,
+    height: 170,
   },
 
   imagePlaceholder: {
