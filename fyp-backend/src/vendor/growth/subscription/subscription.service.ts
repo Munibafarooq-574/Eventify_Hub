@@ -115,45 +115,46 @@ export class SubscriptionService {
     return created;
   }
 
-  /**
-   * Cancels the vendor's current paid plan and drops them back to Free.
-   * The cancelled record is kept (status: cancelled) for history.
-   */
-  async cancelSubscription(vendorId: string, reason?: string): Promise<VendorSubscription> {
-    this.assertValidId(vendorId);
+async cancelSubscription(
+  vendorId: string,
+  reason?: string,
+): Promise<VendorSubscription> {
+  this.assertValidId(vendorId);
 
-    const current = await this.subscriptionModel.findOne({
-      vendorId: new Types.ObjectId(vendorId),
-      isCurrent: true,
-    });
+  const current = await this.subscriptionModel.findOne({
+    vendorId: new Types.ObjectId(vendorId),
+    isCurrent: true,
+  });
 
-    if (!current) {
-      throw new NotFoundException('No active subscription found for this vendor');
-    }
-
-    if (current.plan === SubscriptionPlan.FREE) {
-      throw new BadRequestException('Vendor is already on the Free plan');
-    }
-
-    current.status = SubscriptionStatus.CANCELLED;
-    current.isCurrent = false;
-    current.cancelledReason = reason ?? null;
-    await current.save();
-
-    // Drop back to Free
-    return this.subscriptionModel.create({
-      vendorId: new Types.ObjectId(vendorId),
-      plan: SubscriptionPlan.FREE,
-      status: SubscriptionStatus.ACTIVE,
-      startDate: new Date(),
-      endDate: null,
-      paymentStatus: PaymentStatus.NONE,
-      paymentProvider: PaymentProvider.NONE,
-      paymentReference: null,
-      isCurrent: true,
-    });
+  if (!current) {
+    throw new NotFoundException(
+      'No active subscription found for this vendor',
+    );
   }
 
+  if (current.plan === SubscriptionPlan.FREE) {
+    throw new BadRequestException(
+      'Vendor is already on the Free plan',
+    );
+  }
+
+  // If the paid subscription has already reached its end date,
+  // let the normal expiry flow handle it instead of scheduling cancellation.
+  if (current.endDate && current.endDate.getTime() <= Date.now()) {
+    return this.expireIfNeeded(current);
+  }
+
+  // Cancel renewal/access after the already-paid period ends.
+  // IMPORTANT:
+  // Keep the paid plan as current until endDate.
+  current.status = SubscriptionStatus.CANCELLED;
+  current.isCurrent = true;
+  current.cancelledReason = reason ?? null;
+
+  await current.save();
+
+  return current;
+}
   /**
    * If a subscription's endDate has passed and it's still marked active,
    * flip it to expired and demote the vendor back to Free. Called lazily
@@ -161,12 +162,16 @@ export class SubscriptionService {
    * this method can be reused later inside a scheduled task if needed.
    */
   private async expireIfNeeded(subscription: VendorSubscription): Promise<VendorSubscription> {
-    const isPastEnd = subscription.endDate && subscription.endDate.getTime() < Date.now();
-    const isStillActive = subscription.status === SubscriptionStatus.ACTIVE;
+    const isPastEnd =
+  subscription.endDate &&
+  subscription.endDate.getTime() <= Date.now();
 
-    if (!isPastEnd || !isStillActive || subscription.plan === SubscriptionPlan.FREE) {
-      return subscription;
-    }
+const isPaidPlan =
+  subscription.plan !== SubscriptionPlan.FREE;
+
+if (!isPastEnd || !isPaidPlan) {
+  return subscription;
+}
 
     subscription.status = SubscriptionStatus.EXPIRED;
     subscription.isCurrent = false;
