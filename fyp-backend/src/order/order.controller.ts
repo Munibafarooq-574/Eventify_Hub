@@ -8,20 +8,21 @@ import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
-       @Post()
-    async placeOrder(@Body() body: {
-        organizerId: string;
-        eventDate: string;
-        eventTime: string;
-        eventName: string;
-        eventType?: string;
-        guests: number;
-        services: {
-            vendorId: string;
-            serviceName: string;
-            price: number;
-        }[];
-    }) {
+      @Post()
+async placeOrder(@Body() body: {
+    organizerId: string;
+    eventDate: string;
+    eventTime: string;
+    eventName: string;
+    eventType?: string;
+    guests: number;
+    services: {
+        vendorId: string;
+        serviceName: string;
+        price: number;
+    }[];
+    durationMinutes?: number;
+}) {
         try {
             console.log(body.eventName, body.services)
             // Call the service to create the order
@@ -33,6 +34,7 @@ export class OrderController {
                 body.eventName,
                 body.guests,
                 body.eventType,
+                body.durationMinutes,
             );
             return order;
         } catch (error) {

@@ -25,6 +25,15 @@ export class Order extends Document {
     @Prop({ required: true })
     eventTime: string;
 
+      @Prop()
+    eventStartDateTime?: Date;
+
+    @Prop()
+    eventEndDateTime?: Date;
+
+    @Prop()
+    eventDurationMinutes?: number;
+
     @Prop({ required: true })
     totalAmount: number;
 

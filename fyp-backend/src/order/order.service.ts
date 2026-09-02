@@ -1,110 +1,181 @@
 //fyp-backend/src/order/order.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import {
+    ConflictException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
-import { Model, Types } from 'mongoose';
+import { Connection, Model, Types } from 'mongoose';
 import { Order } from 'src/schemas/order.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
+import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 
 @Injectable()
 export class OrderService {
     constructor(
-        @InjectModel(User.name) private readonly userModel: Model<User>,
-        @InjectModel(Order.name) private readonly orderModel: Model<Order>,
-        @InjectModel(VendorOrder.name) private readonly vendorOrderModel: Model<VendorOrder>,
-        @InjectModel(Notification.name) private readonly notificationModel: Model<Notification>
-    ) { }
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
 
-    // Create a new order
-    /*async createOrder(
-        organizerId: string,
-        eventDate: Date,
-        eventTime: string,
-        services: { vendorId: string; serviceName: string; price: number }[],
-        eventName: string,
-        guests: number,
-    ): Promise<Order> {
-        // Calculate total and final amounts
-        const totalAmount = services.reduce((sum, service) => sum + service.price, 0);
-        const finalAmount = totalAmount; // Modify this if you want to apply discounts or other adjustments
+    @InjectModel(Order.name)
+    private readonly orderModel: Model<Order>,
 
-        // Create the order document
-        const order = new this.orderModel({
-            organizerId: new Types.ObjectId(organizerId),
-            eventDate,
-            eventTime,
-            eventName,
-            guests,
-            totalAmount,
-            discount: 0, // You can modify this if needed
-            finalAmount,
-            status: 'pending', // Initial status
-        });*/
+    @InjectModel(VendorOrder.name)
+    private readonly vendorOrderModel: Model<VendorOrder>,
+
+    @InjectModel(Notification.name)
+    private readonly notificationModel: Model<Notification>,
+
+    @InjectConnection()
+    private readonly connection: Connection,
+
+    private readonly availabilityService: VendorAvailabilityService,
+) { }
 
             // Create a new order
     async createOrder(
-        organizerId: string,
-        eventDate: Date,
-        eventTime: string,
-        services: { vendorId: string; serviceName: string; price: number }[],
-        eventName: string,
-        guests: number,
-        eventType?: string,
-    ): Promise<Order> {
-        // Calculate total and final amounts
-        const totalAmount = services.reduce((sum, service) => sum + service.price, 0);
-        const finalAmount = totalAmount; // Modify this if you want to apply discounts or other adjustments
+    organizerId: string,
+    eventDate: Date,
+    eventTime: string,
+    services: { vendorId: string; serviceName: string; price: number }[],
+    eventName: string,
+    guests: number,
+    eventType?: string,
+    durationMinutes = 60,
+): Promise<Order> {
+      // Calculate event start/end datetime
+const [h, m] = (eventTime || '00:00').split(':').map(Number);
 
-        // Create the order document
-        const order = new this.orderModel({
-            organizerId: new Types.ObjectId(organizerId),
-            eventDate,
-            eventTime,
-            eventName,
-            eventType,
-            guests,
-            totalAmount,
-            discount: 0, // You can modify this if needed
-            finalAmount,
-            status: 'pending', // Initial status
-        });
+const eventStartDateTime = new Date(eventDate);
 
-        // Save the order document
-        const savedOrder = await order.save();
+eventStartDateTime.setHours(
+    h || 0,
+    m || 0,
+    0,
+    0,
+);
 
-        // Create vendor orders and push the vendorOrder _id to the order's vendorOrders field
+const eventEndDateTime = new Date(
+    eventStartDateTime.getTime() + durationMinutes * 60000,
+);
+
+const session = await this.connection.startSession();
+
+try {
+    let savedOrder: Order;
+
+    await session.withTransaction(async () => {
+
+        // Check every selected vendor before creating anything
+        const results = await this.availabilityService.checkMany(
+            services.map((service) => service.vendorId),
+            eventStartDateTime,
+            eventEndDateTime,
+        );
+
+        const unavailable = results.find(
+            (result) => !result.available,
+        );
+
+        if (unavailable) {
+            throw new ConflictException(
+                'This vendor is no longer available for the selected time.',
+            );
+        }
+
+        // Calculate total
+        const totalAmount = services.reduce(
+            (sum, service) => sum + service.price,
+            0,
+        );
+
+        // Create main Order
+        const [order] = await this.orderModel.create(
+            [
+                {
+                    organizerId: new Types.ObjectId(organizerId),
+                    eventDate,
+                    eventTime,
+                    eventName,
+                    eventType,
+                    guests,
+
+                    totalAmount,
+                    discount: 0,
+                    finalAmount: totalAmount,
+
+                    status: 'pending',
+
+                    eventStartDateTime,
+                    eventEndDateTime,
+                    eventDurationMinutes: durationMinutes,
+                },
+            ],
+            { session },
+        );
+
+        // Create VendorOrders
         const vendorOrderIds: Types.ObjectId[] = [];
 
         for (const service of services) {
-            const vendorOrder = new this.vendorOrderModel({
-                orderId: savedOrder._id,
-                vendorId: new Types.ObjectId(service.vendorId),
-                serviceName: service.serviceName,
-                price: service.price,
-                status: 'pending', // Initial vendor order status
-            });
 
-            // Save each vendor order and push its _id into the vendorOrders array
-            const savedVendorOrder = await vendorOrder.save();
-            vendorOrderIds.push(savedVendorOrder._id);
+            const [vendorOrder] =
+                await this.vendorOrderModel.create(
+                    [
+                        {
+                            orderId: order._id,
+                            vendorId: new Types.ObjectId(
+                                service.vendorId,
+                            ),
+                            serviceName: service.serviceName,
+                            price: service.price,
+                            status: 'pending',
+
+                            eventStartDateTime,
+                            eventEndDateTime,
+                        },
+                    ],
+                    { session },
+                );
+
+            vendorOrderIds.push(vendorOrder._id);
         }
 
+        // Attach VendorOrders to main Order
+        order.vendorOrders = vendorOrderIds;
 
-        // Update the order document with the vendorOrder IDs
-        savedOrder.vendorOrders = vendorOrderIds;
-        await savedOrder.save();
-        try {
-            for (let index = 0; index < services.length; index++) {
-                await this.sendPushNotification("Order", "A new order has been placed", services[index].vendorId, "CREATE_ORDER");
-                console.log("Notification sent on create order", services[index].vendorId);
-            }
-        } catch (error) {
-            console.log(error);
+        await order.save({ session });
+
+        savedOrder = order;
+    });
+
+    // Notifications AFTER successful transaction
+    try {
+        for (const service of services) {
+            await this.sendPushNotification(
+                'Order',
+                'A new order has been placed',
+                service.vendorId,
+                'CREATE_ORDER',
+            );
+
+            console.log(
+                'Notification sent on create order',
+                service.vendorId,
+            );
         }
-        return savedOrder;
+    } catch (error) {
+        console.log(error);
+    }
+
+    return savedOrder!;
+
+} finally {
+    await session.endSession();
+}
     }
 
 

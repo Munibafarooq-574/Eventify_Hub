@@ -16,6 +16,7 @@ interface PlaceOrderPayload {
     eventName: string;
     eventType?: string;
     guests: number;
+    durationMinutes?: number; // NEW
 }
 
 export default async function postPlaceOrder(orderData: PlaceOrderPayload) {

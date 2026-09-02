@@ -566,6 +566,58 @@ export const SoundBusinessDetailsSchema = SchemaFactory.createForClass(
   SoundBusinessDetails,
 );
 
+// ==========================================
+// Vendor Availability Settings
+// ==========================================
+
+@Schema({ _id: false })
+export class WorkingDay {
+  @Prop({
+    required: true,
+    enum: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+  })
+  day: string;
+
+  @Prop({ default: true })
+  enabled: boolean;
+}
+
+export const WorkingDaySchema = SchemaFactory.createForClass(WorkingDay);
+
+@Schema({ _id: false })
+export class VendorAvailabilitySettings {
+  @Prop({
+    type: [WorkingDaySchema],
+    default: () =>
+      ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => ({
+        day,
+        enabled: true,
+      })),
+  })
+  workingDays: WorkingDay[];
+
+  @Prop({ default: '09:00' })
+  workingHoursStart: string;
+
+  @Prop({ default: '18:00' })
+  workingHoursEnd: string;
+
+  @Prop({ type: [Date], default: [] })
+  blockedDates: Date[];
+
+  @Prop({
+    enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
+    default: 0,
+  })
+  minimumAdvanceMinutes: number;
+
+  @Prop({ default: 1, min: 1 })
+  maxConcurrentBookings: number;
+}
+
+export const VendorAvailabilitySettingsSchema =
+  SchemaFactory.createForClass(VendorAvailabilitySettings);
+
 @Schema()
 export class Package {
   @Prop({ required: true })
@@ -582,6 +634,7 @@ export const PackageSchema = SchemaFactory.createForClass(Package);
 
 @Schema({ timestamps: true })
 export class User extends Document {
+
   @Prop()
   user_id: string;
 
@@ -654,6 +707,12 @@ cakeBusinessDetails?: CakeBusinessDetails;
 
   @Prop({ type: [PackageSchema], default: [] })
   packages: Package[];
+
+    @Prop({
+    type: VendorAvailabilitySettingsSchema,
+    default: () => ({}),
+  })
+  availabilitySettings?: VendorAvailabilitySettings;
 
   @Prop({ type: [], default: [] })
   images: string[];

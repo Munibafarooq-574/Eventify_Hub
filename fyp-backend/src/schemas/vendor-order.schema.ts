@@ -26,6 +26,19 @@ export class VendorOrder extends Document {
 
     @Prop()
     confirmationTime?: Date;
+
+      @Prop()
+  eventStartDateTime?: Date;
+
+  @Prop()
+  eventEndDateTime?: Date;
 }
 
 export const VendorOrderSchema = SchemaFactory.createForClass(VendorOrder);
+
+VendorOrderSchema.index({
+  vendorId: 1,
+  status: 1,
+  eventStartDateTime: 1,
+  eventEndDateTime: 1,
+});

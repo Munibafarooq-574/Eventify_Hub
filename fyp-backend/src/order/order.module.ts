@@ -6,6 +6,7 @@ import { OrderService } from './order.service';
 import { Module } from '@nestjs/common';
 import { User, UserSchema } from "src/schemas/user.schema";
 import { Notification, NotificationSchema } from "src/schemas/notification.schema";
+import { VendorAvailabilityModule } from "../vendor-availability/vendor-availability.module";
 
 @Module({
     imports: [
@@ -15,6 +16,7 @@ import { Notification, NotificationSchema } from "src/schemas/notification.schem
             { name: VendorOrder.name, schema: VendorOrderSchema },
             { name: Notification.name, schema: NotificationSchema }
         ]),
+        VendorAvailabilityModule,
     ],
     controllers: [OrderController],
     providers: [OrderService],

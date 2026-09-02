@@ -12,6 +12,7 @@ import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { VendorAvailabilityModule } from './vendor-availability/vendor-availability.module';
 
 
 
@@ -29,6 +30,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     OrderModule,
     ReviewsModule,
     NotificationsModule,
+    VendorAvailabilityModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       exclude: ['/api/(.*)'],
