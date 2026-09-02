@@ -1,4 +1,3 @@
-
 // fyp-mobile/components/VendorFeature/FeaturedVendorsSection.tsx
 
 import React, { useEffect, useState } from 'react';
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
 import { FeaturedVendorPublicEntry } from '../../types/promotion.types';
@@ -42,7 +42,10 @@ export function FeaturedVendorsSection() {
         }
       })
       .catch((error) => {
-        console.error('[Featured Vendors] Failed to load:', error);
+        console.error(
+          '[Featured Vendors] Failed to load:',
+          error,
+        );
       });
 
     return () => {
@@ -54,7 +57,9 @@ export function FeaturedVendorsSection() {
     return null;
   }
 
-  const handleVendorPress = (vendor: FeaturedVendorPublicEntry) => {
+  const handleVendorPress = (
+    vendor: FeaturedVendorPublicEntry,
+  ) => {
     router.push({
       pathname: '/vendorprofiledetails',
       params: {
@@ -65,9 +70,20 @@ export function FeaturedVendorsSection() {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        ⭐ Featured Vendors
-      </Text>
+      {/* ---------- Section Heading ---------- */}
+      <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionTitleIcon}>
+          <Ionicons
+            name="star"
+            size={18}
+            color="#F59E0B"
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          Featured Vendors
+        </Text>
+      </View>
 
       <ScrollView
         horizontal
@@ -81,26 +97,41 @@ export function FeaturedVendorsSection() {
             activeOpacity={0.85}
             onPress={() => handleVendorPress(vendor)}
           >
-            {vendor.coverImage ? (
-              <Image
-                source={{ uri: vendor.coverImage }}
-                style={styles.image}
-              />
-            ) : (
-              <View
-                style={[
-                  styles.image,
-                  styles.imagePlaceholder,
-                ]}
-              />
-            )}
+            {/* ---------- Vendor Image ---------- */}
+            {vendor.brandLogo ? (
+          <Image
+            source={{ uri: vendor.brandLogo }}
+            style={styles.image}
+          />
+        ) : (
+          <View
+            style={[
+              styles.image,
+              styles.imagePlaceholder,
+            ]}
+          >
+            <Ionicons
+              name="storefront-outline"
+              size={34}
+              color="#9CA3AF"
+            />
+          </View>
+        )}
 
+            {/* ---------- Featured Badge ---------- */}
             <View style={styles.badge}>
+              <Ionicons
+                name="star"
+                size={11}
+                color={COLORS.badgeText}
+              />
+
               <Text style={styles.badgeText}>
-                ⭐ Featured
+                Featured
               </Text>
             </View>
 
+            {/* ---------- Vendor Name ---------- */}
             <Text
               style={styles.vendorName}
               numberOfLines={1}
@@ -108,47 +139,44 @@ export function FeaturedVendorsSection() {
               {vendor.vendorName}
             </Text>
 
-            {/* Rating */}
-            {/*{vendor.rating !== null && vendor.rating !== undefined && (
-              <View style={styles.ratingRow}>
-                <Text style={styles.ratingStar}>★</Text>
-                <Text style={styles.ratingText}>
-                  {Number(vendor.rating).toFixed(1)}
-                </Text>
-              </View>
-            )}*/}
+            {/* ---------- Rating ---------- */}
             <View style={styles.ratingRow}>
-              <Text style={styles.ratingStar}>
-                {vendor.rating !== null && vendor.rating !== undefined ? '★' : '☆'}
-              </Text>
+              <Ionicons
+                name={
+                  vendor.rating !== null &&
+                  vendor.rating !== undefined
+                    ? 'star'
+                    : 'star-outline'
+                }
+                size={13}
+                color={COLORS.rating}
+              />
 
               <Text style={styles.ratingText}>
-                {vendor.rating !== null && vendor.rating !== undefined
+                {vendor.rating !== null &&
+                vendor.rating !== undefined
                   ? Number(vendor.rating).toFixed(1)
                   : 'No reviews yet'}
               </Text>
             </View>
 
-            {/* Customer Count */}
-            {/*{vendor.customerCount > 0 && (
-              <View style={styles.locationRow}>
-                <Text style={styles.locationIcon}>👥</Text>
-                <Text
-                  style={styles.vendorMeta}
-                  numberOfLines={1}
-                >
-                  {vendor.customerCount} customers
-                </Text>
-              </View>
-            )}*/}
-                    <View style={styles.locationRow}>
-          <Text style={styles.locationIcon}>👥</Text>
-          <Text style={styles.vendorMeta} numberOfLines={1}>
-            {vendor.customerCount > 0
-              ? `${vendor.customerCount} customers`
-              : 'New vendor'}
-          </Text>
-        </View>
+            {/* ---------- Orders ---------- */}
+            <View style={styles.ordersRow}>
+              <Ionicons
+                name="receipt-outline"
+                size={12}
+                color={COLORS.muted}
+              />
+
+              <Text
+                style={styles.vendorMeta}
+                numberOfLines={1}
+              >
+                {vendor.customerCount > 0
+                  ? `${vendor.customerCount} orders`
+                  : 'No orders yet'}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -161,12 +189,26 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
 
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+
+  sectionTitleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 10,
-    paddingHorizontal: 16,
   },
 
   row: {
@@ -175,13 +217,13 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    width: 150,
+    width: 170,
     backgroundColor: COLORS.card,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
 
   image: {
@@ -191,6 +233,8 @@ const styles = StyleSheet.create({
 
   imagePlaceholder: {
     backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   badge: {
@@ -200,7 +244,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.badge,
     borderRadius: 6,
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
 
   badgeText: {
@@ -224,33 +271,24 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 
-  ratingStar: {
-    fontSize: 13,
-    color: COLORS.rating,
-    marginRight: 3,
-  },
-
   ratingText: {
     fontSize: 11,
     fontWeight: '600',
     color: COLORS.text,
+    marginLeft: 4,
   },
 
-  locationRow: {
+  ordersRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 3,
     marginHorizontal: 8,
   },
 
-  locationIcon: {
-    fontSize: 11,
-    marginRight: 3,
-  },
-
   vendorMeta: {
     flex: 1,
     fontSize: 11,
     color: COLORS.muted,
+    marginLeft: 4,
   },
 });

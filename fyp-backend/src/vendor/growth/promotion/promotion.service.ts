@@ -18,21 +18,11 @@ import { FeatureAccessService } from '../feature-access.service';
 import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
 
-/*export interface FeaturedVendorPublicEntry {
-  promotionId: string;
-  vendorId: string;
-  vendorName: string;
-  coverImage: string | null;
-  businessCategoryName: string | null;
-  city: string | null;
-  rating: number | null;
-  featuredUntil: Date;
-}*/
 export interface FeaturedVendorPublicEntry {
   promotionId: string;
   vendorId: string;
   vendorName: string;
-  coverImage: string | null;
+  brandLogo: string | null;
   businessCategoryName: string | null;
   city: string | null;
   rating: number | null;
@@ -40,6 +30,7 @@ export interface FeaturedVendorPublicEntry {
   customerCount: number;
   featuredUntil: Date;
 }
+
 export interface FeaturedPackagePublicEntry {
   promotionId: string;
   vendorId: string;
@@ -380,7 +371,7 @@ return this.promotionModel.create({
       .find({
         _id: { $in: vendorIds },
       })
-      .select('name coverImage city buisnessCategory')
+      .select('name contactDetails city buisnessCategory')
       .populate('buisnessCategory')
       .lean();
 
@@ -475,8 +466,8 @@ return this.promotionModel.create({
         return {
           promotionId: promo._id.toString(),
           vendorId: vendor._id.toString(),
-          vendorName: vendor.name,
-          coverImage: vendor.coverImage || null,
+          vendorName: vendor.contactDetails?.brandName || vendor.name,
+          brandLogo: vendor.contactDetails?.brandLogo || null,
           businessCategoryName:
             vendor.buisnessCategory?.name || null,
           city: vendor.city || null,

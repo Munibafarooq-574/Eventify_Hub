@@ -38,13 +38,13 @@ export interface FeaturedVendorPublicEntry {
   promotionId: string;
   vendorId: string;
   vendorName: string;
-  coverImage: string | null;
+  brandLogo: string | null;
   businessCategoryName: string | null;
   city: string | null;
-    rating: number | null;
-    totalReviews: number;
+  rating: number | null;
+  totalReviews: number;
   customerCount: number;
-    featuredUntil: string;
+  featuredUntil: string;
 }
 
 export interface FeaturedPackagePublicEntry {

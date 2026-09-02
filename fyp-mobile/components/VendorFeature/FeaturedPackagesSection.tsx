@@ -1,5 +1,7 @@
-//fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
+// fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
+
 import React, { useEffect, useState } from 'react';
+
 import {
   View,
   Text,
@@ -8,7 +10,9 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
+
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 import { getActiveFeaturedPackages } from '../../services/getActiveFeaturedPackages';
 import { FeaturedPackagePublicEntry } from '../../types/promotion.types';
@@ -21,12 +25,16 @@ const COLORS = {
   badge: '#FEF3C7',
   badgeText: '#92400E',
   price: '#059669',
+  icon: '#9CA3AF',
+  iconBackground: '#F3F4F6',
 };
 
 export function FeaturedPackagesSection() {
   const router = useRouter();
 
-  const [packages, setPackages] = useState<FeaturedPackagePublicEntry[]>([]);
+  const [packages, setPackages] = useState<
+    FeaturedPackagePublicEntry[]
+  >([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +46,10 @@ export function FeaturedPackagesSection() {
         }
       })
       .catch((error) => {
-        console.error('[Featured Packages] Failed to load:', error);
+        console.error(
+          '[Featured Packages] Failed to load:',
+          error,
+        );
       });
 
     return () => {
@@ -50,19 +61,34 @@ export function FeaturedPackagesSection() {
     return null;
   }
 
- const handlePackagePress = (pkg: FeaturedPackagePublicEntry) => {
-  router.push({
-    pathname: '/vendorprofiledetails',
-    params: {
-      id: pkg.vendorId,
-      packageId: pkg.packageId,   // NEW
-    },
-  });
-};
+  const handlePackagePress = (
+    pkg: FeaturedPackagePublicEntry,
+  ) => {
+    router.push({
+      pathname: '/vendorprofiledetails',
+      params: {
+        id: pkg.vendorId,
+        packageId: pkg.packageId,
+      },
+    });
+  };
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>📦 Featured Packages</Text>
+      {/* ---------- Section Heading ---------- */}
+      <View style={styles.sectionTitleRow}>
+        <View style={styles.sectionTitleIcon}>
+          <Ionicons
+            name="cube"
+            size={18}
+            color="#7D0C72"
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          Featured Packages
+        </Text>
+      </View>
 
       <ScrollView
         horizontal
@@ -76,37 +102,71 @@ export function FeaturedPackagesSection() {
             activeOpacity={0.85}
             onPress={() => handlePackagePress(pkg)}
           >
+            {/* ---------- Package Image ---------- */}
             {pkg.coverImage ? (
               <Image
                 source={{ uri: pkg.coverImage }}
                 style={styles.image}
               />
             ) : (
-              <View style={[styles.image, styles.imagePlaceholder]}>
-                <Text style={styles.placeholderText}>📦</Text>
+              <View
+                style={[
+                  styles.image,
+                  styles.imagePlaceholder,
+                ]}
+              >
+                <View style={styles.packageIconCircle}>
+                  <Ionicons
+                    name="cube-outline"
+                    size={34}
+                    color={COLORS.icon}
+                  />
+                </View>
               </View>
             )}
 
+            {/* ---------- Featured Badge ---------- */}
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>⭐ Featured</Text>
+              <Ionicons
+                name="star"
+                size={11}
+                color={COLORS.badgeText}
+              />
+
+              <Text style={styles.badgeText}>
+                Featured
+              </Text>
             </View>
 
-            <Text style={styles.packageName} numberOfLines={2}>
+            {/* ---------- Package Name ---------- */}
+            <Text
+              style={styles.packageName}
+              numberOfLines={2}
+            >
               {pkg.packageName}
             </Text>
 
-            <Text style={styles.vendorName} numberOfLines={1}>
+            {/* ---------- Vendor Name ---------- */}
+            <Text
+              style={styles.vendorName}
+              numberOfLines={1}
+            >
               {pkg.vendorName}
             </Text>
 
+            {/* ---------- Price ---------- */}
             <Text style={styles.price}>
               Rs. {Number(pkg.price || 0).toLocaleString()}
             </Text>
+
+            {/* ---------- Rating ---------- */}
             <Text style={styles.rating}>
               {pkg.rating !== null
-                ? `⭐ ${pkg.rating.toFixed(1)} (${pkg.totalReviews})`
+                ? `${Number(pkg.rating).toFixed(1)} (${pkg.totalReviews})`
                 : 'No reviews yet'}
             </Text>
+
+            {/* ---------- Orders ---------- */}
             <Text style={styles.orders}>
               {pkg.orderCount > 0
                 ? `${pkg.orderCount} orders`
@@ -124,12 +184,26 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
 
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+
+  sectionTitleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 10,
-    paddingHorizontal: 16,
   },
 
   row: {
@@ -153,13 +227,20 @@ const styles = StyleSheet.create({
   },
 
   imagePlaceholder: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.iconBackground,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  placeholderText: {
-    fontSize: 30,
+  packageIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
 
   badge: {
@@ -169,7 +250,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.badge,
     borderRadius: 6,
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
 
   badgeText: {
@@ -200,7 +284,17 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginHorizontal: 8,
   },
-  rating: { fontSize: 11, color: COLORS.muted, marginTop: 3, marginHorizontal: 8 },
-orders: { fontSize: 11, color: COLORS.muted, marginHorizontal: 8 },
-});
 
+  rating: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginTop: 3,
+    marginHorizontal: 8,
+  },
+
+  orders: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginHorizontal: 8,
+  },
+});
