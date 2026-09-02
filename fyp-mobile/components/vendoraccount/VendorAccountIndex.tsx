@@ -1,3 +1,4 @@
+//vendor account index page
 import { deleteSecureData, deleteUserData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';

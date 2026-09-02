@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -27,6 +28,7 @@ const COLORS = {
 
 const Header: React.FC = () => {
   const [username, setUsername] = useState(""); // State for username
+const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
 
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -85,20 +87,23 @@ const Header: React.FC = () => {
     fetchUsername(); // Fetch username on component mount
   }, []);
 
- const fetchUsername = async () => {
+  const fetchUsername = async () => {
   try {
     const user = await getUserData();
 
     if (!user) {
       console.warn('No user data found in storage.');
       setUsername('Guest');
+      setAvatar('');
       return;
     }
 
     setUsername(user?.name || user?.username || 'Guest');
+    setAvatar(user?.contactDetails?.brandLogo || '');
   } catch (error) {
     console.error('fetchUsername error:', error);
     setUsername('Guest');
+    setAvatar('');
   }
 };
 
@@ -106,11 +111,6 @@ const Header: React.FC = () => {
     <View style={styles.container}>
       {/* Location and Notification */}
       <View style={styles.header}>
-        {/* <View style={styles.locationContainer}>
-          <Ionicons name="location-outline" size={18} color="#7B2869" />
-          <Text style={styles.locationText}>House 30, ISB</Text>
-          <Ionicons name="chevron-down-outline" size={16} color="#7B2869" />
-        </View> */}
         {/* Cart Icon */}
 
         <View style={styles.brandRow}>
@@ -137,11 +137,22 @@ const Header: React.FC = () => {
         </View>
       </View>
 
-      {/* Welcome Section */}
+            {/* Welcome Section */}
       <View style={styles.welcomeCard}>
-        <View style={styles.welcomeTextWrap}>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.username}>{username}</Text>
+        <View style={styles.welcomeLeft}>
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarFallbackText}>
+                {username ? username.charAt(0).toUpperCase() : '?'}
+              </Text>
+            </View>
+          )}
+          <View style={styles.welcomeTextWrap}>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.username}>{username}</Text>
+          </View>
         </View>
         <TouchableOpacity
           style={styles.planButton}
@@ -402,7 +413,7 @@ badgeIcon: {
     alignItems: 'center',
     backgroundColor: COLORS.primary,
     borderRadius: 18,
-    paddingVertical: 18,
+    paddingVertical: 45,
     paddingHorizontal: 18,
     shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 6 },
@@ -414,13 +425,42 @@ badgeIcon: {
     flexShrink: 1,
     paddingRight: 10,
   },
+    welcomeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+  },
+  avatarImage: {
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarFallbackText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   welcomeText: {
     fontSize: 13,
     fontWeight: '500',
     color: 'rgba(255,255,255,0.75)',
   },
   username: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#FFF',
     marginTop: 2,

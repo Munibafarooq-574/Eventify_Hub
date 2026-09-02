@@ -4,11 +4,8 @@ import getAllCategories from '@/services/getAllCategories';
 import patchUpdateProfile from '@/services/patchUpdateProfile'; // import your API function
 import { getUserData, saveUserData } from '@/store';
 //import Ionicons from '@expo/vector-icons';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
-
-import { useGlobalSearchParams, useRouter } from 'expo-router';
+import {Ionicons } from '@expo/vector-icons';
+import {  useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -36,13 +33,7 @@ const EditProfileScreen: React.FC = () => {
   const [avatar, setAvatar] = useState('');
   const [avatarChanged, setAvatarChanged] = useState(false);
   const [address, setAddress] = useState('');
-  const [selectedStaff, setSelectedStaff] = useState<string>("");
-  const [refundPolicy, setRefundPolicy] = useState<string>("");
-  const [description, setDescription] = useState('');
-  const [citiesCovered, setCitiesCovered] = useState('');
-  const { id } = useGlobalSearchParams();
-  const [vendorData, setVendorData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+
 
 
   useEffect(() => {
@@ -80,10 +71,7 @@ const EditProfileScreen: React.FC = () => {
         setPhoneNumber(user.phoneNumber || user.phone || user.phone_number || '');
         setAddress(user.contactDetails.address || '');
         setAvatar(user?.contactDetails?.brandLogo || '');
-        setSelectedStaff(user[objectLiteral]?.staff || '');
-        setRefundPolicy(user[objectLiteral]?.refundPolicy || '');
-        setDescription(user[objectLiteral]?.description || '');
-        setCitiesCovered(user[objectLiteral]?.cityCovered || '');
+      
 
       }
     } catch (error) {
@@ -153,6 +141,7 @@ const EditProfileScreen: React.FC = () => {
       await saveUserData(updatedUser);
       setAvatarChanged(false);
       alert('Profile updated successfully');
+      router.replace('/vendoraccount');
     } catch (error) {
       console.error('Failed to save user data:', error);
       alert('Failed to save profile. Please try again.');
@@ -317,82 +306,10 @@ const EditProfileScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* <Text style={styles.label}>Cities Covered</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter cities you cover"
-              value={citiesCovered}
-              onChangeText={setCitiesCovered}
-            />
-
-
-
-
-            <Text style={styles.label}>Staff</Text>
-            <View style={styles.staffContainer}>
-              {[
-                { label: "MALE", icon: "male" },
-                { label: "FEMALE", icon: "female" },
-                { label: "TRANSGENDER", icon: "transgender-alt" },
-              ].map((staff) => (
-                <TouchableOpacity
-                  key={staff.label}
-                  style={[
-                    styles.staffOption,
-                    selectedStaff === staff.label && styles.staffSelected,
-                  ]}
-                  onPress={() => setSelectedStaff(staff.label)}
-                >
-                  <FontAwesome5
-                    name={staff.icon}
-                    size={20}
-                    style={[
-                      styles.staffIcon,
-                      selectedStaff === staff.label && styles.staffSelectedIcon,
-                    ]} />
-                  <Text
-                    style={[
-                      styles.staffText,
-                      selectedStaff === staff.label && styles.staffSelectedText,
-                    ]}
-                  >
-                    {staff.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Refund Policy*</Text>
-            <View style={styles.covidContainer}>
-              {["REFUNDABLE", "NON-REFUNDABLE", "PARTIALLY REFUNDABLE"].map(
-                (policy) => (
-                  <TouchableOpacity
-                    key={policy}
-                    style={[
-                      styles.covidOption,
-                      refundPolicy === policy && styles.covidSelected,
-                    ]}
-                    onPress={() => setRefundPolicy(policy)}
-                  >
-                    <Text
-                      style={[
-                        styles.covidText,
-                        refundPolicy === policy && styles.covidSelectedText,
-                      ]}
-                    >
-                      {policy}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>  */}
-
           </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <BottomNavigationFinal />
     </View>
   );
 };

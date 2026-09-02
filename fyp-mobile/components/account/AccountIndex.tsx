@@ -1,11 +1,13 @@
-import { deleteSecureData, getSecureData } from '@/store';
+//fpy-mobile/components/account/AccountIndex.tsx
+//(Organizer Account Screen)
+
+import { deleteSecureData, deleteUserData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
-  Alert,
   Image,
-  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -13,134 +15,168 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
+
+const PRIMARY = "#780C60";
+const PRIMARY_LIGHT = "#F8E9F0";
+const ACCENT = "#B84B9A";
 
 const AccountScreen: React.FC = () => {
   const router = useRouter();
   const [isModalVisible, setModalVisible] = useState(false);
 
-  const [username, setUsername] = useState(""); // State for username
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [avatar, setAvatar] = useState("");
   const [role, setRole] = useState("");
 
-  useEffect(() => {
-    fetchUserDetails(); // Fetch username and email on component mount
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserDetails();
+    }, [])
+  );
 
   const fetchUserDetails = async () => {
-    const storedUser = (await getSecureData("user")) || "Guest"; // Retrieve user data
-    const parsedUser = JSON.parse(storedUser);
-    setUsername(parsedUser.name);
-    setEmail(parsedUser.email); // Set the email fetched from the stored data
-    setRole(parsedUser.role);
+    try {
+      const user = await getUserData();
+      if (!user) {
+        setUsername("Guest");
+        setEmail("");
+        setAvatar("");
+        setRole("");
+        return;
+      }
+      setUsername(user?.name || "Guest");
+      setEmail(user?.email || "");
+      // Same field the Vendor side uses — it lives on the shared User
+      // schema (contactDetails.brandLogo), so it works for Organizer too.
+      setAvatar(user?.contactDetails?.brandLogo || "");
+      setRole(user?.role || "");
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+      setUsername("Guest");
+      setEmail("");
+      setAvatar("");
+    }
   };
 
   const handleMenuPress = (menuTitle: string) => {
     switch (menuTitle) {
       case 'Edit Profile':
-        if (role === "Organizer") {
-          router.push('/editprofile');
-        } else {
-          router.push('/vendoreditprofile');
-        }
+        router.push('/editprofile');
         break;
-      // case 'Notifications':
-      //   router.push('/notificationacc');
-      //   break;
       case 'Frequently Asked Questions':
         router.push('/faqs');
         break;
       case 'Contact Us':
-       // openWhatsApp(); // Open WhatsApp
-       router.push('/contactus');
+        router.push('/contactus');
         break;
       case 'Sign Out':
-        setModalVisible(true); // Show confirmation modal
+        setModalVisible(true);
         break;
       default:
         console.log(`No route found for: ${menuTitle}`);
     }
   };
 
-  const openWhatsApp = () => {
-    const phoneNumber = '923331283810'; // Replace with your WhatsApp phone number
-    const message = 'Hello, I need assistance.'; // Default message
-    const url = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
-
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        Alert.alert('Info', supported.toString());
-        Alert.alert('Info', url);
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          Alert.alert('Error', 'WhatsApp is not installed on this device you abc.');
-        }
-      })
-      .catch((err) => console.error('An error occurred', err));
-  };
-
-  // const confirmLogout = () => {
-  //   setModalVisible(false);
-  //   console.log('Signing out...');
-  //   router.push('/account');
-  // };
   const confirmLogout = async () => {
     setModalVisible(false);
     try {
-      await deleteSecureData("user");
+      await deleteSecureData("token");
+      await deleteUserData();
       await deleteSecureData("cartData");
-      console.log("Secure data deleted");
+      console.log("Logout data deleted successfully");
     } catch (error) {
-      console.error("Failed to delete secure data:", error);
+      console.error("Failed to clear logout data:", error);
     }
-    router.push('/intro'); // Navigate to login/intro page
+    router.replace('/intro');
   };
 
-
-  const cancelLogout = () => {
-    setModalVisible(false);
-  };
+  const cancelLogout = () => setModalVisible(false);
 
   const menuOptions = [
-    { title: 'Edit Profile' },
-    //{ title: 'Notifications' },
-    { title: 'Frequently Asked Questions' },
-    { title: 'Contact Us' },
-    { title: 'Sign Out' },
+    {
+      title: 'Edit Profile',
+      subtitle: 'Update your name, photo & details',
+      icon: 'person-outline' as const,
+      danger: false,
+    },
+    {
+      title: 'Frequently Asked Questions',
+      subtitle: 'Get quick answers to common queries',
+      icon: 'help-circle-outline' as const,
+      danger: false,
+    },
+    {
+      title: 'Contact Us',
+      subtitle: "We're here if you need any help",
+      icon: 'chatbubble-ellipses-outline' as const,
+      danger: false,
+    },
+    {
+      title: 'Sign Out',
+      subtitle: 'Log out of your organizer account',
+      icon: 'log-out-outline' as const,
+      danger: true,
+    },
   ];
 
-  // Get the first letter of the username for the avatar
   const avatarInitial = username ? username.charAt(0).toUpperCase() : "N/A";
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Profile Section */}
-        <View style={styles.profileContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarInitial}</Text>
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Account</Text>
+          <Text style={styles.headerSubtitle}>Manage your profile & preferences</Text>
+        </View>
+
+        <View style={styles.profileCard}>
+          <View style={styles.avatarRing}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarInitial}</Text>
+              </View>
+            )}
           </View>
+
           <View style={styles.textContainer}>
-            <Text style={styles.profileName}>{username}</Text>
-            <Text style={styles.profileEmail}>{email}</Text>
+            <Text style={styles.profileName} numberOfLines={1}>{username || 'Guest'}</Text>
+            <Text style={styles.profileEmail} numberOfLines={1}>{email}</Text>
+            <TouchableOpacity style={styles.editBadge} onPress={() => handleMenuPress('Edit Profile')}>
+              <Ionicons name="create-outline" size={13} color={PRIMARY} />
+              <Text style={styles.editBadgeText}>Edit Profile</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Menu Options */}
-        <View style={styles.menuContainer}>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+        </View>
+
+        <View style={styles.menuList}>
           {menuOptions.map((option, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.menuOption}
+              style={styles.menuCard}
+              activeOpacity={0.75}
               onPress={() => handleMenuPress(option.title)}
             >
-              <Text style={styles.menuText}>{option.title}</Text>
-              <Text style={styles.arrow}>{">"}</Text>
+              <View style={styles.menuAccentBar} />
+              <View style={[styles.menuIconWrap, option.danger && styles.menuIconWrapDanger]}>
+                <Ionicons name={option.icon} size={20} color={option.danger ? '#D64545' : PRIMARY} />
+              </View>
+              <View style={styles.menuDetails}>
+                <Text style={[styles.menuText, option.danger && styles.menuTextDanger]}>{option.title}</Text>
+                <Text style={styles.menuSubtitle} numberOfLines={1}>{option.subtitle}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#C6C6C6" />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Terms and Privacy */}
         <View style={styles.termsContainer}>
           <TouchableOpacity onPress={() => router.push("/termsofservices")}>
             <Text style={styles.termsText}>Terms of Service</Text>
@@ -152,132 +188,23 @@ const AccountScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNavigation}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/myevents")}
-        >
-          <View style={styles.iconContainer}>
-            <Image
-              source={require('@/assets/images/myevent.png')}
-              style={styles.iconImage}
-            />
-          </View>
-          <Text style={styles.navText}>My Events</Text>
-        </TouchableOpacity>
+      <BottomNavigationFinal />
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/bottommessages")}
-        >
-          <View style={styles.iconContainer}>
-            <Image
-              source={{
-                uri: "https://cdn.builder.io/api/v1/image/assets/TEMP/549e73c4-da91-40a5-a5c8-fd173b0e2a62?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
-              }}
-              style={styles.iconImage}
-            />
-          </View>
-          <Text style={styles.navText}>Messages</Text>
-        </TouchableOpacity>
-
-        {/* Home Button */}
-        {/* <TouchableOpacity
-  style={[styles.navItem, styles.homeButton]}
-  onPress={() => router.push('/dashboard')}
->
-  <View style={styles.homeButtonIconContainer}>
-    <Image
-      source={{
-        uri: "https://cdn.builder.io/api/v1/image/assets/TEMP/037c15c0-3bc9-4416-8c18-69934587461a?placeholderIfAbsent=true",
-      }}
-      style={styles.homeButtonIconImage}
-    />
-  </View>
-  <Text style={styles.navText}>Home</Text>
-</TouchableOpacity> */}
-        <TouchableOpacity
-          style={[styles.navItem, styles.homeButton]}
-          onPress={() => router.push('/dashboard')}
-        >
-          <View style={styles.homeButtonIconContainer}>
-            <Ionicons name="home" size={40} color="#fff" />
-          </View>
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
-
-
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/bottomnotification")}
-        >
-          <View style={styles.iconContainer}>
-            <Image
-              source={{
-                uri: "https://cdn.builder.io/api/v1/image/assets/TEMP/198f4cc8-49ff-4ccc-b97b-619e572143d4?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
-              }}
-              style={styles.iconImage}
-            />
-          </View>
-          <Text style={styles.navText}>Notifications</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => router.push("/account")}
-        >
-          <View style={styles.iconContainer}>
-            <Image
-              source={{
-                uri: "https://cdn.builder.io/api/v1/image/assets/TEMP/73089a6f-a9a6-4c94-9fd1-4cdd5923a137?placeholderIfAbsent=true&apiKey=0a92af3bc6e24da3a9ef8b1ae693931a",
-              }}
-              style={styles.iconImage}
-            />
-          </View>
-          <Text style={styles.navText}>Account</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Logout Confirmation Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={cancelLogout}
-        testID="logout-modal" // ✅ Add this testID
-      >
+      <Modal animationType="slide" transparent visible={isModalVisible} onRequestClose={cancelLogout} testID="logout-modal">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="log-out-outline" size={28} color="#D64545" />
+            </View>
             <Text style={styles.modalTitle}>Confirm Logout</Text>
-            <Text style={styles.modalMessage}>
-              Are you sure you want to log out?
-            </Text>
+            <Text style={styles.modalMessage}>Are you sure you want to log out?</Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={cancelLogout}
-              >
+              <TouchableOpacity style={styles.cancelButton} onPress={cancelLogout}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-
-              {/* <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={() => {
-                  confirmLogout();
-                  router.push("/intro"); // Navigate to /intro
-                }}
-              >
-                <Text style={styles.confirmButtonText}>Log Out</Text>
-              </TouchableOpacity> */}
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={confirmLogout}
-              >
+              <TouchableOpacity style={styles.confirmButton} onPress={confirmLogout}>
                 <Text style={styles.confirmButtonText}>Log Out</Text>
               </TouchableOpacity>
-
             </View>
           </View>
         </View>
@@ -287,194 +214,67 @@ const AccountScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8E9F0',
+  container: { flex: 1, backgroundColor: PRIMARY_LIGHT },
+  listContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 110 },
+  header: { marginTop: 60, marginBottom: 18, alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
+  headerSubtitle: { fontSize: 12, color: '#8A8A8A', marginTop: 2 },
+  profileCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
   },
-  content: {
-    flexGrow: 1,
-    paddingBottom: 80,
-  },
-  profileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-    paddingHorizontal: 20,
-    marginTop: 100,
+  avatarRing: {
+    width: 84, height: 84, borderRadius: 42, borderWidth: 2, borderColor: PRIMARY_LIGHT,
+    justifyContent: 'center', alignItems: 'center', padding: 3,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#780C60',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 74, height: 74, borderRadius: 37, backgroundColor: PRIMARY,
+    justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 60,
-    fontWeight: 'bold',
+  avatarText: { color: '#fff', fontSize: 34, fontWeight: 'bold' },
+  textContainer: { marginLeft: 16, flex: 1 },
+  profileName: { fontSize: 18, fontWeight: '800', color: '#1A1A1A' },
+  profileEmail: { fontSize: 13, color: '#8A8A8A', marginTop: 3 },
+  editBadge: {
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: PRIMARY_LIGHT,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, marginTop: 10,
   },
-  textContainer: {
-    marginLeft: 20,
-    flex: 1,
+  editBadgeText: { color: PRIMARY, fontSize: 12, fontWeight: '700', marginLeft: 4 },
+  sectionRow: { marginTop: 22, marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  menuList: { gap: 12 },
+  menuCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 14,
+    borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 8, elevation: 2, overflow: 'hidden',
   },
-  profileName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
+  menuAccentBar: { width: 4, alignSelf: 'stretch', backgroundColor: ACCENT, borderRadius: 4, marginRight: 12 },
+  menuIconWrap: {
+    width: 44, height: 44, borderRadius: 12, backgroundColor: PRIMARY_LIGHT,
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  profileEmail: {
-    fontSize: 14,
-    color: '#848484',
-    marginTop: 5,
+  menuIconWrapDanger: { backgroundColor: '#FCEAEA' },
+  menuDetails: { flex: 1 },
+  menuText: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
+  menuTextDanger: { color: '#D64545' },
+  menuSubtitle: { fontSize: 12, color: '#9B9B9B', marginTop: 3 },
+  termsContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 26, marginBottom: 10 },
+  termsText: { fontSize: 13, color: PRIMARY, marginHorizontal: 5, fontWeight: '600' },
+  separator: { fontSize: 13, color: '#B8B8B8' },
+  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  modalContent: { width: '82%', backgroundColor: '#fff', padding: 24, borderRadius: 18, alignItems: 'center' },
+  modalIconCircle: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#FCEAEA',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  menuContainer: {
-    backgroundColor: '#F8E9F0',
-    borderRadius: 15,
-    marginHorizontal: 20,
-    paddingVertical: 10,
-  },
-  menuOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  menuText: {
-    fontSize: 16,
-    color: '#000',
-  },
-  arrow: {
-    fontSize: 16,
-    color: '#848484',
-  },
-  termsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  termsText: {
-    fontSize: 14,
-    color: '#780C60',
-    marginHorizontal: 5,
-  },
-  separator: {
-    fontSize: 14,
-    color: '#848484',
-  },
-  bottomNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    height: 80,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-  },
-  navItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconContainer: {
-    backgroundColor: '#780C60',
-    width: 30,
-    height: 30,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  iconImage: {
-    width: 37,
-    height: 37,
-    marginBottom: 5,
-  },
-  navText: {
-    fontSize: 10,
-    color: '#000000',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  modalMessage: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  cancelButton: {
-    flex: 1,
-    marginRight: 10,
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#E0E0E0',
-    alignItems: 'center',
-  },
-  confirmButton: {
-    flex: 1,
-    marginLeft: 10,
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#780C60',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#000',
-  },
-  confirmButtonText: {
-    color: '#fff',
-  },
-  homeButtonIconContainer: {
-    backgroundColor: '#780C60',
-    width: 55,   // bigger than 30
-    height: 55,  // bigger than 30
-    borderRadius: 27.5, // half of width/height for perfect circle
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-
-  // Increase size of home button's icon image
-  homeButtonIconImage: {
-    width: 55,  // bigger than 37
-    height: 55, // bigger than 37
-    marginBottom: 0, // remove bottom margin if you want it more centered vertically
-  },
-
-  homeButton: {
-    transform: [{ translateY: -20 }], // move it more upward (from -10 to -15)
-
-  },
+  modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6, color: '#1A1A1A' },
+  modalMessage: { fontSize: 13, color: '#8A8A8A', textAlign: 'center', marginBottom: 20 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', width: '100%', gap: 12 },
+  cancelButton: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: '#F0F0F0', alignItems: 'center' },
+  confirmButton: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: PRIMARY, alignItems: 'center' },
+  cancelButtonText: { color: '#333', fontWeight: '700' },
+  confirmButtonText: { color: '#fff', fontWeight: '700' },
 });
 
 export default AccountScreen;
-function fetchUserDetails() {
-  throw new Error('Function not implemented.');
-}

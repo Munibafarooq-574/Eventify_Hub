@@ -1,7 +1,9 @@
+//fyp-mobile/components/dashboard/DashboardIndex.tsx
+//organizer Dashboard Screen
+
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import Header from './Header';
-//import SearchBar from './SearchBar';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
 import BottomNavigationFinal from './BottomNavigationFinal';

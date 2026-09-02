@@ -21,13 +21,15 @@ import {
 } from "react-native";
 
 import Toast from "react-native-toast-message";
+import * as ImagePicker from "expo-image-picker"; 
+import patchUpdateProfile from "@/services/patchUpdateProfile"; 
 
 export default function SignUpIndex() {
 
 // States
 const [isDisabled, setIsDisabled] = useState(true);
 const [isLoading, setIsLoading] = useState(false);
-
+const [avatar, setAvatar] = useState("");
 const [email, setEmail] = useState("");
 const [name, setName] = useState("");
 const [phone, setPhone] = useState("");
@@ -215,6 +217,28 @@ useEffect(() => {
   confirmError,
 ]);
 
+const pickAvatar = async () => {
+  const permission =
+    await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (!permission.granted) {
+    alert("Please allow photo access.");
+    return;
+  }
+
+  const result =
+    await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+  if (!result.canceled) {
+    setAvatar(result.assets[0].uri);
+  }
+};
+
 // Register Function
 const handleRegister = async () => {
   try {
@@ -231,14 +255,60 @@ const handleRegister = async () => {
     );
 
     await saveSecureData("token", response.token);
+
+    let finalUser = response.user;
+
+    // Optional DP selected during signup — upload it now via the existing
+    // profile-update flow.
+    if (avatar) {
+      try {
+        const userId =
+          response.user._id || response.user.userId;
+
+        const formData = new FormData();
+
+        formData.append("userId", userId);
+        formData.append("name", response.user.name);
+        formData.append("email", response.user.email);
+
+        const filename = avatar.split("/").pop()!;
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match
+          ? `image/${match[1]}`
+          : "image";
+
+        formData.append(
+          "file",
+          {
+            uri: avatar,
+            name: filename,
+            type,
+          } as any
+        );
+
+        finalUser = await patchUpdateProfile(
+          userId,
+          formData
+        );
+      } catch (uploadErr) {
+        console.error(
+          "DP upload during signup failed:",
+          uploadErr
+        );
+
+        // Account is already created successfully.
+        // User can add/change DP later from Edit Profile.
+      }
+    }
+
     await saveSecureData(
       "user",
-      JSON.stringify(response.user)
+      JSON.stringify(finalUser)
     );
 
     setIsLoading(false);
 
-    if (response.user.role === "Vendor") {
+    if (finalUser.role === "Vendor") {
       router.push("/vendorcontactdetails");
     } else {
       router.push("/dashboard");
@@ -315,7 +385,34 @@ return (
           Join Eventify Hub and start creating
           unforgettable events.
         </Text>
-      </Animated.View>
+            </Animated.View>
+
+      {/* Profile Picture (optional) */}
+      <TouchableOpacity
+        style={styles.avatarPicker}
+        onPress={pickAvatar}
+      >
+        {avatar ? (
+          <Image
+            source={{ uri: avatar }}
+            style={styles.avatarPreview}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons
+              name="camera-outline"
+              size={26}
+              color="#780C60"
+            />
+          </View>
+        )}
+
+        <Text style={styles.avatarPickerText}>
+          {avatar
+            ? "Change Photo"
+            : "Add Profile Photo (optional)"}
+        </Text>
+      </TouchableOpacity>
 
       {/* Name */}
 
@@ -570,6 +667,37 @@ return (
 );
 }
 const styles = StyleSheet.create({
+  avatarPicker: {
+    alignItems: "center",
+    marginBottom: 15,
+    marginTop: 5,
+  },
+
+  avatarPreview: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: 8,
+  },
+
+  avatarPlaceholder: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#E0C6D8",
+  },
+
+  avatarPickerText: {
+    fontSize: 13,
+    color: "#780C60",
+    fontWeight: "600",
+  },
+
   container: {
     flexGrow: 1,
     backgroundColor: "#F8E9F0",
