@@ -1,5 +1,5 @@
 import Register from "@/services/register";
-import { getSecureData, saveSecureData } from "@/store";
+import { getSecureData, saveSecureData, saveUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
@@ -301,10 +301,13 @@ const handleRegister = async () => {
       }
     }
 
-    await saveSecureData(
+        await saveSecureData(
       "user",
       JSON.stringify(finalUser)
     );
+    await saveUserData(finalUser);
+
+    setIsLoading(false);
 
     setIsLoading(false);
 

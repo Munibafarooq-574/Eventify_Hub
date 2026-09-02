@@ -4,7 +4,8 @@ import { VendorBadgeSummary } from '@/types/badge.types';
 import { getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -28,91 +29,89 @@ const COLORS = {
 
 const Header: React.FC = () => {
   const [username, setUsername] = useState(""); // State for username
-const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
+  const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
 
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [badgeMap, setBadgeMap] = useState<Record<string, VendorBadgeSummary>>({});
 
-  /*const handleSearch = async (text: string) => {
-    if (text.trim().length < 2) return;
+  const handleSearch = async (text: string) => {
+    if (text.trim().length < 2) {
+      setResults([]);
+      setBadgeMap({});
+      setShowDropdown(false);
+      return;
+    }
 
     const results = await searchVendors(text);
     console.log(results);
+
     setResults(results);
     setShowDropdown(true);
-  };*/
 
-  const handleSearch = async (text: string) => {
-  if (text.trim().length < 2) {
-    setResults([]);
-    setBadgeMap({});
-    setShowDropdown(false);
-    return;
-  }
+    try {
+      const ids = results
+        .map((item: any) => item._id)
+        .filter(Boolean);
 
-  const results = await searchVendors(text);
-  console.log(results);
+      if (ids.length === 0) {
+        setBadgeMap({});
+        return;
+      }
 
-  setResults(results);
-  setShowDropdown(true);
+      const summaries = await getVendorBadgesBulk(ids);
 
-  try {
-    const ids = results
-      .map((item: any) => item._id)
-      .filter(Boolean);
+      setBadgeMap(
+        Object.fromEntries(
+          summaries.map((summary) => [summary.vendorId, summary])
+        )
+      );
+    } catch (error) {
+      console.error('Badge lookup failed:', error);
 
-    if (ids.length === 0) {
+      // Badge failure should never break vendor search
       setBadgeMap({});
-      return;
     }
+  };
 
-    const summaries = await getVendorBadgesBulk(ids);
-
-    setBadgeMap(
-      Object.fromEntries(
-        summaries.map((summary) => [summary.vendorId, summary])
-      )
-    );
-  } catch (error) {
-    console.error('Badge lookup failed:', error);
-
-    // Badge failure should never break vendor search
-    setBadgeMap({});
-  }
-};
-
-  useEffect(() => {
-    fetchUsername(); // Fetch username on component mount
-  }, []);
+  // useFocusEffect instead of plain useEffect: Dashboard is a tab-style
+  // screen that stays mounted across navigations (e.g. signup -> dashboard,
+  // or switching tabs and coming back). A mount-only useEffect([]) would
+  // only ever run once and then keep showing stale/"Guest" data forever
+  // after that. useFocusEffect re-runs fetchUsername() every time this
+  // screen becomes focused, so it always reflects the latest AsyncStorage
+  // user data (fresh signup, login, or profile edit).
+  useFocusEffect(
+    useCallback(() => {
+      fetchUsername();
+    }, [])
+  );
 
   const fetchUsername = async () => {
-  try {
-    const user = await getUserData();
+    try {
+      const user = await getUserData();
 
-    if (!user) {
-      console.warn('No user data found in storage.');
+      if (!user) {
+        console.warn('No user data found in storage.');
+        setUsername('Guest');
+        setAvatar('');
+        return;
+      }
+
+      setUsername(user?.name || user?.username || 'Guest');
+      setAvatar(user?.contactDetails?.brandLogo || '');
+    } catch (error) {
+      console.error('fetchUsername error:', error);
       setUsername('Guest');
       setAvatar('');
-      return;
     }
-
-    setUsername(user?.name || user?.username || 'Guest');
-    setAvatar(user?.contactDetails?.brandLogo || '');
-  } catch (error) {
-    console.error('fetchUsername error:', error);
-    setUsername('Guest');
-    setAvatar('');
-  }
-};
+  };
 
   return (
     <View style={styles.container}>
       {/* Location and Notification */}
       <View style={styles.header}>
-        {/* Cart Icon */}
-
         <View style={styles.brandRow}>
           <View style={styles.logoDot} />
           <Text style={styles.brandText}>Dashboard</Text>
@@ -137,7 +136,7 @@ const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
         </View>
       </View>
 
-            {/* Welcome Section */}
+      {/* Welcome Section */}
       <View style={styles.welcomeCard}>
         <View style={styles.welcomeLeft}>
           {avatar ? (
@@ -156,8 +155,8 @@ const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
         </View>
         <TouchableOpacity
           style={styles.planButton}
-          activeOpacity={0.8} // Add touch opacity
-          onPress={() => router.push('/EventDetailsForm')} // Add navigation logic
+          activeOpacity={0.8}
+          onPress={() => router.push('/EventDetailsForm')}
         >
           <Ionicons name="add-circle-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
           <Text style={styles.planButtonText}>Plan an Event</Text>
@@ -211,29 +210,23 @@ const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
                     {item.name ? item.name.charAt(0).toUpperCase() : '?'}
                   </Text>
                 </View>
-                {/*<View style={{ flex: 1 }}>
-                  <Text style={styles.dropdownName}>{item.name}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.dropdownNameRow}>
+                    <Text style={styles.dropdownName}>{item.name}</Text>
+
+                    {badgeMap[item._id]?.hasBadges && (
+                      <View style={styles.badgeDot}>
+                        <Text style={styles.badgeIcon}>🏅</Text>
+                      </View>
+                    )}
+                  </View>
+
                   {!!item.contactDetails?.brandName && (
-                    <Text style={styles.dropdownBrand}>{item.contactDetails?.brandName}</Text>
+                    <Text style={styles.dropdownBrand}>
+                      {item.contactDetails?.brandName}
+                    </Text>
                   )}
-                </View>*/}
-                          <View style={{ flex: 1 }}>
-            <View style={styles.dropdownNameRow}>
-              <Text style={styles.dropdownName}>{item.name}</Text>
-
-              {badgeMap[item._id]?.hasBadges && (
-                <View style={styles.badgeDot}>
-                  <Text style={styles.badgeIcon}>🏅</Text>
                 </View>
-              )}
-            </View>
-
-            {!!item.contactDetails?.brandName && (
-              <Text style={styles.dropdownBrand}>
-                {item.contactDetails?.brandName}
-              </Text>
-            )}
-          </View>
                 <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
               </TouchableOpacity>
             ))}
@@ -247,41 +240,41 @@ const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
 
 const styles = StyleSheet.create({
   searchBarContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: COLORS.card,
-  borderRadius: 14,
-  paddingHorizontal: 14,
-  marginTop: 14,
-  height: 52,
-  shadowColor: COLORS.primaryDark,
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.08,
-  shadowRadius: 8,
-  elevation: 3,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginTop: 14,
+    height: 52,
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
 
-searchInput: {
-  flex: 1,
-  paddingLeft: 10,
-  paddingVertical: 0,
-  textAlignVertical: 'center',
-  color: COLORS.textDark,
-  fontSize: 14,
-},
+  searchInput: {
+    flex: 1,
+    paddingLeft: 10,
+    paddingVertical: 0,
+    textAlignVertical: 'center',
+    color: COLORS.textDark,
+    fontSize: 14,
+  },
   dropdownContainer: {
     backgroundColor: COLORS.card,
     marginTop: 8,
     borderRadius: 14,
-    elevation: 6, // shadow for Android
-    shadowColor: COLORS.primaryDark, // shadow for iOS
+    elevation: 6,
+    shadowColor: COLORS.primaryDark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     maxHeight: 240,
-    zIndex: 10, // important if using dropdown over other elements
+    zIndex: 10,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -316,23 +309,23 @@ searchInput: {
     color: COLORS.textDark,
   },
   dropdownNameRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 4,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
 
-badgeDot: {
-  backgroundColor: COLORS.bg,
-  borderRadius: 8,
-  paddingHorizontal: 4,
-  paddingVertical: 1,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-},
+  badgeDot: {
+    backgroundColor: COLORS.bg,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
 
-badgeIcon: {
-  fontSize: 10,
-},
+  badgeIcon: {
+    fontSize: 10,
+  },
   dropdownBrand: {
     fontSize: 12,
     color: COLORS.textMuted,
@@ -425,7 +418,7 @@ badgeIcon: {
     flexShrink: 1,
     paddingRight: 10,
   },
-    welcomeLeft: {
+  welcomeLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
