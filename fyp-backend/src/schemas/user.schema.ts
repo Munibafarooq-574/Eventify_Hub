@@ -584,6 +584,39 @@ export class WorkingDay {
 
 export const WorkingDaySchema = SchemaFactory.createForClass(WorkingDay);
 
+// ==========================================
+// NEW: Multi-slot day config (Phase 1 gap fix)
+// ==========================================
+
+@Schema({ _id: false })
+export class TimeSlot {
+  @Prop({ required: true })
+  start: string; // "HH:mm"
+
+  @Prop({ required: true })
+  end: string; // "HH:mm"
+}
+
+export const TimeSlotSchema = SchemaFactory.createForClass(TimeSlot);
+
+@Schema({ _id: false })
+export class DaySlotConfig {
+  @Prop({
+    required: true,
+    enum: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+  })
+  day: string;
+
+  @Prop({ default: true })
+  enabled: boolean;
+
+  // Multiple working windows for this day
+  @Prop({ type: [TimeSlotSchema], default: [] })
+  slots: TimeSlot[];
+}
+
+export const DaySlotConfigSchema = SchemaFactory.createForClass(DaySlotConfig);
+
 @Schema({ _id: false })
 export class VendorAvailabilitySettings {
   @Prop({
@@ -613,6 +646,10 @@ export class VendorAvailabilitySettings {
 
   @Prop({ default: 1, min: 1 })
   maxConcurrentBookings: number;
+
+  // NEW (Phase 1). Optional & backward-compatible
+    @Prop({ type: [DaySlotConfigSchema], default: [] })
+    daySlots: DaySlotConfig[];
 }
 
 export const VendorAvailabilitySettingsSchema =

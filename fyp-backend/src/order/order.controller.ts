@@ -69,6 +69,19 @@ async updateVendorOrderStatus(
     async completeVendor(@Param('id') vendorOrderId: string) {
         return this.orderService.completeVendorOrder(vendorOrderId);
     }
+
+        // NEW (Phase 4): organizer cancels a still-pending (REQUESTED) item
+    @Patch('vendor-order/:id/cancel-request')
+    async cancelRequest(
+        @Param('id') vendorOrderId: string,
+        @Body() body: { reason?: string },
+    ) {
+        return this.orderService.cancelVendorOrderByOrganizer(
+            vendorOrderId,
+            body?.reason,
+        );
+    }
+
     @Patch('complete-order/:id')
     async completeOrder(@Param('id') orderId: string) {
         return this.orderService.confirmOrderCompletion(orderId);
@@ -82,6 +95,12 @@ async updateVendorOrderStatus(
         return this.orderService.updateStatus(id, dto);
     }
 
+        // NEW (Phase 5 scaffold): manual trigger for now;
+    // wire to a cron in Phase 6
+    @Post('vendor-order/expire-stale-holds')
+    async expireStaleHolds() {
+        return this.orderService.expireStaleHolds();
+    }
     // Get all orders with status filtering and userId
     @Get()
     async getOrders(

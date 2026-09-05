@@ -89,30 +89,79 @@ export class VendorAvailabilityService {
     const minimumAdvanceMinutes = settings.minimumAdvanceMinutes ?? 0;
     const maxConcurrentBookings = settings.maxConcurrentBookings ?? 1;
 
-    // 1. Working day
+        // 1 & 2. Working day + hours — multi-slot aware, backward-compatible
     const dayCode = DAY_CODES[startDateTime.getDay()];
-    const workingDay = workingDays.find((d: any) => d.day === dayCode);
-    if (workingDays.length > 0 && (!workingDay || !workingDay.enabled)) {
-      return {
-        vendorId,
-        available: false,
-        reason: 'Vendor is not working on the selected day',
-      };
-    }
+    const daySlots: any[] = settings.daySlots ?? [];
+    const daySlotConfig = daySlots.find((d: any) => d.day === dayCode);
 
-    // 2. Working hours must cover the ENTIRE requested range
-    const [wsH, wsM] = workingHoursStart.split(':').map(Number);
-    const [weH, weM] = workingHoursEnd.split(':').map(Number);
-    const dayStart = new Date(startDateTime);
-    dayStart.setHours(wsH, wsM, 0, 0);
-    const dayEnd = new Date(startDateTime);
-    dayEnd.setHours(weH, weM, 0, 0);
-    if (startDateTime < dayStart || endDateTime > dayEnd) {
-      return {
-        vendorId,
-        available: false,
-        reason: 'Outside vendor working hours',
-      };
+    if (daySlotConfig) {
+      // NEW multi-slot model for this day
+      if (!daySlotConfig.enabled) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'Vendor is not working on the selected day',
+        };
+      }
+
+      const slots = daySlotConfig.slots ?? [];
+
+      if (slots.length === 0) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'No working hours configured for this day',
+        };
+      }
+
+      const fitsAnySlot = slots.some((slot: any) => {
+        const [sh, sm] = slot.start.split(':').map(Number);
+        const [eh, em] = slot.end.split(':').map(Number);
+
+        const slotStart = new Date(startDateTime);
+        slotStart.setHours(sh, sm, 0, 0);
+
+        const slotEnd = new Date(startDateTime);
+        slotEnd.setHours(eh, em, 0, 0);
+
+        return startDateTime >= slotStart && endDateTime <= slotEnd;
+      });
+
+      if (!fitsAnySlot) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'Outside vendor working hours for this day',
+        };
+      }
+    } else {
+      // Legacy single-range model (backward compatibility)
+      const workingDay = workingDays.find((d: any) => d.day === dayCode);
+
+      if (workingDays.length > 0 && (!workingDay || !workingDay.enabled)) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'Vendor is not working on the selected day',
+        };
+      }
+
+      const [wsH, wsM] = workingHoursStart.split(':').map(Number);
+      const [weH, weM] = workingHoursEnd.split(':').map(Number);
+
+      const dayStart = new Date(startDateTime);
+      dayStart.setHours(wsH, wsM, 0, 0);
+
+      const dayEnd = new Date(startDateTime);
+      dayEnd.setHours(weH, weM, 0, 0);
+
+      if (startDateTime < dayStart || endDateTime > dayEnd) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'Outside vendor working hours',
+        };
+      }
     }
 
     // 3. Blocked dates
@@ -172,26 +221,80 @@ export class VendorAvailabilityService {
 
   /** Vendor-facing calendar: booked/pending/available slots for one day. */
   async getDaySlots(vendorId: string, dateStr: string) {
-    const dayStart = new Date(dateStr);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(dateStr);
-    dayEnd.setHours(23, 59, 59, 999);
+  const vendor = await this.userModel
+    .findById(vendorId)
+    .select('availabilitySettings role')
+    .lean();
 
-    const bookings = await this.vendorOrderModel
-      .find({
-        vendorId: new Types.ObjectId(vendorId),
-        status: { $in: BLOCKING_STATUSES },
-        eventStartDateTime: { $lt: dayEnd },
-        eventEndDateTime: { $gt: dayStart },
-      })
-      .select('eventStartDateTime eventEndDateTime status serviceName')
-      .lean();
+  if (!vendor || vendor.role !== 'Vendor') {
+    throw new NotFoundException('Vendor not found');
+  }
 
-    return bookings.map((b) => ({
+  const settings: any = vendor.availabilitySettings ?? {};
+
+  const dayStart = new Date(dateStr);
+  dayStart.setHours(0, 0, 0, 0);
+
+  const dayEnd = new Date(dateStr);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  // Determine selected day code.
+  const dayCode = DAY_CODES[dayStart.getDay()];
+
+  // Get configured working slots for this day.
+  const daySlots: any[] = settings.daySlots ?? [];
+  const daySlotConfig = daySlots.find(
+    (day: any) => day.day === dayCode,
+  );
+
+  // Working slots configured by vendor.
+  let workingSlots: Array<{
+    start: string;
+    end: string;
+  }> = [];
+
+  if (daySlotConfig) {
+    // Explicit day configuration takes priority.
+    if (daySlotConfig.enabled) {
+      workingSlots = daySlotConfig.slots ?? [];
+    }
+  } else {
+    // Backward-compatible legacy working hours.
+    const workingHoursStart = settings.workingHoursStart ?? '09:00';
+    const workingHoursEnd = settings.workingHoursEnd ?? '18:00';
+
+    workingSlots = [
+      {
+        start: workingHoursStart,
+        end: workingHoursEnd,
+      },
+    ];
+  }
+
+  // Existing bookings for this day.
+  const bookings = await this.vendorOrderModel
+    .find({
+      vendorId: new Types.ObjectId(vendorId),
+      status: { $in: BLOCKING_STATUSES },
+      eventStartDateTime: { $lt: dayEnd },
+      eventEndDateTime: { $gt: dayStart },
+    })
+    .select('eventStartDateTime eventEndDateTime status serviceName')
+    .lean();
+
+  // Return working slots + booking information.
+  return {
+    vendorId,
+    date: dateStr,
+    day: dayCode,
+    enabled: daySlotConfig ? !!daySlotConfig.enabled : true,
+    workingSlots,
+    bookings: bookings.map((b) => ({
       start: b.eventStartDateTime,
       end: b.eventEndDateTime,
       status: b.status,
       serviceName: b.serviceName,
-    }));
-  }
+    })),
+  };
+}
 }

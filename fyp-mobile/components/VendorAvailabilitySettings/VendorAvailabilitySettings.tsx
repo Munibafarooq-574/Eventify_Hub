@@ -44,7 +44,19 @@ const ADVANCE_OPTIONS = [
   { label: '2 days', value: 2880 },
 ];
 
-const toKey = (d: string | Date) => new Date(d).toISOString().split('T')[0];
+type TimeSlot = {
+  start: string;
+  end: string;
+};
+
+type DaySlotConfig = {
+  day: string;
+  enabled: boolean;
+  slots: TimeSlot[];
+};
+
+const toKey = (d: string | Date) =>
+  new Date(d).toISOString().split('T')[0];
 
 const timeToDate = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number);
@@ -70,14 +82,25 @@ const VendorAvailabilitySettings = () => {
   const [workingDays, setWorkingDays] = useState(
     DAYS.map((d) => ({ day: d.code, enabled: true })),
   );
-  const [workingHoursStart, setWorkingHoursStart] = useState('09:00');
-  const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+   const [workingHoursStart, setWorkingHoursStart] = useState('09:00');
+const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
+
+const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
+
+const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [showBlockCalendar, setShowBlockCalendar] = useState(false);
+const [showEndPicker, setShowEndPicker] = useState(false);
+const [showBlockCalendar, setShowBlockCalendar] = useState(false);
+
+// Multi-slot picker state
+const [activeSlotDay, setActiveSlotDay] = useState<string | null>(null);
+const [slotPickerMode, setSlotPickerMode] = useState<'start' | 'end' | null>(
+  null,
+);
+const [draftSlotStart, setDraftSlotStart] = useState<Date>(timeToDate('09:00'));
+const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
 
   useEffect(() => {
     const load = async () => {
@@ -94,7 +117,23 @@ const VendorAvailabilitySettings = () => {
         if (data?.workingDays?.length) setWorkingDays(data.workingDays);
         if (data?.workingHoursStart) setWorkingHoursStart(data.workingHoursStart);
         if (data?.workingHoursEnd) setWorkingHoursEnd(data.workingHoursEnd);
-        if (data?.blockedDates) {
+
+if (Array.isArray(data?.daySlots)) {
+  setDaySlots(
+    data.daySlots.map((item: any) => ({
+      day: item.day,
+      enabled: item.enabled !== false,
+      slots: Array.isArray(item.slots)
+        ? item.slots.map((slot: any) => ({
+            start: slot.start,
+            end: slot.end,
+          }))
+        : [],
+    })),
+  );
+}
+
+if (data?.blockedDates) {
           setBlockedDates(data.blockedDates.map((d: string) => toKey(d)));
         }
         if (typeof data?.minimumAdvanceMinutes === 'number') {
@@ -115,38 +154,93 @@ const VendorAvailabilitySettings = () => {
     );
   };
 
-  const toggleBlockedDate = (dateStr: string) => {
+  const addSlotForDay = (day: string) => {
+  const start = timeToDate('09:00');
+  const end = timeToDate('13:00');
+
+  setActiveSlotDay(day);
+  setDraftSlotStart(start);
+  setDraftSlotEnd(end);
+  setSlotPickerMode('start');
+};
+
+const removeSlotForDay = (day: string, index: number) => {
+  setDaySlots((prev) =>
+    prev
+      .map((config) =>
+        config.day === day
+          ? {
+              ...config,
+              slots: config.slots.filter((_, i) => i !== index),
+            }
+          : config,
+      )
+      .filter((config) => config.slots.length > 0 || config.enabled === false),
+  );
+};
+
+
+const toggleBlockedDate = (dateStr: string) => {
     setBlockedDates((prev) =>
       prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr],
     );
   };
 
-  const handleSave = async () => {
-    if (!vendorId) return;
+ const handleSave = async () => {
+  if (!vendorId) return;
 
-    // Basic sanity check so vendors can't save an inverted working window
-    if (workingHoursStart >= workingHoursEnd) {
-      Alert.alert('Invalid hours', 'Working hours start must be before the end time.');
-      return;
-    }
+  // Legacy working-hours validation remains for backward compatibility.
+  if (workingHoursStart >= workingHoursEnd) {
+    Alert.alert(
+      'Invalid hours',
+      'Working hours start must be before the end time.',
+    );
+    return;
+  }
 
-    setSaving(true);
-    try {
-      await patchVendorAvailability(vendorId, {
-        workingDays,
-        workingHoursStart,
-        workingHoursEnd,
-        blockedDates,
-        minimumAdvanceMinutes,
-      });
-      Alert.alert('Saved', 'Your availability settings have been updated.');
-    } catch (error) {
-      console.error('Error saving availability settings:', error);
-      Alert.alert('Error', 'Could not save availability settings. Please try again.');
-    } finally {
-      setSaving(false);
+  // Validate every custom slot before saving.
+  for (const config of daySlots) {
+    for (const slot of config.slots) {
+      if (slot.start >= slot.end) {
+        Alert.alert(
+          'Invalid slot',
+          `${config.day}: slot end time must be after start time.`,
+        );
+        return;
+      }
     }
-  };
+  }
+
+  setSaving(true);
+
+  try {
+    await patchVendorAvailability(vendorId, {
+      // Existing fields stay untouched.
+      workingDays,
+      workingHoursStart,
+      workingHoursEnd,
+
+      // NEW: multiple working windows per day.
+      daySlots,
+
+      blockedDates,
+      minimumAdvanceMinutes,
+    });
+
+    Alert.alert(
+      'Saved',
+      'Your availability settings have been updated.',
+    );
+  } catch (error) {
+    console.error('Error saving availability settings:', error);
+    Alert.alert(
+      'Error',
+      'Could not save availability settings. Please try again.',
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const blockedMarks = blockedDates.reduce((acc: Record<string, any>, dateStr) => {
     acc[dateStr] = {
@@ -199,60 +293,167 @@ const VendorAvailabilitySettings = () => {
           })}
         </View>
 
-        {/* Working Hours */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Working Hours</Text>
-          <Text style={styles.cardSubtitle}>
-            Bookings must fit entirely inside this window.
-          </Text>
+        {/* Working Hours / Multiple Slots */}
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Working Hours</Text>
 
-          <View style={styles.hoursRow}>
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowStartPicker(true)}
-            >
-              <Ionicons name="time-outline" size={16} color={PRIMARY} />
-              <Text style={styles.timeButtonText}>
-                {formatDisplayTime(workingHoursStart)}
+  <Text style={styles.cardSubtitle}>
+    Add one or more working windows for each day. For example,
+    9 AM - 1 PM and 4 PM - 10 PM.
+  </Text>
+
+  {DAYS.map(({ code, label }) => {
+    const config = daySlots.find((item) => item.day === code);
+    const slots = config?.slots ?? [];
+
+    return (
+      <View key={code} style={styles.slotDayContainer}>
+        <View style={styles.slotDayHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowLabel}>{label}</Text>
+
+            {slots.length === 0 && (
+              <Text style={styles.slotHint}>
+                Using default working hours
               </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.hoursSeparator}>to</Text>
-
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowEndPicker(true)}
-            >
-              <Ionicons name="time-outline" size={16} color={PRIMARY} />
-              <Text style={styles.timeButtonText}>
-                {formatDisplayTime(workingHoursEnd)}
-              </Text>
-            </TouchableOpacity>
+            )}
           </View>
 
-          {showStartPicker && (
-            <DateTimePicker
-              value={timeToDate(workingHoursStart)}
-              mode="time"
-              display="default"
-              onChange={(_, selected) => {
-                setShowStartPicker(Platform.OS === 'ios');
-                if (selected) setWorkingHoursStart(dateToTime(selected));
-              }}
-            />
-          )}
-          {showEndPicker && (
-            <DateTimePicker
-              value={timeToDate(workingHoursEnd)}
-              mode="time"
-              display="default"
-              onChange={(_, selected) => {
-                setShowEndPicker(Platform.OS === 'ios');
-                if (selected) setWorkingHoursEnd(dateToTime(selected));
-              }}
-            />
-          )}
+          <Switch
+            value={config ? config.enabled : true}
+            onValueChange={() => {
+              setDaySlots((prev) => {
+                const existing = prev.find((item) => item.day === code);
+
+                if (!existing) {
+                  return [
+                    ...prev,
+                    {
+                      day: code,
+                      enabled: false,
+                      slots: [],
+                    },
+                  ];
+                }
+
+                return prev.map((item) =>
+                  item.day === code
+                    ? { ...item, enabled: !item.enabled }
+                    : item,
+                );
+              });
+            }}
+            trackColor={{ false: '#E3D3DD', true: ACCENT }}
+            thumbColor="#FFFFFF"
+          />
         </View>
+
+        {config?.enabled !== false && (
+          <>
+            {slots.map((slot, index) => (
+              <View key={`${code}-${index}`} style={styles.slotRow}>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={PRIMARY}
+                />
+
+                <Text style={styles.slotText}>
+                  {formatDisplayTime(slot.start)} -{' '}
+                  {formatDisplayTime(slot.end)}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => removeSlotForDay(code, index)}
+                  style={styles.removeSlotButton}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={17}
+                    color="#D9534F"
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addSlotButton}
+              onPress={() => addSlotForDay(code)}
+            >
+              <Ionicons name="add-circle-outline" size={17} color={PRIMARY} />
+              <Text style={styles.addSlotButtonText}>Add Slot</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  })}
+
+  {/* Existing legacy global hours remain available */}
+  <View style={styles.legacyHoursDivider}>
+    <Text style={styles.legacyHoursTitle}>
+      Default Working Hours
+    </Text>
+
+    <Text style={styles.slotHint}>
+      Used for days where no custom slots are configured.
+    </Text>
+  </View>
+
+  <View style={styles.hoursRow}>
+    <TouchableOpacity
+      style={styles.timeButton}
+      onPress={() => setShowStartPicker(true)}
+    >
+      <Ionicons name="time-outline" size={16} color={PRIMARY} />
+      <Text style={styles.timeButtonText}>
+        {formatDisplayTime(workingHoursStart)}
+      </Text>
+    </TouchableOpacity>
+
+    <Text style={styles.hoursSeparator}>to</Text>
+
+    <TouchableOpacity
+      style={styles.timeButton}
+      onPress={() => setShowEndPicker(true)}
+    >
+      <Ionicons name="time-outline" size={16} color={PRIMARY} />
+      <Text style={styles.timeButtonText}>
+        {formatDisplayTime(workingHoursEnd)}
+      </Text>
+    </TouchableOpacity>
+  </View>
+
+  {showStartPicker && (
+    <DateTimePicker
+      value={timeToDate(workingHoursStart)}
+      mode="time"
+      display="default"
+      onChange={(_, selected) => {
+        setShowStartPicker(Platform.OS === 'ios');
+
+        if (selected) {
+          setWorkingHoursStart(dateToTime(selected));
+        }
+      }}
+    />
+  )}
+
+  {showEndPicker && (
+    <DateTimePicker
+      value={timeToDate(workingHoursEnd)}
+      mode="time"
+      display="default"
+      onChange={(_, selected) => {
+        setShowEndPicker(Platform.OS === 'ios');
+
+        if (selected) {
+          setWorkingHoursEnd(dateToTime(selected));
+        }
+      }}
+    />
+  )}
+</View>
 
         {/* Minimum Advance Booking */}
         <View style={styles.card}>
@@ -329,7 +530,86 @@ const VendorAvailabilitySettings = () => {
             </View>
           )}
         </View>
-      </ScrollView>
+            </ScrollView>
+
+      {/* Multi-slot time picker */}
+      {slotPickerMode === 'start' && (
+        <DateTimePicker
+          value={draftSlotStart}
+          mode="time"
+          display="default"
+          onChange={(_, selected) => {
+            if (Platform.OS === 'android') {
+              setSlotPickerMode(null);
+            }
+
+            if (selected) {
+              setDraftSlotStart(selected);
+              setSlotPickerMode('end');
+            }
+          }}
+        />
+      )}
+
+      {slotPickerMode === 'end' && (
+        <DateTimePicker
+          value={draftSlotEnd}
+          mode="time"
+          display="default"
+          onChange={(_, selected) => {
+            setSlotPickerMode(null);
+
+            if (selected) {
+              setDraftSlotEnd(selected);
+
+              // Android fires the callback immediately.
+              // Confirm after receiving the selected end time.
+              if (draftSlotStart < selected) {
+                const newSlot: TimeSlot = {
+                  start: dateToTime(draftSlotStart),
+                  end: dateToTime(selected),
+                };
+
+                if (activeSlotDay) {
+                  setDaySlots((prev) => {
+                    const existing = prev.find(
+                      (item) => item.day === activeSlotDay,
+                    );
+
+                    if (!existing) {
+                      return [
+                        ...prev,
+                        {
+                          day: activeSlotDay,
+                          enabled: true,
+                          slots: [newSlot],
+                        },
+                      ];
+                    }
+
+                    return prev.map((item) =>
+                      item.day === activeSlotDay
+                        ? {
+                            ...item,
+                            enabled: true,
+                            slots: [...item.slots, newSlot],
+                          }
+                        : item,
+                    );
+                  });
+                }
+
+                setActiveSlotDay(null);
+              } else {
+                Alert.alert(
+                  'Invalid slot',
+                  'End time must be after start time.',
+                );
+              }
+            }
+          }}
+        />
+      )}
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -408,7 +688,76 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   timeButtonText: { fontSize: 13, fontWeight: '700', color: PRIMARY },
-  hoursSeparator: { fontSize: 12, color: '#8A8A8A' },
+    hoursSeparator: { fontSize: 12, color: '#8A8A8A' },
+
+  slotDayContainer: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5EAF1',
+  },
+
+  slotDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  slotHint: {
+    fontSize: 10,
+    color: '#999999',
+    marginTop: 2,
+  },
+
+  slotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY_LIGHT,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    marginTop: 7,
+    gap: 7,
+  },
+
+  slotText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: PRIMARY,
+  },
+
+  removeSlotButton: {
+    padding: 3,
+  },
+
+  addSlotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 5,
+  },
+
+  addSlotButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
+
+  legacyHoursDivider: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F0DDEA',
+  },
+
+  legacyHoursTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#333333',
+  },
+
   chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1.5,

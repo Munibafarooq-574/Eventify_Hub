@@ -14,6 +14,10 @@ import { User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 
+// Phase 5 scaffold: how long a vendor's acceptance holds the slot before
+// payment is required. Configurable via env, not hardcoded.
+const DEFAULT_HOLD_HOURS = Number(process.env.BOOKING_HOLD_HOURS) || 24;
+
 @Injectable()
 export class OrderService {
     constructor(
@@ -226,18 +230,37 @@ try {
         .lean()
         .exec();
 
-    if (type === 'Vendor') {
-        return orders.map((order: any) => {
-            order.vendorOrders = (order.vendorOrders || []).filter(
-                (vo: any) => {
-                    const vendorIdOnItem =
-                        vo.vendorId?._id ?? vo.vendorId;
+        if (type === 'Vendor') {
+        // Fetch the vendor's own down payment config once (reused field,
+        // no duplicate). Only needed for the vendor's own request list.
+        const vendorUser = await this.userModel.findById(userId).lean();
+        const downPaymentConfig = this.getDownPaymentConfig(vendorUser);
 
-                    return (
-                        vendorIdOnItem?.toString() === userId
-                    );
-                },
-            );
+        return orders.map((order: any) => {
+            order.vendorOrders = (order.vendorOrders || [])
+                .filter((vo: any) => {
+                    const vendorIdOnItem = vo.vendorId?._id ?? vo.vendorId;
+                    return vendorIdOnItem?.toString() === userId;
+                })
+                .map((vo: any) => {
+                    if (!downPaymentConfig) {
+                        return vo;
+                    }
+
+                    const downPaymentAmount =
+                        downPaymentConfig.type === 'PERCENTAGE'
+                            ? Math.round((vo.price * downPaymentConfig.value) / 100)
+                            : downPaymentConfig.value;
+
+                    return {
+                        ...vo,
+                        downPaymentType: downPaymentConfig.type,
+                        downPaymentPercentage:
+                            downPaymentConfig.type === 'PERCENTAGE' ? downPaymentConfig.value : null,
+                        downPaymentAmount,
+                        remainingAmount: vo.price - downPaymentAmount,
+                    };
+                });
 
             return order;
         });
@@ -395,6 +418,7 @@ try {
 
     return vendorOrder;
 }
+
     // Update vendor order status (accepted/rejected)
     async updateVendorResponse(vendorOrderId: string, status: 'accepted' | 'rejected', message?: string) {
         const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
@@ -407,7 +431,123 @@ try {
         if (message) {
             vendorOrder.message = message;
         }
-        return vendorOrder.save();
+
+        if (status === 'accepted') {
+            const now = new Date();
+            vendorOrder.acceptedAt = now;
+            vendorOrder.holdExpiresAt = new Date(
+                now.getTime() + DEFAULT_HOLD_HOURS * 60 * 60000,
+            );
+        }
+
+        const saved = await vendorOrder.save();
+
+        // Notify organizer (reuses existing notification pipeline)
+        try {
+            const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
+            if (order) {
+                const title = status === 'accepted' ? 'Booking request accepted' : 'Booking request rejected';
+                const body = status === 'accepted'
+                    ? `Your request for ${vendorOrder.serviceName} was accepted.`
+                    : `Your request for ${vendorOrder.serviceName} was rejected.`;
+                await this.sendPushNotification(title, body, order.organizerId.toString(), 'VENDOR_RESPONSE');
+            }
+        } catch (error) {
+            console.log(error);
+        }
+
+        return saved;
+    }
+
+    // ===== NEW (Phase 4): organizer cancels a still-REQUESTED (pending) item =====
+    async cancelVendorOrderByOrganizer(vendorOrderId: string, reason?: string) {
+        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
+
+        if (!vendorOrder) {
+            throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
+        }
+
+        if (vendorOrder.status !== 'pending') {
+            throw new ConflictException(
+                'Only a requested (pending) booking can be cancelled by the organizer this way.',
+            );
+        }
+
+        vendorOrder.status = 'cancelled';
+        vendorOrder.cancelledBy = 'organizer';
+        vendorOrder.cancelledAt = new Date();
+        vendorOrder.cancellationReason = reason || null;
+
+        const saved = await vendorOrder.save();
+
+        try {
+            await this.sendPushNotification(
+                'Booking request cancelled',
+                `The organizer cancelled their request for ${vendorOrder.serviceName}.`,
+                vendorOrder.vendorId.toString(),
+                'ORGANIZER_CANCELLED_REQUEST',
+            );
+        } catch (error) {
+            console.log(error);
+        }
+
+        return saved;
+    }
+
+    // ===== NEW (Phase 5 scaffold): expire stale accepted-but-unpaid holds =====
+    // Not wired to a cron job yet — call manually / via admin endpoint until
+    // Phase 6 (payment) exists, so no currently-accepted booking is affected
+    // unintentionally.
+    async expireStaleHolds() {
+        const now = new Date();
+
+        const stale = await this.vendorOrderModel.find({
+            status: 'accepted',
+            holdExpiresAt: { $ne: null, $lt: now },
+        });
+
+        for (const vendorOrder of stale) {
+            vendorOrder.status = 'expired';
+            await vendorOrder.save();
+
+            try {
+                const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
+                if (order) {
+                    await this.sendPushNotification(
+                        'Booking hold expired',
+                        `Your accepted request for ${vendorOrder.serviceName} expired before payment.`,
+                        order.organizerId.toString(),
+                        'HOLD_EXPIRED',
+                    );
+                }
+            } catch (error) {
+                console.log(error);
+            }
+        }
+
+        return { expiredCount: stale.length };
+    }
+
+    // ===== NEW (Phase 4): down payment info for vendor request details =====
+    // Reuses the EXISTING per-category downPayment field — no duplicate field.
+    private getDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
+        const businessDetails =
+            vendorUser?.photographerBusinessDetails ||
+            vendorUser?.cateringBusinessDetails ||
+            vendorUser?.venueBusinessDetails ||
+            vendorUser?.salonBusinessDetails ||
+            vendorUser?.cakeBusinessDetails ||
+            vendorUser?.mehndiBusinessDetails ||
+            vendorUser?.soundBusinessDetails;
+
+        if (!businessDetails || businessDetails.downPayment == null) {
+            return null;
+        }
+
+        return {
+            type: businessDetails.downPaymentType || 'PERCENTAGE',
+            value: businessDetails.downPayment,
+        };
     }
 
     // Mark a vendor order as completed
