@@ -13,6 +13,8 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
+import { PayoutService } from 'src/payout/payout.service';
+import { CommissionConfig } from 'src/schemas/commission-config.schema';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -20,7 +22,7 @@ const DEFAULT_HOLD_HOURS = Number(process.env.BOOKING_HOLD_HOURS) || 24;
 
 @Injectable()
 export class OrderService {
-    constructor(
+  constructor(
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
 
@@ -33,10 +35,14 @@ export class OrderService {
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<Notification>,
 
+    @InjectModel(CommissionConfig.name)
+    private readonly commissionConfigModel: Model<CommissionConfig>,
+
     @InjectConnection()
     private readonly connection: Connection,
 
     private readonly availabilityService: VendorAvailabilityService,
+    private readonly payoutService: PayoutService,
 ) { }
 
             // Create a new order
@@ -380,6 +386,23 @@ try {
         throw new NotFoundException('Vendor order not found');
     }
 
+        // Phase 8: if vendor order is completed and fully paid,
+    // automatically create the payout ledger entry.
+    if (mappedStatus === 'completed') {
+        try {
+            if (vendorOrder.paymentStatus === 'PAID') {
+                await this.payoutService.createPayoutIfEligible(
+                    vendorOrderId,
+                );
+            }
+        } catch (error) {
+            console.log(
+                'Payout not created yet:',
+                error instanceof Error ? error.message : error,
+            );
+        }
+    }
+
     // Find the parent Order
     const order = await this.orderModel.findOne({
         vendorOrders: vendorOrder._id,
@@ -433,12 +456,68 @@ try {
         }
 
         if (status === 'accepted') {
-            const now = new Date();
-            vendorOrder.acceptedAt = now;
-            vendorOrder.holdExpiresAt = new Date(
-                now.getTime() + DEFAULT_HOLD_HOURS * 60 * 60000,
-            );
-        }
+    const now = new Date();
+
+    vendorOrder.acceptedAt = now;
+
+    vendorOrder.holdExpiresAt = new Date(
+        now.getTime() + DEFAULT_HOLD_HOURS * 60 * 60000,
+    );
+
+    // ===== NEW (Phase 6): compute + snapshot down payment =====
+    const vendorUser = await this.userModel
+        .findById(vendorOrder.vendorId)
+        .lean();
+
+    const downPaymentConfig = this.getDownPaymentConfig(vendorUser);
+
+    if (downPaymentConfig) {
+        const downPaymentAmount =
+            downPaymentConfig.type === 'PERCENTAGE'
+                ? Math.round(
+                    (vendorOrder.price * downPaymentConfig.value) / 100,
+                )
+                : downPaymentConfig.value;
+
+        vendorOrder.downPaymentType = downPaymentConfig.type;
+
+        vendorOrder.downPaymentPercentage =
+            downPaymentConfig.type === 'PERCENTAGE'
+                ? downPaymentConfig.value
+                : null;
+
+        vendorOrder.downPaymentAmount = downPaymentAmount;
+
+        vendorOrder.remainingAmount =
+            vendorOrder.price - downPaymentAmount;
+    } else {
+        // No down payment configured:
+        // full booking price is treated as the required payment.
+        vendorOrder.downPaymentType = 'FIXED';
+        vendorOrder.downPaymentPercentage = null;
+        vendorOrder.downPaymentAmount = vendorOrder.price;
+        vendorOrder.remainingAmount = 0;
+    }
+
+    vendorOrder.paymentStatus = 'PAYMENT_REQUIRED';
+    vendorOrder.paymentDeadline = vendorOrder.holdExpiresAt;
+
+    // ===== Phase 13: commission snapshot =====
+// Current platform commission is 0%, so vendor receives 100%.
+const commissionConfig = await this.commissionConfigModel.findOne();
+
+const commissionPercentage =
+    commissionConfig?.platformCommissionPercentage ?? 0;
+
+vendorOrder.commissionPercentageAtBooking = commissionPercentage;
+
+vendorOrder.commissionAmount = Math.round(
+    (vendorOrder.price * commissionPercentage) / 100,
+);
+
+vendorOrder.vendorNetAmount =
+    vendorOrder.price - vendorOrder.commissionAmount;
+}
 
         const saved = await vendorOrder.save();
 
@@ -499,34 +578,40 @@ try {
     // Phase 6 (payment) exists, so no currently-accepted booking is affected
     // unintentionally.
     async expireStaleHolds() {
-        const now = new Date();
+    const now = new Date();
 
-        const stale = await this.vendorOrderModel.find({
-            status: 'accepted',
-            holdExpiresAt: { $ne: null, $lt: now },
-        });
+    const stale = await this.vendorOrderModel.find({
+        status: 'accepted',
+        holdExpiresAt: { $ne: null, $lt: now },
+        paymentStatus: { $ne: 'PAID' },
+    });
 
-        for (const vendorOrder of stale) {
-            vendorOrder.status = 'expired';
-            await vendorOrder.save();
+    for (const vendorOrder of stale) {
+        vendorOrder.status = 'expired';
+        vendorOrder.paymentStatus = 'PAYMENT_EXPIRED';
 
-            try {
-                const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
-                if (order) {
-                    await this.sendPushNotification(
-                        'Booking hold expired',
-                        `Your accepted request for ${vendorOrder.serviceName} expired before payment.`,
-                        order.organizerId.toString(),
-                        'HOLD_EXPIRED',
-                    );
-                }
-            } catch (error) {
-                console.log(error);
+        await vendorOrder.save();
+
+        try {
+            const order = await this.orderModel.findOne({
+                vendorOrders: vendorOrder._id,
+            });
+
+            if (order) {
+                await this.sendPushNotification(
+                    'Booking hold expired',
+                    `Your accepted request for ${vendorOrder.serviceName} expired before payment.`,
+                    order.organizerId.toString(),
+                    'HOLD_EXPIRED',
+                );
             }
+        } catch (error) {
+            console.log(error);
         }
-
-        return { expiredCount: stale.length };
     }
+
+    return { expiredCount: stale.length };
+}
 
     // ===== NEW (Phase 4): down payment info for vendor request details =====
     // Reuses the EXISTING per-category downPayment field — no duplicate field.
@@ -551,16 +636,32 @@ try {
     }
 
     // Mark a vendor order as completed
-    async completeVendorOrder(vendorOrderId: string) {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
+async completeVendorOrder(vendorOrderId: string) {
+    const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
 
-        if (!vendorOrder) {
-            throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
-        }
-
-        vendorOrder.status = 'completed';
-        return vendorOrder.save();
+    if (!vendorOrder) {
+        throw new NotFoundException(
+            `Vendor Order with ID ${vendorOrderId} not found`,
+        );
     }
+
+    vendorOrder.status = 'completed';
+
+    const saved = await vendorOrder.save();
+
+    try {
+        if (saved.paymentStatus === 'PAID') {
+            await this.payoutService.createPayoutIfEligible(vendorOrderId);
+        }
+    } catch (error) {
+        console.log(
+            'Payout not created yet:',
+            error instanceof Error ? error.message : error,
+        );
+    }
+
+    return saved;
+}
 
     // Delete an order from the database
     async deleteOrder(orderId: string): Promise<any> {

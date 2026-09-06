@@ -39,6 +39,12 @@ async getPackages(@Query('userId') userId: string) {
 async getVendorAnalytics(@Param('id') id: string) {
     return this.vendorAnalyticsService.getVendorAnalytics(id);
 }
+
+@Get('reliability/:id')
+async getVendorReliability(@Param('id') id: string) {
+    return this.vendorAnalyticsService.getVendorReliability(id);
+}
+
  @Get('contact-details/:userId')
      async getContactDetails(@Param('userId') userId: string) {
     return this.vendorService.getContactDetails(userId);

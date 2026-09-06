@@ -13,8 +13,11 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { VendorAvailabilityModule } from './vendor-availability/vendor-availability.module';
-
-
+import { PaymentModule } from './payment/payment.module';
+import { PayoutModule } from './payout/payout.module';
+import { CancellationModule } from './cancellation/cancellation.module';
+import { BookingChangeModule } from './booking-change/booking-change.module';
+import { AdminModule } from './admin/admin.module';
 
 
 @Module({
@@ -31,6 +34,11 @@ import { VendorAvailabilityModule } from './vendor-availability/vendor-availabil
     ReviewsModule,
     NotificationsModule,
     VendorAvailabilityModule,
+    PaymentModule,
+    PayoutModule,
+    CancellationModule,
+    BookingChangeModule,
+    AdminModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       exclude: ['/api/(.*)'],

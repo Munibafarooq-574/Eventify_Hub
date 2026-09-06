@@ -103,6 +103,52 @@ export class VendorAnalyticsService {
         };
     }
 
+    async getVendorReliability(vendorId: string) {
+    const totalCompleted = await this.vendorOrderModel.countDocuments({
+        vendorId,
+        status: 'completed',
+    });
+
+    const totalCancelledByVendor =
+        await this.vendorOrderModel.countDocuments({
+            vendorId,
+            status: 'cancelled_by_vendor',
+        });
+
+    const totalRelevantBookings =
+        totalCompleted + totalCancelledByVendor;
+
+    const cancellationRate =
+        totalRelevantBookings > 0
+            ? Math.round(
+                  (totalCancelledByVendor / totalRelevantBookings) * 1000,
+              ) / 10
+            : 0;
+
+    // Reliability score starts at 100 and drops
+    // based on vendor cancellation rate.
+    const reliabilityScore = Math.max(
+        0,
+        Math.round(100 - cancellationRate * 2),
+    );
+
+    let warningLevel: 'NONE' | 'WARNING' | 'RESTRICTED' = 'NONE';
+
+    if (cancellationRate >= 20) {
+        warningLevel = 'RESTRICTED';
+    } else if (cancellationRate >= 10) {
+        warningLevel = 'WARNING';
+    }
+
+    return {
+        completedBookings: totalCompleted,
+        cancelledBookings: totalCancelledByVendor,
+        cancellationRate,
+        reliabilityScore,
+        warningLevel,
+    };
+}
+
     // ---------------------------------------------------------------
     // Orders / Revenue
     //
