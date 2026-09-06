@@ -246,18 +246,30 @@ export default async function postPlaceOrder(
         }
       );
 
-      // Backend error message
-      const backendMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        error.response?.data;
+            // Backend error message — handle both flat and nested NestJS shapes
+      const responseData = error.response?.data;
+      let backendMessage: string | undefined;
+
+      if (responseData) {
+        if (typeof responseData.message === "string") {
+          // Flat shape: { message: "some text", statusCode }
+          backendMessage = responseData.message;
+        } else if (
+          responseData.message &&
+          typeof responseData.message === "object"
+        ) {
+          // Nested shape: { message: { message: "some text", error, statusCode } }
+          backendMessage =
+            responseData.message.message || responseData.message.error;
+        } else if (typeof responseData.error === "string") {
+          backendMessage = responseData.error;
+        } else if (Array.isArray(responseData.message)) {
+          backendMessage = responseData.message.join(", ");
+        }
+      }
 
       if (backendMessage) {
-        throw new Error(
-          Array.isArray(backendMessage)
-            ? backendMessage.join(", ")
-            : String(backendMessage)
-        );
+        throw new Error(backendMessage);
       }
 
       throw new Error(

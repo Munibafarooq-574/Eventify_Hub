@@ -1,11 +1,9 @@
 import getVendorOrders from "@/services/getVendorOrders";
 import getVendorAvailability from "@/services/getVendorAvailability";
 import { getUserData } from "@/store";
-
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-
 import {
   ActivityIndicator,
   Dimensions,
@@ -17,7 +15,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
 import { Calendar } from "react-native-calendars";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
@@ -30,27 +27,37 @@ const ACCENT_LIGHT = "#F0DDEA";
 
 type ViewMode = "day" | "upcoming" | "month" | "past";
 
-type AvailabilitySettings = {
-  workingDays?: {
-    day: string;
-    enabled: boolean;
-  }[];
+type WorkingDay = {
+  day: string;
+  enabled: boolean;
+};
 
+type TimeSlotConfig = {
+  start: string;
+  end: string;
+};
+
+type DaySlotConfig = {
+  day: string;
+  enabled: boolean;
+  slots: TimeSlotConfig[];
+};
+
+type AvailabilitySettings = {
+  workingDays?: WorkingDay[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
-
+  daySlots?: DaySlotConfig[];
   blockedDates?: string[];
-
   minimumAdvanceMinutes?: number;
-
   maxConcurrentBookings?: number;
 };
 
-type DaySlot = {
+type GeneratedSlot = {
   start: string;
   end: string;
-  status: string;
-  serviceName?: string;
+  status: "available" | "booked";
+  booking?: any;
 };
 
 const FILTERS: {
@@ -80,8 +87,21 @@ const FILTERS: {
   },
 ];
 
-const toKey = (d: string | Date) =>
-  new Date(d).toISOString().split("T")[0];
+/**
+ * ---------------------------------------------------------
+ * DATE / TIME HELPERS
+ * ---------------------------------------------------------
+ */
+
+const toKey = (date: string | Date) => {
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+
+  return d.toISOString().split("T")[0];
+};
 
 const formatTime = (date: Date) => {
   return date.toLocaleTimeString("en-US", {
@@ -94,9 +114,18 @@ const parseTime = (time: string) => {
   const [h, m] = time.split(":").map(Number);
 
   const date = new Date();
-  date.setHours(h, m, 0, 0);
+  date.setHours(
+    Number.isFinite(h) ? h : 0,
+    Number.isFinite(m) ? m : 0,
+    0,
+    0
+  );
 
   return date;
+};
+
+const addMinutes = (date: Date, minutes: number) => {
+  return new Date(date.getTime() + minutes * 60000);
 };
 
 const minutesBetween = (start: string, end: string) => {
@@ -104,10 +133,6 @@ const minutesBetween = (start: string, end: string) => {
   const e = parseTime(end);
 
   return Math.max(0, (e.getTime() - s.getTime()) / 60000);
-};
-
-const addMinutes = (date: Date, minutes: number) => {
-  return new Date(date.getTime() + minutes * 60000);
 };
 
 const formatMinutes = (minutes: number) => {
@@ -125,6 +150,12 @@ const formatMinutes = (minutes: number) => {
   return `${hours} hr ${mins} min`;
 };
 
+/**
+ * ---------------------------------------------------------
+ * STATUS HELPERS
+ * ---------------------------------------------------------
+ */
+
 const getStatusColor = (status?: string) => {
   switch ((status || "").toLowerCase()) {
     case "pending":
@@ -138,6 +169,7 @@ const getStatusColor = (status?: string) => {
 
     case "cancelled":
     case "rejected":
+    case "expired":
       return "#C0392B";
 
     default:
@@ -158,11 +190,34 @@ const getStatusBackground = (status?: string) => {
 
     case "cancelled":
     case "rejected":
+    case "expired":
       return "#FDEBEC";
 
     default:
       return PRIMARY_LIGHT;
   }
+};
+
+/**
+ * ---------------------------------------------------------
+ * DAY CODE HELPER
+ * ---------------------------------------------------------
+ */
+
+const getDayCode = (dateString: string) => {
+  const day = new Date(`${dateString}T12:00:00`);
+
+  const dayCodes = [
+    "SUN",
+    "MON",
+    "TUE",
+    "WED",
+    "THU",
+    "FRI",
+    "SAT",
+  ];
+
+  return dayCodes[day.getDay()];
 };
 
 const MyEventsScreen = () => {
@@ -202,15 +257,18 @@ const MyEventsScreen = () => {
         throw new Error("Vendor user not found");
       }
 
-      setVendorId(user._id);
+      setVendorId(String(user._id));
 
       const [ordersData, availabilityData] = await Promise.all([
         getVendorOrders("Vendor", user._id),
         getVendorAvailability(user._id),
       ]);
 
-      setOrders(ordersData || []);
-      setAvailability(availabilityData || {});
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+
+      setAvailability(
+        availabilityData || {}
+      );
     } catch (error) {
       console.error("Error fetching vendor events:", error);
     } finally {
@@ -230,6 +288,128 @@ const MyEventsScreen = () => {
 
   /**
    * ---------------------------------------------------------
+   * IMPORTANT:
+   * GET THE CURRENT VENDOR'S OWN VENDOR ORDER
+   *
+   * This prevents Vendor A's status from being displayed
+   * for Vendor B.
+   * ---------------------------------------------------------
+   */
+
+  const getOwnVendorOrders = useCallback(
+    (order: any): any[] => {
+      if (!Array.isArray(order?.vendorOrders)) {
+        return [];
+      }
+
+      /**
+       * If backend already returns only this vendor's
+       * vendorOrders, return them directly.
+       */
+      const ownOrders = order.vendorOrders.filter((vendorOrder: any) => {
+        const currentVendorId = vendorOrder?.vendorId;
+
+        const normalizedVendorId =
+          typeof currentVendorId === "object"
+            ? currentVendorId?._id
+            : currentVendorId;
+
+        if (!vendorId || !normalizedVendorId) {
+          return false;
+        }
+
+        return (
+          String(normalizedVendorId) === String(vendorId)
+        );
+      });
+
+      /**
+       * If vendorOrders are already filtered by backend
+       * and vendorId isn't available inside them, fallback
+       * to all vendorOrders returned.
+       */
+      if (ownOrders.length > 0) {
+        return ownOrders;
+      }
+
+      return order.vendorOrders;
+    },
+    [vendorId]
+  );
+
+  /**
+   * ---------------------------------------------------------
+   * GET VENDOR-SPECIFIC STATUS
+   * ---------------------------------------------------------
+   *
+   * Parent Order.status MUST NOT be blindly used here.
+   *
+   * Example:
+   *
+   * Order
+   * ├── Vendor A → accepted
+   * └── Vendor B → pending
+   *
+   * Vendor A screen must show "accepted"
+   * Vendor B screen must show "pending"
+   * ---------------------------------------------------------
+   */
+
+  const getVendorStatus = useCallback(
+    (order: any) => {
+      const ownVendorOrders = getOwnVendorOrders(order);
+
+      if (ownVendorOrders.length > 0) {
+        /**
+         * Normally there should be one VendorOrder
+         * for this vendor.
+         *
+         * If there are multiple services under the same vendor,
+         * prioritize the first meaningful status.
+         */
+        const statuses = ownVendorOrders
+          .map((vendorOrder: any) =>
+            String(vendorOrder?.status || "").toLowerCase()
+          )
+          .filter(Boolean);
+
+        if (statuses.includes("pending")) {
+          return "pending";
+        }
+
+        if (statuses.includes("accepted")) {
+          return "accepted";
+        }
+
+        if (statuses.includes("completed")) {
+          return "completed";
+        }
+
+        if (statuses.includes("cancelled")) {
+          return "cancelled";
+        }
+
+        if (statuses.includes("rejected")) {
+          return "rejected";
+        }
+
+        if (statuses.includes("expired")) {
+          return "expired";
+        }
+
+        return statuses[0] || order?.status;
+      }
+
+      /**
+       * Legacy fallback.
+       */
+      return order?.status;
+    },
+    [getOwnVendorOrders]
+  );
+
+  /**
+   * ---------------------------------------------------------
    * STATS
    * ---------------------------------------------------------
    */
@@ -237,8 +417,12 @@ const MyEventsScreen = () => {
   const stats = useMemo(() => {
     const now = new Date();
 
-    const thisMonth = orders.filter((o) => {
-      const d = new Date(o.eventDate);
+    const thisMonth = orders.filter((order) => {
+      if (!order?.eventDate) {
+        return false;
+      }
+
+      const d = new Date(order.eventDate);
 
       return (
         d.getMonth() === now.getMonth() &&
@@ -246,13 +430,24 @@ const MyEventsScreen = () => {
       );
     });
 
-    const upcoming = orders.filter(
-      (o) => toKey(o.eventDate) >= todayKey
-    );
+    const upcoming = orders.filter((order) => {
+      if (!order?.eventDate) {
+        return false;
+      }
 
-    const pending = orders.filter(
-      (o) => String(o.status).toLowerCase() === "pending"
-    );
+      return toKey(order.eventDate) >= todayKey;
+    });
+
+    /**
+     * IMPORTANT:
+     * Pending count now uses vendor-specific status.
+     */
+    const pending = orders.filter((order) => {
+      return (
+        String(getVendorStatus(order) || "").toLowerCase() ===
+        "pending"
+      );
+    });
 
     return {
       total: orders.length,
@@ -260,7 +455,7 @@ const MyEventsScreen = () => {
       upcoming: upcoming.length,
       pending: pending.length,
     };
-  }, [orders, todayKey]);
+  }, [orders, todayKey, getVendorStatus]);
 
   /**
    * ---------------------------------------------------------
@@ -275,13 +470,19 @@ const MyEventsScreen = () => {
 
     if (viewMode === "day") {
       list = orders.filter(
-        (o) => toKey(o.eventDate) === selectedDate
+        (order) =>
+          order?.eventDate &&
+          toKey(order.eventDate) === selectedDate
       );
     }
 
     if (viewMode === "upcoming") {
       list = orders
-        .filter((o) => toKey(o.eventDate) >= todayKey)
+        .filter(
+          (order) =>
+            order?.eventDate &&
+            toKey(order.eventDate) >= todayKey
+        )
         .sort(
           (a, b) =>
             new Date(a.eventDate).getTime() -
@@ -291,8 +492,12 @@ const MyEventsScreen = () => {
 
     if (viewMode === "month") {
       list = orders
-        .filter((o) => {
-          const d = new Date(o.eventDate);
+        .filter((order) => {
+          if (!order?.eventDate) {
+            return false;
+          }
+
+          const d = new Date(order.eventDate);
 
           return (
             d.getMonth() === now.getMonth() &&
@@ -308,7 +513,11 @@ const MyEventsScreen = () => {
 
     if (viewMode === "past") {
       list = orders
-        .filter((o) => toKey(o.eventDate) < todayKey)
+        .filter(
+          (order) =>
+            order?.eventDate &&
+            toKey(order.eventDate) < todayKey
+        )
         .sort(
           (a, b) =>
             new Date(b.eventDate).getTime() -
@@ -317,7 +526,12 @@ const MyEventsScreen = () => {
     }
 
     return list;
-  }, [orders, viewMode, selectedDate, todayKey]);
+  }, [
+    orders,
+    viewMode,
+    selectedDate,
+    todayKey,
+  ]);
 
   /**
    * ---------------------------------------------------------
@@ -329,8 +543,33 @@ const MyEventsScreen = () => {
     (date: string) => {
       return (
         availability?.blockedDates?.some(
-          (d) => toKey(d) === date
+          (blockedDate) =>
+            toKey(blockedDate) === date
         ) || false
+      );
+    },
+    [availability]
+  );
+
+  /**
+   * ---------------------------------------------------------
+   * MULTI-SLOT WORKING DAY
+   * ---------------------------------------------------------
+   *
+   * Priority:
+   *
+   * 1. daySlots
+   * 2. legacy workingDays
+   * 3. default true
+   * ---------------------------------------------------------
+   */
+
+  const getDaySlotConfig = useCallback(
+    (date: string) => {
+      const dayCode = getDayCode(date);
+
+      return availability?.daySlots?.find(
+        (config) => config.day === dayCode
       );
     },
     [availability]
@@ -338,58 +577,136 @@ const MyEventsScreen = () => {
 
   const isWorkingDay = useCallback(
     (date: string) => {
-      const day = new Date(`${date}T12:00:00`);
+      /**
+       * NEW MULTI-SLOT SYSTEM
+       */
+      if (availability?.daySlots?.length) {
+        const config = getDaySlotConfig(date);
 
-      const dayCodes = [
-        "SUN",
-        "MON",
-        "TUE",
-        "WED",
-        "THU",
-        "FRI",
-        "SAT",
-      ];
+        /**
+         * If this particular day exists in daySlots,
+         * it becomes the source of truth.
+         */
+        if (config) {
+          return config.enabled === true;
+        }
+      }
 
-      const code = dayCodes[day.getDay()];
-
+      /**
+       * LEGACY SYSTEM
+       */
       if (!availability?.workingDays?.length) {
         return true;
       }
 
-      const workingDay = availability.workingDays.find(
-        (item) => item.day === code
-      );
+      const code = getDayCode(date);
+
+      const workingDay =
+        availability.workingDays.find(
+          (item) => item.day === code
+        );
 
       return !!workingDay?.enabled;
     },
-    [availability]
+    [
+      availability,
+      getDaySlotConfig,
+    ]
   );
 
   /**
-   * Existing bookings for selected date.
-   *
-   * Vendor order data may already contain:
-   * eventStartDateTime
-   * eventEndDateTime
-   *
-   * If only eventDate exists, it will still be shown
-   * as a booking day.
+   * ---------------------------------------------------------
+   * SELECTED DAY BOOKINGS
+   * ---------------------------------------------------------
    */
 
   const selectedDayBookings = useMemo(() => {
     return orders.filter(
-      (order) => toKey(order.eventDate) === selectedDate
+      (order) =>
+        order?.eventDate &&
+        toKey(order.eventDate) === selectedDate
     );
   }, [orders, selectedDate]);
 
   /**
    * ---------------------------------------------------------
-   * GENERATE PROFESSIONAL DAY AVAILABILITY
+   * GET WORKING WINDOWS FOR SELECTED DAY
+   * ---------------------------------------------------------
+   */
+
+  const selectedDayWindows = useMemo(() => {
+    if (!availability) {
+      return [];
+    }
+
+    /**
+     * NEW MULTI-SLOT SYSTEM
+     */
+    if (availability.daySlots?.length) {
+      const config = getDaySlotConfig(selectedDate);
+
+      if (config) {
+        if (!config.enabled) {
+          return [];
+        }
+
+        return Array.isArray(config.slots)
+          ? config.slots.filter(
+              (slot) =>
+                slot?.start &&
+                slot?.end &&
+                minutesBetween(
+                  slot.start,
+                  slot.end
+                ) > 0
+            )
+          : [];
+      }
+    }
+
+    /**
+     * LEGACY FALLBACK
+     */
+    if (!isWorkingDay(selectedDate)) {
+      return [];
+    }
+
+    const start =
+      availability.workingHoursStart || "09:00";
+
+    const end =
+      availability.workingHoursEnd || "18:00";
+
+    if (minutesBetween(start, end) <= 0) {
+      return [];
+    }
+
+    return [
+      {
+        start,
+        end,
+      },
+    ];
+  }, [
+    availability,
+    selectedDate,
+    getDaySlotConfig,
+    isWorkingDay,
+  ]);
+
+  /**
+   * ---------------------------------------------------------
+   * DAY AVAILABILITY
    * ---------------------------------------------------------
    *
-   * This is frontend presentation only.
+   * Supports:
    *
-   * Backend remains source of truth when the order is created.
+   * 09:00 - 13:00
+   * 16:00 - 22:00
+   *
+   * Each working window generates 60-minute
+   * presentation slots.
+   * ---------------------------------------------------------
    */
 
   const dayAvailability = useMemo(() => {
@@ -397,12 +714,8 @@ const MyEventsScreen = () => {
       return {
         isWorking: true,
         isBlocked: false,
-        slots: [] as {
-          start: string;
-          end: string;
-          status: "available" | "booked";
-          booking?: any;
-        }[],
+        windows: [],
+        slots: [] as GeneratedSlot[],
       };
     }
 
@@ -413,85 +726,103 @@ const MyEventsScreen = () => {
       return {
         isWorking,
         isBlocked,
-        slots: [],
+        windows: [],
+        slots: [] as GeneratedSlot[],
       };
     }
 
-    const startTime =
-      availability.workingHoursStart || "09:00";
-
-    const endTime =
-      availability.workingHoursEnd || "18:00";
-
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
-
-    /**
-     * 60-minute visual slots.
-     *
-     * These are calendar visualization slots.
-     * Actual booking availability is still validated by backend.
-     */
+    const windows = selectedDayWindows;
 
     const SLOT_MINUTES = 60;
 
-    const slots: {
-      start: string;
-      end: string;
-      status: "available" | "booked";
-      booking?: any;
-    }[] = [];
+    const slots: GeneratedSlot[] = [];
 
-    let cursor = start;
+    /**
+     * Generate slots separately for every configured
+     * working window.
+     */
+    windows.forEach((window) => {
+      const start = parseTime(window.start);
+      const end = parseTime(window.end);
 
-    while (cursor < end) {
-      const slotEnd = addMinutes(cursor, SLOT_MINUTES);
+      let cursor = start;
 
-      if (slotEnd > end) {
-        break;
-      }
+      while (cursor < end) {
+        const slotEnd = addMinutes(
+          cursor,
+          SLOT_MINUTES
+        );
 
-      const slotStartKey = cursor.getTime();
-      const slotEndKey = slotEnd.getTime();
-
-      const booking = selectedDayBookings.find((order) => {
-        if (!order.eventStartDateTime || !order.eventEndDateTime) {
-          return false;
+        /**
+         * Don't create a slot outside configured
+         * working window.
+         */
+        if (slotEnd > end) {
+          break;
         }
 
-        const bookingStart = new Date(
-          order.eventStartDateTime
-        ).getTime();
+        const slotStartKey = cursor.getTime();
+        const slotEndKey = slotEnd.getTime();
 
-        const bookingEnd = new Date(
-          order.eventEndDateTime
-        ).getTime();
+        /**
+         * Find a booking overlapping this visual slot.
+         */
+        const booking =
+          selectedDayBookings.find((order) => {
+            if (
+              !order?.eventStartDateTime ||
+              !order?.eventEndDateTime
+            ) {
+              return false;
+            }
 
-        return (
-          bookingStart < slotEndKey &&
-          bookingEnd > slotStartKey
-        );
-      });
+            const bookingStart =
+              new Date(
+                order.eventStartDateTime
+              ).getTime();
 
-      slots.push({
-        start: formatTime(cursor),
-        end: formatTime(slotEnd),
-        status: booking ? "booked" : "available",
-        booking,
-      });
+            const bookingEnd =
+              new Date(
+                order.eventEndDateTime
+              ).getTime();
 
-      cursor = slotEnd;
-    }
+            if (
+              Number.isNaN(bookingStart) ||
+              Number.isNaN(bookingEnd)
+            ) {
+              return false;
+            }
+
+            return (
+              bookingStart < slotEndKey &&
+              bookingEnd > slotStartKey
+            );
+          });
+
+        slots.push({
+          start: formatTime(cursor),
+          end: formatTime(slotEnd),
+          status: booking
+            ? "booked"
+            : "available",
+          booking,
+        });
+
+        cursor = slotEnd;
+      }
+    });
 
     return {
       isWorking,
       isBlocked,
+      windows,
       slots,
     };
   }, [
     availability,
     selectedDate,
     selectedDayBookings,
+    selectedDayWindows,
     isWorkingDay,
     isBlockedDate,
   ]);
@@ -509,7 +840,15 @@ const MyEventsScreen = () => {
      * Booking dates
      */
     orders.forEach((order) => {
+      if (!order?.eventDate) {
+        return;
+      }
+
       const key = toKey(order.eventDate);
+
+      if (!key) {
+        return;
+      }
 
       marks[key] = {
         customStyles: {
@@ -517,7 +856,6 @@ const MyEventsScreen = () => {
             backgroundColor: ACCENT,
             borderRadius: 9,
           },
-
           text: {
             color: "#FFFFFF",
             fontWeight: "800",
@@ -529,35 +867,33 @@ const MyEventsScreen = () => {
     /**
      * Blocked dates
      */
-    availability?.blockedDates?.forEach((date) => {
-      const key = toKey(date);
+    availability?.blockedDates?.forEach(
+      (date) => {
+        const key = toKey(date);
 
-      marks[key] = {
-        customStyles: {
-          container: {
-            backgroundColor: "#FDEBEC",
-            borderRadius: 9,
-            borderWidth: 1,
-            borderColor: "#D9534F",
-          },
+        if (!key) {
+          return;
+        }
 
-          text: {
-            color: "#C0392B",
-            fontWeight: "800",
+        marks[key] = {
+          customStyles: {
+            container: {
+              backgroundColor: "#FDEBEC",
+              borderRadius: 9,
+              borderWidth: 1,
+              borderColor: "#D9534F",
+            },
+            text: {
+              color: "#C0392B",
+              fontWeight: "800",
+            },
           },
-        },
-      };
-    });
+        };
+      }
+    );
 
     /**
-     * Non-working days
-     *
-     * We don't mark every future date aggressively.
-     * Instead only selected date is emphasized.
-     */
-
-    /**
-     * Selected date wins
+     * Selected date wins.
      */
     marks[selectedDate] = {
       customStyles: {
@@ -567,7 +903,6 @@ const MyEventsScreen = () => {
           borderWidth: 2,
           borderColor: "#FFFFFF",
         },
-
         text: {
           color: "#FFFFFF",
           fontWeight: "800",
@@ -576,22 +911,48 @@ const MyEventsScreen = () => {
     };
 
     return marks;
-  }, [orders, selectedDate, availability]);
+  }, [
+    orders,
+    selectedDate,
+    availability,
+  ]);
+
+  /**
+   * ---------------------------------------------------------
+   * MONTH LABEL
+   * ---------------------------------------------------------
+   */
 
   const monthLabel = new Date(
-    selectedDate
+    `${selectedDate}T12:00:00`
   ).toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
 
+  /**
+   * ---------------------------------------------------------
+   * EXPAND
+   * ---------------------------------------------------------
+   */
+
   const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedId((previous) =>
+      previous === id ? null : id
+    );
   };
+
+  /**
+   * ---------------------------------------------------------
+   * LIST TITLE
+   * ---------------------------------------------------------
+   */
 
   const listTitle =
     viewMode === "day"
-      ? new Date(selectedDate).toDateString()
+      ? new Date(
+          `${selectedDate}T12:00:00`
+        ).toDateString()
       : viewMode === "upcoming"
       ? "Upcoming Bookings"
       : viewMode === "month"
@@ -604,18 +965,61 @@ const MyEventsScreen = () => {
    * ---------------------------------------------------------
    */
 
-  const availableSlotCount = dayAvailability.slots.filter(
-    (slot) => slot.status === "available"
-  ).length;
+  const availableSlotCount =
+    dayAvailability.slots.filter(
+      (slot) =>
+        slot.status === "available"
+    ).length;
 
-  const bookedSlotCount = dayAvailability.slots.filter(
-    (slot) => slot.status === "booked"
-  ).length;
+  const bookedSlotCount =
+    dayAvailability.slots.filter(
+      (slot) =>
+        slot.status === "booked"
+    ).length;
+
+  /**
+   * ---------------------------------------------------------
+   * WORKING WINDOW LABEL
+   * ---------------------------------------------------------
+   */
+
+  const workingHoursLabel = useMemo(() => {
+    if (
+      !dayAvailability.windows ||
+      dayAvailability.windows.length === 0
+    ) {
+      return "No working hours";
+    }
+
+    return dayAvailability.windows
+      .map(
+        (window) =>
+          `${window.start} - ${window.end}`
+      )
+      .join("  •  ");
+  }, [dayAvailability.windows]);
+
+  /**
+   * ---------------------------------------------------------
+   * TOTAL WORKING MINUTES
+   * ---------------------------------------------------------
+   */
+
+  const totalWorkingMinutes = useMemo(() => {
+    return dayAvailability.windows.reduce(
+      (total, window) =>
+        total +
+        minutesBetween(
+          window.start,
+          window.end
+        ),
+      0
+    );
+  }, [dayAvailability.windows]);
 
   return (
     <View style={styles.container}>
       {/* HEADER */}
-
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.headerIconBtn}
@@ -657,16 +1061,17 @@ const MyEventsScreen = () => {
       <FlatList
         data={events}
         keyExtractor={(item) =>
-          item._id || item.id
+          String(item?._id || item?.id)
         }
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={
+          styles.listContent
+        }
         ListHeaderComponent={
           <>
             {/* STATS */}
-
             <View style={styles.statsRow}>
               <View style={styles.statCard}>
                 <View style={styles.statIcon}>
@@ -724,15 +1129,18 @@ const MyEventsScreen = () => {
             </View>
 
             {/* CALENDAR */}
-
             <View style={styles.calendarCard}>
               <View style={styles.calendarHeader}>
                 <View>
-                  <Text style={styles.calendarTitle}>
+                  <Text
+                    style={styles.calendarTitle}
+                  >
                     Booking Calendar
                   </Text>
 
-                  <Text style={styles.calendarSubtitle}>
+                  <Text
+                    style={styles.calendarSubtitle}
+                  >
                     Select a date to view your schedule
                   </Text>
                 </View>
@@ -751,23 +1159,29 @@ const MyEventsScreen = () => {
                 markedDates={markedDates}
                 markingType="custom"
                 onDayPress={(day) => {
-                  setSelectedDate(day.dateString);
+                  setSelectedDate(
+                    day.dateString
+                  );
                   setViewMode("day");
                 }}
                 enableSwipeMonths
                 theme={{
                   backgroundColor: "#FFFFFF",
                   calendarBackground: "#FFFFFF",
-                  textSectionTitleColor: "#9B9B9B",
+                  textSectionTitleColor:
+                    "#9B9B9B",
                   todayTextColor: PRIMARY,
-                  todayBackgroundColor: PRIMARY_LIGHT,
+                  todayBackgroundColor:
+                    PRIMARY_LIGHT,
                   dayTextColor: "#2D2D2D",
-                  textDisabledColor: "#D9D9D9",
+                  textDisabledColor:
+                    "#D9D9D9",
                   arrowColor: PRIMARY,
                   monthTextColor: "#000000",
                   textDayFontWeight: "500",
                   textMonthFontWeight: "800",
-                  textDayHeaderFontWeight: "700",
+                  textDayHeaderFontWeight:
+                    "700",
                   textDayFontSize: 14,
                   textMonthFontSize: 17,
                   textDayHeaderFontSize: 12,
@@ -776,18 +1190,20 @@ const MyEventsScreen = () => {
               />
 
               {/* LEGEND */}
-
               <View style={styles.legendRow}>
                 <View
                   style={[
                     styles.legendDot,
                     {
-                      backgroundColor: ACCENT,
+                      backgroundColor:
+                        ACCENT,
                     },
                   ]}
                 />
 
-                <Text style={styles.legendText}>
+                <Text
+                  style={styles.legendText}
+                >
                   Booking
                 </Text>
 
@@ -795,14 +1211,18 @@ const MyEventsScreen = () => {
                   style={[
                     styles.legendDot,
                     {
-                      backgroundColor: "#FDEBEC",
+                      backgroundColor:
+                        "#FDEBEC",
                       borderWidth: 1,
-                      borderColor: "#D9534F",
+                      borderColor:
+                        "#D9534F",
                     },
                   ]}
                 />
 
-                <Text style={styles.legendText}>
+                <Text
+                  style={styles.legendText}
+                >
                   Unavailable
                 </Text>
 
@@ -810,34 +1230,57 @@ const MyEventsScreen = () => {
                   style={[
                     styles.legendDot,
                     {
-                      backgroundColor: PRIMARY,
+                      backgroundColor:
+                        PRIMARY,
                     },
                   ]}
                 />
 
-                <Text style={styles.legendText}>
+                <Text
+                  style={styles.legendText}
+                >
                   Selected
                 </Text>
               </View>
             </View>
 
             {/* AVAILABILITY CARD */}
-
-            <View style={styles.availabilityCard}>
-              <View style={styles.availabilityHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.availabilityTitle}>
+            <View
+              style={
+                styles.availabilityCard
+              }
+            >
+              <View
+                style={
+                  styles.availabilityHeader
+                }
+              >
+                <View
+                  style={{ flex: 1 }}
+                >
+                  <Text
+                    style={
+                      styles.availabilityTitle
+                    }
+                  >
                     Your Availability
                   </Text>
 
-                  <Text style={styles.availabilityDate}>
+                  <Text
+                    style={
+                      styles.availabilityDate
+                    }
+                  >
                     {new Date(
-                      selectedDate
-                    ).toLocaleDateString("en-US", {
-                      weekday: "long",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                      `${selectedDate}T12:00:00`
+                    ).toLocaleDateString(
+                      "en-US",
+                      {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric",
+                      }
+                    )}
                   </Text>
                 </View>
 
@@ -885,49 +1328,83 @@ const MyEventsScreen = () => {
               </View>
 
               {availabilityLoading ? (
-                <View style={styles.loadingAvailability}>
+                <View
+                  style={
+                    styles.loadingAvailability
+                  }
+                >
                   <ActivityIndicator
                     size="small"
                     color={PRIMARY}
                   />
 
-                  <Text style={styles.loadingText}>
+                  <Text
+                    style={styles.loadingText}
+                  >
                     Loading availability...
                   </Text>
                 </View>
               ) : dayAvailability.isBlocked ? (
-                <View style={styles.unavailableMessage}>
+                <View
+                  style={
+                    styles.unavailableMessage
+                  }
+                >
                   <Ionicons
                     name="close-circle"
                     size={24}
                     color="#C0392B"
                   />
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.messageTitle}>
+                  <View
+                    style={{ flex: 1 }}
+                  >
+                    <Text
+                      style={
+                        styles.messageTitle
+                      }
+                    >
                       Date blocked
                     </Text>
 
-                    <Text style={styles.messageText}>
+                    <Text
+                      style={
+                        styles.messageText
+                      }
+                    >
                       You have marked this date as
                       unavailable.
                     </Text>
                   </View>
                 </View>
               ) : !dayAvailability.isWorking ? (
-                <View style={styles.unavailableMessage}>
+                <View
+                  style={
+                    styles.unavailableMessage
+                  }
+                >
                   <Ionicons
                     name="moon-outline"
                     size={24}
                     color="#C0392B"
                   />
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.messageTitle}>
+                  <View
+                    style={{ flex: 1 }}
+                  >
+                    <Text
+                      style={
+                        styles.messageTitle
+                      }
+                    >
                       Non-working day
                     </Text>
 
-                    <Text style={styles.messageText}>
+                    <Text
+                      style={
+                        styles.messageText
+                      }
+                    >
                       You are not accepting bookings
                       on this day.
                     </Text>
@@ -936,9 +1413,16 @@ const MyEventsScreen = () => {
               ) : (
                 <>
                   {/* WORKING HOURS */}
-
-                  <View style={styles.workingHoursCard}>
-                    <View style={styles.workingHoursIcon}>
+                  <View
+                    style={
+                      styles.workingHoursCard
+                    }
+                  >
+                    <View
+                      style={
+                        styles.workingHoursIcon
+                      }
+                    >
                       <Ionicons
                         name="time-outline"
                         size={18}
@@ -946,87 +1430,151 @@ const MyEventsScreen = () => {
                       />
                     </View>
 
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.smallLabel}>
+                    <View
+                      style={{ flex: 1 }}
+                    >
+                      <Text
+                        style={
+                          styles.smallLabel
+                        }
+                      >
                         Working Hours
                       </Text>
 
-                      <Text style={styles.workingHours}>
-                        {availability?.workingHoursStart ||
-                          "09:00"}{" "}
-                        -{" "}
-                        {availability?.workingHoursEnd ||
-                          "18:00"}
+                      <Text
+                        style={
+                          styles.workingHours
+                        }
+                      >
+                        {workingHoursLabel}
                       </Text>
+
+                      {totalWorkingMinutes >
+                        0 && (
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: "#8A8A8A",
+                            marginTop: 3,
+                          }}
+                        >
+                          {formatMinutes(
+                            totalWorkingMinutes
+                          )}{" "}
+                          total
+                        </Text>
+                      )}
                     </View>
 
-                    <Text style={styles.slotCount}>
+                    <Text
+                      style={
+                        styles.slotCount
+                      }
+                    >
                       {availableSlotCount} free
                     </Text>
                   </View>
 
                   {/* SLOT SUMMARY */}
-
-                  <View style={styles.slotSummaryRow}>
-                    <View style={styles.slotSummaryItem}>
+                  <View
+                    style={
+                      styles.slotSummaryRow
+                    }
+                  >
+                    <View
+                      style={
+                        styles.slotSummaryItem
+                      }
+                    >
                       <View
                         style={[
                           styles.summaryDot,
                           {
-                            backgroundColor: "#278A4B",
+                            backgroundColor:
+                              "#278A4B",
                           },
                         ]}
                       />
 
-                      <Text style={styles.summaryText}>
-                        {availableSlotCount} Available
+                      <Text
+                        style={
+                          styles.summaryText
+                        }
+                      >
+                        {availableSlotCount}{" "}
+                        Available
                       </Text>
                     </View>
 
-                    <View style={styles.slotSummaryItem}>
+                    <View
+                      style={
+                        styles.slotSummaryItem
+                      }
+                    >
                       <View
                         style={[
                           styles.summaryDot,
                           {
-                            backgroundColor: "#D98B00",
+                            backgroundColor:
+                              "#D98B00",
                           },
                         ]}
                       />
 
-                      <Text style={styles.summaryText}>
-                        {bookedSlotCount} Booked
+                      <Text
+                        style={
+                          styles.summaryText
+                        }
+                      >
+                        {bookedSlotCount}{" "}
+                        Booked
                       </Text>
                     </View>
                   </View>
 
                   {/* TIME SLOTS */}
-
-                  <Text style={styles.slotSectionTitle}>
+                  <Text
+                    style={
+                      styles.slotSectionTitle
+                    }
+                  >
                     Today's Schedule
                   </Text>
 
-                  {dayAvailability.slots.length === 0 ? (
-                    <View style={styles.noSlots}>
+                  {dayAvailability.slots
+                    .length === 0 ? (
+                    <View
+                      style={styles.noSlots}
+                    >
                       <Ionicons
                         name="calendar-outline"
                         size={24}
                         color="#9B9B9B"
                       />
 
-                      <Text style={styles.noSlotsText}>
+                      <Text
+                        style={
+                          styles.noSlotsText
+                        }
+                      >
                         No time slots available.
                       </Text>
                     </View>
                   ) : (
-                    <View style={styles.slotsGrid}>
+                    <View
+                      style={
+                        styles.slotsGrid
+                      }
+                    >
                       {dayAvailability.slots.map(
                         (slot, index) => {
                           const booked =
-                            slot.status === "booked";
+                            slot.status ===
+                            "booked";
 
                           return (
                             <View
-                              key={`${slot.start}-${index}`}
+                              key={`${slot.start}-${slot.end}-${index}`}
                               style={[
                                 styles.slotCard,
                                 booked
@@ -1057,7 +1605,11 @@ const MyEventsScreen = () => {
                                 />
                               </View>
 
-                              <View style={{ flex: 1 }}>
+                              <View
+                                style={{
+                                  flex: 1,
+                                }}
+                              >
                                 <Text
                                   style={
                                     styles.slotTime
@@ -1073,7 +1625,8 @@ const MyEventsScreen = () => {
                                   }
                                 >
                                   {booked
-                                    ? slot.booking
+                                    ? slot
+                                        .booking
                                         ?.eventName ||
                                       "Booked"
                                     : "Available"}
@@ -1086,29 +1639,40 @@ const MyEventsScreen = () => {
                     </View>
                   )}
 
-                  <Text style={styles.backendNote}>
-                    Availability is checked again by the
-                    system before a booking is confirmed.
+                  <Text
+                    style={
+                      styles.backendNote
+                    }
+                  >
+                    Availability is checked again by
+                    the system before a booking is
+                    confirmed.
                   </Text>
                 </>
               )}
             </View>
 
             {/* FILTERS */}
-
             <ScrollView
               horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}
+              showsHorizontalScrollIndicator={
+                false
+              }
+              contentContainerStyle={
+                styles.filterRow
+              }
             >
-              {FILTERS.map((f) => {
-                const active = viewMode === f.key;
+              {FILTERS.map((filter) => {
+                const active =
+                  viewMode === filter.key;
 
                 return (
                   <TouchableOpacity
-                    key={f.key}
+                    key={filter.key}
                     onPress={() =>
-                      setViewMode(f.key)
+                      setViewMode(
+                        filter.key
+                      )
                     }
                     style={[
                       styles.filterChip,
@@ -1118,7 +1682,7 @@ const MyEventsScreen = () => {
                     activeOpacity={0.8}
                   >
                     <Ionicons
-                      name={f.icon}
+                      name={filter.icon}
                       size={14}
                       color={
                         active
@@ -1134,7 +1698,7 @@ const MyEventsScreen = () => {
                           styles.filterChipTextActive,
                       ]}
                     >
-                      {f.label}
+                      {filter.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1142,22 +1706,35 @@ const MyEventsScreen = () => {
             </ScrollView>
 
             {/* SECTION TITLE */}
-
-            <View style={styles.sectionRow}>
+            <View
+              style={styles.sectionRow}
+            >
               <View>
-                <Text style={styles.sectionTitle}>
+                <Text
+                  style={styles.sectionTitle}
+                >
                   {listTitle}
                 </Text>
 
                 {viewMode === "day" && (
-                  <Text style={styles.sectionSubtitle}>
+                  <Text
+                    style={
+                      styles.sectionSubtitle
+                    }
+                  >
                     {monthLabel}
                   </Text>
                 )}
               </View>
 
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>
+              <View
+                style={styles.countBadge}
+              >
+                <Text
+                  style={
+                    styles.countBadgeText
+                  }
+                >
                   {events.length}{" "}
                   {events.length === 1
                     ? "Event"
@@ -1168,27 +1745,51 @@ const MyEventsScreen = () => {
           </>
         }
         renderItem={({ item }) => {
-          const id = item._id || item.id;
+          const id =
+            String(item?._id || item?.id);
 
           const isExpanded =
             expandedId === id;
 
+          /**
+           * IMPORTANT:
+           * Only calculate total from THIS vendor's
+           * vendorOrders.
+           */
+          const ownVendorOrders =
+            getOwnVendorOrders(item);
+
           const vendorTotal =
-            Array.isArray(item.vendorOrders)
-              ? item.vendorOrders.reduce(
+            ownVendorOrders.length > 0
+              ? ownVendorOrders.reduce(
                   (
                     sum: number,
-                    s: any
-                  ) => sum + (s.price || 0),
+                    service: any
+                  ) =>
+                    sum +
+                    Number(
+                      service?.price || 0
+                    ),
                   0
                 )
-              : item.totalAmount;
+              : Number(
+                  item?.totalAmount || 0
+                );
+
+          /**
+           * IMPORTANT:
+           * Use vendor-specific status.
+           */
+          const vendorStatus =
+            getVendorStatus(item);
 
           return (
             <TouchableOpacity
               style={styles.eventCard}
               activeOpacity={0.85}
-              onPress={() => toggleExpand(id)}
+              onPress={() =>
+                toggleExpand(id)
+              }
             >
               <View
                 style={[
@@ -1196,13 +1797,15 @@ const MyEventsScreen = () => {
                   {
                     backgroundColor:
                       getStatusColor(
-                        item.status
+                        vendorStatus
                       ),
                   },
                 ]}
               />
 
-              <View style={styles.eventIconWrap}>
+              <View
+                style={styles.eventIconWrap}
+              >
                 <Ionicons
                   name="calendar"
                   size={22}
@@ -1210,31 +1813,46 @@ const MyEventsScreen = () => {
                 />
               </View>
 
-              <View style={styles.eventDetails}>
-                <View style={styles.eventTopRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.eventDate}>
-                      {new Date(
-                        item.eventDate
-                      ).toDateString()}
+              <View
+                style={styles.eventDetails}
+              >
+                <View
+                  style={styles.eventTopRow}
+                >
+                  <View
+                    style={{ flex: 1 }}
+                  >
+                    <Text
+                      style={
+                        styles.eventDate
+                      }
+                    >
+                      {item?.eventDate
+                        ? new Date(
+                            item.eventDate
+                          ).toDateString()
+                        : "Date unavailable"}
                     </Text>
 
                     <Text
-                      style={styles.eventTitle}
+                      style={
+                        styles.eventTitle
+                      }
                       numberOfLines={1}
                     >
-                      {item.eventName}
+                      {item?.eventName ||
+                        "Unnamed Event"}
                     </Text>
                   </View>
 
-                  {!!item.status && (
+                  {!!vendorStatus && (
                     <View
                       style={[
                         styles.statusBadge,
                         {
                           backgroundColor:
                             getStatusBackground(
-                              item.status
+                              vendorStatus
                             ),
                         },
                       ]}
@@ -1245,7 +1863,7 @@ const MyEventsScreen = () => {
                           {
                             backgroundColor:
                               getStatusColor(
-                                item.status
+                                vendorStatus
                               ),
                           },
                         ]}
@@ -1257,41 +1875,55 @@ const MyEventsScreen = () => {
                           {
                             color:
                               getStatusColor(
-                                item.status
+                                vendorStatus
                               ),
                           },
                         ]}
                       >
-                        {item.status}
+                        {vendorStatus}
                       </Text>
                     </View>
                   )}
                 </View>
 
-                <View style={styles.metaRow}>
-                  {!!item.guests && (
-                    <View style={styles.eventMeta}>
+                <View
+                  style={styles.metaRow}
+                >
+                  {!!item?.guests && (
+                    <View
+                      style={styles.eventMeta}
+                    >
                       <Ionicons
                         name="people-outline"
                         size={15}
                         color={PRIMARY}
                       />
 
-                      <Text style={styles.eventText}>
+                      <Text
+                        style={
+                          styles.eventText
+                        }
+                      >
                         {item.guests} guests
                       </Text>
                     </View>
                   )}
 
-                  {!!item.eventTime && (
-                    <View style={styles.eventMeta}>
+                  {!!item?.eventTime && (
+                    <View
+                      style={styles.eventMeta}
+                    >
                       <Ionicons
                         name="time-outline"
                         size={15}
                         color={PRIMARY}
                       />
 
-                      <Text style={styles.eventText}>
+                      <Text
+                        style={
+                          styles.eventText
+                        }
+                      >
                         {item.eventTime}
                       </Text>
                     </View>
@@ -1300,7 +1932,9 @@ const MyEventsScreen = () => {
 
                 {isExpanded && (
                   <View
-                    style={styles.expandedBlock}
+                    style={
+                      styles.expandedBlock
+                    }
                   >
                     <Text
                       style={
@@ -1310,8 +1944,12 @@ const MyEventsScreen = () => {
                       Event Details
                     </Text>
 
-                    {!!item.eventName && (
-                      <View style={styles.eventMeta}>
+                    {!!item?.eventName && (
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="calendar-outline"
                           size={14}
@@ -1329,8 +1967,12 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {!!item.eventType && (
-                      <View style={styles.eventMeta}>
+                    {!!item?.eventType && (
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="pricetag-outline"
                           size={14}
@@ -1348,8 +1990,12 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {!!item.eventDate && (
-                      <View style={styles.eventMeta}>
+                    {!!item?.eventDate && (
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="calendar-number-outline"
                           size={14}
@@ -1369,8 +2015,12 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {!!item.guests && (
-                      <View style={styles.eventMeta}>
+                    {!!item?.guests && (
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="people-outline"
                           size={14}
@@ -1397,7 +2047,11 @@ const MyEventsScreen = () => {
                     </Text>
 
                     {!!vendorTotal && (
-                      <View style={styles.eventMeta}>
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="cash-outline"
                           size={14}
@@ -1415,8 +2069,12 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {!!item.status && (
-                      <View style={styles.eventMeta}>
+                    {!!vendorStatus && (
+                      <View
+                        style={
+                          styles.eventMeta
+                        }
+                      >
                         <Ionicons
                           name="information-circle-outline"
                           size={14}
@@ -1432,59 +2090,61 @@ const MyEventsScreen = () => {
                             },
                           ]}
                         >
-                          Status: {item.status}
+                          Status:{" "}
+                          {vendorStatus}
                         </Text>
                       </View>
                     )}
 
-                    {Array.isArray(
-                      item.vendorOrders
-                    ) &&
-                      item.vendorOrders.length >
-                        0 && (
-                        <>
-                          <Text
-                            style={
-                              styles.expandedSubTitle
-                            }
-                          >
-                            Services
-                          </Text>
+                    {ownVendorOrders.length >
+                      0 && (
+                      <>
+                        <Text
+                          style={
+                            styles.expandedSubTitle
+                          }
+                        >
+                          Services
+                        </Text>
 
-                          {item.vendorOrders.map(
-                            (
-                              s: any,
-                              idx: number
-                            ) => (
-                              <View
-                                key={idx}
+                        {ownVendorOrders.map(
+                          (
+                            service: any,
+                            index: number
+                          ) => (
+                            <View
+                              key={
+                                service?._id ||
+                                `${service?.serviceName}-${index}`
+                              }
+                              style={
+                                styles.eventMeta
+                              }
+                            >
+                              <Ionicons
+                                name="checkmark-circle-outline"
+                                size={14}
+                                color={PRIMARY}
+                              />
+
+                              <Text
                                 style={
-                                  styles.eventMeta
+                                  styles.expandedText
                                 }
                               >
-                                <Ionicons
-                                  name="checkmark-circle-outline"
-                                  size={14}
-                                  color={PRIMARY}
-                                />
+                                {service?.serviceName ||
+                                  "Service"}
 
-                                <Text
-                                  style={
-                                    styles.expandedText
-                                  }
-                                >
-                                  {s.serviceName}
-
-                                  {s.price !=
+                                {service?.price !=
                                   null
-                                    ? ` - Rs. ${s.price}`
-                                    : ""}
-                                </Text>
-                              </View>
-                            )
-                          )}
-                        </>
-                      )}
+                                  ? ` - Rs. ${service.price}`
+                                  : ""}
+                              </Text>
+                            </View>
+                          )
+                        )}
+                      </>
+                    )}
                   </View>
                 )}
               </View>
@@ -1502,8 +2162,14 @@ const MyEventsScreen = () => {
           );
         }}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconCircle}>
+          <View
+            style={styles.emptyState}
+          >
+            <View
+              style={
+                styles.emptyIconCircle
+              }
+            >
               <Ionicons
                 name="calendar-outline"
                 size={34}
@@ -1511,13 +2177,19 @@ const MyEventsScreen = () => {
               />
             </View>
 
-            <Text style={styles.emptyTitle}>
+            <Text
+              style={styles.emptyTitle}
+            >
               {viewMode === "day"
                 ? "No events on this day"
                 : "No events found"}
             </Text>
 
-            <Text style={styles.emptySubtitle}>
+            <Text
+              style={
+                styles.emptySubtitle
+              }
+            >
               {viewMode === "day"
                 ? "Your availability is shown above. Select another date to view bookings."
                 : "Try a different filter or check back later."}
@@ -1544,7 +2216,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: PRIMARY,
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    paddingTop:
+      Platform.OS === "ios" ? 60 : 40,
     paddingBottom: 22,
     paddingHorizontal: 18,
     borderBottomLeftRadius: 26,
@@ -1563,7 +2236,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor:
+      "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2110,7 +2784,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "rgba(120,12,96,0.12)",
+    borderTopColor:
+      "rgba(120,12,96,0.12)",
   },
 
   expandedText: {
