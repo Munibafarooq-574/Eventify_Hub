@@ -1,6 +1,6 @@
 
 //fyp-backend/src/order/order.controller.ts
-import { Controller, Post, Body, Patch, Param, Get, Delete, Query } from "@nestjs/common";
+import { Controller, Post, Body, Patch, Param, Get, Delete, Query, HttpException, InternalServerErrorException } from "@nestjs/common";
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
@@ -37,9 +37,18 @@ async placeOrder(@Body() body: {
                 body.durationMinutes,
             );
             return order;
-        } catch (error) {
+                } catch (error) {
             console.error('Error placing order:', error);
-            throw new Error('Failed to place order');
+
+            // Agar service ne pehle se HttpException throw ki hai
+            // (jaise ConflictException 409, BadRequestException 400 wagera),
+            // usay waisa hi aage jane do — status code preserve rahega.
+            if (error instanceof HttpException) {
+                throw error;
+            }
+
+            // Sirf genuinely unexpected errors ke liye 500 throw karo.
+            throw new InternalServerErrorException('Failed to place order');
         }
     }
 

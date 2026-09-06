@@ -170,15 +170,15 @@ const OrderReviewScreen = () => {
 
         router.push('/OrderSummary');
       }
-    } catch (error) {
-      console.error('Error placing order:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to place order. Please try again.',
-        position: 'bottom',
-      });
-    } finally {
+   } catch (error: any) {
+  console.error('Error placing order:', error);
+  Toast.show({
+    type: 'error',
+    text1: 'Booking Failed',
+    text2: error?.message || 'Failed to place order. Please try again.',
+    position: 'bottom',
+  });
+} finally {
       setPlacingOrder(false);
     }
   };

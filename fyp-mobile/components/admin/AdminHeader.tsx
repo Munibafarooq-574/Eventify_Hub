@@ -1,9 +1,10 @@
+
 // components/admin/AdminHeader.tsx
+
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "expo-router";
-import { DrawerActions } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { AdminColors } from "../../constants/AdminColors";
 
 interface AdminHeaderProps {
@@ -15,25 +16,44 @@ export default function AdminHeader({
   title = "Eventify Hub Admin",
   onNotificationsPress,
 }: AdminHeaderProps) {
-  const navigation = useNavigation();
+  const router = useRouter();
+
+  const handleMenuPress = () => {
+    // Expo Router does not expose DrawerActions directly.
+    // Navigate to the admin drawer/layout where the drawer is managed.
+    router.push("/admin");
+  };
 
   return (
     <View style={styles.container}>
       <Pressable
-        onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+        onPress={handleMenuPress}
         hitSlop={12}
         style={styles.iconButton}
       >
-        <Ionicons name="menu-outline" size={24} color={AdminColors.text} />
+        <Ionicons
+          name="menu-outline"
+          size={24}
+          color={AdminColors.text}
+        />
       </Pressable>
 
       <Text style={styles.title} numberOfLines={1}>
         {title}
       </Text>
 
-      <Pressable onPress={onNotificationsPress} hitSlop={12} style={styles.iconButton}>
-        <Ionicons name="notifications-outline" size={22} color={AdminColors.text} />
-        {/* Notification dot — wire to real unread count */}
+      <Pressable
+        onPress={onNotificationsPress}
+        hitSlop={12}
+        style={styles.iconButton}
+      >
+        <Ionicons
+          name="notifications-outline"
+          size={22}
+          color={AdminColors.text}
+        />
+
+        {/* Notification dot — wire to real unread count later */}
         <View style={styles.badge} />
       </Pressable>
     </View>
@@ -51,12 +71,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: AdminColors.border,
   },
+
   iconButton: {
     width: 36,
     height: 36,
     alignItems: "center",
     justifyContent: "center",
   },
+
   title: {
     flex: 1,
     textAlign: "center",
@@ -64,6 +86,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: AdminColors.text,
   },
+
   badge: {
     position: "absolute",
     top: 6,
