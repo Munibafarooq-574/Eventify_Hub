@@ -1,21 +1,36 @@
 import getVendorOrders from "@/services/getVendorOrders";
 import getVendorAvailability from "@/services/getVendorAvailability";
+import patchVendorAvailability from "@/services/patchVendorAvailability";
 import { getUserData } from "@/store";
+
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { Calendar } from "react-native-calendars";
+
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 const { width } = Dimensions.get("window");
@@ -60,6 +75,37 @@ type GeneratedSlot = {
   booking?: any;
 };
 
+const DAYS: { code: string; label: string }[] = [
+  {
+    code: "MON",
+    label: "Monday",
+  },
+  {
+    code: "TUE",
+    label: "Tuesday",
+  },
+  {
+    code: "WED",
+    label: "Wednesday",
+  },
+  {
+    code: "THU",
+    label: "Thursday",
+  },
+  {
+    code: "FRI",
+    label: "Friday",
+  },
+  {
+    code: "SAT",
+    label: "Saturday",
+  },
+  {
+    code: "SUN",
+    label: "Sunday",
+  },
+];
+
 const FILTERS: {
   key: ViewMode;
   label: string;
@@ -88,12 +134,19 @@ const FILTERS: {
 ];
 
 /**
- * ---------------------------------------------------------
+ * =========================================================
  * DATE / TIME HELPERS
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 const toKey = (date: string | Date) => {
+  if (
+    typeof date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date)
+  ) {
+    return date;
+  }
+
   const d = new Date(date);
 
   if (Number.isNaN(d.getTime())) {
@@ -110,10 +163,31 @@ const formatTime = (date: Date) => {
   });
 };
 
+const formatDisplayTime = (time: string) => {
+  const [h, m] = time.split(":").map(Number);
+
+  if (
+    !Number.isFinite(h) ||
+    !Number.isFinite(m)
+  ) {
+    return time;
+  }
+
+  const date = new Date();
+
+  date.setHours(h, m, 0, 0);
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 const parseTime = (time: string) => {
   const [h, m] = time.split(":").map(Number);
 
   const date = new Date();
+
   date.setHours(
     Number.isFinite(h) ? h : 0,
     Number.isFinite(m) ? m : 0,
@@ -124,15 +198,54 @@ const parseTime = (time: string) => {
   return date;
 };
 
-const addMinutes = (date: Date, minutes: number) => {
-  return new Date(date.getTime() + minutes * 60000);
+const parseTimeOnDate = (
+  dateKey: string,
+  time: string
+) => {
+  const [h, m] = time.split(":").map(Number);
+
+  const date = new Date(`${dateKey}T00:00:00`);
+
+  date.setHours(
+    Number.isFinite(h) ? h : 0,
+    Number.isFinite(m) ? m : 0,
+    0,
+    0
+  );
+
+  return date;
 };
 
-const minutesBetween = (start: string, end: string) => {
+const toHHMM = (date: Date) => {
+  return `${String(date.getHours()).padStart(
+    2,
+    "0"
+  )}:${String(date.getMinutes()).padStart(
+    2,
+    "0"
+  )}`;
+};
+
+const addMinutes = (
+  date: Date,
+  minutes: number
+) => {
+  return new Date(
+    date.getTime() + minutes * 60000
+  );
+};
+
+const minutesBetween = (
+  start: string,
+  end: string
+) => {
   const s = parseTime(start);
   const e = parseTime(end);
 
-  return Math.max(0, (e.getTime() - s.getTime()) / 60000);
+  return Math.max(
+    0,
+    (e.getTime() - s.getTime()) / 60000
+  );
 };
 
 const formatMinutes = (minutes: number) => {
@@ -141,6 +254,7 @@ const formatMinutes = (minutes: number) => {
   }
 
   const hours = Math.floor(minutes / 60);
+
   const mins = minutes % 60;
 
   if (mins === 0) {
@@ -150,10 +264,28 @@ const formatMinutes = (minutes: number) => {
   return `${hours} hr ${mins} min`;
 };
 
+const getDayCode = (dateString: string) => {
+  const day = new Date(
+    `${dateString}T12:00:00`
+  );
+
+  const dayCodes = [
+    "SUN",
+    "MON",
+    "TUE",
+    "WED",
+    "THU",
+    "FRI",
+    "SAT",
+  ];
+
+  return dayCodes[day.getDay()];
+};
+
 /**
- * ---------------------------------------------------------
+ * =========================================================
  * STATUS HELPERS
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 const getStatusColor = (status?: string) => {
@@ -177,7 +309,9 @@ const getStatusColor = (status?: string) => {
   }
 };
 
-const getStatusBackground = (status?: string) => {
+const getStatusBackground = (
+  status?: string
+) => {
   switch ((status || "").toLowerCase()) {
     case "pending":
       return "#FFF4D6";
@@ -198,84 +332,160 @@ const getStatusBackground = (status?: string) => {
   }
 };
 
-/**
- * ---------------------------------------------------------
- * DAY CODE HELPER
- * ---------------------------------------------------------
- */
+const isBlockingBookingStatus = (
+  status?: string
+) => {
+  const normalized = String(
+    status || ""
+  ).toLowerCase();
 
-const getDayCode = (dateString: string) => {
-  const day = new Date(`${dateString}T12:00:00`);
-
-  const dayCodes = [
-    "SUN",
-    "MON",
-    "TUE",
-    "WED",
-    "THU",
-    "FRI",
-    "SAT",
-  ];
-
-  return dayCodes[day.getDay()];
+  return ![
+    "cancelled",
+    "rejected",
+    "expired",
+  ].includes(normalized);
 };
 
+/**
+ * =========================================================
+ * MAIN SCREEN
+ * =========================================================
+ */
+
 const MyEventsScreen = () => {
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+  const [selectedDate, setSelectedDate] =
+    useState<string>(
+      new Date()
+        .toISOString()
+        .split("T")[0]
+    );
+
+  const [orders, setOrders] = useState<any[]>(
+    []
   );
 
-  const [orders, setOrders] = useState<any[]>([]);
+  const [viewMode, setViewMode] =
+    useState<ViewMode>("day");
 
-  const [viewMode, setViewMode] = useState<ViewMode>("day");
+  const [expandedId, setExpandedId] =
+    useState<string | null>(null);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const [vendorId, setVendorId] = useState<string | null>(null);
+  const [vendorId, setVendorId] =
+    useState<string | null>(null);
 
   const [availability, setAvailability] =
-    useState<AvailabilitySettings | null>(null);
+    useState<AvailabilitySettings | null>(
+      null
+    );
 
   const [availabilityLoading, setAvailabilityLoading] =
     useState(true);
 
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  /**
+   * =======================================================
+   * AVAILABILITY EDITOR STATE
+   * =======================================================
+   */
+
+  const [availabilityEditorVisible, setAvailabilityEditorVisible] =
+    useState(false);
+
+  const [editorSaving, setEditorSaving] =
+    useState(false);
+
+  const [editorDaySlots, setEditorDaySlots] =
+    useState<DaySlotConfig[]>([]);
+
+  const [editorBlockedDates, setEditorBlockedDates] =
+    useState<string[]>([]);
+
+  const [editorMinimumAdvanceMinutes, setEditorMinimumAdvanceMinutes] =
+    useState(0);
+
+  /**
+   * Slot editor
+   */
+  const [activeDayForSlot, setActiveDayForSlot] =
+    useState<string | null>(null);
+
+  const [editingSlotIndex, setEditingSlotIndex] =
+    useState<number | null>(null);
+
+  const [slotPickerMode, setSlotPickerMode] =
+    useState<"start" | "end" | null>(null);
+
+  const [draftStart, setDraftStart] =
+    useState<Date>(() => {
+      const d = new Date();
+      d.setHours(9, 0, 0, 0);
+      return d;
+    });
+
+  const [draftEnd, setDraftEnd] =
+    useState<Date>(() => {
+      const d = new Date();
+      d.setHours(17, 0, 0, 0);
+      return d;
+    });
 
   const todayKey = toKey(new Date());
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
    * LOAD EVENTS + AVAILABILITY
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
-  const fetchData = useCallback(async () => {
-    try {
-      const user = await getUserData();
+  const fetchData = useCallback(
+    async () => {
+      try {
+        const user = await getUserData();
 
-      if (!user?._id) {
-        throw new Error("Vendor user not found");
+        if (!user?._id) {
+          throw new Error(
+            "Vendor user not found"
+          );
+        }
+
+        setVendorId(String(user._id));
+
+        const [
+          ordersData,
+          availabilityData,
+        ] = await Promise.all([
+          getVendorOrders(
+            "Vendor",
+            user._id
+          ),
+          getVendorAvailability(
+            user._id
+          ),
+        ]);
+
+        setOrders(
+          Array.isArray(ordersData)
+            ? ordersData
+            : []
+        );
+
+        setAvailability(
+          availabilityData || {}
+        );
+      } catch (error) {
+        console.error(
+          "Error fetching vendor events:",
+          error
+        );
+      } finally {
+        setAvailabilityLoading(false);
+        setRefreshing(false);
       }
-
-      setVendorId(String(user._id));
-
-      const [ordersData, availabilityData] = await Promise.all([
-        getVendorOrders("Vendor", user._id),
-        getVendorAvailability(user._id),
-      ]);
-
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-
-      setAvailability(
-        availabilityData || {}
-      );
-    } catch (error) {
-      console.error("Error fetching vendor events:", error);
-    } finally {
-      setAvailabilityLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchData();
@@ -283,171 +493,198 @@ const MyEventsScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+
     await fetchData();
   };
 
   /**
-   * ---------------------------------------------------------
-   * IMPORTANT:
-   * GET THE CURRENT VENDOR'S OWN VENDOR ORDER
-   *
-   * This prevents Vendor A's status from being displayed
-   * for Vendor B.
-   * ---------------------------------------------------------
+   * =========================================================
+   * VENDOR-SPECIFIC ORDERS
+   * =========================================================
    */
 
-  const getOwnVendorOrders = useCallback(
-    (order: any): any[] => {
-      if (!Array.isArray(order?.vendorOrders)) {
-        return [];
-      }
-
-      /**
-       * If backend already returns only this vendor's
-       * vendorOrders, return them directly.
-       */
-      const ownOrders = order.vendorOrders.filter((vendorOrder: any) => {
-        const currentVendorId = vendorOrder?.vendorId;
-
-        const normalizedVendorId =
-          typeof currentVendorId === "object"
-            ? currentVendorId?._id
-            : currentVendorId;
-
-        if (!vendorId || !normalizedVendorId) {
-          return false;
-        }
-
-        return (
-          String(normalizedVendorId) === String(vendorId)
-        );
-      });
-
-      /**
-       * If vendorOrders are already filtered by backend
-       * and vendorId isn't available inside them, fallback
-       * to all vendorOrders returned.
-       */
-      if (ownOrders.length > 0) {
-        return ownOrders;
-      }
-
-      return order.vendorOrders;
-    },
-    [vendorId]
-  );
-
-  /**
-   * ---------------------------------------------------------
-   * GET VENDOR-SPECIFIC STATUS
-   * ---------------------------------------------------------
-   *
-   * Parent Order.status MUST NOT be blindly used here.
-   *
-   * Example:
-   *
-   * Order
-   * ├── Vendor A → accepted
-   * └── Vendor B → pending
-   *
-   * Vendor A screen must show "accepted"
-   * Vendor B screen must show "pending"
-   * ---------------------------------------------------------
-   */
-
-  const getVendorStatus = useCallback(
-    (order: any) => {
-      const ownVendorOrders = getOwnVendorOrders(order);
-
-      if (ownVendorOrders.length > 0) {
-        /**
-         * Normally there should be one VendorOrder
-         * for this vendor.
-         *
-         * If there are multiple services under the same vendor,
-         * prioritize the first meaningful status.
-         */
-        const statuses = ownVendorOrders
-          .map((vendorOrder: any) =>
-            String(vendorOrder?.status || "").toLowerCase()
+  const getOwnVendorOrders =
+    useCallback(
+      (order: any): any[] => {
+        if (
+          !Array.isArray(
+            order?.vendorOrders
           )
-          .filter(Boolean);
-
-        if (statuses.includes("pending")) {
-          return "pending";
+        ) {
+          return [];
         }
 
-        if (statuses.includes("accepted")) {
-          return "accepted";
+        const hasVendorIds =
+          order.vendorOrders.some(
+            (vendorOrder: any) => {
+              return Boolean(
+                vendorOrder?.vendorId?._id ||
+                  vendorOrder?.vendorId
+              );
+            }
+          );
+
+        /**
+         * If backend doesn't provide vendorId
+         * inside vendorOrders, assume the response
+         * has already been filtered for this vendor.
+         */
+        if (
+          !vendorId ||
+          !hasVendorIds
+        ) {
+          return order.vendorOrders;
         }
 
-        if (statuses.includes("completed")) {
-          return "completed";
-        }
+        return order.vendorOrders.filter(
+          (vendorOrder: any) => {
+            const currentVendorId =
+              vendorOrder?.vendorId;
 
-        if (statuses.includes("cancelled")) {
-          return "cancelled";
-        }
+            const normalizedVendorId =
+              typeof currentVendorId ===
+              "object"
+                ? currentVendorId?._id
+                : currentVendorId;
 
-        if (statuses.includes("rejected")) {
-          return "rejected";
-        }
-
-        if (statuses.includes("expired")) {
-          return "expired";
-        }
-
-        return statuses[0] || order?.status;
-      }
-
-      /**
-       * Legacy fallback.
-       */
-      return order?.status;
-    },
-    [getOwnVendorOrders]
-  );
+            return (
+              normalizedVendorId != null &&
+              String(
+                normalizedVendorId
+              ) === String(vendorId)
+            );
+          }
+        );
+      },
+      [vendorId]
+    );
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
+   * VENDOR-SPECIFIC STATUS
+   * =========================================================
+   */
+
+  const getVendorStatus =
+    useCallback(
+      (order: any) => {
+        const ownVendorOrders =
+          getOwnVendorOrders(order);
+
+        if (
+          ownVendorOrders.length > 0
+        ) {
+          const statuses =
+            ownVendorOrders
+              .map((vendorOrder: any) =>
+                String(
+                  vendorOrder?.status || ""
+                ).toLowerCase()
+              )
+              .filter(Boolean);
+
+          /**
+           * If multiple services belong to this vendor,
+           * pending gets highest priority because the
+           * vendor still has something waiting.
+           */
+          if (
+            statuses.includes("pending")
+          ) {
+            return "pending";
+          }
+
+          if (
+            statuses.includes("accepted")
+          ) {
+            return "accepted";
+          }
+
+          if (
+            statuses.includes("completed")
+          ) {
+            return "completed";
+          }
+
+          if (
+            statuses.includes("cancelled")
+          ) {
+            return "cancelled";
+          }
+
+          if (
+            statuses.includes("rejected")
+          ) {
+            return "rejected";
+          }
+
+          if (
+            statuses.includes("expired")
+          ) {
+            return "expired";
+          }
+
+          return (
+            statuses[0] ||
+            order?.status
+          );
+        }
+
+        return order?.status;
+      },
+      [getOwnVendorOrders]
+    );
+
+  /**
+   * =========================================================
    * STATS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const stats = useMemo(() => {
     const now = new Date();
 
-    const thisMonth = orders.filter((order) => {
-      if (!order?.eventDate) {
-        return false;
+    const thisMonth = orders.filter(
+      (order) => {
+        if (!order?.eventDate) {
+          return false;
+        }
+
+        const d = new Date(
+          order.eventDate
+        );
+
+        return (
+          d.getMonth() ===
+            now.getMonth() &&
+          d.getFullYear() ===
+            now.getFullYear()
+        );
       }
+    );
 
-      const d = new Date(order.eventDate);
+    const upcoming = orders.filter(
+      (order) => {
+        if (!order?.eventDate) {
+          return false;
+        }
 
-      return (
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear()
-      );
-    });
-
-    const upcoming = orders.filter((order) => {
-      if (!order?.eventDate) {
-        return false;
+        return (
+          toKey(order.eventDate) >=
+          todayKey
+        );
       }
+    );
 
-      return toKey(order.eventDate) >= todayKey;
-    });
-
-    /**
-     * IMPORTANT:
-     * Pending count now uses vendor-specific status.
-     */
-    const pending = orders.filter((order) => {
-      return (
-        String(getVendorStatus(order) || "").toLowerCase() ===
-        "pending"
-      );
-    });
+    const pending = orders.filter(
+      (order) => {
+        return (
+          String(
+            getVendorStatus(order) || ""
+          ).toLowerCase() === "pending"
+        );
+      }
+    );
 
     return {
       total: orders.length,
@@ -455,12 +692,16 @@ const MyEventsScreen = () => {
       upcoming: upcoming.length,
       pending: pending.length,
     };
-  }, [orders, todayKey, getVendorStatus]);
+  }, [
+    orders,
+    todayKey,
+    getVendorStatus,
+  ]);
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
    * EVENTS FILTER
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const events = useMemo(() => {
@@ -472,7 +713,8 @@ const MyEventsScreen = () => {
       list = orders.filter(
         (order) =>
           order?.eventDate &&
-          toKey(order.eventDate) === selectedDate
+          toKey(order.eventDate) ===
+            selectedDate
       );
     }
 
@@ -481,12 +723,17 @@ const MyEventsScreen = () => {
         .filter(
           (order) =>
             order?.eventDate &&
-            toKey(order.eventDate) >= todayKey
+            toKey(order.eventDate) >=
+              todayKey
         )
         .sort(
           (a, b) =>
-            new Date(a.eventDate).getTime() -
-            new Date(b.eventDate).getTime()
+            new Date(
+              a.eventDate
+            ).getTime() -
+            new Date(
+              b.eventDate
+            ).getTime()
         );
     }
 
@@ -497,17 +744,25 @@ const MyEventsScreen = () => {
             return false;
           }
 
-          const d = new Date(order.eventDate);
+          const d = new Date(
+            order.eventDate
+          );
 
           return (
-            d.getMonth() === now.getMonth() &&
-            d.getFullYear() === now.getFullYear()
+            d.getMonth() ===
+              now.getMonth() &&
+            d.getFullYear() ===
+              now.getFullYear()
           );
         })
         .sort(
           (a, b) =>
-            new Date(a.eventDate).getTime() -
-            new Date(b.eventDate).getTime()
+            new Date(
+              a.eventDate
+            ).getTime() -
+            new Date(
+              b.eventDate
+            ).getTime()
         );
     }
 
@@ -516,12 +771,17 @@ const MyEventsScreen = () => {
         .filter(
           (order) =>
             order?.eventDate &&
-            toKey(order.eventDate) < todayKey
+            toKey(order.eventDate) <
+              todayKey
         )
         .sort(
           (a, b) =>
-            new Date(b.eventDate).getTime() -
-            new Date(a.eventDate).getTime()
+            new Date(
+              b.eventDate
+            ).getTime() -
+            new Date(
+              a.eventDate
+            ).getTime()
         );
     }
 
@@ -534,317 +794,365 @@ const MyEventsScreen = () => {
   ]);
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
    * AVAILABILITY HELPERS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
-  const isBlockedDate = useCallback(
-    (date: string) => {
-      return (
-        availability?.blockedDates?.some(
-          (blockedDate) =>
-            toKey(blockedDate) === date
-        ) || false
-      );
-    },
-    [availability]
-  );
+  const isBlockedDate =
+    useCallback(
+      (date: string) => {
+        return (
+          availability?.blockedDates?.some(
+            (blockedDate) =>
+              toKey(blockedDate) === date
+          ) || false
+        );
+      },
+      [availability]
+    );
+
+  const getDaySlotConfig =
+    useCallback(
+      (date: string) => {
+        const dayCode =
+          getDayCode(date);
+
+        return availability?.daySlots?.find(
+          (config) =>
+            config.day === dayCode
+        );
+      },
+      [availability]
+    );
+
+  const isWorkingDay =
+    useCallback(
+      (date: string) => {
+        if (
+          availability?.daySlots
+            ?.length
+        ) {
+          const config =
+            getDaySlotConfig(date);
+
+          if (config) {
+            return (
+              config.enabled === true
+            );
+          }
+        }
+
+        if (
+          !availability?.workingDays
+            ?.length
+        ) {
+          return true;
+        }
+
+        const code =
+          getDayCode(date);
+
+        const workingDay =
+          availability.workingDays.find(
+            (item) =>
+              item.day === code
+          );
+
+        return !!workingDay?.enabled;
+      },
+      [
+        availability,
+        getDaySlotConfig,
+      ]
+    );
 
   /**
-   * ---------------------------------------------------------
-   * MULTI-SLOT WORKING DAY
-   * ---------------------------------------------------------
-   *
-   * Priority:
-   *
-   * 1. daySlots
-   * 2. legacy workingDays
-   * 3. default true
-   * ---------------------------------------------------------
+   * =========================================================
+   * SELECTED DAY BOOKINGS
+   * =========================================================
    */
 
-  const getDaySlotConfig = useCallback(
-    (date: string) => {
-      const dayCode = getDayCode(date);
-
-      return availability?.daySlots?.find(
-        (config) => config.day === dayCode
+  const selectedDayBookings =
+    useMemo(() => {
+      return orders.filter(
+        (order) =>
+          order?.eventDate &&
+          toKey(order.eventDate) ===
+            selectedDate
       );
-    },
-    [availability]
-  );
+    }, [
+      orders,
+      selectedDate,
+    ]);
 
-  const isWorkingDay = useCallback(
-    (date: string) => {
-      /**
-       * NEW MULTI-SLOT SYSTEM
-       */
-      if (availability?.daySlots?.length) {
-        const config = getDaySlotConfig(date);
+  /**
+   * =========================================================
+   * SELECTED DAY WINDOWS
+   * =========================================================
+   */
 
-        /**
-         * If this particular day exists in daySlots,
-         * it becomes the source of truth.
-         */
+  const selectedDayWindows =
+    useMemo(() => {
+      if (!availability) {
+        return [];
+      }
+
+      if (
+        availability.daySlots
+          ?.length
+      ) {
+        const config =
+          getDaySlotConfig(
+            selectedDate
+          );
+
         if (config) {
-          return config.enabled === true;
+          if (!config.enabled) {
+            return [];
+          }
+
+          return Array.isArray(
+            config.slots
+          )
+            ? config.slots.filter(
+                (slot) =>
+                  slot?.start &&
+                  slot?.end &&
+                  minutesBetween(
+                    slot.start,
+                    slot.end
+                  ) > 0
+              )
+            : [];
         }
       }
 
-      /**
-       * LEGACY SYSTEM
-       */
-      if (!availability?.workingDays?.length) {
-        return true;
+      if (
+        !isWorkingDay(
+          selectedDate
+        )
+      ) {
+        return [];
       }
 
-      const code = getDayCode(date);
+      const start =
+        availability.workingHoursStart ||
+        "09:00";
 
-      const workingDay =
-        availability.workingDays.find(
-          (item) => item.day === code
+      const end =
+        availability.workingHoursEnd ||
+        "18:00";
+
+      if (
+        minutesBetween(
+          start,
+          end
+        ) <= 0
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          start,
+          end,
+        },
+      ];
+    }, [
+      availability,
+      selectedDate,
+      getDaySlotConfig,
+      isWorkingDay,
+    ]);
+
+  /**
+   * =========================================================
+   * DAY AVAILABILITY
+   * =========================================================
+   */
+
+  const dayAvailability =
+    useMemo(() => {
+      if (!availability) {
+        return {
+          isWorking: true,
+          isBlocked: false,
+          windows: [],
+          slots: [] as GeneratedSlot[],
+        };
+      }
+
+      const isWorking =
+        isWorkingDay(
+          selectedDate
         );
 
-      return !!workingDay?.enabled;
-    },
-    [
-      availability,
-      getDaySlotConfig,
-    ]
-  );
+      const isBlocked =
+        isBlockedDate(
+          selectedDate
+        );
 
-  /**
-   * ---------------------------------------------------------
-   * SELECTED DAY BOOKINGS
-   * ---------------------------------------------------------
-   */
-
-  const selectedDayBookings = useMemo(() => {
-    return orders.filter(
-      (order) =>
-        order?.eventDate &&
-        toKey(order.eventDate) === selectedDate
-    );
-  }, [orders, selectedDate]);
-
-  /**
-   * ---------------------------------------------------------
-   * GET WORKING WINDOWS FOR SELECTED DAY
-   * ---------------------------------------------------------
-   */
-
-  const selectedDayWindows = useMemo(() => {
-    if (!availability) {
-      return [];
-    }
-
-    /**
-     * NEW MULTI-SLOT SYSTEM
-     */
-    if (availability.daySlots?.length) {
-      const config = getDaySlotConfig(selectedDate);
-
-      if (config) {
-        if (!config.enabled) {
-          return [];
-        }
-
-        return Array.isArray(config.slots)
-          ? config.slots.filter(
-              (slot) =>
-                slot?.start &&
-                slot?.end &&
-                minutesBetween(
-                  slot.start,
-                  slot.end
-                ) > 0
-            )
-          : [];
+      if (
+        !isWorking ||
+        isBlocked
+      ) {
+        return {
+          isWorking,
+          isBlocked,
+          windows: [],
+          slots: [] as GeneratedSlot[],
+        };
       }
-    }
 
-    /**
-     * LEGACY FALLBACK
-     */
-    if (!isWorkingDay(selectedDate)) {
-      return [];
-    }
+      const windows =
+        selectedDayWindows;
 
-    const start =
-      availability.workingHoursStart || "09:00";
+      const SLOT_MINUTES = 60;
 
-    const end =
-      availability.workingHoursEnd || "18:00";
+      const slots: GeneratedSlot[] =
+        [];
 
-    if (minutesBetween(start, end) <= 0) {
-      return [];
-    }
+      windows.forEach(
+        (workingWindow) => {
+          const start =
+            parseTimeOnDate(
+              selectedDate,
+              workingWindow.start
+            );
 
-    return [
-      {
-        start,
-        end,
-      },
-    ];
-  }, [
-    availability,
-    selectedDate,
-    getDaySlotConfig,
-    isWorkingDay,
-  ]);
+          const end =
+            parseTimeOnDate(
+              selectedDate,
+              workingWindow.end
+            );
 
-  /**
-   * ---------------------------------------------------------
-   * DAY AVAILABILITY
-   * ---------------------------------------------------------
-   *
-   * Supports:
-   *
-   * 09:00 - 13:00
-   * 16:00 - 22:00
-   *
-   * Each working window generates 60-minute
-   * presentation slots.
-   * ---------------------------------------------------------
-   */
+          let cursor = start;
 
-  const dayAvailability = useMemo(() => {
-    if (!availability) {
-      return {
-        isWorking: true,
-        isBlocked: false,
-        windows: [],
-        slots: [] as GeneratedSlot[],
-      };
-    }
+          while (cursor < end) {
+            const slotEnd =
+              addMinutes(
+                cursor,
+                SLOT_MINUTES
+              );
 
-    const isWorking = isWorkingDay(selectedDate);
-    const isBlocked = isBlockedDate(selectedDate);
+            if (
+              slotEnd > end
+            ) {
+              break;
+            }
 
-    if (!isWorking || isBlocked) {
+            const slotStartKey =
+              cursor.getTime();
+
+            const slotEndKey =
+              slotEnd.getTime();
+
+            const booking =
+              selectedDayBookings.find(
+                (order) => {
+                  const status =
+                    getVendorStatus(
+                      order
+                    );
+
+                  if (
+                    !isBlockingBookingStatus(
+                      status
+                    )
+                  ) {
+                    return false;
+                  }
+
+                  if (
+                    !order?.eventStartDateTime ||
+                    !order?.eventEndDateTime
+                  ) {
+                    return false;
+                  }
+
+                  const bookingStart =
+                    new Date(
+                      order.eventStartDateTime
+                    ).getTime();
+
+                  const bookingEnd =
+                    new Date(
+                      order.eventEndDateTime
+                    ).getTime();
+
+                  if (
+                    Number.isNaN(
+                      bookingStart
+                    ) ||
+                    Number.isNaN(
+                      bookingEnd
+                    )
+                  ) {
+                    return false;
+                  }
+
+                  return (
+                    bookingStart <
+                      slotEndKey &&
+                    bookingEnd >
+                      slotStartKey
+                  );
+                }
+              );
+
+            slots.push({
+              start:
+                formatTime(cursor),
+              end:
+                formatTime(slotEnd),
+              status: booking
+                ? "booked"
+                : "available",
+              booking,
+            });
+
+            cursor = slotEnd;
+          }
+        }
+      );
+
       return {
         isWorking,
         isBlocked,
-        windows: [],
-        slots: [] as GeneratedSlot[],
+        windows,
+        slots,
       };
-    }
-
-    const windows = selectedDayWindows;
-
-    const SLOT_MINUTES = 60;
-
-    const slots: GeneratedSlot[] = [];
-
-    /**
-     * Generate slots separately for every configured
-     * working window.
-     */
-    windows.forEach((window) => {
-      const start = parseTime(window.start);
-      const end = parseTime(window.end);
-
-      let cursor = start;
-
-      while (cursor < end) {
-        const slotEnd = addMinutes(
-          cursor,
-          SLOT_MINUTES
-        );
-
-        /**
-         * Don't create a slot outside configured
-         * working window.
-         */
-        if (slotEnd > end) {
-          break;
-        }
-
-        const slotStartKey = cursor.getTime();
-        const slotEndKey = slotEnd.getTime();
-
-        /**
-         * Find a booking overlapping this visual slot.
-         */
-        const booking =
-          selectedDayBookings.find((order) => {
-            if (
-              !order?.eventStartDateTime ||
-              !order?.eventEndDateTime
-            ) {
-              return false;
-            }
-
-            const bookingStart =
-              new Date(
-                order.eventStartDateTime
-              ).getTime();
-
-            const bookingEnd =
-              new Date(
-                order.eventEndDateTime
-              ).getTime();
-
-            if (
-              Number.isNaN(bookingStart) ||
-              Number.isNaN(bookingEnd)
-            ) {
-              return false;
-            }
-
-            return (
-              bookingStart < slotEndKey &&
-              bookingEnd > slotStartKey
-            );
-          });
-
-        slots.push({
-          start: formatTime(cursor),
-          end: formatTime(slotEnd),
-          status: booking
-            ? "booked"
-            : "available",
-          booking,
-        });
-
-        cursor = slotEnd;
-      }
-    });
-
-    return {
-      isWorking,
-      isBlocked,
-      windows,
-      slots,
-    };
-  }, [
-    availability,
-    selectedDate,
-    selectedDayBookings,
-    selectedDayWindows,
-    isWorkingDay,
-    isBlockedDate,
-  ]);
+    }, [
+      availability,
+      selectedDate,
+      selectedDayBookings,
+      selectedDayWindows,
+      isWorkingDay,
+      isBlockedDate,
+      getVendorStatus,
+    ]);
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
    * CALENDAR MARKS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const markedDates = useMemo(() => {
-    const marks: Record<string, any> = {};
+    const marks: Record<
+      string,
+      any
+    > = {};
 
-    /**
-     * Booking dates
-     */
     orders.forEach((order) => {
       if (!order?.eventDate) {
         return;
       }
 
-      const key = toKey(order.eventDate);
+      const key = toKey(
+        order.eventDate
+      );
 
       if (!key) {
         return;
@@ -864,9 +1172,6 @@ const MyEventsScreen = () => {
       };
     });
 
-    /**
-     * Blocked dates
-     */
     availability?.blockedDates?.forEach(
       (date) => {
         const key = toKey(date);
@@ -878,10 +1183,12 @@ const MyEventsScreen = () => {
         marks[key] = {
           customStyles: {
             container: {
-              backgroundColor: "#FDEBEC",
+              backgroundColor:
+                "#FDEBEC",
               borderRadius: 9,
               borderWidth: 1,
-              borderColor: "#D9534F",
+              borderColor:
+                "#D9534F",
             },
             text: {
               color: "#C0392B",
@@ -892,9 +1199,6 @@ const MyEventsScreen = () => {
       }
     );
 
-    /**
-     * Selected date wins.
-     */
     marks[selectedDate] = {
       customStyles: {
         container: {
@@ -918,34 +1222,678 @@ const MyEventsScreen = () => {
   ]);
 
   /**
-   * ---------------------------------------------------------
-   * MONTH LABEL
-   * ---------------------------------------------------------
+   * =========================================================
+   * MONTH
+   * =========================================================
    */
 
-  const monthLabel = new Date(
-    `${selectedDate}T12:00:00`
-  ).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const monthLabel =
+    new Date(
+      `${selectedDate}T12:00:00`
+    ).toLocaleDateString(
+      "en-US",
+      {
+        month: "long",
+        year: "numeric",
+      }
+    );
 
   /**
-   * ---------------------------------------------------------
-   * EXPAND
-   * ---------------------------------------------------------
+   * =========================================================
+   * AVAILABILITY SUMMARY
+   * =========================================================
    */
 
-  const toggleExpand = (id: string) => {
-    setExpandedId((previous) =>
-      previous === id ? null : id
+  const availableSlotCount =
+    dayAvailability.slots.filter(
+      (slot) =>
+        slot.status ===
+        "available"
+    ).length;
+
+  const bookedSlotCount =
+    dayAvailability.slots.filter(
+      (slot) =>
+        slot.status ===
+        "booked"
+    ).length;
+
+  const workingHoursLabel =
+    useMemo(() => {
+      if (
+        !dayAvailability.windows ||
+        dayAvailability.windows
+          .length === 0
+      ) {
+        return "No configured slots";
+      }
+
+      return dayAvailability.windows
+        .map(
+          (workingWindow) =>
+            `${formatDisplayTime(
+              workingWindow.start
+            )} - ${formatDisplayTime(
+              workingWindow.end
+            )}`
+        )
+        .join("  •  ");
+    }, [
+      dayAvailability.windows,
+    ]);
+
+  const totalWorkingMinutes =
+    useMemo(() => {
+      return dayAvailability.windows.reduce(
+        (total, workingWindow) =>
+          total +
+          minutesBetween(
+            workingWindow.start,
+            workingWindow.end
+          ),
+        0
+      );
+    }, [
+      dayAvailability.windows,
+    ]);
+
+  /**
+   * =========================================================
+   * OPEN AVAILABILITY EDITOR
+   * =========================================================
+   */
+
+  const openAvailabilityEditor =
+    useCallback(() => {
+      const source =
+        availability?.daySlots;
+
+      const mergedDays: DaySlotConfig[] =
+        DAYS.map((day) => {
+          const existing =
+            source?.find(
+              (item) =>
+                item.day === day.code
+            );
+
+          if (existing) {
+            return {
+              day: day.code,
+              enabled:
+                existing.enabled !==
+                false,
+              slots:
+                Array.isArray(
+                  existing.slots
+                )
+                  ? existing.slots.map(
+                      (slot) => ({
+                        start:
+                          slot.start,
+                        end: slot.end,
+                      })
+                    )
+                  : [],
+            };
+          }
+
+          /**
+           * Backward compatibility:
+           * If old availability exists, create
+           * a first slot from legacy working hours.
+           */
+          const oldWorkingDay =
+            availability?.workingDays?.find(
+              (item) =>
+                item.day ===
+                day.code
+            );
+
+          const oldStart =
+            availability?.workingHoursStart ||
+            "09:00";
+
+          const oldEnd =
+            availability?.workingHoursEnd ||
+            "18:00";
+
+          return {
+            day: day.code,
+            enabled:
+              oldWorkingDay?.enabled ??
+              true,
+            slots:
+              oldWorkingDay?.enabled ===
+                false
+                ? []
+                : [
+                    {
+                      start: oldStart,
+                      end: oldEnd,
+                    },
+                  ],
+          };
+        });
+
+      setEditorDaySlots(
+        mergedDays
+      );
+
+      setEditorBlockedDates(
+        (
+          availability?.blockedDates ||
+          []
+        ).map((date) =>
+          toKey(date)
+        )
+      );
+
+      setEditorMinimumAdvanceMinutes(
+        availability
+          ?.minimumAdvanceMinutes ||
+          0
+      );
+
+      setAvailabilityEditorVisible(
+        true
+      );
+    }, [availability]);
+
+  /**
+   * =========================================================
+   * DAY TOGGLE
+   * =========================================================
+   */
+
+  const toggleEditorDay =
+    (dayCode: string) => {
+      setEditorDaySlots(
+        (previous) =>
+          previous.map((day) =>
+            day.day === dayCode
+              ? {
+                  ...day,
+                  enabled:
+                    !day.enabled,
+                }
+              : day
+          )
+      );
+    };
+
+  /**
+   * =========================================================
+   * ADD SLOT
+   * =========================================================
+   */
+
+  const startAddingSlot = (
+    dayCode: string
+  ) => {
+    const start = new Date();
+
+    start.setHours(
+      9,
+      0,
+      0,
+      0
+    );
+
+    const end = new Date();
+
+    end.setHours(
+      17,
+      0,
+      0,
+      0
+    );
+
+    setActiveDayForSlot(
+      dayCode
+    );
+
+    setEditingSlotIndex(
+      null
+    );
+
+    setDraftStart(start);
+    setDraftEnd(end);
+
+    setSlotPickerMode(
+      "start"
     );
   };
 
   /**
-   * ---------------------------------------------------------
+   * =========================================================
+   * EDIT SLOT
+   * =========================================================
+   */
+
+  const startEditingSlot = (
+    dayCode: string,
+    index: number
+  ) => {
+    const day =
+      editorDaySlots.find(
+        (item) =>
+          item.day === dayCode
+      );
+
+    const slot =
+      day?.slots?.[index];
+
+    if (!slot) {
+      return;
+    }
+
+    setActiveDayForSlot(
+      dayCode
+    );
+
+    setEditingSlotIndex(
+      index
+    );
+
+    setDraftStart(
+      parseTime(slot.start)
+    );
+
+    setDraftEnd(
+      parseTime(slot.end)
+    );
+
+    setSlotPickerMode(
+      "start"
+    );
+  };
+
+  /**
+   * =========================================================
+   * DELETE SLOT
+   * =========================================================
+   */
+
+  const deleteSlot = (
+    dayCode: string,
+    index: number
+  ) => {
+    Alert.alert(
+      "Delete time slot",
+      "Are you sure you want to remove this working slot?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            setEditorDaySlots(
+              (previous) =>
+                previous.map(
+                  (day) =>
+                    day.day ===
+                    dayCode
+                      ? {
+                          ...day,
+                          slots:
+                            day.slots.filter(
+                              (
+                                _,
+                                slotIndex
+                              ) =>
+                                slotIndex !==
+                                index
+                            ),
+                        }
+                      : day
+                )
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * =========================================================
+   * CONFIRM SLOT
+   * =========================================================
+   */
+
+  const confirmSlot = () => {
+    if (!activeDayForSlot) {
+      return;
+    }
+
+    if (
+      draftEnd <=
+      draftStart
+    ) {
+      Alert.alert(
+        "Invalid slot",
+        "End time must be after start time."
+      );
+
+      return;
+    }
+
+    const newSlot: TimeSlotConfig =
+      {
+        start:
+          toHHMM(
+            draftStart
+          ),
+        end:
+          toHHMM(
+            draftEnd
+          ),
+      };
+
+    /**
+     * Prevent overlapping slots.
+     */
+    const currentDay =
+      editorDaySlots.find(
+        (day) =>
+          day.day ===
+          activeDayForSlot
+      );
+
+    const existingSlots =
+      currentDay?.slots ||
+      [];
+
+    const editingIndex =
+      editingSlotIndex;
+
+    const newStart =
+      parseTime(
+        newSlot.start
+      ).getTime();
+
+    const newEnd =
+      parseTime(
+        newSlot.end
+      ).getTime();
+
+    const overlaps =
+      existingSlots.some(
+        (slot, index) => {
+          if (
+            editingIndex !==
+              null &&
+            index ===
+              editingIndex
+          ) {
+            return false;
+          }
+
+          const existingStart =
+            parseTime(
+              slot.start
+            ).getTime();
+
+          const existingEnd =
+            parseTime(
+              slot.end
+            ).getTime();
+
+          return (
+            newStart <
+              existingEnd &&
+            newEnd >
+              existingStart
+          );
+        }
+      );
+
+    if (overlaps) {
+      Alert.alert(
+        "Overlapping slot",
+        "This time overlaps another working slot for the same day."
+      );
+
+      return;
+    }
+
+    setEditorDaySlots(
+      (previous) =>
+        previous.map(
+          (day) => {
+            if (
+              day.day !==
+              activeDayForSlot
+            ) {
+              return day;
+            }
+
+            const slots =
+              [...day.slots];
+
+            if (
+              editingIndex !==
+              null
+            ) {
+              slots[
+                editingIndex
+              ] = newSlot;
+            } else {
+              slots.push(
+                newSlot
+              );
+            }
+
+            slots.sort(
+              (a, b) =>
+                parseTime(
+                  a.start
+                ).getTime() -
+                parseTime(
+                  b.start
+                ).getTime()
+            );
+
+            return {
+              ...day,
+              enabled: true,
+              slots,
+            };
+          }
+        )
+    );
+
+    setActiveDayForSlot(
+      null
+    );
+
+    setEditingSlotIndex(
+      null
+    );
+
+    setSlotPickerMode(
+      null
+    );
+  };
+
+  /**
+   * =========================================================
+   * BLOCK DATE
+   * =========================================================
+   */
+
+  const toggleBlockedDate =
+    (dateKey: string) => {
+      setEditorBlockedDates(
+        (previous) =>
+          previous.includes(
+            dateKey
+          )
+            ? previous.filter(
+                (date) =>
+                  date !==
+                  dateKey
+              )
+            : [
+                ...previous,
+                dateKey,
+              ]
+      );
+    };
+
+  /**
+   * =========================================================
+   * SAVE AVAILABILITY
+   * =========================================================
+   */
+
+  const handleSaveAvailability =
+    async () => {
+      if (!vendorId) {
+        Alert.alert(
+          "Error",
+          "Vendor account could not be identified."
+        );
+
+        return;
+      }
+
+      /**
+       * Validate enabled days.
+       */
+      const invalidDay =
+        editorDaySlots.find(
+          (day) =>
+            day.enabled &&
+            day.slots.some(
+              (slot) =>
+                minutesBetween(
+                  slot.start,
+                  slot.end
+                ) <= 0
+            )
+        );
+
+      if (invalidDay) {
+        Alert.alert(
+          "Invalid time slot",
+          `${DAYS.find(
+            (day) =>
+              day.code ===
+              invalidDay.day
+          )?.label || invalidDay.day} contains an invalid time slot.`
+        );
+
+        return;
+      }
+
+      setEditorSaving(
+        true
+      );
+
+      try {
+        /**
+         * Sort slots before sending.
+         */
+        const cleanDaySlots =
+          editorDaySlots.map(
+            (day) => ({
+              day: day.day,
+              enabled:
+                day.enabled,
+              slots:
+                [...day.slots].sort(
+                  (a, b) =>
+                    parseTime(
+                      a.start
+                    ).getTime() -
+                    parseTime(
+                      b.start
+                    ).getTime()
+                ),
+            })
+          );
+
+        await patchVendorAvailability(
+          vendorId,
+          {
+            daySlots:
+              cleanDaySlots,
+            blockedDates:
+              editorBlockedDates,
+            minimumAdvanceMinutes:
+              editorMinimumAdvanceMinutes,
+          }
+        );
+
+        /**
+         * Update local availability immediately.
+         */
+        setAvailability(
+          (previous) => ({
+            ...(previous || {}),
+            daySlots:
+              cleanDaySlots,
+            blockedDates:
+              editorBlockedDates,
+            minimumAdvanceMinutes:
+              editorMinimumAdvanceMinutes,
+          })
+        );
+
+        setAvailabilityEditorVisible(
+          false
+        );
+
+        Alert.alert(
+          "Availability Saved",
+          "Your working days and time slots have been updated successfully."
+        );
+
+        /**
+         * Reload everything from backend.
+         */
+        await fetchData();
+      } catch (error) {
+        console.error(
+          "Error saving availability:",
+          error
+        );
+
+        Alert.alert(
+          "Error",
+          "Unable to save availability. Please try again."
+        );
+      } finally {
+        setEditorSaving(
+          false
+        );
+      }
+    };
+
+  /**
+   * =========================================================
+   * TOGGLE EXPAND
+   * =========================================================
+   */
+
+  const toggleExpand = (
+    id: string
+  ) => {
+    setExpandedId(
+      (previous) =>
+        previous === id
+          ? null
+          : id
+    );
+  };
+
+  /**
+   * =========================================================
    * LIST TITLE
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const listTitle =
@@ -960,70 +1908,53 @@ const MyEventsScreen = () => {
       : "Past Bookings";
 
   /**
-   * ---------------------------------------------------------
-   * AVAILABILITY SUMMARY
-   * ---------------------------------------------------------
+   * =========================================================
+   * AVAILABILITY STATUS
+   * =========================================================
    */
 
-  const availableSlotCount =
-    dayAvailability.slots.filter(
-      (slot) =>
-        slot.status === "available"
-    ).length;
+  const availabilityState =
+    dayAvailability.isBlocked
+      ? "Blocked"
+      : !dayAvailability.isWorking
+      ? "Not Working"
+      : dayAvailability.slots
+          .length === 0
+      ? "No Slots"
+      : "Available";
 
-  const bookedSlotCount =
-    dayAvailability.slots.filter(
-      (slot) =>
-        slot.status === "booked"
-    ).length;
+  const availabilityPositive =
+    dayAvailability.isWorking &&
+    !dayAvailability.isBlocked &&
+    dayAvailability.slots
+      .length > 0;
 
   /**
-   * ---------------------------------------------------------
-   * WORKING WINDOW LABEL
-   * ---------------------------------------------------------
+   * =========================================================
+   * RENDER
+   * =========================================================
    */
-
-  const workingHoursLabel = useMemo(() => {
-    if (
-      !dayAvailability.windows ||
-      dayAvailability.windows.length === 0
-    ) {
-      return "No working hours";
-    }
-
-    return dayAvailability.windows
-      .map(
-        (window) =>
-          `${window.start} - ${window.end}`
-      )
-      .join("  •  ");
-  }, [dayAvailability.windows]);
-
-  /**
-   * ---------------------------------------------------------
-   * TOTAL WORKING MINUTES
-   * ---------------------------------------------------------
-   */
-
-  const totalWorkingMinutes = useMemo(() => {
-    return dayAvailability.windows.reduce(
-      (total, window) =>
-        total +
-        minutesBetween(
-          window.start,
-          window.end
-        ),
-      0
-    );
-  }, [dayAvailability.windows]);
 
   return (
-    <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
+    <View
+      style={
+        styles.container
+      }
+    >
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
+      <View
+        style={styles.header}
+      >
         <TouchableOpacity
-          style={styles.headerIconBtn}
-          onPress={() => router.back()}
+          style={
+            styles.headerIconBtn
+          }
+          onPress={() =>
+            router.back()
+          }
         >
           <Ionicons
             name="arrow-back"
@@ -1032,20 +1963,36 @@ const MyEventsScreen = () => {
           />
         </TouchableOpacity>
 
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>
+        <View
+          style={
+            styles.headerTitleWrap
+          }
+        >
+          <Text
+            style={
+              styles.headerTitle
+            }
+          >
             My Events
           </Text>
 
-          <Text style={styles.headerSubtitle}>
+          <Text
+            style={
+              styles.headerSubtitle
+            }
+          >
             Events & availability
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.headerIconBtn}
+          style={
+            styles.headerIconBtn
+          }
           onPress={() =>
-            router.push("/vendornotifications")
+            router.push(
+              "/vendornotifications"
+            )
           }
         >
           <Ionicons
@@ -1054,98 +2001,197 @@ const MyEventsScreen = () => {
             color="#FFFFFF"
           />
 
-          <View style={styles.notificationDot} />
+          <View
+            style={
+              styles.notificationDot
+            }
+          />
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={events}
         keyExtractor={(item) =>
-          String(item?._id || item?.id)
+          String(
+            item?._id ||
+              item?.id
+          )
         }
-        showsVerticalScrollIndicator={false}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
+        showsVerticalScrollIndicator={
+          false
+        }
+        refreshing={
+          refreshing
+        }
+        onRefresh={
+          onRefresh
+        }
         contentContainerStyle={
           styles.listContent
         }
         ListHeaderComponent={
           <>
-            {/* STATS */}
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <View style={styles.statIcon}>
+            {/* =================================================
+                STATS
+            ================================================== */}
+
+            <View
+              style={
+                styles.statsRow
+              }
+            >
+              <View
+                style={
+                  styles.statCard
+                }
+              >
+                <View
+                  style={
+                    styles.statIcon
+                  }
+                >
                   <Ionicons
                     name="calendar-outline"
                     size={18}
-                    color={PRIMARY}
+                    color={
+                      PRIMARY
+                    }
                   />
                 </View>
 
-                <Text style={styles.statValue}>
-                  {stats.total}
+                <Text
+                  style={
+                    styles.statValue
+                  }
+                >
+                  {
+                    stats.total
+                  }
                 </Text>
 
-                <Text style={styles.statLabel}>
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
                   Total
                 </Text>
               </View>
 
-              <View style={styles.statCard}>
-                <View style={styles.statIcon}>
+              <View
+                style={
+                  styles.statCard
+                }
+              >
+                <View
+                  style={
+                    styles.statIcon
+                  }
+                >
                   <Ionicons
                     name="time-outline"
                     size={18}
-                    color={PRIMARY}
+                    color={
+                      PRIMARY
+                    }
                   />
                 </View>
 
-                <Text style={styles.statValue}>
-                  {stats.upcoming}
+                <Text
+                  style={
+                    styles.statValue
+                  }
+                >
+                  {
+                    stats.upcoming
+                  }
                 </Text>
 
-                <Text style={styles.statLabel}>
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
                   Upcoming
                 </Text>
               </View>
 
-              <View style={styles.statCard}>
-                <View style={styles.statIcon}>
+              <View
+                style={
+                  styles.statCard
+                }
+              >
+                <View
+                  style={
+                    styles.statIcon
+                  }
+                >
                   <Ionicons
                     name="hourglass-outline"
                     size={18}
-                    color={PRIMARY}
+                    color={
+                      PRIMARY
+                    }
                   />
                 </View>
 
-                <Text style={styles.statValue}>
-                  {stats.pending}
+                <Text
+                  style={
+                    styles.statValue
+                  }
+                >
+                  {
+                    stats.pending
+                  }
                 </Text>
 
-                <Text style={styles.statLabel}>
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
                   Pending
                 </Text>
               </View>
             </View>
 
-            {/* CALENDAR */}
-            <View style={styles.calendarCard}>
-              <View style={styles.calendarHeader}>
+            {/* =================================================
+                CALENDAR
+            ================================================== */}
+
+            <View
+              style={
+                styles.calendarCard
+              }
+            >
+              <View
+                style={
+                  styles.calendarHeader
+                }
+              >
                 <View>
                   <Text
-                    style={styles.calendarTitle}
+                    style={
+                      styles.calendarTitle
+                    }
                   >
                     Booking Calendar
                   </Text>
 
                   <Text
-                    style={styles.calendarSubtitle}
+                    style={
+                      styles.calendarSubtitle
+                    }
                   >
                     Select a date to view your schedule
                   </Text>
                 </View>
 
-                <View style={styles.calendarIcon}>
+                <View
+                  style={
+                    styles.calendarIcon
+                  }
+                >
                   <Ionicons
                     name="calendar"
                     size={20}
@@ -1155,42 +2201,67 @@ const MyEventsScreen = () => {
               </View>
 
               <Calendar
-                current={selectedDate}
-                markedDates={markedDates}
+                current={
+                  selectedDate
+                }
+                markedDates={
+                  markedDates
+                }
                 markingType="custom"
-                onDayPress={(day) => {
+                onDayPress={(
+                  day
+                ) => {
                   setSelectedDate(
                     day.dateString
                   );
-                  setViewMode("day");
+
+                  setViewMode(
+                    "day"
+                  );
                 }}
                 enableSwipeMonths
                 theme={{
-                  backgroundColor: "#FFFFFF",
-                  calendarBackground: "#FFFFFF",
+                  backgroundColor:
+                    "#FFFFFF",
+                  calendarBackground:
+                    "#FFFFFF",
                   textSectionTitleColor:
                     "#9B9B9B",
-                  todayTextColor: PRIMARY,
+                  todayTextColor:
+                    PRIMARY,
                   todayBackgroundColor:
                     PRIMARY_LIGHT,
-                  dayTextColor: "#2D2D2D",
+                  dayTextColor:
+                    "#2D2D2D",
                   textDisabledColor:
                     "#D9D9D9",
-                  arrowColor: PRIMARY,
-                  monthTextColor: "#000000",
-                  textDayFontWeight: "500",
-                  textMonthFontWeight: "800",
+                  arrowColor:
+                    PRIMARY,
+                  monthTextColor:
+                    "#000000",
+                  textDayFontWeight:
+                    "500",
+                  textMonthFontWeight:
+                    "800",
                   textDayHeaderFontWeight:
                     "700",
-                  textDayFontSize: 14,
-                  textMonthFontSize: 17,
-                  textDayHeaderFontSize: 12,
+                  textDayFontSize:
+                    14,
+                  textMonthFontSize:
+                    17,
+                  textDayHeaderFontSize:
+                    12,
                 }}
-                style={styles.calendar}
+                style={
+                  styles.calendar
+                }
               />
 
-              {/* LEGEND */}
-              <View style={styles.legendRow}>
+              <View
+                style={
+                  styles.legendRow
+                }
+              >
                 <View
                   style={[
                     styles.legendDot,
@@ -1202,7 +2273,9 @@ const MyEventsScreen = () => {
                 />
 
                 <Text
-                  style={styles.legendText}
+                  style={
+                    styles.legendText
+                  }
                 >
                   Booking
                 </Text>
@@ -1221,7 +2294,9 @@ const MyEventsScreen = () => {
                 />
 
                 <Text
-                  style={styles.legendText}
+                  style={
+                    styles.legendText
+                  }
                 >
                   Unavailable
                 </Text>
@@ -1237,14 +2312,19 @@ const MyEventsScreen = () => {
                 />
 
                 <Text
-                  style={styles.legendText}
+                  style={
+                    styles.legendText
+                  }
                 >
                   Selected
                 </Text>
               </View>
             </View>
 
-            {/* AVAILABILITY CARD */}
+            {/* =================================================
+                AVAILABILITY CARD
+            ================================================== */}
+
             <View
               style={
                 styles.availabilityCard
@@ -1256,7 +2336,9 @@ const MyEventsScreen = () => {
                 }
               >
                 <View
-                  style={{ flex: 1 }}
+                  style={{
+                    flex: 1,
+                  }}
                 >
                   <Text
                     style={
@@ -1276,8 +2358,10 @@ const MyEventsScreen = () => {
                     ).toLocaleDateString(
                       "en-US",
                       {
-                        weekday: "long",
-                        month: "short",
+                        weekday:
+                          "long",
+                        month:
+                          "short",
                         day: "numeric",
                       }
                     )}
@@ -1285,45 +2369,72 @@ const MyEventsScreen = () => {
                 </View>
 
                 <View
-                  style={[
-                    styles.availabilityStatus,
-                    dayAvailability.isWorking &&
-                    !dayAvailability.isBlocked
-                      ? styles.availableStatus
-                      : styles.unavailableStatus,
-                  ]}
+                  style={
+                    styles.availabilityHeaderRight
+                  }
                 >
                   <View
                     style={[
-                      styles.statusDot,
-                      {
-                        backgroundColor:
-                          dayAvailability.isWorking &&
-                          !dayAvailability.isBlocked
-                            ? "#278A4B"
-                            : "#C0392B",
-                      },
-                    ]}
-                  />
-
-                  <Text
-                    style={[
-                      styles.availabilityStatusText,
-                      {
-                        color:
-                          dayAvailability.isWorking &&
-                          !dayAvailability.isBlocked
-                            ? "#278A4B"
-                            : "#C0392B",
-                      },
+                      styles.availabilityStatus,
+                      availabilityPositive
+                        ? styles.availableStatus
+                        : styles.unavailableStatus,
                     ]}
                   >
-                    {dayAvailability.isBlocked
-                      ? "Blocked"
-                      : !dayAvailability.isWorking
-                      ? "Not Working"
-                      : "Available"}
-                  </Text>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        {
+                          backgroundColor:
+                            availabilityPositive
+                              ? "#278A4B"
+                              : "#C0392B",
+                        },
+                      ]}
+                    />
+
+                    <Text
+                      style={[
+                        styles.availabilityStatusText,
+                        {
+                          color:
+                            availabilityPositive
+                              ? "#278A4B"
+                              : "#C0392B",
+                        },
+                      ]}
+                    >
+                      {
+                        availabilityState
+                      }
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={
+                      styles.editAvailabilityButton
+                    }
+                    onPress={
+                      openAvailabilityEditor
+                    }
+                    activeOpacity={
+                      0.8
+                    }
+                  >
+                    <Ionicons
+                      name="create-outline"
+                      size={15}
+                      color="#FFFFFF"
+                    />
+
+                    <Text
+                      style={
+                        styles.editAvailabilityText
+                      }
+                    >
+                      Edit
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -1335,11 +2446,15 @@ const MyEventsScreen = () => {
                 >
                   <ActivityIndicator
                     size="small"
-                    color={PRIMARY}
+                    color={
+                      PRIMARY
+                    }
                   />
 
                   <Text
-                    style={styles.loadingText}
+                    style={
+                      styles.loadingText
+                    }
                   >
                     Loading availability...
                   </Text>
@@ -1357,7 +2472,9 @@ const MyEventsScreen = () => {
                   />
 
                   <View
-                    style={{ flex: 1 }}
+                    style={{
+                      flex: 1,
+                    }}
                   >
                     <Text
                       style={
@@ -1372,8 +2489,7 @@ const MyEventsScreen = () => {
                         styles.messageText
                       }
                     >
-                      You have marked this date as
-                      unavailable.
+                      You have marked this date as unavailable.
                     </Text>
                   </View>
                 </View>
@@ -1390,7 +2506,9 @@ const MyEventsScreen = () => {
                   />
 
                   <View
-                    style={{ flex: 1 }}
+                    style={{
+                      flex: 1,
+                    }}
                   >
                     <Text
                       style={
@@ -1405,14 +2523,12 @@ const MyEventsScreen = () => {
                         styles.messageText
                       }
                     >
-                      You are not accepting bookings
-                      on this day.
+                      You are not accepting bookings on this day.
                     </Text>
                   </View>
                 </View>
               ) : (
                 <>
-                  {/* WORKING HOURS */}
                   <View
                     style={
                       styles.workingHoursCard
@@ -1426,12 +2542,16 @@ const MyEventsScreen = () => {
                       <Ionicons
                         name="time-outline"
                         size={18}
-                        color={PRIMARY}
+                        color={
+                          PRIMARY
+                        }
                       />
                     </View>
 
                     <View
-                      style={{ flex: 1 }}
+                      style={{
+                        flex: 1,
+                      }}
                     >
                       <Text
                         style={
@@ -1446,17 +2566,17 @@ const MyEventsScreen = () => {
                           styles.workingHours
                         }
                       >
-                        {workingHoursLabel}
+                        {
+                          workingHoursLabel
+                        }
                       </Text>
 
                       {totalWorkingMinutes >
                         0 && (
                         <Text
-                          style={{
-                            fontSize: 10,
-                            color: "#8A8A8A",
-                            marginTop: 3,
-                          }}
+                          style={
+                            styles.totalMinutesText
+                          }
                         >
                           {formatMinutes(
                             totalWorkingMinutes
@@ -1471,11 +2591,13 @@ const MyEventsScreen = () => {
                         styles.slotCount
                       }
                     >
-                      {availableSlotCount} free
+                      {
+                        availableSlotCount
+                      }{" "}
+                      free
                     </Text>
                   </View>
 
-                  {/* SLOT SUMMARY */}
                   <View
                     style={
                       styles.slotSummaryRow
@@ -1501,7 +2623,9 @@ const MyEventsScreen = () => {
                           styles.summaryText
                         }
                       >
-                        {availableSlotCount}{" "}
+                        {
+                          availableSlotCount
+                        }{" "}
                         Available
                       </Text>
                     </View>
@@ -1526,13 +2650,14 @@ const MyEventsScreen = () => {
                           styles.summaryText
                         }
                       >
-                        {bookedSlotCount}{" "}
+                        {
+                          bookedSlotCount
+                        }{" "}
                         Booked
                       </Text>
                     </View>
                   </View>
 
-                  {/* TIME SLOTS */}
                   <Text
                     style={
                       styles.slotSectionTitle
@@ -1542,9 +2667,12 @@ const MyEventsScreen = () => {
                   </Text>
 
                   {dayAvailability.slots
-                    .length === 0 ? (
+                    .length ===
+                  0 ? (
                     <View
-                      style={styles.noSlots}
+                      style={
+                        styles.noSlots
+                      }
                     >
                       <Ionicons
                         name="calendar-outline"
@@ -1567,7 +2695,10 @@ const MyEventsScreen = () => {
                       }
                     >
                       {dayAvailability.slots.map(
-                        (slot, index) => {
+                        (
+                          slot,
+                          index
+                        ) => {
                           const booked =
                             slot.status ===
                             "booked";
@@ -1596,7 +2727,9 @@ const MyEventsScreen = () => {
                                       ? "lock-closed-outline"
                                       : "checkmark-outline"
                                   }
-                                  size={16}
+                                  size={
+                                    16
+                                  }
                                   color={
                                     booked
                                       ? "#C0392B"
@@ -1615,8 +2748,13 @@ const MyEventsScreen = () => {
                                     styles.slotTime
                                   }
                                 >
-                                  {slot.start} -{" "}
-                                  {slot.end}
+                                  {
+                                    slot.start
+                                  }{" "}
+                                  -{" "}
+                                  {
+                                    slot.end
+                                  }
                                 </Text>
 
                                 <Text
@@ -1644,15 +2782,16 @@ const MyEventsScreen = () => {
                       styles.backendNote
                     }
                   >
-                    Availability is checked again by
-                    the system before a booking is
-                    confirmed.
+                    Availability is checked again by the system before a booking is confirmed.
                   </Text>
                 </>
               )}
             </View>
 
-            {/* FILTERS */}
+            {/* =================================================
+                FILTERS
+            ================================================== */}
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={
@@ -1662,81 +2801,109 @@ const MyEventsScreen = () => {
                 styles.filterRow
               }
             >
-              {FILTERS.map((filter) => {
-                const active =
-                  viewMode === filter.key;
+              {FILTERS.map(
+                (filter) => {
+                  const active =
+                    viewMode ===
+                    filter.key;
 
-                return (
-                  <TouchableOpacity
-                    key={filter.key}
-                    onPress={() =>
-                      setViewMode(
+                  return (
+                    <TouchableOpacity
+                      key={
                         filter.key
-                      )
-                    }
-                    style={[
-                      styles.filterChip,
-                      active &&
-                        styles.filterChipActive,
-                    ]}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons
-                      name={filter.icon}
-                      size={14}
-                      color={
-                        active
-                          ? "#FFFFFF"
-                          : PRIMARY
                       }
-                    />
-
-                    <Text
+                      onPress={() =>
+                        setViewMode(
+                          filter.key
+                        )
+                      }
                       style={[
-                        styles.filterChipText,
+                        styles.filterChip,
                         active &&
-                          styles.filterChipTextActive,
+                          styles.filterChipActive,
                       ]}
+                      activeOpacity={
+                        0.8
+                      }
                     >
-                      {filter.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <Ionicons
+                        name={
+                          filter.icon
+                        }
+                        size={14}
+                        color={
+                          active
+                            ? "#FFFFFF"
+                            : PRIMARY
+                        }
+                      />
+
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          active &&
+                            styles.filterChipTextActive,
+                        ]}
+                      >
+                        {
+                          filter.label
+                        }
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }
+              )}
             </ScrollView>
 
-            {/* SECTION TITLE */}
+            {/* =================================================
+                SECTION TITLE
+            ================================================== */}
+
             <View
-              style={styles.sectionRow}
+              style={
+                styles.sectionRow
+              }
             >
               <View>
                 <Text
-                  style={styles.sectionTitle}
+                  style={
+                    styles.sectionTitle
+                  }
                 >
-                  {listTitle}
+                  {
+                    listTitle
+                  }
                 </Text>
 
-                {viewMode === "day" && (
+                {viewMode ===
+                  "day" && (
                   <Text
                     style={
                       styles.sectionSubtitle
                     }
                   >
-                    {monthLabel}
+                    {
+                      monthLabel
+                    }
                   </Text>
                 )}
               </View>
 
               <View
-                style={styles.countBadge}
+                style={
+                  styles.countBadge
+                }
               >
                 <Text
                   style={
                     styles.countBadgeText
                   }
                 >
-                  {events.length}{" "}
-                  {events.length === 1
+                  {
+                    events.length
+                  }{" "}
+                  {events.length ===
+                  1
                     ? "Event"
                     : "Events"}
                 </Text>
@@ -1744,23 +2911,27 @@ const MyEventsScreen = () => {
             </View>
           </>
         }
-        renderItem={({ item }) => {
+        renderItem={({
+          item,
+        }) => {
           const id =
-            String(item?._id || item?.id);
+            String(
+              item?._id ||
+                item?.id
+            );
 
           const isExpanded =
-            expandedId === id;
+            expandedId ===
+            id;
 
-          /**
-           * IMPORTANT:
-           * Only calculate total from THIS vendor's
-           * vendorOrders.
-           */
           const ownVendorOrders =
-            getOwnVendorOrders(item);
+            getOwnVendorOrders(
+              item
+            );
 
           const vendorTotal =
-            ownVendorOrders.length > 0
+            ownVendorOrders.length >
+            0
               ? ownVendorOrders.reduce(
                   (
                     sum: number,
@@ -1768,27 +2939,33 @@ const MyEventsScreen = () => {
                   ) =>
                     sum +
                     Number(
-                      service?.price || 0
+                      service?.price ||
+                        0
                     ),
                   0
                 )
               : Number(
-                  item?.totalAmount || 0
+                  item?.totalAmount ||
+                    0
                 );
 
-          /**
-           * IMPORTANT:
-           * Use vendor-specific status.
-           */
           const vendorStatus =
-            getVendorStatus(item);
+            getVendorStatus(
+              item
+            );
 
           return (
             <TouchableOpacity
-              style={styles.eventCard}
-              activeOpacity={0.85}
+              style={
+                styles.eventCard
+              }
+              activeOpacity={
+                0.85
+              }
               onPress={() =>
-                toggleExpand(id)
+                toggleExpand(
+                  id
+                )
               }
             >
               <View
@@ -1804,23 +2981,33 @@ const MyEventsScreen = () => {
               />
 
               <View
-                style={styles.eventIconWrap}
+                style={
+                  styles.eventIconWrap
+                }
               >
                 <Ionicons
                   name="calendar"
                   size={22}
-                  color={PRIMARY}
+                  color={
+                    PRIMARY
+                  }
                 />
               </View>
 
               <View
-                style={styles.eventDetails}
+                style={
+                  styles.eventDetails
+                }
               >
                 <View
-                  style={styles.eventTopRow}
+                  style={
+                    styles.eventTopRow
+                  }
                 >
                   <View
-                    style={{ flex: 1 }}
+                    style={{
+                      flex: 1,
+                    }}
                   >
                     <Text
                       style={
@@ -1838,7 +3025,9 @@ const MyEventsScreen = () => {
                       style={
                         styles.eventTitle
                       }
-                      numberOfLines={1}
+                      numberOfLines={
+                        1
+                      }
                     >
                       {item?.eventName ||
                         "Unnamed Event"}
@@ -1880,23 +3069,31 @@ const MyEventsScreen = () => {
                           },
                         ]}
                       >
-                        {vendorStatus}
+                        {
+                          vendorStatus
+                        }
                       </Text>
                     </View>
                   )}
                 </View>
 
                 <View
-                  style={styles.metaRow}
+                  style={
+                    styles.metaRow
+                  }
                 >
                   {!!item?.guests && (
                     <View
-                      style={styles.eventMeta}
+                      style={
+                        styles.eventMeta
+                      }
                     >
                       <Ionicons
                         name="people-outline"
                         size={15}
-                        color={PRIMARY}
+                        color={
+                          PRIMARY
+                        }
                       />
 
                       <Text
@@ -1904,19 +3101,26 @@ const MyEventsScreen = () => {
                           styles.eventText
                         }
                       >
-                        {item.guests} guests
+                        {
+                          item.guests
+                        }{" "}
+                        guests
                       </Text>
                     </View>
                   )}
 
                   {!!item?.eventTime && (
                     <View
-                      style={styles.eventMeta}
+                      style={
+                        styles.eventMeta
+                      }
                     >
                       <Ionicons
                         name="time-outline"
                         size={15}
-                        color={PRIMARY}
+                        color={
+                          PRIMARY
+                        }
                       />
 
                       <Text
@@ -1924,7 +3128,9 @@ const MyEventsScreen = () => {
                           styles.eventText
                         }
                       >
-                        {item.eventTime}
+                        {
+                          item.eventTime
+                        }
                       </Text>
                     </View>
                   )}
@@ -1953,7 +3159,9 @@ const MyEventsScreen = () => {
                         <Ionicons
                           name="calendar-outline"
                           size={14}
-                          color={PRIMARY}
+                          color={
+                            PRIMARY
+                          }
                         />
 
                         <Text
@@ -1962,7 +3170,9 @@ const MyEventsScreen = () => {
                           }
                         >
                           Event Name:{" "}
-                          {item.eventName}
+                          {
+                            item.eventName
+                          }
                         </Text>
                       </View>
                     )}
@@ -1985,7 +3195,9 @@ const MyEventsScreen = () => {
                           }
                         >
                           Event Type:{" "}
-                          {item.eventType}
+                          {
+                            item.eventType
+                          }
                         </Text>
                       </View>
                     )}
@@ -2033,7 +3245,9 @@ const MyEventsScreen = () => {
                           }
                         >
                           Guests:{" "}
-                          {item.guests}
+                          {
+                            item.guests
+                          }
                         </Text>
                       </View>
                     )}
@@ -2064,7 +3278,9 @@ const MyEventsScreen = () => {
                           }
                         >
                           Your Earnings: Rs.{" "}
-                          {vendorTotal}
+                          {
+                            vendorTotal
+                          }
                         </Text>
                       </View>
                     )}
@@ -2091,7 +3307,9 @@ const MyEventsScreen = () => {
                           ]}
                         >
                           Status:{" "}
-                          {vendorStatus}
+                          {
+                            vendorStatus
+                          }
                         </Text>
                       </View>
                     )}
@@ -2124,7 +3342,9 @@ const MyEventsScreen = () => {
                               <Ionicons
                                 name="checkmark-circle-outline"
                                 size={14}
-                                color={PRIMARY}
+                                color={
+                                  PRIMARY
+                                }
                               />
 
                               <Text
@@ -2132,11 +3352,13 @@ const MyEventsScreen = () => {
                                   styles.expandedText
                                 }
                               >
-                                {service?.serviceName ||
-                                  "Service"}
+                                {
+                                  service?.serviceName ||
+                                  "Service"
+                                }
 
                                 {service?.price !=
-                                  null
+                                null
                                   ? ` - Rs. ${service.price}`
                                   : ""}
                               </Text>
@@ -2163,7 +3385,9 @@ const MyEventsScreen = () => {
         }}
         ListEmptyComponent={
           <View
-            style={styles.emptyState}
+            style={
+              styles.emptyState
+            }
           >
             <View
               style={
@@ -2173,14 +3397,19 @@ const MyEventsScreen = () => {
               <Ionicons
                 name="calendar-outline"
                 size={34}
-                color={PRIMARY}
+                color={
+                  PRIMARY
+                }
               />
             </View>
 
             <Text
-              style={styles.emptyTitle}
+              style={
+                styles.emptyTitle
+              }
             >
-              {viewMode === "day"
+              {viewMode ===
+              "day"
                 ? "No events on this day"
                 : "No events found"}
             </Text>
@@ -2190,7 +3419,8 @@ const MyEventsScreen = () => {
                 styles.emptySubtitle
               }
             >
-              {viewMode === "day"
+              {viewMode ===
+              "day"
                 ? "Your availability is shown above. Select another date to view bookings."
                 : "Try a different filter or check back later."}
             </Text>
@@ -2199,637 +3429,2044 @@ const MyEventsScreen = () => {
       />
 
       <BottomNavigationFinal />
+
+      {/* =====================================================
+          AVAILABILITY EDITOR MODAL
+      ====================================================== */}
+
+      <Modal
+        visible={
+          availabilityEditorVisible
+        }
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          if (!editorSaving) {
+            setAvailabilityEditorVisible(
+              false
+            );
+          }
+        }}
+      >
+        <View
+          style={
+            styles.editorContainer
+          }
+        >
+          {/* EDITOR HEADER */}
+
+          <View
+            style={
+              styles.editorHeader
+            }
+          >
+            <TouchableOpacity
+              style={
+                styles.editorCloseButton
+              }
+              disabled={
+                editorSaving
+              }
+              onPress={() =>
+                setAvailabilityEditorVisible(
+                  false
+                )
+              }
+            >
+              <Ionicons
+                name="close"
+                size={22}
+                color={
+                  PRIMARY
+                }
+              />
+            </TouchableOpacity>
+
+            <View
+              style={
+                styles.editorHeaderTitleWrap
+              }
+            >
+              <Text
+                style={
+                  styles.editorTitle
+                }
+              >
+                Manage Availability
+              </Text>
+
+              <Text
+                style={
+                  styles.editorSubtitle
+                }
+              >
+                Set your working days & hours
+              </Text>
+            </View>
+
+            <View
+              style={
+                styles.editorHeaderIcon
+              }
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color="#FFFFFF"
+              />
+            </View>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={
+              false
+            }
+            contentContainerStyle={
+              styles.editorContent
+            }
+          >
+            {/* INFO */}
+
+            <View
+              style={
+                styles.editorInfoCard
+              }
+            >
+              <View
+                style={
+                  styles.editorInfoIcon
+                }
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={21}
+                  color={
+                    PRIMARY
+                  }
+                />
+              </View>
+
+              <Text
+                style={
+                  styles.editorInfoText
+                }
+              >
+                Choose which days you work and add one or more working time slots for each day.
+              </Text>
+            </View>
+
+            {/* DAYS */}
+
+            <Text
+              style={
+                styles.editorSectionTitle
+              }
+            >
+              Working Days
+            </Text>
+
+            {DAYS.map(
+              (day) => {
+                const config =
+                  editorDaySlots.find(
+                    (item) =>
+                      item.day ===
+                      day.code
+                  ) || {
+                    day: day.code,
+                    enabled:
+                      true,
+                    slots: [],
+                  };
+
+                return (
+                  <View
+                    key={
+                      day.code
+                    }
+                    style={[
+                      styles.dayEditorCard,
+                      config.enabled &&
+                        styles.dayEditorCardActive,
+                    ]}
+                  >
+                    {/* DAY HEADER */}
+
+                    <View
+                      style={
+                        styles.dayEditorHeader
+                      }
+                    >
+                      <View
+                        style={
+                          styles.dayTitleRow
+                        }
+                      >
+                        <View
+                          style={[
+                            styles.dayIconCircle,
+                            config.enabled
+                              ? styles.dayIconActive
+                              : styles.dayIconInactive,
+                          ]}
+                        >
+                          <Ionicons
+                            name={
+                              config.enabled
+                                ? "checkmark"
+                                : "moon-outline"
+                            }
+                            size={17}
+                            color={
+                              config.enabled
+                                ? "#FFFFFF"
+                                : "#999999"
+                            }
+                          />
+                        </View>
+
+                        <View>
+                          <Text
+                            style={
+                              styles.dayName
+                            }
+                          >
+                            {
+                              day.label
+                            }
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.dayStatus
+                            }
+                          >
+                            {config.enabled
+                              ? config
+                                  .slots
+                                  .length >
+                                0
+                                ? `${config.slots.length} time ${
+                                    config.slots.length ===
+                                    1
+                                      ? "slot"
+                                      : "slots"
+                                  }`
+                                : "Working day"
+                              : "Day off"}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Switch
+                        value={
+                          config.enabled
+                        }
+                        onValueChange={() =>
+                          toggleEditorDay(
+                            day.code
+                          )
+                        }
+                        trackColor={{
+                          false:
+                            "#D8D8D8",
+                          true:
+                            ACCENT,
+                        }}
+                        thumbColor="#FFFFFF"
+                      />
+                    </View>
+
+                    {/* SLOTS */}
+
+                    {config.enabled && (
+                      <View
+                        style={
+                          styles.daySlotsEditor
+                        }
+                      >
+                        {config.slots
+                          .length ===
+                        0 ? (
+                          <View
+                            style={
+                              styles.noEditorSlots
+                            }
+                          >
+                            <Ionicons
+                              name="time-outline"
+                              size={18}
+                              color="#AAAAAA"
+                            />
+
+                            <Text
+                              style={
+                                styles.noEditorSlotsText
+                              }
+                            >
+                              No working hours added
+                            </Text>
+                          </View>
+                        ) : (
+                          config.slots.map(
+                            (
+                              slot,
+                              index
+                            ) => (
+                              <View
+                                key={`${day.code}-${index}`}
+                                style={
+                                  styles.editorSlotRow
+                                }
+                              >
+                                <View
+                                  style={
+                                    styles.editorSlotTimeBox
+                                  }
+                                >
+                                  <Ionicons
+                                    name="time-outline"
+                                    size={
+                                      15
+                                    }
+                                    color={
+                                      PRIMARY
+                                    }
+                                  />
+
+                                  <Text
+                                    style={
+                                      styles.editorSlotTime
+                                    }
+                                  >
+                                    {formatDisplayTime(
+                                      slot.start
+                                    )}{" "}
+                                    -{" "}
+                                    {formatDisplayTime(
+                                      slot.end
+                                    )}
+                                  </Text>
+                                </View>
+
+                                <View
+                                  style={
+                                    styles.editorSlotActions
+                                  }
+                                >
+                                  <TouchableOpacity
+                                    style={
+                                      styles.slotActionButton
+                                    }
+                                    onPress={() =>
+                                      startEditingSlot(
+                                        day.code,
+                                        index
+                                      )
+                                    }
+                                  >
+                                    <Ionicons
+                                      name="create-outline"
+                                      size={
+                                        16
+                                      }
+                                      color={
+                                        PRIMARY
+                                      }
+                                    />
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.slotActionButton,
+                                      styles.deleteSlotButton,
+                                    ]}
+                                    onPress={() =>
+                                      deleteSlot(
+                                        day.code,
+                                        index
+                                      )
+                                    }
+                                  >
+                                    <Ionicons
+                                      name="trash-outline"
+                                      size={
+                                        16
+                                      }
+                                      color="#C0392B"
+                                    />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            )
+                          )
+                        )}
+
+                        <TouchableOpacity
+                          style={
+                            styles.addSlotButton
+                          }
+                          onPress={() =>
+                            startAddingSlot(
+                              day.code
+                            )
+                          }
+                        >
+                          <Ionicons
+                            name="add-circle-outline"
+                            size={18}
+                            color={
+                              PRIMARY
+                            }
+                          />
+
+                          <Text
+                            style={
+                              styles.addSlotButtonText
+                            }
+                          >
+                            Add Time Slot
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              }
+            )}
+
+            {/* BLOCKED DATES */}
+
+            <Text
+              style={
+                styles.editorSectionTitle
+              }
+            >
+              Block Specific Dates
+            </Text>
+
+            <Text
+              style={
+                styles.editorSectionDescription
+              }
+            >
+              Tap a date to temporarily make yourself unavailable.
+            </Text>
+
+            <View
+              style={
+                styles.blockCalendarCard
+              }
+            >
+              <Calendar
+                current={
+                  selectedDate
+                }
+                markingType="custom"
+                markedDates={DAYS.reduce(
+                  (
+                    result: Record<
+                      string,
+                      any
+                    >
+                  ) => {
+                    editorBlockedDates.forEach(
+                      (
+                        date
+                      ) => {
+                        result[
+                          date
+                        ] = {
+                          customStyles:
+                            {
+                              container:
+                                {
+                                  backgroundColor:
+                                    "#C0392B",
+                                  borderRadius: 8,
+                                },
+                              text: {
+                                color:
+                                  "#FFFFFF",
+                                fontWeight:
+                                  "800",
+                              },
+                            },
+                        };
+                      }
+                    );
+
+                    return result;
+                  },
+                  {}
+                )}
+                onDayPress={(
+                  day
+                ) =>
+                  toggleBlockedDate(
+                    day.dateString
+                  )
+                }
+                enableSwipeMonths
+                theme={{
+                  backgroundColor:
+                    "#FFFFFF",
+                  calendarBackground:
+                    "#FFFFFF",
+                  textSectionTitleColor:
+                    "#9B9B9B",
+                  todayTextColor:
+                    PRIMARY,
+                  todayBackgroundColor:
+                    PRIMARY_LIGHT,
+                  dayTextColor:
+                    "#2D2D2D",
+                  textDisabledColor:
+                    "#D9D9D9",
+                  arrowColor:
+                    PRIMARY,
+                  monthTextColor:
+                    "#000000",
+                  textDayFontWeight:
+                    "500",
+                  textMonthFontWeight:
+                    "800",
+                  textDayHeaderFontWeight:
+                    "700",
+                  textDayFontSize:
+                    14,
+                  textMonthFontSize:
+                    17,
+                  textDayHeaderFontSize:
+                    12,
+                }}
+              />
+
+              {editorBlockedDates.length >
+                0 && (
+                <View
+                  style={
+                    styles.blockedDatesSummary
+                  }
+                >
+                  <Ionicons
+                    name="ban-outline"
+                    size={17}
+                    color="#C0392B"
+                  />
+
+                  <Text
+                    style={
+                      styles.blockedDatesText
+                    }
+                  >
+                    {
+                      editorBlockedDates.length
+                    }{" "}
+                    blocked{" "}
+                    {editorBlockedDates.length ===
+                    1
+                      ? "date"
+                      : "dates"}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* SAVE */}
+
+            <TouchableOpacity
+              style={
+                styles.saveAvailabilityButton
+              }
+              disabled={
+                editorSaving
+              }
+              onPress={
+                handleSaveAvailability
+              }
+              activeOpacity={
+                0.85
+              }
+            >
+              {editorSaving ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#FFFFFF"
+                />
+              ) : (
+                <>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={21}
+                    color="#FFFFFF"
+                  />
+
+                  <Text
+                    style={
+                      styles.saveAvailabilityText
+                    }
+                  >
+                    Save Availability
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View
+              style={
+                styles.editorBottomSpace
+              }
+            />
+          </ScrollView>
+
+          {/* =================================================
+              SLOT TIME PICKER
+          ================================================== */}
+
+          {slotPickerMode && (
+            <View
+              style={
+                styles.pickerOverlay
+              }
+            >
+              <View
+                style={
+                  styles.pickerCard
+                }
+              >
+                <View
+                  style={
+                    styles.pickerHeader
+                  }
+                >
+                  <View>
+                    <Text
+                      style={
+                        styles.pickerTitle
+                      }
+                    >
+                      {editingSlotIndex !==
+                      null
+                        ? "Edit Time Slot"
+                        : "Add Time Slot"}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.pickerSubtitle
+                      }
+                    >
+                      Select{" "}
+                      {slotPickerMode ===
+                      "start"
+                        ? "start"
+                        : "end"}{" "}
+                      time
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSlotPickerMode(
+                        null
+                      );
+
+                      setActiveDayForSlot(
+                        null
+                      );
+
+                      setEditingSlotIndex(
+                        null
+                      );
+                    }}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={25}
+                      color="#999999"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <DateTimePicker
+                  value={
+                    slotPickerMode ===
+                    "start"
+                      ? draftStart
+                      : draftEnd
+                  }
+                  mode="time"
+                  display={
+                    Platform.OS ===
+                    "ios"
+                      ? "spinner"
+                      : "default"
+                  }
+                  onChange={(
+                    event,
+                    date
+                  ) => {
+                    if (!date) {
+                      return;
+                    }
+
+                    if (
+                      slotPickerMode ===
+                      "start"
+                    ) {
+                      setDraftStart(
+                        date
+                      );
+
+                      /**
+                       * If start is after current end,
+                       * move end 1 hour ahead.
+                       */
+                      if (
+                        date >=
+                        draftEnd
+                      ) {
+                        setDraftEnd(
+                          addMinutes(
+                            date,
+                            60
+                          )
+                        );
+                      }
+                    } else {
+                      setDraftEnd(
+                        date
+                      );
+                    }
+                  }}
+                  style={
+                    styles.timePicker
+                  }
+                />
+
+                <View
+                  style={
+                    styles.pickerPreview
+                  }
+                >
+                  <Ionicons
+                    name="time-outline"
+                    size={18}
+                    color={
+                      PRIMARY
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.pickerPreviewText
+                    }
+                  >
+                    {formatDisplayTime(
+                      toHHMM(
+                        draftStart
+                      )
+                    )}{" "}
+                    -{" "}
+                    {formatDisplayTime(
+                      toHHMM(
+                        draftEnd
+                      )
+                    )}
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.pickerButtons
+                  }
+                >
+                  {slotPickerMode ===
+                  "start" ? (
+                    <TouchableOpacity
+                      style={
+                        styles.pickerPrimaryButton
+                      }
+                      onPress={() =>
+                        setSlotPickerMode(
+                          "end"
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.pickerPrimaryButtonText
+                        }
+                      >
+                        Next: End Time
+                      </Text>
+
+                      <Ionicons
+                        name="arrow-forward"
+                        size={17}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={
+                        styles.pickerPrimaryButton
+                      }
+                      onPress={
+                        confirmSlot
+                      }
+                    >
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color="#FFFFFF"
+                      />
+
+                      <Text
+                        style={
+                          styles.pickerPrimaryButtonText
+                        }
+                      >
+                        Save Slot
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
 
 export default MyEventsScreen;
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PRIMARY_LIGHT,
-  },
+/**
+ * =========================================================
+ * STYLES
+ * =========================================================
+ */
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: PRIMARY,
-    paddingTop:
-      Platform.OS === "ios" ? 60 : 40,
-    paddingBottom: 22,
-    paddingHorizontal: 18,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        PRIMARY_LIGHT,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
 
-  headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor:
-      "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  notificationDot: {
-    position: "absolute",
-    top: 8,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FF5A5F",
-    borderWidth: 1.5,
-    borderColor: PRIMARY,
-  },
-
-  headerTitleWrap: {
-    alignItems: "center",
-  },
-
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-
-  headerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.75)",
-    marginTop: 2,
-  },
-
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 110,
-  },
-
-  statsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 18,
-    marginBottom: 4,
-  },
-
-  statCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#F0DDEA",
-  },
-
-  statIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: PRIMARY_LIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-
-  statValue: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: PRIMARY,
-  },
-
-  statLabel: {
-    fontSize: 10,
-    color: "#8A8A8A",
-    fontWeight: "600",
-    marginTop: 2,
-  },
-
-  calendarCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    marginTop: 14,
-    padding: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent:
+        "space-between",
+      backgroundColor:
+        PRIMARY,
+      paddingTop:
+        Platform.OS === "ios"
+          ? 60
+          : 40,
+      paddingBottom: 22,
+      paddingHorizontal: 18,
+      borderBottomLeftRadius:
+        26,
+      borderBottomRightRadius:
+        26,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 6,
     },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-  },
 
-  calendarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 5,
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-
-  calendarTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-
-  calendarSubtitle: {
-    fontSize: 11,
-    color: "#8A8A8A",
-    marginTop: 3,
-  },
-
-  calendarIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: PRIMARY,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  calendar: {
-    borderRadius: 16,
-  },
-
-  legendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    paddingHorizontal: 4,
-    paddingTop: 5,
-    gap: 6,
-  },
-
-  legendDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 4,
-    marginLeft: 5,
-  },
-
-  legendText: {
-    fontSize: 10,
-    color: "#777",
-    fontWeight: "600",
-  },
-
-  availabilityCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    marginTop: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#F0DDEA",
-  },
-
-  availabilityHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  availabilityTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-
-  availabilityDate: {
-    fontSize: 12,
-    color: "#8A8A8A",
-    marginTop: 3,
-  },
-
-  availabilityStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-
-  availableStatus: {
-    backgroundColor: "#E7F7EC",
-  },
-
-  unavailableStatus: {
-    backgroundColor: "#FDEBEC",
-  },
-
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-
-  availabilityStatusText: {
-    fontSize: 11,
-    fontWeight: "800",
-  },
-
-  loadingAvailability: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 25,
-  },
-
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 12,
-    color: "#777",
-  },
-
-  unavailableMessage: {
-    marginTop: 14,
-    backgroundColor: "#FDEBEC",
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  messageTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#7B2020",
-  },
-
-  messageText: {
-    fontSize: 11,
-    color: "#8A4A4A",
-    marginTop: 3,
-  },
-
-  workingHoursCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: PRIMARY_LIGHT,
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 14,
-  },
-
-  workingHoursIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-
-  smallLabel: {
-    fontSize: 10,
-    color: "#8A8A8A",
-    fontWeight: "600",
-  },
-
-  workingHours: {
-    fontSize: 14,
-    color: PRIMARY,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-
-  slotCount: {
-    fontSize: 11,
-    color: "#278A4B",
-    fontWeight: "800",
-  },
-
-  slotSummaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    gap: 16,
-  },
-
-  slotSummaryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  summaryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 5,
-  },
-
-  summaryText: {
-    fontSize: 11,
-    color: "#666",
-    fontWeight: "600",
-  },
-
-  slotSectionTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#222",
-    marginTop: 17,
-    marginBottom: 9,
-  },
-
-  slotsGrid: {
-    gap: 8,
-  },
-
-  slotCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 13,
-    padding: 10,
-    borderWidth: 1,
-  },
-
-  freeSlot: {
-    backgroundColor: "#F1FBF4",
-    borderColor: "#CBEAD3",
-  },
-
-  bookedSlot: {
-    backgroundColor: "#FFF5F5",
-    borderColor: "#F1C8C8",
-  },
-
-  slotIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 9,
-  },
-
-  freeSlotIcon: {
-    backgroundColor: "#DDF4E4",
-  },
-
-  bookedSlotIcon: {
-    backgroundColor: "#FCE1E1",
-  },
-
-  slotTime: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#333",
-  },
-
-  slotStatus: {
-    fontSize: 10,
-    color: "#777",
-    marginTop: 2,
-  },
-
-  noSlots: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
-  },
-
-  noSlotsText: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 6,
-  },
-
-  backendNote: {
-    fontSize: 9,
-    lineHeight: 14,
-    color: "#999",
-    marginTop: 12,
-  },
-
-  filterRow: {
-    gap: 8,
-    marginTop: 16,
-    paddingRight: 8,
-  },
-
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1.5,
-    borderColor: "#F0DDEA",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-  },
-
-  filterChipActive: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
-  },
-
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: PRIMARY,
-  },
-
-  filterChipTextActive: {
-    color: "#FFFFFF",
-  },
-
-  sectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 22,
-    marginBottom: 12,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1A1A1A",
-  },
-
-  sectionSubtitle: {
-    fontSize: 12,
-    color: "#8A8A8A",
-    marginTop: 2,
-  },
-
-  countBadge: {
-    backgroundColor: PRIMARY,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-
-  countBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  eventCard: {
-    flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    borderRadius: 16,
-    alignItems: "center",
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
+    headerIconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor:
+        "rgba(255,255,255,0.15)",
+      justifyContent:
+        "center",
+      alignItems: "center",
     },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
-    overflow: "hidden",
-  },
 
-  eventAccentBar: {
-    width: 4,
-    alignSelf: "stretch",
-    borderRadius: 4,
-    marginRight: 12,
-  },
+    notificationDot: {
+      position:
+        "absolute",
+      top: 8,
+      right: 9,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor:
+        "#FF5A5F",
+      borderWidth: 1.5,
+      borderColor:
+        PRIMARY,
+    },
 
-  eventIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: PRIMARY_LIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
+    headerTitleWrap: {
+      alignItems:
+        "center",
+    },
 
-  eventDetails: {
-    flex: 1,
-  },
+    headerTitle: {
+      fontSize: 19,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
 
-  eventTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
+    headerSubtitle: {
+      fontSize: 12,
+      color:
+        "rgba(255,255,255,0.75)",
+      marginTop: 2,
+    },
 
-  eventDate: {
-    fontSize: 11,
-    color: "#9B9B9B",
-    fontWeight: "600",
-    marginBottom: 2,
-  },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 110,
+    },
 
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1A1A1A",
-  },
+    statsRow: {
+      flexDirection:
+        "row",
+      gap: 10,
+      marginTop: 18,
+      marginBottom: 4,
+    },
 
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    marginLeft: 7,
-  },
+    statCard: {
+      flex: 1,
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 16,
+      paddingVertical: 12,
+      alignItems:
+        "center",
+      borderWidth: 1,
+      borderColor:
+        "#F0DDEA",
+    },
 
-  statusDotSmall: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
+    statIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor:
+        PRIMARY_LIGHT,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginBottom: 5,
+    },
 
-  statusBadgeText: {
-    fontSize: 9,
-    fontWeight: "800",
-    textTransform: "capitalize",
-  },
+    statValue: {
+      fontSize: 19,
+      fontWeight: "800",
+      color: PRIMARY,
+    },
 
-  metaRow: {
-    flexDirection: "row",
-    marginTop: 8,
-    gap: 16,
-  },
+    statLabel: {
+      fontSize: 10,
+      color: "#8A8A8A",
+      fontWeight: "600",
+      marginTop: 2,
+    },
 
-  eventMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
+    calendarCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 20,
+      marginTop: 14,
+      padding: 12,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 3,
+      },
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      elevation: 3,
+    },
 
-  eventText: {
-    marginLeft: 5,
-    color: "#555",
-    fontSize: 12,
-    fontWeight: "500",
-  },
+    calendarHeader: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+      paddingHorizontal: 5,
+      paddingTop: 4,
+      paddingBottom: 4,
+    },
 
-  expandedBlock: {
-    marginTop: 6,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor:
-      "rgba(120,12,96,0.12)",
-  },
+    calendarTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: "#1A1A1A",
+    },
 
-  expandedText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: "#4A4A4A",
-  },
+    calendarSubtitle: {
+      fontSize: 11,
+      color: "#8A8A8A",
+      marginTop: 3,
+    },
 
-  expandedSubTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: PRIMARY,
-    marginTop: 6,
-    textTransform: "uppercase",
-  },
+    calendarIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor:
+        PRIMARY,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+    },
 
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-    paddingHorizontal: 30,
-  },
+    calendar: {
+      borderRadius: 16,
+    },
 
-  emptyIconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: PRIMARY_LIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 14,
-  },
+    legendRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      flexWrap: "wrap",
+      paddingHorizontal: 4,
+      paddingTop: 5,
+      gap: 6,
+    },
 
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1A1A1A",
-    marginBottom: 4,
-  },
+    legendDot: {
+      width: 11,
+      height: 11,
+      borderRadius: 4,
+      marginLeft: 5,
+    },
 
-  emptySubtitle: {
-    fontSize: 12,
-    color: "#8A8A8A",
-    textAlign: "center",
-    lineHeight: 18,
-  },
-});
+    legendText: {
+      fontSize: 10,
+      color: "#777",
+      fontWeight: "600",
+    },
+
+    availabilityCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 20,
+      marginTop: 14,
+      padding: 16,
+      borderWidth: 1,
+      borderColor:
+        "#F0DDEA",
+    },
+
+    availabilityHeader: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
+
+    availabilityHeaderRight: {
+      alignItems:
+        "flex-end",
+      gap: 7,
+    },
+
+    availabilityTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: "#1A1A1A",
+    },
+
+    availabilityDate: {
+      fontSize: 12,
+      color: "#8A8A8A",
+      marginTop: 3,
+    },
+
+    availabilityStatus: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+
+    availableStatus: {
+      backgroundColor:
+        "#E7F7EC",
+    },
+
+    unavailableStatus: {
+      backgroundColor:
+        "#FDEBEC",
+    },
+
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      marginRight: 6,
+    },
+
+    availabilityStatusText: {
+      fontSize: 11,
+      fontWeight: "800",
+    },
+
+    editAvailabilityButton: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        PRIMARY,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      gap: 4,
+    },
+
+    editAvailabilityText: {
+      color: "#FFFFFF",
+      fontSize: 10,
+      fontWeight: "800",
+    },
+
+    loadingAvailability: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingVertical: 25,
+    },
+
+    loadingText: {
+      marginLeft: 8,
+      fontSize: 12,
+      color: "#777",
+    },
+
+    unavailableMessage: {
+      marginTop: 14,
+      backgroundColor:
+        "#FDEBEC",
+      borderRadius: 14,
+      padding: 14,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 12,
+    },
+
+    messageTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: "#7B2020",
+    },
+
+    messageText: {
+      fontSize: 11,
+      color: "#8A4A4A",
+      marginTop: 3,
+    },
+
+    workingHoursCard: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        PRIMARY_LIGHT,
+      borderRadius: 14,
+      padding: 12,
+      marginTop: 14,
+    },
+
+    workingHoursIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor:
+        "#FFFFFF",
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginRight: 10,
+    },
+
+    smallLabel: {
+      fontSize: 10,
+      color: "#8A8A8A",
+      fontWeight: "600",
+    },
+
+    workingHours: {
+      fontSize: 14,
+      color: PRIMARY,
+      fontWeight: "800",
+      marginTop: 2,
+      lineHeight: 20,
+    },
+
+    totalMinutesText: {
+      fontSize: 10,
+      color: "#8A8A8A",
+      marginTop: 3,
+    },
+
+    slotCount: {
+      fontSize: 11,
+      color: "#278A4B",
+      fontWeight: "800",
+    },
+
+    slotSummaryRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      marginTop: 12,
+      gap: 16,
+    },
+
+    slotSummaryItem: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+    },
+
+    summaryDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 5,
+    },
+
+    summaryText: {
+      fontSize: 11,
+      color: "#666",
+      fontWeight: "600",
+    },
+
+    slotSectionTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: "#222",
+      marginTop: 17,
+      marginBottom: 9,
+    },
+
+    slotsGrid: {
+      gap: 8,
+    },
+
+    slotCard: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      borderRadius: 13,
+      padding: 10,
+      borderWidth: 1,
+    },
+
+    freeSlot: {
+      backgroundColor:
+        "#F1FBF4",
+      borderColor:
+        "#CBEAD3",
+    },
+
+    bookedSlot: {
+      backgroundColor:
+        "#FFF5F5",
+      borderColor:
+        "#F1C8C8",
+    },
+
+    slotIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 9,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginRight: 9,
+    },
+
+    freeSlotIcon: {
+      backgroundColor:
+        "#DDF4E4",
+    },
+
+    bookedSlotIcon: {
+      backgroundColor:
+        "#FCE1E1",
+    },
+
+    slotTime: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: "#333",
+    },
+
+    slotStatus: {
+      fontSize: 10,
+      color: "#777",
+      marginTop: 2,
+    },
+
+    noSlots: {
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical: 20,
+    },
+
+    noSlotsText: {
+      fontSize: 11,
+      color: "#999",
+      marginTop: 6,
+    },
+
+    backendNote: {
+      fontSize: 9,
+      lineHeight: 14,
+      color: "#999",
+      marginTop: 12,
+    },
+
+    filterRow: {
+      gap: 8,
+      marginTop: 16,
+      paddingRight: 8,
+    },
+
+    filterChip: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 6,
+      backgroundColor:
+        "#FFFFFF",
+      borderWidth: 1.5,
+      borderColor:
+        "#F0DDEA",
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 20,
+    },
+
+    filterChipActive: {
+      backgroundColor:
+        PRIMARY,
+      borderColor:
+        PRIMARY,
+    },
+
+    filterChipText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: PRIMARY,
+    },
+
+    filterChipTextActive: {
+      color: "#FFFFFF",
+    },
+
+    sectionRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+      marginTop: 22,
+      marginBottom: 12,
+    },
+
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: "#1A1A1A",
+    },
+
+    sectionSubtitle: {
+      fontSize: 12,
+      color: "#8A8A8A",
+      marginTop: 2,
+    },
+
+    countBadge: {
+      backgroundColor:
+        PRIMARY,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+
+    countBadgeText: {
+      color: "#FFFFFF",
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
+    eventCard: {
+      flexDirection:
+        "row",
+      backgroundColor:
+        "#FFFFFF",
+      padding: 14,
+      borderRadius: 16,
+      alignItems:
+        "center",
+      marginBottom: 12,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.07,
+      shadowRadius: 8,
+      elevation: 2,
+      overflow: "hidden",
+    },
+
+    eventAccentBar: {
+      width: 4,
+      alignSelf:
+        "stretch",
+      borderRadius: 4,
+      marginRight: 12,
+    },
+
+    eventIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor:
+        PRIMARY_LIGHT,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginRight: 12,
+    },
+
+    eventDetails: {
+      flex: 1,
+    },
+
+    eventTopRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "flex-start",
+    },
+
+    eventDate: {
+      fontSize: 11,
+      color: "#9B9B9B",
+      fontWeight: "600",
+      marginBottom: 2,
+    },
+
+    eventTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#1A1A1A",
+    },
+
+    statusBadge: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      borderRadius: 20,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      marginLeft: 7,
+    },
+
+    statusDotSmall: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 5,
+    },
+
+    statusBadgeText: {
+      fontSize: 9,
+      fontWeight: "800",
+      textTransform:
+        "capitalize",
+    },
+
+    metaRow: {
+      flexDirection:
+        "row",
+      marginTop: 8,
+      gap: 16,
+    },
+
+    eventMeta: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      marginTop: 6,
+    },
+
+    eventText: {
+      marginLeft: 5,
+      color: "#555",
+      fontSize: 12,
+      fontWeight: "500",
+    },
+
+    expandedBlock: {
+      marginTop: 6,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor:
+        "rgba(120,12,96,0.12)",
+    },
+
+    expandedText: {
+      marginLeft: 6,
+      fontSize: 12,
+      color: "#4A4A4A",
+    },
+
+    expandedSubTitle: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: PRIMARY,
+      marginTop: 6,
+      textTransform:
+        "uppercase",
+    },
+
+    emptyState: {
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical: 40,
+      paddingHorizontal: 30,
+    },
+
+    emptyIconCircle: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      backgroundColor:
+        PRIMARY_LIGHT,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      marginBottom: 14,
+    },
+
+    emptyTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#1A1A1A",
+      marginBottom: 4,
+    },
+
+    emptySubtitle: {
+      fontSize: 12,
+      color: "#8A8A8A",
+      textAlign:
+        "center",
+      lineHeight: 18,
+    },
+
+    /**
+     * =======================================================
+     * AVAILABILITY EDITOR
+     * =======================================================
+     */
+
+    editorContainer: {
+      flex: 1,
+      backgroundColor:
+        PRIMARY_LIGHT,
+    },
+
+    editorHeader: {
+      backgroundColor:
+        PRIMARY,
+      paddingTop:
+        Platform.OS === "ios"
+          ? 55
+          : 25,
+      paddingHorizontal: 16,
+      paddingBottom: 18,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      borderBottomLeftRadius:
+        24,
+      borderBottomRightRadius:
+        24,
+    },
+
+    editorCloseButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor:
+        "#FFFFFF",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    editorHeaderTitleWrap: {
+      flex: 1,
+      marginLeft: 12,
+    },
+
+    editorTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: "#FFFFFF",
+    },
+
+    editorSubtitle: {
+      fontSize: 11,
+      color:
+        "rgba(255,255,255,0.72)",
+      marginTop: 3,
+    },
+
+    editorHeaderIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor:
+        "rgba(255,255,255,0.15)",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    editorContent: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+
+    editorInfoCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 16,
+      padding: 13,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      borderWidth: 1,
+      borderColor:
+        "#F0DDEA",
+      marginBottom: 18,
+    },
+
+    editorInfoIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor:
+        PRIMARY_LIGHT,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      marginRight: 10,
+    },
+
+    editorInfoText: {
+      flex: 1,
+      fontSize: 11,
+      lineHeight: 17,
+      color: "#666666",
+    },
+
+    editorSectionTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: "#1A1A1A",
+      marginBottom: 5,
+      marginTop: 4,
+    },
+
+    editorSectionDescription: {
+      fontSize: 11,
+      color: "#888888",
+      lineHeight: 16,
+      marginBottom: 10,
+    },
+
+    dayEditorCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 17,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor:
+        "#E9E9E9",
+      overflow: "hidden",
+    },
+
+    dayEditorCardActive: {
+      borderColor:
+        "#E4C7DC",
+    },
+
+    dayEditorHeader: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+      padding: 13,
+    },
+
+    dayTitleRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+    },
+
+    dayIconCircle: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      marginRight: 10,
+    },
+
+    dayIconActive: {
+      backgroundColor:
+        PRIMARY,
+    },
+
+    dayIconInactive: {
+      backgroundColor:
+        "#EEEEEE",
+    },
+
+    dayName: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: "#222222",
+    },
+
+    dayStatus: {
+      fontSize: 10,
+      color: "#8A8A8A",
+      marginTop: 2,
+    },
+
+    daySlotsEditor: {
+      borderTopWidth: 1,
+      borderTopColor:
+        "#F0F0F0",
+      padding: 12,
+      backgroundColor:
+        "#FCFCFC",
+    },
+
+    noEditorSlots: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical: 13,
+      gap: 6,
+    },
+
+    noEditorSlotsText: {
+      fontSize: 11,
+      color: "#999999",
+    },
+
+    editorSlotRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        PRIMARY_LIGHT,
+      borderRadius: 12,
+      padding: 9,
+      marginBottom: 7,
+    },
+
+    editorSlotTimeBox: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      flex: 1,
+      gap: 7,
+    },
+
+    editorSlotTime: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: PRIMARY,
+    },
+
+    editorSlotActions: {
+      flexDirection:
+        "row",
+      gap: 6,
+    },
+
+    slotActionButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 9,
+      backgroundColor:
+        "#FFFFFF",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    deleteSlotButton: {
+      backgroundColor:
+        "#FDEBEC",
+    },
+
+    addSlotButton: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderWidth: 1.5,
+      borderStyle:
+        "dashed",
+      borderColor:
+        "#D9B6D0",
+      borderRadius: 12,
+      paddingVertical: 10,
+      marginTop: 3,
+      gap: 6,
+    },
+
+    addSlotButtonText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: PRIMARY,
+    },
+
+    blockCalendarCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 18,
+      padding: 10,
+      marginTop: 4,
+      borderWidth: 1,
+      borderColor:
+        "#F0DDEA",
+    },
+
+    blockedDatesSummary: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        "#FDEBEC",
+      borderRadius: 11,
+      padding: 9,
+      marginTop: 8,
+      gap: 6,
+    },
+
+    blockedDatesText: {
+      fontSize: 11,
+      color: "#C0392B",
+      fontWeight: "700",
+    },
+
+    saveAvailabilityButton: {
+      backgroundColor:
+        PRIMARY,
+      borderRadius: 16,
+      minHeight: 54,
+      marginTop: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      flexDirection:
+        "row",
+      gap: 8,
+      shadowColor: PRIMARY,
+      shadowOffset: {
+        width: 0,
+        height: 5,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+
+    saveAvailabilityText: {
+      color: "#FFFFFF",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    editorBottomSpace: {
+      height: 30,
+    },
+
+    /**
+     * =======================================================
+     * TIME PICKER
+     * =======================================================
+     */
+
+    pickerOverlay: {
+      position:
+        "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor:
+        "rgba(0,0,0,0.42)",
+      justifyContent:
+        "flex-end",
+    },
+
+    pickerCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderTopLeftRadius:
+        26,
+      borderTopRightRadius:
+        26,
+      padding: 18,
+      paddingBottom:
+        Platform.OS ===
+        "ios"
+          ? 30
+          : 20,
+    },
+
+    pickerHeader: {
+      flexDirection:
+        "row",
+      justifyContent:
+        "space-between",
+      alignItems:
+        "center",
+      marginBottom: 10,
+    },
+
+    pickerTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: "#1A1A1A",
+    },
+
+    pickerSubtitle: {
+      fontSize: 11,
+      color: "#888888",
+      marginTop: 3,
+    },
+
+    timePicker: {
+      alignSelf:
+        "center",
+    },
+
+    pickerPreview: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        PRIMARY_LIGHT,
+      borderRadius: 13,
+      paddingVertical: 12,
+      marginTop: 5,
+      gap: 7,
+    },
+
+    pickerPreviewText: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: PRIMARY,
+    },
+
+    pickerButtons: {
+      marginTop: 13,
+    },
+
+    pickerPrimaryButton: {
+      backgroundColor:
+        PRIMARY,
+      borderRadius: 14,
+      minHeight: 50,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 7,
+    },
+
+    pickerPrimaryButtonText: {
+      color: "#FFFFFF",
+      fontSize: 13,
+      fontWeight: "800",
+    },
+  });
