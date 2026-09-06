@@ -1,5 +1,5 @@
 import { getSecureData, saveSecureData } from '@/store';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "expo-router/react-navigation";
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -24,9 +24,9 @@ const CartManagementIndexScreen: React.FC = () => {
         const fetchCartData = async () => {
             try {
                 const storedCart = await getSecureData('cartData');
-                const eventDetails = JSON.parse(await getSecureData("eventDetails") || "");
+                const eventDetails = JSON.parse((await getSecureData("eventDetails")) || "");
                 setGuests(parseInt(eventDetails.guests.toString()));
-                const categories = JSON.parse(await getSecureData("categories") || "");
+                const categories = JSON.parse((await getSecureData("categories")) || "");
                 const cateringCategory = categories.find((x: any) => x.name.toLowerCase() === "caterings");
                 setCateringCategory(cateringCategory);
                 if (storedCart) {

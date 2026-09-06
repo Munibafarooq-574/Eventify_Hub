@@ -1,7 +1,7 @@
 import deletePackage from '@/services/deletePackage';
 import { getSecureData, saveSecureData, getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons'; // For icons
-import { useRoute } from '@react-navigation/native';
+import { useRoute } from "expo-router/react-navigation";
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';

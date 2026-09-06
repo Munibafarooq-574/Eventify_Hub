@@ -4,7 +4,7 @@ import { VendorBadgeSummary } from '@/types/badge.types';
 import { getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import React, { useCallback, useState } from 'react';
 import {
   Image,

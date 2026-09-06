@@ -4,7 +4,7 @@ import {
   UploadMediaAsset,
 } from "@/services/uploadMultipleImages";
 import { getSecureData } from "@/store";
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation } from "expo-router/react-navigation";
 import * as ImagePicker from 'expo-image-picker';
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -96,7 +96,7 @@ const ImageUploadScreen: React.FC = () => {
     const handleSaveAndContinue = async () => {
         try {
             setUploading(true);
-            const user = JSON.parse(await getSecureData("user") || "");
+            const user = JSON.parse((await getSecureData("user")) || "");
             await uploadMultipleImages(user._id, images);
     
             router.push("/vendorreview");

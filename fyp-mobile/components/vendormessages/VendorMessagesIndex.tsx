@@ -2,7 +2,7 @@ import getConversationList from '@/services/getConversationList';
 import { getSecureData, saveSecureData, getUserData } from '@/store';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from "expo-router/react-navigation";
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
