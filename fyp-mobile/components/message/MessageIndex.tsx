@@ -5,7 +5,8 @@ import getPinnedMessages from "@/services/getPinnedMessages";
 import { getSecureData, getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+//import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
 import * as FileSystem from "expo-file-system/legacy";
 import uploadChatImage from "@/services/uploadChatImage";
 import uploadChatVideo from "@/services/uploadChatVideo";
@@ -216,7 +217,8 @@ const FullVideoPlayer: React.FC<{ uri: string }> = ({ uri }) => {
       player={player}
       style={styles.fullScreenVideo}
       nativeControls
-      allowsFullscreen
+      //allowsFullscreen
+      fullscreenOptions={{ enable: true }}
       allowsPictureInPicture
       contentFit="contain"
     />
