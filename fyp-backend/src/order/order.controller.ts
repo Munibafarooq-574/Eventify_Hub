@@ -1,6 +1,18 @@
 
 //fyp-backend/src/order/order.controller.ts
-import { Controller, Post, Body, Patch, Param, Get, Delete, Query, HttpException, InternalServerErrorException } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Get,
+  Delete,
+  Query,
+  HttpException,
+  InternalServerErrorException,
+  BadRequestException,
+} from '@nestjs/common';
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 
@@ -127,12 +139,20 @@ async updateVendorOrderStatus(
 
     // Get order stats (pending, processing, completed)
     @Get('stats')
-    async getOrderStats(
-        @Query('type') type: string,
-        @Query('userId') userId: string,
-    ) {
-        return this.orderService.getOrderStats(type, userId);
-    }
+async getOrderStats(
+  @Query('type') type: string,
+  @Query('userId') userId: string,
+) {
+  if (!type) {
+    throw new BadRequestException('type is required');
+  }
+
+  if (!userId) {
+    throw new BadRequestException('userId is required');
+  }
+
+  return this.orderService.getOrderStats(type, userId);
+}
 
     @Get('stats/monthly')
     async getMonthlyOrderStats(@Query('vendorId') vendorId: string) {

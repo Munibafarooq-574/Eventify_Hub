@@ -1,8 +1,9 @@
 //fyp-backend/src/order/order.service.ts
 import {
-    ConflictException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
@@ -276,39 +277,110 @@ try {
 }
 
 
-       async getOrderStats(type: string, userId: string) {
-    let userIdObj;
-    if (typeof userId === 'string') {
-        userIdObj = new Types.ObjectId(userId);
-    }
+async getOrderStats(type: string, userId: string) {
+  console.log('📊 getOrderStats request:', { type, userId });
 
-    // Vendor stats now read straight from VendorOrder.status —
-    // the same source vendor-analytics.service.ts already uses,
-    // so cards + analytics stay consistent.
-    // NOTE: VendorOrder schema uses 'accepted' (not 'processing') for the
-    // "vendor confirmed, work in progress" state — this must match the
-    // mapping used in updateStatus() below.
-    if (type === 'Vendor') {
-        const vQuery = { vendorId: userIdObj };
-        const totalOrders = await this.vendorOrderModel.countDocuments(vQuery);
-        const pending = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'pending' });
-        const processing = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'accepted' });
-        const completed = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'completed' });
-        const cancelled = await this.vendorOrderModel.countDocuments({ ...vQuery, status: 'cancelled' });
+  if (!userId || !Types.ObjectId.isValid(userId)) {
+    throw new BadRequestException(`Invalid userId: ${userId}`);
+  }
 
-        return { totalOrders, pending, processing, completed, cancelled };
-    }
+  if (type !== 'Vendor' && type !== 'Organizer') {
+    throw new BadRequestException(`Invalid type: ${type}`);
+  }
 
-    // Organizer path — Order schema uses 'confirmed' (not 'processing') for
-    // the "vendor confirmed, work in progress" state.
-    const query: any = { organizerId: userIdObj };
-    const totalOrders = await this.orderModel.countDocuments(query);
-    const pending = await this.orderModel.countDocuments({ ...query, status: 'pending' });
-    const processing = await this.orderModel.countDocuments({ ...query, status: 'confirmed' });
-    const completed = await this.orderModel.countDocuments({ ...query, status: 'completed' });
-    const cancelled = await this.orderModel.countDocuments({ ...query, status: 'cancelled' });
+  const userIdObj = new Types.ObjectId(userId);
 
-    return { totalOrders, pending, processing, completed, cancelled };
+  if (type === 'Vendor') {
+    const vQuery = { vendorId: userIdObj };
+
+    const [
+      totalOrders,
+      pending,
+      processing,
+      completed,
+      cancelled,
+    ] = await Promise.all([
+      this.vendorOrderModel.countDocuments(vQuery),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        status: 'pending',
+      }),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        status: 'accepted',
+      }),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        status: 'completed',
+      }),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        status: 'cancelled',
+      }),
+    ]);
+
+    console.log('📊 Vendor order stats:', {
+      totalOrders,
+      pending,
+      processing,
+      completed,
+      cancelled,
+    });
+
+    return {
+      totalOrders,
+      pending,
+      processing,
+      completed,
+      cancelled,
+    };
+  }
+
+  const query = {
+    organizerId: userIdObj,
+  };
+
+  const [
+    totalOrders,
+    pending,
+    processing,
+    completed,
+    cancelled,
+  ] = await Promise.all([
+    this.orderModel.countDocuments(query),
+    this.orderModel.countDocuments({
+      ...query,
+      status: 'pending',
+    }),
+    this.orderModel.countDocuments({
+      ...query,
+      status: 'confirmed',
+    }),
+    this.orderModel.countDocuments({
+      ...query,
+      status: 'completed',
+    }),
+    this.orderModel.countDocuments({
+      ...query,
+      status: 'cancelled',
+    }),
+  ]);
+
+  console.log('📊 Organizer order stats:', {
+    totalOrders,
+    pending,
+    processing,
+    completed,
+    cancelled,
+  });
+
+  return {
+    totalOrders,
+    pending,
+    processing,
+    completed,
+    cancelled,
+  };
 }
 
 
