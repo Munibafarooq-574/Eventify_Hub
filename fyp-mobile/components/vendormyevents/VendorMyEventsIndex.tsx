@@ -25,6 +25,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -56,6 +57,7 @@ type DaySlotConfig = {
   day: string;
   enabled: boolean;
   slots: TimeSlotConfig[];
+  maxEventDurationMinutes?: number | null; // NEW
 };
 
 type AvailabilitySettings = {
@@ -1323,25 +1325,19 @@ const MyEventsScreen = () => {
             );
 
           if (existing) {
-            return {
-              day: day.code,
-              enabled:
-                existing.enabled !==
-                false,
-              slots:
-                Array.isArray(
-                  existing.slots
-                )
-                  ? existing.slots.map(
-                      (slot) => ({
-                        start:
-                          slot.start,
-                        end: slot.end,
-                      })
-                    )
-                  : [],
-            };
-          }
+  return {
+    day: day.code,
+    enabled: existing.enabled !== false,
+    slots: Array.isArray(existing.slots)
+      ? existing.slots.map((slot) => ({
+          start: slot.start,
+          end: slot.end,
+        }))
+      : [],
+    maxEventDurationMinutes:
+      existing.maxEventDurationMinutes ?? null,
+  };
+}
 
           /**
            * Backward compatibility:
@@ -1363,22 +1359,20 @@ const MyEventsScreen = () => {
             availability?.workingHoursEnd ||
             "18:00";
 
-          return {
-            day: day.code,
-            enabled:
-              oldWorkingDay?.enabled ??
-              true,
-            slots:
-              oldWorkingDay?.enabled ===
-                false
-                ? []
-                : [
-                    {
-                      start: oldStart,
-                      end: oldEnd,
-                    },
-                  ],
-          };
+            return {
+  day: day.code,
+  enabled: oldWorkingDay?.enabled ?? true,
+  slots:
+    oldWorkingDay?.enabled === false
+      ? []
+      : [
+          {
+            start: oldStart,
+            end: oldEnd,
+          },
+        ],
+  maxEventDurationMinutes: null,
+};
         });
 
       setEditorDaySlots(
@@ -1866,24 +1860,19 @@ const MyEventsScreen = () => {
         /**
          * Sort slots before sending.
          */
-        const cleanDaySlots =
-          editorDaySlots.map(
-            (day) => ({
-              day: day.day,
-              enabled:
-                day.enabled,
-              slots:
-                [...day.slots].sort(
-                  (a, b) =>
-                    parseTime(
-                      a.start
-                    ).getTime() -
-                    parseTime(
-                      b.start
-                    ).getTime()
-                ),
-            })
-          );
+        const cleanDaySlots = editorDaySlots.map(
+  (day) => ({
+    day: day.day,
+    enabled: day.enabled,
+    slots: [...day.slots].sort(
+      (a, b) =>
+        parseTime(a.start).getTime() -
+        parseTime(b.start).getTime()
+    ),
+    maxEventDurationMinutes:
+      day.maxEventDurationMinutes ?? null,
+  })
+);
 
         await patchVendorAvailability(
           vendorId,
@@ -3897,6 +3886,54 @@ const MyEventsScreen = () => {
                             Add Time Slot
                           </Text>
                         </TouchableOpacity>
+                        <View style={styles.maxDurationRow}>
+  <View style={styles.maxDurationLabelWrap}>
+    <Ionicons
+      name="hourglass-outline"
+      size={16}
+      color={PRIMARY}
+    />
+
+    <Text style={styles.maxDurationLabel}>
+      Max event length for this day
+    </Text>
+  </View>
+
+  <TextInput
+    style={styles.maxDurationInput}
+    keyboardType="numeric"
+    placeholder="No limit"
+    placeholderTextColor="#999999"
+    value={
+      config.maxEventDurationMinutes
+        ? String(config.maxEventDurationMinutes)
+        : ""
+    }
+    onChangeText={(text) => {
+      const trimmed = text.trim();
+
+      const parsedMinutes = trimmed
+        ? parseInt(trimmed, 10)
+        : null;
+
+      setEditorDaySlots((previous) =>
+        previous.map((item) =>
+          item.day === day.code
+            ? {
+                ...item,
+                maxEventDurationMinutes:
+                  parsedMinutes !== null &&
+                  Number.isFinite(parsedMinutes) &&
+                  parsedMinutes > 0
+                    ? parsedMinutes
+                    : null,
+              }
+            : item
+        )
+      );
+    }}
+  />
+</View>
                           {(editorDaySlots.find(
                         (item) => item.day === day.code
                       )?.slots.length ?? 0) > 0 && (
@@ -5416,18 +5453,54 @@ const styles =
     },
 
     editorSlotRow: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      backgroundColor:
-        PRIMARY_LIGHT,
-      borderRadius: 12,
-      padding: 9,
-      marginBottom: 7,
-    },
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: PRIMARY_LIGHT,
+  borderRadius: 12,
+  padding: 9,
+  marginBottom: 7,
+},
 
-    editorSlotTimeBox: {
+// 👇 NEW: Max event duration styles
+maxDurationRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginTop: 12,
+  paddingTop: 12,
+  borderTopWidth: 1,
+  borderTopColor: "#F0E4ED",
+},
+
+maxDurationLabelWrap: {
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  marginRight: 10,
+},
+
+maxDurationLabel: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: "#555555",
+  marginLeft: 7,
+},
+
+maxDurationInput: {
+  width: 90,
+  height: 40,
+  borderWidth: 1,
+  borderColor: ACCENT_LIGHT,
+  borderRadius: 8,
+  paddingHorizontal: 10,
+  fontSize: 14,
+  fontWeight: "600",
+  color: "#333333",
+  backgroundColor: "#FFFFFF",
+  textAlign: "center",
+},
+
+editorSlotTimeBox: {
       flexDirection:
         "row",
       alignItems:

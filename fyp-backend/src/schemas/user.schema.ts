@@ -613,6 +613,13 @@ export class DaySlotConfig {
   // Multiple working windows for this day
   @Prop({ type: [TimeSlotSchema], default: [] })
   slots: TimeSlot[];
+
+  // Phase 1:
+  // Maximum event duration allowed for this specific day.
+  // null = no per-day limit.
+  // If null, vendor-wide maxEventDurationMinutes will be used.
+  @Prop({ type: Number, default: null })
+  maxEventDurationMinutes: number | null;
 }
 
 export const DaySlotConfigSchema = SchemaFactory.createForClass(DaySlotConfig);
@@ -638,19 +645,25 @@ export class VendorAvailabilitySettings {
   @Prop({ type: [Date], default: [] })
   blockedDates: Date[];
 
-  @Prop({
-    enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
-    default: 0,
-  })
-  minimumAdvanceMinutes: number;
+ @Prop({
+  enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
+  default: 0,
+})
+minimumAdvanceMinutes: number;
 
-  @Prop({ default: 1, min: 1 })
-  maxConcurrentBookings: number;
+@Prop({ default: 1, min: 1 })
+maxConcurrentBookings: number;
 
-  // NEW (Phase 1). Optional & backward-compatible
-    @Prop({ type: [DaySlotConfigSchema], default: [] })
-    daySlots: DaySlotConfig[];
-}
+// Phase 1:
+// Vendor-wide default maximum event duration.
+// null = no maximum duration.
+// A day's maxEventDurationMinutes overrides this value.
+@Prop({ type: Number, default: null })
+maxEventDurationMinutes: number | null;
+
+// Multiple working slots + optional per-day event duration cap
+@Prop({ type: [DaySlotConfigSchema], default: [] })
+daySlots: DaySlotConfig[];
 
 export const VendorAvailabilitySettingsSchema =
   SchemaFactory.createForClass(VendorAvailabilitySettings);
