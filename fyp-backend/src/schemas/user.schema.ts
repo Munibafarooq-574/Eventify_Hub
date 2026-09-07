@@ -1,8 +1,8 @@
 //fyp-backend/src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 import { ContactDetails, ContactDetailsSchema } from './contact-details.schema';
-import { Category } from './category.schema';
+
 
 @Schema({ discriminatorKey: 'type' }) // Add discriminator key to the base schema
 export class BusinessDetails extends Document {
@@ -645,25 +645,25 @@ export class VendorAvailabilitySettings {
   @Prop({ type: [Date], default: [] })
   blockedDates: Date[];
 
- @Prop({
-  enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
-  default: 0,
-})
-minimumAdvanceMinutes: number;
+  @Prop({
+    enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
+    default: 0,
+  })
+  minimumAdvanceMinutes: number;
 
-@Prop({ default: 1, min: 1 })
-maxConcurrentBookings: number;
+  @Prop({ default: 1, min: 1 })
+  maxConcurrentBookings: number;
 
-// Phase 1:
-// Vendor-wide default maximum event duration.
-// null = no maximum duration.
-// A day's maxEventDurationMinutes overrides this value.
-@Prop({ type: Number, default: null })
-maxEventDurationMinutes: number | null;
+  // Vendor-wide default maximum event duration.
+  // null = no maximum duration.
+  // A day's maxEventDurationMinutes overrides this value.
+  @Prop({ type: Number, default: null })
+  maxEventDurationMinutes: number | null;
 
-// Multiple working slots + optional per-day event duration cap
-@Prop({ type: [DaySlotConfigSchema], default: [] })
-daySlots: DaySlotConfig[];
+  // Multiple working slots + optional per-day event duration cap
+  @Prop({ type: [DaySlotConfigSchema], default: [] })
+  daySlots: DaySlotConfig[];
+}
 
 export const VendorAvailabilitySettingsSchema =
   SchemaFactory.createForClass(VendorAvailabilitySettings);
@@ -764,8 +764,8 @@ cakeBusinessDetails?: CakeBusinessDetails;
   })
   availabilitySettings?: VendorAvailabilitySettings;
 
-  @Prop({ type: [], default: [] })
-  images: string[];
+  @Prop({ type: [String], default: [] })
+    images: string[];
 
   @Prop()
   coverImage: string;
