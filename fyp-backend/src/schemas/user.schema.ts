@@ -614,13 +614,14 @@ export class DaySlotConfig {
   @Prop({ type: [TimeSlotSchema], default: [] })
   slots: TimeSlot[];
 
-  // Phase 1:
-  // Maximum event duration allowed for this specific day.
-  // null = no per-day limit.
-  // If null, vendor-wide maxEventDurationMinutes will be used.
+    // Per-day booking notice override.
+  // How many minutes before the event this day's slots
+  // can still be booked. Empty = use vendor-wide
+  // advanceNoticeOptionsMinutes instead.
   @Prop({ type: [Number], default: [] })
-  maxEventDurationMinutes: number[];
+  advanceNoticeOptionsMinutes: number[];
 }
+  
 
 export const DaySlotConfigSchema = SchemaFactory.createForClass(DaySlotConfig);
 

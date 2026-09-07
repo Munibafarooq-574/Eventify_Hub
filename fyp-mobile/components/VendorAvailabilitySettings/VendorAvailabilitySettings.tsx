@@ -82,25 +82,25 @@ const VendorAvailabilitySettings = () => {
   const [workingDays, setWorkingDays] = useState(
     DAYS.map((d) => ({ day: d.code, enabled: true })),
   );
-  const [workingHoursStart, setWorkingHoursStart] = useState('09:00');
-  const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
+   const [workingHoursStart, setWorkingHoursStart] = useState('09:00');
+const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
 
-  const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
+const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
 
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [showBlockCalendar, setShowBlockCalendar] = useState(false);
+const [showEndPicker, setShowEndPicker] = useState(false);
+const [showBlockCalendar, setShowBlockCalendar] = useState(false);
 
-  // Multi-slot picker state
-  const [activeSlotDay, setActiveSlotDay] = useState<string | null>(null);
-  const [slotPickerMode, setSlotPickerMode] = useState<'start' | 'end' | null>(
-    null,
-  );
-  const [draftSlotStart, setDraftSlotStart] = useState<Date>(timeToDate('09:00'));
-  const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
+// Multi-slot picker state
+const [activeSlotDay, setActiveSlotDay] = useState<string | null>(null);
+const [slotPickerMode, setSlotPickerMode] = useState<'start' | 'end' | null>(
+  null,
+);
+const [draftSlotStart, setDraftSlotStart] = useState<Date>(timeToDate('09:00'));
+const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
 
   useEffect(() => {
     const load = async () => {
@@ -118,22 +118,22 @@ const VendorAvailabilitySettings = () => {
         if (data?.workingHoursStart) setWorkingHoursStart(data.workingHoursStart);
         if (data?.workingHoursEnd) setWorkingHoursEnd(data.workingHoursEnd);
 
-        if (Array.isArray(data?.daySlots)) {
-          setDaySlots(
-            data.daySlots.map((item: any) => ({
-              day: item.day,
-              enabled: item.enabled !== false,
-              slots: Array.isArray(item.slots)
-                ? item.slots.map((slot: any) => ({
-                    start: slot.start,
-                    end: slot.end,
-                  }))
-                : [],
-            })),
-          );
-        }
+if (Array.isArray(data?.daySlots)) {
+  setDaySlots(
+    data.daySlots.map((item: any) => ({
+      day: item.day,
+      enabled: item.enabled !== false,
+      slots: Array.isArray(item.slots)
+        ? item.slots.map((slot: any) => ({
+            start: slot.start,
+            end: slot.end,
+          }))
+        : [],
+    })),
+  );
+}
 
-        if (data?.blockedDates) {
+if (data?.blockedDates) {
           setBlockedDates(data.blockedDates.map((d: string) => toKey(d)));
         }
         if (typeof data?.minimumAdvanceMinutes === 'number') {
@@ -155,91 +155,92 @@ const VendorAvailabilitySettings = () => {
   };
 
   const addSlotForDay = (day: string) => {
-    const start = timeToDate('09:00');
-    const end = timeToDate('13:00');
+  const start = timeToDate('09:00');
+  const end = timeToDate('13:00');
 
-    setActiveSlotDay(day);
-    setDraftSlotStart(start);
-    setDraftSlotEnd(end);
-    setSlotPickerMode('start');
-  };
+  setActiveSlotDay(day);
+  setDraftSlotStart(start);
+  setDraftSlotEnd(end);
+  setSlotPickerMode('start');
+};
 
-  const removeSlotForDay = (day: string, index: number) => {
-    setDaySlots((prev) =>
-      prev
-        .map((config) =>
-          config.day === day
-            ? {
-                ...config,
-                slots: config.slots.filter((_, i) => i !== index),
-              }
-            : config,
-        )
-        .filter((config) => config.slots.length > 0 || config.enabled === false),
-    );
-  };
+const removeSlotForDay = (day: string, index: number) => {
+  setDaySlots((prev) =>
+    prev
+      .map((config) =>
+        config.day === day
+          ? {
+              ...config,
+              slots: config.slots.filter((_, i) => i !== index),
+            }
+          : config,
+      )
+      .filter((config) => config.slots.length > 0 || config.enabled === false),
+  );
+};
 
-  const toggleBlockedDate = (dateStr: string) => {
+
+const toggleBlockedDate = (dateStr: string) => {
     setBlockedDates((prev) =>
       prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr],
     );
   };
 
-  const handleSave = async () => {
-    if (!vendorId) return;
+ const handleSave = async () => {
+  if (!vendorId) return;
 
-    // Legacy working-hours validation remains for backward compatibility.
-    if (workingHoursStart >= workingHoursEnd) {
-      Alert.alert(
-        'Invalid hours',
-        'Working hours start must be before the end time.',
-      );
-      return;
-    }
+  // Legacy working-hours validation remains for backward compatibility.
+  if (workingHoursStart >= workingHoursEnd) {
+    Alert.alert(
+      'Invalid hours',
+      'Working hours start must be before the end time.',
+    );
+    return;
+  }
 
-    // Validate every custom slot before saving.
-    for (const config of daySlots) {
-      for (const slot of config.slots) {
-        if (slot.start >= slot.end) {
-          Alert.alert(
-            'Invalid slot',
-            `${config.day}: slot end time must be after start time.`,
-          );
-          return;
-        }
+  // Validate every custom slot before saving.
+  for (const config of daySlots) {
+    for (const slot of config.slots) {
+      if (slot.start >= slot.end) {
+        Alert.alert(
+          'Invalid slot',
+          `${config.day}: slot end time must be after start time.`,
+        );
+        return;
       }
     }
+  }
 
-    setSaving(true);
+  setSaving(true);
 
-    try {
-      await patchVendorAvailability(vendorId, {
-        // Existing fields stay untouched.
-        workingDays,
-        workingHoursStart,
-        workingHoursEnd,
+  try {
+    await patchVendorAvailability(vendorId, {
+      // Existing fields stay untouched.
+      workingDays,
+      workingHoursStart,
+      workingHoursEnd,
 
-        // NEW: multiple working windows per day.
-        daySlots,
+      // NEW: multiple working windows per day.
+      daySlots,
 
-        blockedDates,
-        minimumAdvanceMinutes,
-      });
+      blockedDates,
+      minimumAdvanceMinutes,
+    });
 
-      Alert.alert(
-        'Saved',
-        'Your availability settings have been updated.',
-      );
-    } catch (error) {
-      console.error('Error saving availability settings:', error);
-      Alert.alert(
-        'Error',
-        'Could not save availability settings. Please try again.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+    Alert.alert(
+      'Saved',
+      'Your availability settings have been updated.',
+    );
+  } catch (error) {
+    console.error('Error saving availability settings:', error);
+    Alert.alert(
+      'Error',
+      'Could not save availability settings. Please try again.',
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const blockedMarks = blockedDates.reduce((acc: Record<string, any>, dateStr) => {
     acc[dateStr] = {
@@ -293,168 +294,166 @@ const VendorAvailabilitySettings = () => {
         </View>
 
         {/* Working Hours / Multiple Slots */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Working Hours</Text>
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Working Hours</Text>
 
-          <Text style={styles.cardSubtitle}>
-            Add one or more working windows for each day. For example,
-            9 AM - 1 PM and 4 PM - 10 PM.
-          </Text>
+  <Text style={styles.cardSubtitle}>
+    Add one or more working windows for each day. For example,
+    9 AM - 1 PM and 4 PM - 10 PM.
+  </Text>
 
-          {DAYS.map(({ code, label }) => {
-            const config = daySlots.find((item) => item.day === code);
-            const slots = config?.slots ?? [];
+  {DAYS.map(({ code, label }) => {
+    const config = daySlots.find((item) => item.day === code);
+    const slots = config?.slots ?? [];
 
-            return (
-              <View key={code} style={styles.slotDayContainer}>
-                <View style={styles.slotDayHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowLabel}>{label}</Text>
+    return (
+      <View key={code} style={styles.slotDayContainer}>
+        <View style={styles.slotDayHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowLabel}>{label}</Text>
 
-                    {slots.length === 0 && (
-                      <Text style={styles.slotHint}>
-                        Using default working hours
-                      </Text>
-                    )}
-                  </View>
-
-                  <Switch
-                    value={config ? config.enabled : true}
-                    onValueChange={() => {
-                      setDaySlots((prev) => {
-                        const existing = prev.find((item) => item.day === code);
-
-                        if (!existing) {
-                          return [
-                            ...prev,
-                            {
-                              day: code,
-                              enabled: false,
-                              slots: [],
-                            },
-                          ];
-                        }
-
-                        return prev.map((item) =>
-                          item.day === code
-                            ? { ...item, enabled: !item.enabled }
-                            : item,
-                        );
-                      });
-                    }}
-                    trackColor={{ false: '#E3D3DD', true: ACCENT }}
-                    thumbColor="#FFFFFF"
-                  />
-                </View>
-
-                {config?.enabled !== false && (
-                  <>
-                    {slots.map((slot, index) => (
-                      <View key={`${code}-${index}`} style={styles.slotRow}>
-                        <Ionicons
-                          name="time-outline"
-                          size={16}
-                          color={PRIMARY}
-                        />
-
-                        <Text style={styles.slotText}>
-                          {formatDisplayTime(slot.start)} -{' '}
-                          {formatDisplayTime(slot.end)}
-                        </Text>
-
-                        <TouchableOpacity
-                          onPress={() => removeSlotForDay(code, index)}
-                          style={styles.removeSlotButton}
-                        >
-                          <Ionicons
-                            name="trash-outline"
-                            size={17}
-                            color="#D9534F"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-
-                    <TouchableOpacity
-                      style={styles.addSlotButton}
-                      onPress={() => addSlotForDay(code)}
-                    >
-                      <Ionicons name="add-circle-outline" size={17} color={PRIMARY} />
-                      <Text style={styles.addSlotButtonText}>Add Slot</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            );
-          })}
-
-          {/* Existing legacy global hours remain available */}
-          <View style={styles.legacyHoursDivider}>
-            <Text style={styles.legacyHoursTitle}>
-              Default Working Hours
-            </Text>
-
-            <Text style={styles.slotHint}>
-              Used for days where no custom slots are configured.
-            </Text>
+            {slots.length === 0 && (
+              <Text style={styles.slotHint}>
+                Using default working hours
+              </Text>
+            )}
           </View>
 
-          <View style={styles.hoursRow}>
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowStartPicker(true)}
-            >
-              <Ionicons name="time-outline" size={16} color={PRIMARY} />
-              <Text style={styles.timeButtonText}>
-                {formatDisplayTime(workingHoursStart)}
-              </Text>
-            </TouchableOpacity>
+          <Switch
+            value={config ? config.enabled : true}
+            onValueChange={() => {
+              setDaySlots((prev) => {
+                const existing = prev.find((item) => item.day === code);
 
-            <Text style={styles.hoursSeparator}>to</Text>
-
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowEndPicker(true)}
-            >
-              <Ionicons name="time-outline" size={16} color={PRIMARY} />
-              <Text style={styles.timeButtonText}>
-                {formatDisplayTime(workingHoursEnd)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {showStartPicker && (
-            <DateTimePicker
-              value={timeToDate(workingHoursStart)}
-              mode="time"
-              display="default"
-              onValueChange={(_, selected) => {
-                setShowStartPicker(Platform.OS === 'ios');
-
-                if (selected) {
-                  setWorkingHoursStart(dateToTime(selected));
+                if (!existing) {
+                  return [
+                    ...prev,
+                    {
+                      day: code,
+                      enabled: false,
+                      slots: [],
+                    },
+                  ];
                 }
-              }}
-              onDismiss={() => setShowStartPicker(false)}
-            />
-          )}
 
-          {showEndPicker && (
-            <DateTimePicker
-              value={timeToDate(workingHoursEnd)}
-              mode="time"
-              display="default"
-              onValueChange={(_, selected) => {
-                setShowEndPicker(Platform.OS === 'ios');
-
-                if (selected) {
-                  setWorkingHoursEnd(dateToTime(selected));
-                }
-              }}
-              onDismiss={() => setShowEndPicker(false)}
-            />
-          )}
+                return prev.map((item) =>
+                  item.day === code
+                    ? { ...item, enabled: !item.enabled }
+                    : item,
+                );
+              });
+            }}
+            trackColor={{ false: '#E3D3DD', true: ACCENT }}
+            thumbColor="#FFFFFF"
+          />
         </View>
+
+        {config?.enabled !== false && (
+          <>
+            {slots.map((slot, index) => (
+              <View key={`${code}-${index}`} style={styles.slotRow}>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={PRIMARY}
+                />
+
+                <Text style={styles.slotText}>
+                  {formatDisplayTime(slot.start)} -{' '}
+                  {formatDisplayTime(slot.end)}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => removeSlotForDay(code, index)}
+                  style={styles.removeSlotButton}
+                >
+                  <Ionicons
+                    name="trash-outline"
+                    size={17}
+                    color="#D9534F"
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addSlotButton}
+              onPress={() => addSlotForDay(code)}
+            >
+              <Ionicons name="add-circle-outline" size={17} color={PRIMARY} />
+              <Text style={styles.addSlotButtonText}>Add Slot</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  })}
+
+  {/* Existing legacy global hours remain available */}
+  <View style={styles.legacyHoursDivider}>
+    <Text style={styles.legacyHoursTitle}>
+      Default Working Hours
+    </Text>
+
+    <Text style={styles.slotHint}>
+      Used for days where no custom slots are configured.
+    </Text>
+  </View>
+
+  <View style={styles.hoursRow}>
+    <TouchableOpacity
+      style={styles.timeButton}
+      onPress={() => setShowStartPicker(true)}
+    >
+      <Ionicons name="time-outline" size={16} color={PRIMARY} />
+      <Text style={styles.timeButtonText}>
+        {formatDisplayTime(workingHoursStart)}
+      </Text>
+    </TouchableOpacity>
+
+    <Text style={styles.hoursSeparator}>to</Text>
+
+    <TouchableOpacity
+      style={styles.timeButton}
+      onPress={() => setShowEndPicker(true)}
+    >
+      <Ionicons name="time-outline" size={16} color={PRIMARY} />
+      <Text style={styles.timeButtonText}>
+        {formatDisplayTime(workingHoursEnd)}
+      </Text>
+    </TouchableOpacity>
+  </View>
+
+  {showStartPicker && (
+    <DateTimePicker
+      value={timeToDate(workingHoursStart)}
+      mode="time"
+      display="default"
+      onChange={(_, selected) => {
+        setShowStartPicker(Platform.OS === 'ios');
+
+        if (selected) {
+          setWorkingHoursStart(dateToTime(selected));
+        }
+      }}
+    />
+  )}
+
+  {showEndPicker && (
+    <DateTimePicker
+      value={timeToDate(workingHoursEnd)}
+      mode="time"
+      display="default"
+      onChange={(_, selected) => {
+        setShowEndPicker(Platform.OS === 'ios');
+
+        if (selected) {
+          setWorkingHoursEnd(dateToTime(selected));
+        }
+      }}
+    />
+  )}
+</View>
 
         {/* Minimum Advance Booking */}
         <View style={styles.card}>
@@ -531,7 +530,7 @@ const VendorAvailabilitySettings = () => {
             </View>
           )}
         </View>
-      </ScrollView>
+            </ScrollView>
 
       {/* Multi-slot time picker */}
       {slotPickerMode === 'start' && (
@@ -539,7 +538,7 @@ const VendorAvailabilitySettings = () => {
           value={draftSlotStart}
           mode="time"
           display="default"
-          onValueChange={(_, selected) => {
+          onChange={(_, selected) => {
             if (Platform.OS === 'android') {
               setSlotPickerMode(null);
             }
@@ -549,7 +548,6 @@ const VendorAvailabilitySettings = () => {
               setSlotPickerMode('end');
             }
           }}
-          onDismiss={() => setSlotPickerMode(null)}
         />
       )}
 
@@ -558,7 +556,7 @@ const VendorAvailabilitySettings = () => {
           value={draftSlotEnd}
           mode="time"
           display="default"
-          onValueChange={(_, selected) => {
+          onChange={(_, selected) => {
             setSlotPickerMode(null);
 
             if (selected) {
@@ -609,10 +607,6 @@ const VendorAvailabilitySettings = () => {
                 );
               }
             }
-          }}
-          onDismiss={() => {
-            setSlotPickerMode(null);
-            setActiveSlotDay(null);
           }}
         />
       )}
@@ -694,7 +688,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   timeButtonText: { fontSize: 13, fontWeight: '700', color: PRIMARY },
-  hoursSeparator: { fontSize: 12, color: '#8A8A8A' },
+    hoursSeparator: { fontSize: 12, color: '#8A8A8A' },
 
   slotDayContainer: {
     paddingVertical: 10,

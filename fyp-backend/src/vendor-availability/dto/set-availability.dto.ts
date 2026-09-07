@@ -48,11 +48,11 @@ export class DaySlotConfigDto {
    * If an empty array is provided, there is no
    * per-day duration restriction.
    */
-  @IsArray()
+    @IsArray()
   @IsInt({ each: true })
   @Min(1, { each: true })
   @IsOptional()
-  maxEventDurationMinutes?: number[];
+  advanceNoticeOptionsMinutes?: number[];
 }
 
 export class SetAvailabilityDto {
@@ -122,17 +122,4 @@ export class SetAvailabilityDto {
   @Min(1)
   maxConcurrentBookings?: number;
 
-  /**
-   * Vendor-wide default maximum event duration.
-   *
-   * Example:
-   * 480 = 8 hours
-   *
-   * Per-day daySlots[].maxEventDurationMinutes
-   * can override this value.
-   */
-  @IsInt()
-  @IsOptional()
-  @Min(1)
-  maxEventDurationMinutes?: number | null;
 }

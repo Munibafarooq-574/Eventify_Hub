@@ -121,13 +121,6 @@ export class VendorAvailabilityService {
     const blockedDates: Date[] =
       settings.blockedDates ?? [];
 
-    const advanceNoticeOptionsMinutes: number[] =
-  Array.isArray(settings.advanceNoticeOptionsMinutes)
-    ? settings.advanceNoticeOptionsMinutes
-    : settings.minimumAdvanceMinutes != null
-      ? [settings.minimumAdvanceMinutes]
-      : [];
-
     const maxConcurrentBookings =
       settings.maxConcurrentBookings ?? 1;
 
@@ -276,56 +269,6 @@ export class VendorAvailabilityService {
     }
 
     // ---------------------------------------------------------
-    // 3. Maximum event duration
-    //
-    // Per-day max duration overrides the vendor-wide default.
-    // ---------------------------------------------------------
-
-    const requestedDurationMinutes =
-      (endDateTime.getTime() -
-        startDateTime.getTime()) /
-      60000;
-
-    const globalMaxDurations: number[] =
-  Array.isArray(settings.maxEventDurationMinutes)
-    ? settings.maxEventDurationMinutes
-    : settings.maxEventDurationMinutes != null
-      ? [settings.maxEventDurationMinutes]
-      : [];
-
-const dayMaxDurations: number[] =
-  daySlotConfig &&
-  Array.isArray(daySlotConfig.maxEventDurationMinutes)
-    ? daySlotConfig.maxEventDurationMinutes
-    : globalMaxDurations;
-
-// If duration options are configured, the requested event
-// must fit within at least one allowed duration option.
-//
-// Example:
-// Vendor allows [120, 300, 480]
-// Organizer requests 240 minutes
-// → 300-minute option can accommodate it → AVAILABLE.
-if (dayMaxDurations.length > 0) {
-  const fitsAllowedDuration = dayMaxDurations.some(
-    (maxDuration) =>
-      requestedDurationMinutes <= maxDuration,
-  );
-
-  if (!fitsAllowedDuration) {
-    const sortedDurations = [...dayMaxDurations].sort(
-      (a, b) => a - b,
-    );
-
-    return {
-      vendorId,
-      available: false,
-      reason: `This vendor accepts events up to ${sortedDurations[sortedDurations.length - 1]} minutes long for the selected day`,
-    };
-  }
-}
-
-    // ---------------------------------------------------------
     // 4. Blocked dates
     // ---------------------------------------------------------
 
@@ -347,8 +290,21 @@ if (dayMaxDurations.length > 0) {
 
     // ---------------------------------------------------------
     // 5. Minimum advance booking time
+    // Per-day override takes priority over vendor-wide default.
     // ---------------------------------------------------------
-      if (advanceNoticeOptionsMinutes.length > 0) {
+
+    const advanceNoticeOptionsMinutes: number[] =
+      daySlotConfig &&
+      Array.isArray(daySlotConfig.advanceNoticeOptionsMinutes) &&
+      daySlotConfig.advanceNoticeOptionsMinutes.length > 0
+        ? daySlotConfig.advanceNoticeOptionsMinutes
+        : Array.isArray(settings.advanceNoticeOptionsMinutes)
+          ? settings.advanceNoticeOptionsMinutes
+          : settings.minimumAdvanceMinutes != null
+            ? [settings.minimumAdvanceMinutes]
+            : [];
+
+    if (advanceNoticeOptionsMinutes.length > 0) {
   const now = new Date();
 
   const minutesUntilEvent =
@@ -548,22 +504,6 @@ if (dayMaxDurations.length > 0) {
     }
 
     // ---------------------------------------------------------
-    // Maximum event duration
-    //
-    // Per-day value overrides vendor-wide default.
-    // ---------------------------------------------------------
-
-    const maxEventDurationMinutes =
-  daySlotConfig &&
-  Array.isArray(daySlotConfig.maxEventDurationMinutes)
-    ? daySlotConfig.maxEventDurationMinutes
-    : Array.isArray(settings.maxEventDurationMinutes)
-      ? settings.maxEventDurationMinutes
-      : settings.maxEventDurationMinutes != null
-        ? [settings.maxEventDurationMinutes]
-        : [];
-
-    // ---------------------------------------------------------
     // Existing bookings for this day
     // ---------------------------------------------------------
 
@@ -601,14 +541,6 @@ return {
     ? !!daySlotConfig.enabled
     : true,
 
-  // Multiple event-duration options for this day.
-  //
-  // Example:
-  // [120, 300, 480]
-  //
-  // = 2 hours, 5 hours, 8 hours.
-  maxEventDurationMinutes,
-
   // Multiple advance-booking notice options.
   //
   // Example:
@@ -616,13 +548,15 @@ return {
   //
   // = 3 hours, 6 hours, 12 hours before event.
   advanceNoticeOptionsMinutes:
-    Array.isArray(
-      settings.advanceNoticeOptionsMinutes,
-    )
-      ? settings.advanceNoticeOptionsMinutes
-      : settings.minimumAdvanceMinutes != null
-        ? [settings.minimumAdvanceMinutes]
-        : [],
+    daySlotConfig &&
+    Array.isArray(daySlotConfig.advanceNoticeOptionsMinutes) &&
+    daySlotConfig.advanceNoticeOptionsMinutes.length > 0
+      ? daySlotConfig.advanceNoticeOptionsMinutes
+      : Array.isArray(settings.advanceNoticeOptionsMinutes)
+        ? settings.advanceNoticeOptionsMinutes
+        : settings.minimumAdvanceMinutes != null
+          ? [settings.minimumAdvanceMinutes]
+          : [],
 
   workingSlots,
 
