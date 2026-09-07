@@ -354,21 +354,25 @@ const PersonalizedExperienceScreen: React.FC = () => {
   // CONTINUE (single CTA — AI Suggested Plan removed)
   // -------------------------------------------------------
 
-  const handleContinue = async () => {
-    const saved = await saveEventDetails();
+const handleContinue = async () => {
+  const saved = await saveEventDetails();
+  if (!saved) return;
 
-    if (!saved) {
-      return;
-    }
+  const selectedCats = categories.filter((cat) =>
+    selectedServices.includes(cat.name)
+  );
 
-    router.push({
-      pathname: "/customizeyourown",
-      params: {
-        selectedServices:
-          JSON.stringify(selectedServices),
-      },
-    });
-  };
+  const selectedCategoryIds = selectedCats.map((cat) => cat._id);
+  const selectedCategoryNames = selectedCats.map((cat) => cat.name);
+
+  router.push({
+    pathname: "/categoryvendorlisting",
+    params: {
+      categoryIds: JSON.stringify(selectedCategoryIds),
+      categoryNames: JSON.stringify(selectedCategoryNames),
+    },
+  });
+};
 
   // -------------------------------------------------------
   // RENDER
