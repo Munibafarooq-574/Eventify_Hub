@@ -1,14 +1,20 @@
 // fyp-mobile/services/admin/adminGetRevenueAnalytics.ts
-import { adminGet } from "./adminApi";
-import { RevenueAnalytics } from "../../types/admin.types";
+import axios, { AxiosRequestConfig } from 'axios';
 
-export type RevenueRange = "7d" | "30d" | "12m";
+export interface RevenuePoint {
+  label: string; // e.g. "Jan", "Feb"
+  amount: number;
+}
 
-/**
- * GET /admin/analytics/revenue?range=7d|30d|12m
- */
-export async function adminGetRevenueAnalytics(
-  range: RevenueRange = "30d"
-): Promise<RevenueAnalytics> {
-  return adminGet<RevenueAnalytics>(`/admin/analytics/revenue?range=${range}`);
+export default async function adminGetRevenueAnalytics(): Promise<RevenuePoint[]> {
+  const url = `https://eventify-hub.onrender.com/admin/analytics/revenue`;
+  const config: AxiosRequestConfig = { method: 'GET', url };
+
+  try {
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching revenue analytics:', error);
+    throw error;
+  }
 }

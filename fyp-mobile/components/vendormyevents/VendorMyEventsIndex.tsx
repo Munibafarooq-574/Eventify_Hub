@@ -431,6 +431,12 @@ const MyEventsScreen = () => {
       return d;
     });
 
+      const [copyDaySource, setCopyDaySource] =
+    useState<string | null>(null);
+
+  const [copyTargetDays, setCopyTargetDays] =
+    useState<string[]>([]);
+
   const todayKey = toKey(new Date());
 
   /**
@@ -1554,6 +1560,69 @@ const MyEventsScreen = () => {
           },
         },
       ]
+    );
+  };
+
+    /**
+   * =========================================================
+   * COPY DAY TO OTHER DAYS
+   * =========================================================
+   */
+
+  const startCopyingDay = (dayCode: string) => {
+    setCopyDaySource(dayCode);
+    setCopyTargetDays([]);
+  };
+
+  const toggleCopyTargetDay = (dayCode: string) => {
+    setCopyTargetDays((previous) =>
+      previous.includes(dayCode)
+        ? previous.filter((d) => d !== dayCode)
+        : [...previous, dayCode]
+    );
+  };
+
+  const applyCopyToDays = () => {
+    if (!copyDaySource || copyTargetDays.length === 0) {
+      setCopyDaySource(null);
+      return;
+    }
+
+    const sourceDay = editorDaySlots.find(
+      (day) => day.day === copyDaySource
+    );
+
+    if (!sourceDay) {
+      setCopyDaySource(null);
+      return;
+    }
+
+    const clonedSlots = sourceDay.slots.map((slot) => ({
+      ...slot,
+    }));
+
+    setEditorDaySlots((previous) =>
+      previous.map((day) =>
+        copyTargetDays.includes(day.day)
+          ? {
+              ...day,
+              enabled: true,
+              slots: clonedSlots,
+            }
+          : day
+      )
+    );
+
+    const copiedCount = copyTargetDays.length;
+
+    setCopyDaySource(null);
+    setCopyTargetDays([]);
+
+    Alert.alert(
+      "Copied",
+      `Working hours copied to ${copiedCount} ${
+        copiedCount === 1 ? "day" : "days"
+      }.`
     );
   };
 
@@ -3828,6 +3897,102 @@ const MyEventsScreen = () => {
                             Add Time Slot
                           </Text>
                         </TouchableOpacity>
+                          {(editorDaySlots.find(
+                        (item) => item.day === day.code
+                      )?.slots.length ?? 0) > 0 && (
+                          <TouchableOpacity
+                            style={styles.copyDayButton}
+                            onPress={() =>
+                              startCopyingDay(day.code)
+                            }
+                          >
+                            <Ionicons
+                              name="copy-outline"
+                              size={15}
+                              color={ACCENT}
+                            />
+
+                            <Text style={styles.copyDayButtonText}>
+                              Copy to other days
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        {copyDaySource === day.code && (
+                          <View style={styles.copyDayPanel}>
+                            <Text style={styles.copyDayPanelTitle}>
+                              Apply these hours to:
+                            </Text>
+
+                            <View style={styles.copyDayChipsRow}>
+                              {DAYS.filter(
+                                (otherDay) =>
+                                  otherDay.code !== day.code
+                              ).map((otherDay) => {
+                                const selected =
+                                  copyTargetDays.includes(
+                                    otherDay.code
+                                  );
+
+                                return (
+                                  <TouchableOpacity
+                                    key={otherDay.code}
+                                    style={[
+                                      styles.copyDayChip,
+                                      selected &&
+                                        styles.copyDayChipActive,
+                                    ]}
+                                    onPress={() =>
+                                      toggleCopyTargetDay(
+                                        otherDay.code
+                                      )
+                                    }
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.copyDayChipText,
+                                        selected &&
+                                          styles.copyDayChipTextActive,
+                                      ]}
+                                    >
+                                      {otherDay.label.slice(0, 3)}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+
+                            <View style={styles.copyDayActionsRow}>
+                              <TouchableOpacity
+                                style={styles.copyDayCancelButton}
+                                onPress={() => {
+                                  setCopyDaySource(null);
+                                  setCopyTargetDays([]);
+                                }}
+                              >
+                                <Text style={styles.copyDayCancelText}>
+                                  Cancel
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[
+                                  styles.copyDayApplyButton,
+                                  copyTargetDays.length === 0 &&
+                                    styles.copyDayApplyButtonDisabled,
+                                ]}
+                                disabled={
+                                  copyTargetDays.length === 0
+                                }
+                                onPress={applyCopyToDays}
+                              >
+                                <Text style={styles.copyDayApplyText}>
+                                  Apply
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>
@@ -4089,7 +4254,7 @@ const MyEventsScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                <DateTimePicker
+                                <DateTimePicker
                   value={
                     slotPickerMode ===
                     "start"
@@ -4102,6 +4267,12 @@ const MyEventsScreen = () => {
                     "ios"
                       ? "spinner"
                       : "default"
+                  }
+                  themeVariant="light"
+                  textColor={
+                    Platform.OS === "ios"
+                      ? "#1A1A1A"
+                      : undefined
                   }
                   onChange={(
                     event,
@@ -4119,10 +4290,6 @@ const MyEventsScreen = () => {
                         date
                       );
 
-                      /**
-                       * If start is after current end,
-                       * move end 1 hour ahead.
-                       */
                       if (
                         date >=
                         draftEnd
@@ -4177,7 +4344,7 @@ const MyEventsScreen = () => {
                   </Text>
                 </View>
 
-                <View
+                                <View
                   style={
                     styles.pickerButtons
                   }
@@ -4209,28 +4376,49 @@ const MyEventsScreen = () => {
                       />
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity
-                      style={
-                        styles.pickerPrimaryButton
-                      }
-                      onPress={
-                        confirmSlot
-                      }
-                    >
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-
-                      <Text
-                        style={
-                          styles.pickerPrimaryButtonText
+                    <View style={styles.pickerButtonsRow}>
+                      <TouchableOpacity
+                        style={styles.pickerBackButton}
+                        onPress={() =>
+                          setSlotPickerMode("start")
                         }
                       >
-                        Save Slot
-                      </Text>
-                    </TouchableOpacity>
+                        <Ionicons
+                          name="arrow-back"
+                          size={17}
+                          color={PRIMARY}
+                        />
+
+                        <Text
+                          style={
+                            styles.pickerBackButtonText
+                          }
+                        >
+                          Back
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={
+                          styles.pickerPrimaryButtonFlex
+                        }
+                        onPress={confirmSlot}
+                      >
+                        <Ionicons
+                          name="checkmark"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+
+                        <Text
+                          style={
+                            styles.pickerPrimaryButtonText
+                          }
+                        >
+                          Save Slot
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               </View>
@@ -5420,9 +5608,10 @@ const styles =
       marginTop: 3,
     },
 
-    timePicker: {
-      alignSelf:
-        "center",
+        timePicker: {
+      alignSelf: "center",
+      height: 180,
+      width: "100%",
     },
 
     pickerPreview: {
@@ -5468,5 +5657,141 @@ const styles =
       color: "#FFFFFF",
       fontSize: 13,
       fontWeight: "800",
+    },
+
+        pickerButtonsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+
+    pickerBackButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      borderWidth: 1.5,
+      borderColor: PRIMARY,
+      borderRadius: 14,
+      minHeight: 50,
+      paddingHorizontal: 18,
+    },
+
+    pickerBackButtonText: {
+      color: PRIMARY,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    pickerPrimaryButtonFlex: {
+      flex: 1,
+      backgroundColor: PRIMARY,
+      borderRadius: 14,
+      minHeight: 50,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+    },
+
+    copyDayButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      marginTop: 8,
+      paddingVertical: 8,
+    },
+
+    copyDayButtonText: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: ACCENT,
+    },
+
+    copyDayPanel: {
+      backgroundColor: "#FFFFFF",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: "#F0DDEA",
+      padding: 12,
+      marginTop: 6,
+    },
+
+    copyDayPanelTitle: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: "#333333",
+      marginBottom: 9,
+    },
+
+    copyDayChipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 7,
+    },
+
+    copyDayChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: "#E7D8E2",
+      backgroundColor: "#FFFFFF",
+    },
+
+    copyDayChipActive: {
+      backgroundColor: PRIMARY,
+      borderColor: PRIMARY,
+    },
+
+    copyDayChipText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: PRIMARY,
+    },
+
+    copyDayChipTextActive: {
+      color: "#FFFFFF",
+    },
+
+    copyDayActionsRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 12,
+    },
+
+    copyDayCancelButton: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: "#DDDDDD",
+    },
+
+    copyDayCancelText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#666666",
+    },
+
+    copyDayApplyButton: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: PRIMARY,
+    },
+
+    copyDayApplyButtonDisabled: {
+      backgroundColor: "#D8B9CE",
+    },
+
+    copyDayApplyText: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: "#FFFFFF",
     },
   });
