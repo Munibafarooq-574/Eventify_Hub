@@ -3,13 +3,38 @@ import { growthApi } from './growthApiClient';
 
 export type VendorAvailabilityResponse = {
   vendorId: string;
+
   date?: string;
   day?: string;
   enabled?: boolean;
 
-  maxEventDurationMinutes?: number[];
+  workingDays?: {
+    day: string;
+    enabled: boolean;
+  }[];
+
+  workingHoursStart?: string;
+  workingHoursEnd?: string;
+
+  daySlots?: {
+    day: string;
+    enabled: boolean;
+    slots: {
+      start: string;
+      end: string;
+    }[];
+    maxEventDurationMinutes?: number[];
+  }[];
+
+  blockedDates?: string[];
+
+  minimumAdvanceMinutes?: number[];
 
   advanceNoticeOptionsMinutes?: number[];
+
+  maxEventDurationMinutes?: number[];
+
+  maxConcurrentBookings?: number;
 
   workingSlots?: {
     start: string;
