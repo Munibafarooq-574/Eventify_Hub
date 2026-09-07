@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react-native";
 import axios from "axios";
 import React from "react";
-import PhotographerDetailsScreen from "../vendorprofiledetails/VendorProfileDetailsIndex"; // Adjust path if needed
+import PhotographerDetailsScreen from "../vendorprofiledetails(orginzer)/VendorProfileDetailsIndex"; // Adjust path if needed
 
 // Mocking axios for API calls with correct typing
 jest.mock("axios");

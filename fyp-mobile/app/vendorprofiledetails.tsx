@@ -1,4 +1,4 @@
-import VendorProfileDetailsIndex from "@/components/vendorprofiledetails/VendorProfileDetailsIndex";
+import VendorProfileDetailsIndex from "@/components/vendorprofiledetails(orginzer)/VendorProfileDetailsIndex";
 
 
 
