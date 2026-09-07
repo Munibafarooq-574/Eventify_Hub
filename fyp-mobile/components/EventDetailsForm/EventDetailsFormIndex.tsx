@@ -1,3 +1,4 @@
+// fyp-mobile/components/personalizedexperience/PersonalizedExperienceScreen.tsx
 import getAllCategories from "@/services/getAllCategories";
 import { saveSecureData } from "@/store";
 import { useVendorsAvailability } from "@/hooks/useVendorsAvailability";
@@ -28,30 +29,12 @@ const PRIMARY_LIGHT = "#F8E9F0";
 const ACCENT = "#B84B9A";
 
 const DURATION_OPTIONS = [
-  {
-    label: "1 hour",
-    value: 60,
-  },
-  {
-    label: "2 hours",
-    value: 120,
-  },
-  {
-    label: "3 hours",
-    value: 180,
-  },
-  {
-    label: "4 hours",
-    value: 240,
-  },
-  {
-    label: "5 hours",
-    value: 300,
-  },
-  {
-    label: "6 hours",
-    value: 360,
-  },
+  { label: "1 hour", value: 60 },
+  { label: "2 hours", value: 120 },
+  { label: "3 hours", value: 180 },
+  { label: "4 hours", value: 240 },
+  { label: "5 hours", value: 300 },
+  { label: "6 hours", value: 360 },
 ];
 
 const formatTime = (date: Date) => {
@@ -80,35 +63,40 @@ const formatDuration = (minutes: number) => {
 
 const PersonalizedExperienceScreen: React.FC = () => {
   // -------------------------------------------------------
-  // BASIC EVENT DETAILS
+  // STEP 1 & 2 — EVENT NAME / TYPE
   // -------------------------------------------------------
 
   const [eventName, setEventName] = useState("");
   const [eventType, setEventType] = useState("");
+
+  // -------------------------------------------------------
+  // STEP 3, 4, 5 — DATE / START TIME / DURATION
+  // -------------------------------------------------------
+
   const [eventDate, setEventDate] = useState<Date | null>(null);
 
-  const [budget, setBudget] = useState("");
-  const [guests, setGuests] = useState("");
-
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [categories, setCategories] = useState<ICategory[]>([]);
-
-  // -------------------------------------------------------
-  // DATE / TIME
-  // -------------------------------------------------------
-
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [startTime, setStartTime] = useState<Date>(() => {
     const d = new Date();
-
     d.setHours(10, 0, 0, 0);
-
     return d;
   });
 
   const [durationMinutes, setDurationMinutes] = useState(120);
+
+  // -------------------------------------------------------
+  // STEP 6 — TOTAL GUESTS
+  // -------------------------------------------------------
+
+  const [guests, setGuests] = useState("");
+
+  // -------------------------------------------------------
+  // DESIRED SERVICES (Phase 3 — shown right after event details)
+  // -------------------------------------------------------
+
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [categories, setCategories] = useState<ICategory[]>([]);
 
   // -------------------------------------------------------
   // VENDOR IDs
@@ -124,6 +112,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
 
   // -------------------------------------------------------
   // VALIDATION ERRORS
+  // (budget removed — no longer part of this form)
   // -------------------------------------------------------
 
   const [errors, setErrors] = useState({
@@ -132,7 +121,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
     eventDate: "",
     guests: "",
     selectedServices: "",
-    budget: "",
   });
 
   // -------------------------------------------------------
@@ -197,10 +185,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
         ? ""
         : "Event date is required",
 
-      budget: budget.trim()
-        ? ""
-        : "Budget is required",
-
       guests: guests.trim()
         ? ""
         : "Guest count is required",
@@ -240,28 +224,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
       ...prev,
       selectedServices: "",
     }));
-  };
-
-  // -------------------------------------------------------
-  // DATE PICKER
-  // -------------------------------------------------------
-
-  const onChangeDate = (
-    _: any,
-    selectedDate?: Date
-  ) => {
-    setShowDatePicker(
-      Platform.OS === "ios"
-    );
-
-    if (selectedDate) {
-      setEventDate(selectedDate);
-
-      setErrors((prev) => ({
-        ...prev,
-        eventDate: "",
-      }));
-    }
   };
 
   // -------------------------------------------------------
@@ -329,6 +291,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
 
   // -------------------------------------------------------
   // SAVE EVENT DETAILS
+  // (budget removed from payload)
   // -------------------------------------------------------
 
   const saveEventDetails = async () => {
@@ -360,15 +323,10 @@ const PersonalizedExperienceScreen: React.FC = () => {
           eventName,
           eventType,
           eventDate,
-
-          // NEW
           startTime: timeToHHMM(startTime),
           durationMinutes,
-
-          // EXISTING
           guests,
           selectedServices,
-          budget,
 
           // Will be populated later when
           // vendors are selected.
@@ -393,24 +351,10 @@ const PersonalizedExperienceScreen: React.FC = () => {
   };
 
   // -------------------------------------------------------
-  // AI PLAN
+  // CONTINUE (single CTA — AI Suggested Plan removed)
   // -------------------------------------------------------
 
-  const handleAIPlan = async () => {
-    const saved = await saveEventDetails();
-
-    if (!saved) {
-      return;
-    }
-
-    router.push("/AI");
-  };
-
-  // -------------------------------------------------------
-  // CUSTOMIZE OWN
-  // -------------------------------------------------------
-
-  const handleCustomizeOwn = async () => {
+  const handleContinue = async () => {
     const saved = await saveEventDetails();
 
     if (!saved) {
@@ -442,7 +386,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       <View style={styles.heroCard}>
         <View style={styles.heroIcon}>
           <Ionicons
-            name="sparkles-outline"
+            name="calendar-outline"
             size={25}
             color="#FFFFFF"
           />
@@ -453,13 +397,13 @@ const PersonalizedExperienceScreen: React.FC = () => {
         </Text>
 
         <Text style={styles.subHeading}>
-          Choose your date and time to see vendor
-          availability before booking.
+          Tell us about your event so we can show you
+          vendors who are actually available.
         </Text>
       </View>
 
       {/* ==================================================
-          EVENT NAME
+          STEP 1 — EVENT NAME
       ================================================== */}
 
       <Text style={styles.label}>
@@ -490,7 +434,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          EVENT TYPE
+          STEP 2 — EVENT TYPE
       ================================================== */}
 
       <Text style={styles.label}>
@@ -521,7 +465,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          EVENT DATE
+          STEP 3 — EVENT DATE
       ================================================== */}
 
       <View style={styles.sectionHeader}>
@@ -577,27 +521,16 @@ const PersonalizedExperienceScreen: React.FC = () => {
           theme={{
             backgroundColor: "#FFFFFF",
             calendarBackground: "#FFFFFF",
-
             textSectionTitleColor: "#999999",
-
             dayTextColor: "#222222",
-
             todayTextColor: PRIMARY,
-
             arrowColor: PRIMARY,
-
             monthTextColor: "#111111",
-
             textMonthFontWeight: "800",
-
             textDayHeaderFontWeight: "700",
-
             textDayFontWeight: "500",
-
             textDayFontSize: 14,
-
             textMonthFontSize: 17,
-
             textDayHeaderFontSize: 11,
           }}
         />
@@ -608,10 +541,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
           {errors.eventDate}
         </Text>
       )}
-
-      {/* ==================================================
-          SELECTED DATE
-      ================================================== */}
 
       {eventDate && (
         <View style={styles.selectedDateCard}>
@@ -644,7 +573,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          START TIME
+          STEP 4 — EVENT START TIME
       ================================================== */}
 
       <Text style={styles.label}>
@@ -692,7 +621,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          DURATION
+          STEP 5 — EVENT DURATION
       ================================================== */}
 
       <Text style={styles.label}>
@@ -748,13 +677,48 @@ const PersonalizedExperienceScreen: React.FC = () => {
       </View>
 
       {/* ==================================================
-          VENDOR AVAILABILITY
+          STEP 6 — TOTAL GUESTS
+      ================================================== */}
+
+      <Text style={styles.label}>
+        Total Guests
+      </Text>
+
+      <View style={styles.inputWrapper}>
+        <Ionicons
+          name="people-outline"
+          size={19}
+          color={PRIMARY}
+        />
+
+        <TextInput
+          style={styles.inputText}
+          placeholder="Enter guests"
+          placeholderTextColor="#AAAAAA"
+          keyboardType="numeric"
+          value={guests}
+          onChangeText={setGuests}
+          testID="guests-input-bottom"
+        />
+      </View>
+
+      {!!errors.guests && (
+        <Text
+          style={styles.errorText}
+          testID="guests-error-bottom"
+        >
+          {errors.guests}
+        </Text>
+      )}
+
+      {/* ==================================================
+          VENDOR AVAILABILITY PREVIEW
+          (depends on date/time/duration above, so it sits
+          right after the 6 core event-detail steps)
       ================================================== */}
 
       {eventDate && (
         <View style={styles.availabilityCard}>
-          {/* Header */}
-
           <View style={styles.availabilityHeader}>
             <View
               style={
@@ -810,8 +774,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
               )}
           </View>
 
-          {/* No vendor IDs yet */}
-
           {vendorIds.length === 0 ? (
             <View
               style={
@@ -851,8 +813,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
             </View>
           ) : (
             <>
-              {/* Availability summary */}
-
               <View
                 style={
                   styles.availabilitySummary
@@ -890,8 +850,6 @@ const PersonalizedExperienceScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
-
-              {/* Vendor results */}
 
               {Object.entries(
                 vendorAvailability
@@ -990,77 +948,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          TOTAL GUESTS
-      ================================================== */}
-
-      <Text style={styles.label}>
-        Total Guests
-      </Text>
-
-      <View style={styles.inputWrapper}>
-        <Ionicons
-          name="people-outline"
-          size={19}
-          color={PRIMARY}
-        />
-
-        <TextInput
-          style={styles.inputText}
-          placeholder="Enter guests"
-          placeholderTextColor="#AAAAAA"
-          keyboardType="numeric"
-          value={guests}
-          onChangeText={setGuests}
-          testID="guests-input-bottom"
-        />
-      </View>
-
-      {!!errors.guests && (
-        <Text
-          style={styles.errorText}
-          testID="guests-error-bottom"
-        >
-          {errors.guests}
-        </Text>
-      )}
-
-      {/* ==================================================
-          BUDGET
-      ================================================== */}
-
-      <Text style={styles.label}>
-        Your Budget
-      </Text>
-
-      <View style={styles.inputWrapper}>
-        <Ionicons
-          name="cash-outline"
-          size={19}
-          color={PRIMARY}
-        />
-
-        <TextInput
-          style={styles.inputText}
-          placeholder="Your Budget"
-          placeholderTextColor="#AAAAAA"
-          keyboardType="numeric"
-          value={budget}
-          onChangeText={setBudget}
-          testID="budget-input"
-        />
-      </View>
-
-      {!!errors.budget && (
-        <Text
-          style={styles.errorText}
-          testID="budget-error"
-        >
-          {errors.budget}
-        </Text>
-      )}
-
-      {/* ==================================================
-          DESIRED SERVICES
+          DESIRED SERVICES (Phase 3)
       ================================================== */}
 
       <Text style={styles.label}>
@@ -1122,50 +1010,24 @@ const PersonalizedExperienceScreen: React.FC = () => {
       )}
 
       {/* ==================================================
-          BUTTONS
+          CONTINUE (AI Suggested Plan removed — single CTA)
       ================================================== */}
 
-      <View style={styles.buttonContainer}>
-        {/* AI */}
+      <TouchableOpacity
+        style={styles.continueButton}
+        onPress={handleContinue}
+        testID="continue-button"
+      >
+        <Text style={styles.continueButtonText}>
+          Continue
+        </Text>
 
-        <TouchableOpacity
-          style={styles.aiPlanButton}
-          onPress={handleAIPlan}
-        >
-          <Ionicons
-            name="sparkles-outline"
-            size={18}
-            color="#FFFFFF"
-          />
-
-          <Text
-            style={styles.aiPlanButtonText}
-          >
-            AI Suggested Plan
-          </Text>
-        </TouchableOpacity>
-
-        {/* Customize */}
-
-        <TouchableOpacity
-          style={styles.customizeButton}
-          onPress={handleCustomizeOwn}
-        >
-          <Ionicons
-            name="create-outline"
-            size={18}
-            color="#FFFFFF"
-          />
-
-          <Text
-            style={
-              styles.customizeButtonText
-            }
-          >
-            Customize Your Own
-          </Text>
-        </TouchableOpacity>
-      </View>
+        <Ionicons
+          name="arrow-forward"
+          size={18}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
 
       <View style={styles.bottomSpace} />
     </ScrollView>
@@ -1183,10 +1045,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 55,
   },
-
-  // -----------------------------------------------------
-  // HERO
-  // -----------------------------------------------------
 
   heroCard: {
     width: "100%",
@@ -1230,10 +1088,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 
-  // -----------------------------------------------------
-  // LABEL
-  // -----------------------------------------------------
-
   label: {
     fontSize: 14,
     color: "#222222",
@@ -1256,10 +1110,6 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 12,
   },
-
-  // -----------------------------------------------------
-  // INPUT
-  // -----------------------------------------------------
 
   inputWrapper: {
     width: "100%",
@@ -1288,10 +1138,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 
-  // -----------------------------------------------------
-  // SECTION HEADER
-  // -----------------------------------------------------
-
   sectionHeader: {
     width: "100%",
     flexDirection: "row",
@@ -1309,10 +1155,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // -----------------------------------------------------
-  // CALENDAR
-  // -----------------------------------------------------
-
   calendarContainer: {
     width: "100%",
     backgroundColor: "#FFFFFF",
@@ -1329,10 +1171,6 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
-
-  // -----------------------------------------------------
-  // SELECTED DATE
-  // -----------------------------------------------------
 
   selectedDateCard: {
     width: "100%",
@@ -1374,10 +1212,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#222222",
   },
-
-  // -----------------------------------------------------
-  // TIME
-  // -----------------------------------------------------
 
   timeSelector: {
     width: "100%",
@@ -1421,10 +1255,6 @@ const styles = StyleSheet.create({
     color: PRIMARY,
   },
 
-  // -----------------------------------------------------
-  // DURATION
-  // -----------------------------------------------------
-
   durationGrid: {
     width: "100%",
     flexDirection: "row",
@@ -1461,10 +1291,6 @@ const styles = StyleSheet.create({
   durationTextActive: {
     color: "#FFFFFF",
   },
-
-  // -----------------------------------------------------
-  // AVAILABILITY CARD
-  // -----------------------------------------------------
 
   availabilityCard: {
     width: "100%",
@@ -1518,10 +1344,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // -----------------------------------------------------
-  // WAITING AVAILABILITY
-  // -----------------------------------------------------
-
   waitingAvailability: {
     flexDirection: "row",
     alignItems: "center",
@@ -1553,10 +1375,6 @@ const styles = StyleSheet.create({
     color: "#777777",
   },
 
-  // -----------------------------------------------------
-  // AVAILABILITY SUMMARY
-  // -----------------------------------------------------
-
   availabilitySummary: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1582,10 +1400,6 @@ const styles = StyleSheet.create({
     color: "#777777",
     marginTop: 2,
   },
-
-  // -----------------------------------------------------
-  // VENDOR RESULT
-  // -----------------------------------------------------
 
   vendorResult: {
     flexDirection: "row",
@@ -1635,10 +1449,6 @@ const styles = StyleSheet.create({
     marginLeft: 7,
   },
 
-  // -----------------------------------------------------
-  // SERVICES
-  // -----------------------------------------------------
-
   checkboxContainer: {
     width: "100%",
     flexDirection: "row",
@@ -1677,27 +1487,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // -----------------------------------------------------
-  // BUTTONS
-  // -----------------------------------------------------
-
-  buttonContainer: {
+  continueButton: {
     width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-
-  aiPlanButton: {
-    flex: 1,
     minHeight: 54,
     backgroundColor: PRIMARY,
     borderRadius: 13,
-    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 6,
+    gap: 8,
+    marginTop: 8,
 
     shadowColor: "#000",
     shadowOffset: {
@@ -1709,41 +1508,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  customizeButton: {
-    flex: 1,
-    minHeight: 54,
-    backgroundColor: ACCENT,
-    borderRadius: 13,
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 6,
-
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-
-  aiPlanButtonText: {
+  continueButtonText: {
     color: "#FFFFFF",
     fontWeight: "800",
-    fontSize: 12,
-    marginLeft: 5,
-    textAlign: "center",
-  },
-
-  customizeButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 12,
-    marginLeft: 5,
-    textAlign: "center",
+    fontSize: 14,
   },
 
   bottomSpace: {
