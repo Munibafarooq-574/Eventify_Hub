@@ -57,17 +57,38 @@ type DaySlotConfig = {
   day: string;
   enabled: boolean;
   slots: TimeSlotConfig[];
-  maxEventDurationMinutes?: number | null; // NEW
+  maxEventDurationMinutes?: number[];
 };
 
 type AvailabilitySettings = {
+  vendorId?: string;
+  date?: string;
+  day?: string;
+  enabled?: boolean;
+
   workingDays?: WorkingDay[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
   daySlots?: DaySlotConfig[];
   blockedDates?: string[];
-  minimumAdvanceMinutes?: number;
+
+  minimumAdvanceMinutes?: number[];
+  advanceNoticeOptionsMinutes?: number[];
+
+  maxEventDurationMinutes?: number[];
   maxConcurrentBookings?: number;
+
+  workingSlots?: {
+    start: string;
+    end: string;
+  }[];
+
+  bookings?: {
+    start: string;
+    end: string;
+    status: string;
+    serviceName?: string;
+  }[];
 };
 
 type GeneratedSlot = {
@@ -404,8 +425,8 @@ const MyEventsScreen = () => {
   const [editorBlockedDates, setEditorBlockedDates] =
     useState<string[]>([]);
 
-  const [editorMinimumAdvanceMinutes, setEditorMinimumAdvanceMinutes] =
-    useState(0);
+      const [editorMinimumAdvanceMinutes, setEditorMinimumAdvanceMinutes] =
+  useState<number[]>([]);
 
   /**
    * Slot editor
@@ -1335,7 +1356,11 @@ const MyEventsScreen = () => {
         }))
       : [],
     maxEventDurationMinutes:
-      existing.maxEventDurationMinutes ?? null,
+  Array.isArray(existing.maxEventDurationMinutes)
+    ? existing.maxEventDurationMinutes
+    : existing.maxEventDurationMinutes != null
+    ? [existing.maxEventDurationMinutes]
+    : [],
   };
 }
 
@@ -1371,7 +1396,7 @@ const MyEventsScreen = () => {
             end: oldEnd,
           },
         ],
-  maxEventDurationMinutes: null,
+        maxEventDurationMinutes: [],
 };
         });
 
@@ -1389,10 +1414,12 @@ const MyEventsScreen = () => {
       );
 
       setEditorMinimumAdvanceMinutes(
-        availability
-          ?.minimumAdvanceMinutes ||
-          0
-      );
+  Array.isArray(availability?.minimumAdvanceMinutes)
+    ? availability.minimumAdvanceMinutes
+    : availability?.minimumAdvanceMinutes != null
+    ? [availability.minimumAdvanceMinutes]
+    : []
+);
 
       setAvailabilityEditorVisible(
         true
@@ -1599,10 +1626,13 @@ const MyEventsScreen = () => {
       previous.map((day) =>
         copyTargetDays.includes(day.day)
           ? {
-              ...day,
-              enabled: true,
-              slots: clonedSlots,
-            }
+    ...day,
+    enabled: true,
+    slots: clonedSlots,
+    maxEventDurationMinutes: [
+      ...(sourceDay.maxEventDurationMinutes || []),
+    ],
+  }
           : day
       )
     );
@@ -1870,7 +1900,9 @@ const MyEventsScreen = () => {
         parseTime(b.start).getTime()
     ),
     maxEventDurationMinutes:
-      day.maxEventDurationMinutes ?? null,
+  Array.isArray(day.maxEventDurationMinutes)
+    ? day.maxEventDurationMinutes
+    : [],
   })
 );
 
@@ -3886,53 +3918,134 @@ const MyEventsScreen = () => {
                             Add Time Slot
                           </Text>
                         </TouchableOpacity>
-                        <View style={styles.maxDurationRow}>
-  <View style={styles.maxDurationLabelWrap}>
+                         <View style={styles.maxDurationSection}>
+  <View style={styles.maxDurationHeader}>
+    <View style={styles.maxDurationLabelWrap}>
+      <Ionicons
+        name="hourglass-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.maxDurationLabel}>
+        Max event length for this day
+      </Text>
+    </View>
+  </View>
+
+  <View style={styles.durationChipsRow}>
+    {(config.maxEventDurationMinutes || []).map(
+      (minutes) => (
+        <View
+          key={`${day.code}-${minutes}`}
+          style={styles.durationChip}
+        >
+          <Text style={styles.durationChipText}>
+            {minutes / 60}{" "}
+            {minutes / 60 === 1 ? "hour" : "hours"}
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              setEditorDaySlots((previous) =>
+                previous.map((item) =>
+                  item.day === day.code
+                    ? {
+                        ...item,
+                        maxEventDurationMinutes:
+                          (
+                            item.maxEventDurationMinutes ||
+                            []
+                          ).filter(
+                            (value) =>
+                              value !== minutes
+                          ),
+                      }
+                    : item
+                )
+              );
+            }}
+          >
+            <Ionicons
+              name="close-circle"
+              size={17}
+              color="#C0392B"
+            />
+          </TouchableOpacity>
+        </View>
+      )
+    )}
+  </View>
+
+  <TouchableOpacity
+    style={styles.addDurationButton}
+    onPress={() => {
+      Alert.prompt(
+        "Add event duration",
+        "Enter maximum event length in hours",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Add",
+            onPress: (value?: string) => {
+              const hours = parseFloat(
+                String(value || "").trim()
+              );
+
+              if (
+                !Number.isFinite(hours) ||
+                hours <= 0
+              ) {
+                Alert.alert(
+                  "Invalid duration",
+                  "Please enter a valid number of hours."
+                );
+                return;
+              }
+
+              const minutes = Math.round(
+                hours * 60
+              );
+
+              setEditorDaySlots((previous) =>
+                previous.map((item) =>
+                  item.day === day.code
+                    ? {
+                        ...item,
+                        maxEventDurationMinutes:
+                          Array.from(
+                            new Set([
+                              ...(item.maxEventDurationMinutes ||
+                                []),
+                              minutes,
+                            ])
+                          ).sort(
+                            (a, b) => a - b
+                          ),
+                      }
+                    : item
+                )
+              );
+            },
+          },
+        ],
+        "plain-text"
+      );
+    }}
+  >
     <Ionicons
-      name="hourglass-outline"
-      size={16}
+      name="add-circle-outline"
+      size={18}
       color={PRIMARY}
     />
 
-    <Text style={styles.maxDurationLabel}>
-      Max event length for this day
+    <Text style={styles.addDurationButtonText}>
+      Add duration
     </Text>
-  </View>
-
-  <TextInput
-    style={styles.maxDurationInput}
-    keyboardType="numeric"
-    placeholder="No limit"
-    placeholderTextColor="#999999"
-    value={
-      config.maxEventDurationMinutes
-        ? String(config.maxEventDurationMinutes)
-        : ""
-    }
-    onChangeText={(text) => {
-      const trimmed = text.trim();
-
-      const parsedMinutes = trimmed
-        ? parseInt(trimmed, 10)
-        : null;
-
-      setEditorDaySlots((previous) =>
-        previous.map((item) =>
-          item.day === day.code
-            ? {
-                ...item,
-                maxEventDurationMinutes:
-                  parsedMinutes !== null &&
-                  Number.isFinite(parsedMinutes) &&
-                  parsedMinutes > 0
-                    ? parsedMinutes
-                    : null,
-              }
-            : item
-        )
-      );
-    }}
-  />
+  </TouchableOpacity>
 </View>
                           {(editorDaySlots.find(
                         (item) => item.day === day.code
@@ -4037,6 +4150,136 @@ const MyEventsScreen = () => {
               }
             )}
 
+            {/* BOOKING NOTICE */}
+
+<Text
+  style={styles.editorSectionTitle}
+>
+  Booking Notice
+</Text>
+
+<Text
+  style={styles.editorSectionDescription}
+>
+  Choose how early customers must book before an event.
+</Text>
+
+<View style={styles.bookingNoticeCard}>
+  <View style={styles.bookingNoticeHeader}>
+    <Ionicons
+      name="notifications-outline"
+      size={18}
+      color={PRIMARY}
+    />
+
+    <Text style={styles.bookingNoticeTitle}>
+      Booking notice
+    </Text>
+  </View>
+
+  <Text style={styles.bookingNoticeDescription}>
+    Vendor can choose how early bookings are allowed.
+  </Text>
+
+  <View style={styles.noticeChipsRow}>
+    {editorMinimumAdvanceMinutes.map(
+      (minutes) => (
+        <View
+          key={minutes}
+          style={styles.noticeChip}
+        >
+          <Text style={styles.noticeChipText}>
+            {minutes / 60}{" "}
+            {minutes / 60 === 1
+              ? "hour"
+              : "hours"}{" "}
+            before event
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              setEditorMinimumAdvanceMinutes(
+                (previous) =>
+                  previous.filter(
+                    (value) =>
+                      value !== minutes
+                  )
+              );
+            }}
+          >
+            <Ionicons
+              name="close-circle"
+              size={17}
+              color="#C0392B"
+            />
+          </TouchableOpacity>
+        </View>
+      )
+    )}
+  </View>
+
+  <TouchableOpacity
+    style={styles.addNoticeButton}
+    onPress={() => {
+      Alert.prompt(
+        "Add booking notice",
+        "Enter number of hours",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Add",
+            onPress: (value?: string) => {
+              const hours = parseFloat(
+                String(value || "").trim()
+              );
+
+              if (
+                !Number.isFinite(hours) ||
+                hours <= 0
+              ) {
+                Alert.alert(
+                  "Invalid notice",
+                  "Please enter a valid number of hours."
+                );
+                return;
+              }
+
+              const minutes = Math.round(
+                hours * 60
+              );
+
+              setEditorMinimumAdvanceMinutes(
+                (previous) =>
+                  Array.from(
+                    new Set([
+                      ...previous,
+                      minutes,
+                    ])
+                  ).sort(
+                    (a, b) => a - b
+                  )
+              );
+            },
+          },
+        ],
+        "plain-text"
+      );
+    }}
+  >
+    <Ionicons
+      name="add-circle-outline"
+      size={18}
+      color={PRIMARY}
+    />
+
+    <Text style={styles.addNoticeButtonText}>
+      Add booking notice
+    </Text>
+  </TouchableOpacity>
+</View>
             {/* BLOCKED DATES */}
 
             <Text
@@ -4483,6 +4726,76 @@ const styles =
         PRIMARY_LIGHT,
     },
 
+    bookingNoticeCard: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "#F0DDEA",
+  padding: 13,
+  marginTop: 4,
+},
+
+bookingNoticeHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 7,
+},
+
+bookingNoticeTitle: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: "#333333",
+},
+
+bookingNoticeDescription: {
+  fontSize: 11,
+  color: "#888888",
+  marginTop: 5,
+  marginBottom: 10,
+},
+
+noticeChipsRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginBottom: 10,
+},
+
+noticeChip: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: PRIMARY_LIGHT,
+  borderWidth: 1,
+  borderColor: ACCENT_LIGHT,
+  borderRadius: 20,
+  paddingVertical: 7,
+  paddingHorizontal: 10,
+  gap: 6,
+},
+
+noticeChipText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: PRIMARY,
+},
+
+addNoticeButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1.5,
+  borderStyle: "dashed",
+  borderColor: "#D9B6D0",
+  borderRadius: 12,
+  paddingVertical: 10,
+  gap: 6,
+},
+
+addNoticeButtonText: {
+  fontSize: 11,
+  fontWeight: "800",
+  color: PRIMARY,
+},
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -5461,22 +5774,20 @@ const styles =
   marginBottom: 7,
 },
 
-// 👇 NEW: Max event duration styles
-maxDurationRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
+maxDurationSection: {
   marginTop: 12,
   paddingTop: 12,
   borderTopWidth: 1,
   borderTopColor: "#F0E4ED",
 },
 
+maxDurationHeader: {
+  marginBottom: 10,
+},
+
 maxDurationLabelWrap: {
-  flex: 1,
   flexDirection: "row",
   alignItems: "center",
-  marginRight: 10,
 },
 
 maxDurationLabel: {
@@ -5486,18 +5797,47 @@ maxDurationLabel: {
   marginLeft: 7,
 },
 
-maxDurationInput: {
-  width: 90,
-  height: 40,
+durationChipsRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginBottom: 10,
+},
+
+durationChip: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: PRIMARY_LIGHT,
   borderWidth: 1,
   borderColor: ACCENT_LIGHT,
-  borderRadius: 8,
-  paddingHorizontal: 10,
-  fontSize: 14,
-  fontWeight: "600",
-  color: "#333333",
-  backgroundColor: "#FFFFFF",
-  textAlign: "center",
+  borderRadius: 20,
+  paddingVertical: 7,
+  paddingHorizontal: 11,
+  gap: 6,
+},
+
+durationChipText: {
+  fontSize: 12,
+  fontWeight: "700",
+  color: PRIMARY,
+},
+
+addDurationButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  borderWidth: 1.5,
+  borderStyle: "dashed",
+  borderColor: "#D9B6D0",
+  borderRadius: 12,
+  paddingVertical: 10,
+  gap: 6,
+},
+
+addDurationButtonText: {
+  fontSize: 11,
+  fontWeight: "800",
+  color: PRIMARY,
 },
 
 editorSlotTimeBox: {

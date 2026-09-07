@@ -618,8 +618,8 @@ export class DaySlotConfig {
   // Maximum event duration allowed for this specific day.
   // null = no per-day limit.
   // If null, vendor-wide maxEventDurationMinutes will be used.
-  @Prop({ type: Number, default: null })
-  maxEventDurationMinutes: number | null;
+  @Prop({ type: [Number], default: [] })
+  maxEventDurationMinutes: number[];
 }
 
 export const DaySlotConfigSchema = SchemaFactory.createForClass(DaySlotConfig);
@@ -657,8 +657,8 @@ export class VendorAvailabilitySettings {
   // Vendor-wide default maximum event duration.
   // null = no maximum duration.
   // A day's maxEventDurationMinutes overrides this value.
-  @Prop({ type: Number, default: null })
-  maxEventDurationMinutes: number | null;
+  @Prop({ type: [Number], default: [] })
+advanceNoticeOptionsMinutes: number[];
 
   // Multiple working slots + optional per-day event duration cap
   @Prop({ type: [DaySlotConfigSchema], default: [] })

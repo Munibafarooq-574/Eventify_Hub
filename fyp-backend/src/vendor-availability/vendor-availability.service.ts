@@ -121,8 +121,12 @@ export class VendorAvailabilityService {
     const blockedDates: Date[] =
       settings.blockedDates ?? [];
 
-    const minimumAdvanceMinutes =
-      settings.minimumAdvanceMinutes ?? 0;
+    const advanceNoticeOptionsMinutes: number[] =
+  Array.isArray(settings.advanceNoticeOptionsMinutes)
+    ? settings.advanceNoticeOptionsMinutes
+    : settings.minimumAdvanceMinutes != null
+      ? [settings.minimumAdvanceMinutes]
+      : [];
 
     const maxConcurrentBookings =
       settings.maxConcurrentBookings ?? 1;
@@ -282,24 +286,44 @@ export class VendorAvailabilityService {
         startDateTime.getTime()) /
       60000;
 
-    const globalMaxDuration =
-      settings.maxEventDurationMinutes ?? null;
+    const globalMaxDurations: number[] =
+  Array.isArray(settings.maxEventDurationMinutes)
+    ? settings.maxEventDurationMinutes
+    : settings.maxEventDurationMinutes != null
+      ? [settings.maxEventDurationMinutes]
+      : [];
 
-    const dayMaxDuration = daySlotConfig
-      ? daySlotConfig.maxEventDurationMinutes ??
-        globalMaxDuration
-      : globalMaxDuration;
+const dayMaxDurations: number[] =
+  daySlotConfig &&
+  Array.isArray(daySlotConfig.maxEventDurationMinutes)
+    ? daySlotConfig.maxEventDurationMinutes
+    : globalMaxDurations;
 
-    if (
-      dayMaxDuration != null &&
-      requestedDurationMinutes > dayMaxDuration
-    ) {
-      return {
-        vendorId,
-        available: false,
-        reason: `This vendor accepts events up to ${dayMaxDuration} minutes long for the selected day`,
-      };
-    }
+// If duration options are configured, the requested event
+// must fit within at least one allowed duration option.
+//
+// Example:
+// Vendor allows [120, 300, 480]
+// Organizer requests 240 minutes
+// → 300-minute option can accommodate it → AVAILABLE.
+if (dayMaxDurations.length > 0) {
+  const fitsAllowedDuration = dayMaxDurations.some(
+    (maxDuration) =>
+      requestedDurationMinutes <= maxDuration,
+  );
+
+  if (!fitsAllowedDuration) {
+    const sortedDurations = [...dayMaxDurations].sort(
+      (a, b) => a - b,
+    );
+
+    return {
+      vendorId,
+      available: false,
+      reason: `This vendor accepts events up to ${sortedDurations[sortedDurations.length - 1]} minutes long for the selected day`,
+    };
+  }
+}
 
     // ---------------------------------------------------------
     // 4. Blocked dates
@@ -324,23 +348,41 @@ export class VendorAvailabilityService {
     // ---------------------------------------------------------
     // 5. Minimum advance booking time
     // ---------------------------------------------------------
+      if (advanceNoticeOptionsMinutes.length > 0) {
+  const now = new Date();
 
-    if (minimumAdvanceMinutes > 0) {
-      const deadline =
-        new Date(
-          startDateTime.getTime() -
-            minimumAdvanceMinutes * 60000,
-        );
+  const minutesUntilEvent =
+    (startDateTime.getTime() - now.getTime()) /
+    60000;
 
-      if (new Date() > deadline) {
-        return {
-          vendorId,
-          available: false,
-          reason:
-            'Booking deadline has passed for this vendor',
-        };
-      }
-    }
+  // Booking is allowed if at least one of the vendor's
+  // configured notice options is satisfied.
+  //
+  // Example:
+  // Vendor options: 3h, 6h, 12h
+  // Event is 5h away
+  //
+  // 3h option is satisfied → booking allowed.
+  const bookingAllowed = advanceNoticeOptionsMinutes.some(
+    (noticeMinutes) =>
+      minutesUntilEvent >= noticeMinutes,
+  );
+
+  if (!bookingAllowed) {
+    const sortedNoticeOptions = [
+      ...advanceNoticeOptionsMinutes,
+    ].sort((a, b) => a - b);
+
+    const minimumNotice =
+      sortedNoticeOptions[0];
+
+    return {
+      vendorId,
+      available: false,
+      reason: `Booking must be made at least ${minimumNotice} minutes before the event`,
+    };
+  }
+}
 
     // ---------------------------------------------------------
     // 6. Existing bookings + capacity
@@ -512,10 +554,14 @@ export class VendorAvailabilityService {
     // ---------------------------------------------------------
 
     const maxEventDurationMinutes =
-      daySlotConfig
-        ?.maxEventDurationMinutes ??
-      settings.maxEventDurationMinutes ??
-      null;
+  daySlotConfig &&
+  Array.isArray(daySlotConfig.maxEventDurationMinutes)
+    ? daySlotConfig.maxEventDurationMinutes
+    : Array.isArray(settings.maxEventDurationMinutes)
+      ? settings.maxEventDurationMinutes
+      : settings.maxEventDurationMinutes != null
+        ? [settings.maxEventDurationMinutes]
+        : [];
 
     // ---------------------------------------------------------
     // Existing bookings for this day
@@ -543,42 +589,49 @@ export class VendorAvailabilityService {
         )
         .lean();
 
-    // ---------------------------------------------------------
-    // Return calendar information
-    // ---------------------------------------------------------
+   // ---------------------------------------------------------
+// Return calendar information
+// ---------------------------------------------------------
+return {
+  vendorId,
+  date: dateStr,
+  day: dayCode,
 
-    return {
-      vendorId,
+  enabled: daySlotConfig
+    ? !!daySlotConfig.enabled
+    : true,
 
-      date: dateStr,
+  // Multiple event-duration options for this day.
+  //
+  // Example:
+  // [120, 300, 480]
+  //
+  // = 2 hours, 5 hours, 8 hours.
+  maxEventDurationMinutes,
 
-      day: dayCode,
+  // Multiple advance-booking notice options.
+  //
+  // Example:
+  // [180, 360, 720]
+  //
+  // = 3 hours, 6 hours, 12 hours before event.
+  advanceNoticeOptionsMinutes:
+    Array.isArray(
+      settings.advanceNoticeOptionsMinutes,
+    )
+      ? settings.advanceNoticeOptionsMinutes
+      : settings.minimumAdvanceMinutes != null
+        ? [settings.minimumAdvanceMinutes]
+        : [],
 
-      enabled: daySlotConfig
-        ? !!daySlotConfig.enabled
-        : true,
+  workingSlots,
 
-      // NEW:
-      // Per-day maximum duration takes priority
-      // over vendor-wide default.
-      maxEventDurationMinutes,
-
-      workingSlots,
-
-      bookings: bookings.map(
-        (b) => ({
-          start:
-            b.eventStartDateTime,
-
-          end:
-            b.eventEndDateTime,
-
-          status: b.status,
-
-          serviceName:
-            b.serviceName,
-        }),
-      ),
-    };
+  bookings: bookings.map((b) => ({
+    start: b.eventStartDateTime,
+    end: b.eventEndDateTime,
+    status: b.status,
+    serviceName: b.serviceName,
+  })),
+};
   }
 }
