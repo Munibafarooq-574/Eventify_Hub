@@ -740,161 +740,588 @@ const category =
                 </View>
             )}
 
-            {activeTab === "Packages" && (
-    <View style={styles.detailsContainer}>
+{activeTab === "Packages" && (
+  <View style={styles.detailsContainer}>
 
-        {/* Package Selector Cards */}
-        <View
-    style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    {/* Package Selector */}
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
         marginBottom: 10,
-    }}
->
-    <Text style={styles.packagesSectionTitle}>
+      }}
+    >
+      <Text style={styles.packagesSectionTitle}>
         Choose a Package
-    </Text>
+      </Text>
 
-    <TouchableOpacity
-    onPress={() => router.push({ pathname: '/vpdaddnewpackage' })} // ✅ naya route, purana /vendorpackages nahi
-    style={styles.editPill}
->
-    <Ionicons name="add-circle-outline" size={14} color={PRIMARY} />
-    <Text style={styles.editLink}>Add New</Text>
-</TouchableOpacity>
-</View>
-        <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.packageTabContainer}
-            contentContainerStyle={{ paddingRight: 8 }}
-        >
-            {vendorData.packages.map((pkg: any, idx: number) => {
-                const isActive = activePackage === pkg._id;
-                return (
-                    <TouchableOpacity
-                        key={pkg._id}
-                        style={[styles.packageCard, isActive && styles.activePackageCard]}
-                        onPress={() => setActivePackage(pkg._id)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={[styles.packageCardIconWrap, isActive && styles.packageCardIconWrapActive]}>
-                            <Ionicons
-                                name="gift-outline"
-                                size={18}
-                                color={isActive ? '#FFFFFF' : PRIMARY}
-                            />
-                        </View>
-                        <Text
-                            style={[styles.packageCardName, isActive && styles.packageCardNameActive]}
-                            numberOfLines={1}
-                        >
-                            {pkg.packageName}
-                        </Text>
-                        <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
-                            Rs. {pkg.price}/-
-                        </Text>
-                        {isActive && (
-                            <View style={styles.activeDot}>
-                                <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                );
-            })}
-
-            {/* Custom Package CTA */}
-            <TouchableOpacity
-                style={[styles.customPackageCard, activePackage === null && styles.customPackageCardActive]}
-                onPress={() => setActivePackage(null)}
-                activeOpacity={0.85}
-            >
-                <View style={styles.customPackageIconWrap}>
-                    <Ionicons name="sparkles-outline" size={20} color={PRIMARY} />
-                </View>
-                <Text style={styles.customPackageTitle}>Custom</Text>
-                <Text style={styles.customPackageSubtitle}>Build your own</Text>
-            </TouchableOpacity>
-        </ScrollView>
-
-        {/* Selected Package Details */}
-        {vendorData.packages
-            .filter((pkg: any) => pkg._id === activePackage)
-            .map((pkg: any) => (
-                <View key={pkg._id} style={[styles.card, styles.packageDetailsCreative]}>
-
-                    {/* Header strip */}
-                    <View style={styles.packageDetailsHeader}>
-                        <View style={styles.packageDetailsHeaderLeft}>
-                            <View style={styles.packageBadgeIcon}>
-                                <Ionicons name="briefcase-outline" size={20} color="#FFFFFF" />
-                            </View>
-                            <View>
-                                <Text style={styles.packageDetailsName}>{pkg.packageName}</Text>
-                                <Text style={styles.packageDetailsTag}>Package Details</Text>
-                            </View>
-                        </View>
-                       
-                    </View>
-
-                    <View style={styles.packageDivider} />
-
-                    {/* Services */}
-                    <View style={styles.servicesBlock}>
-                        <View style={styles.sectionTitleWithIcon}>
-                            <Ionicons name="list-outline" size={16} color={PRIMARY} />
-                            <Text style={styles.servicesLabel}>What's Included</Text>
-                        </View>
-                        <Text testID="package-services" style={styles.packageDetailItem}>
-                            {pkg.services}
-                        </Text>
-                    </View>
-
-                    {/* Price footer */}
-                    <View style={styles.packagePriceFooter}>
-                        <View>
-                            <Text style={styles.priceFooterLabel}>Total Price</Text>
-                            <Text testID="package-price" style={styles.priceText}>
-                                Rs. {pkg.price}/-
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.cartButton}
-                            onPress={() => {
-                                router.push({
-                                    pathname: '/vendorpackages',
-                                    params: { packageId: pkg._id },
-                                });
-                            }}
-                            activeOpacity={0.85}
-                        >
-                            <Ionicons name="create-outline" size={14} color="#FFFFFF" />
-                            <Text style={styles.cartButtonText}>Edit Package</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            ))}
-
-        {/* Custom package selected state */}
-        {activePackage === null && (
-            <View style={[styles.card, styles.customPackagePanel]}>
-                <View style={styles.customPackagePanelIcon}>
-                    <Ionicons name="chatbubbles-outline" size={26} color={PRIMARY} />
-                </View>
-                <Text style={styles.customPackagePanelTitle}>Need something different?</Text>
-                <Text style={styles.customPackagePanelText}>
-                    Contact this vendor directly to discuss a custom package tailored to your event's needs and budget.
-                </Text>
-                <TouchableOpacity style={styles.customPackagePanelButton} activeOpacity={0.85}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={15} color="#FFFFFF" />
-                    <Text style={styles.customPackagePanelButtonText}>Contact Vendor</Text>
-                </TouchableOpacity>
-            </View>
-        )}
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/vpdaddnewpackage",
+          })
+        }
+        style={styles.editPill}
+      >
+        <Ionicons
+          name="add-circle-outline"
+          size={14}
+          color={PRIMARY}
+        />
+        <Text style={styles.editLink}>
+          Add New
+        </Text>
+      </TouchableOpacity>
     </View>
-)}
 
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.packageTabContainer}
+      contentContainerStyle={{
+        paddingRight: 8,
+      }}
+    >
+      {vendorData.packages?.map((pkg: any) => {
+        const isActive =
+          activePackage === pkg._id;
+
+        return (
+          <TouchableOpacity
+            key={pkg._id}
+            style={[
+              styles.packageCard,
+              isActive &&
+                styles.activePackageCard,
+            ]}
+            onPress={() =>
+              setActivePackage(pkg._id)
+            }
+            activeOpacity={0.85}
+          >
+            <View
+              style={[
+                styles.packageCardIconWrap,
+                isActive &&
+                  styles.packageCardIconWrapActive,
+              ]}
+            >
+              <Ionicons
+                name="gift-outline"
+                size={18}
+                color={
+                  isActive
+                    ? "#FFFFFF"
+                    : PRIMARY
+                }
+              />
+            </View>
+
+            <Text
+              style={[
+                styles.packageCardName,
+                isActive &&
+                  styles.packageCardNameActive,
+              ]}
+              numberOfLines={1}
+            >
+              {pkg.packageName}
+            </Text>
+
+            <Text
+              style={[
+                styles.packageCardPrice,
+                isActive &&
+                  styles.packageCardPriceActive,
+              ]}
+            >
+              Rs.{" "}
+              {Number(
+                pkg.price || 0
+              ).toLocaleString()}
+              /-
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+
+    {/* ONLY SHOW SELECTED PACKAGE INSIDE PACKAGES TAB */}
+    {vendorData.packages
+      ?.filter(
+        (pkg: any) =>
+          pkg._id === activePackage
+      )
+      .map((pkg: any) => (
+        <View
+          key={pkg._id}
+          style={[
+            styles.card,
+            styles.packageDetailsCreative,
+          ]}
+        >
+          {/* Package Header */}
+          <View
+            style={
+              styles.packageDetailsHeader
+            }
+          >
+            <View
+              style={
+                styles.packageDetailsHeaderLeft
+              }
+            >
+              <View
+                style={styles.packageBadgeIcon}
+              >
+                <Ionicons
+                  name="gift-outline"
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={
+                    styles.packageDetailsName
+                  }
+                >
+                  {pkg.packageName}
+                </Text>
+
+                <Text
+                  style={
+                    styles.packageDetailsTag
+                  }
+                >
+                  Package Details
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View
+            style={styles.packageDivider}
+          />
+
+          {/* Images */}
+          {Array.isArray(pkg.images) &&
+            pkg.images.length > 0 && (
+              <View
+                style={
+                  styles.packageInfoSection
+                }
+              >
+                <View
+                  style={
+                    styles.sectionTitleWithIcon
+                  }
+                >
+                  <Ionicons
+                    name="images-outline"
+                    size={16}
+                    color={PRIMARY}
+                  />
+
+                  <Text
+                    style={
+                      styles.servicesLabel
+                    }
+                  >
+                    Package Images
+                  </Text>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={
+                    false
+                  }
+                  contentContainerStyle={
+                    styles.packageImagesRow
+                  }
+                >
+                  {pkg.images.map(
+                    (
+                      image: string,
+                      index: number
+                    ) => (
+                      <Image
+                        key={`${image}-${index}`}
+                        source={{
+                          uri: image,
+                        }}
+                        style={
+                          styles.packageDetailImage
+                        }
+                        resizeMode="cover"
+                      />
+                    )
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+          {/* Description */}
+          <View
+            style={
+              styles.packageInfoSection
+            }
+          >
+            <View
+              style={
+                styles.sectionTitleWithIcon
+              }
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color={PRIMARY}
+              />
+
+              <Text
+                style={
+                  styles.servicesLabel
+                }
+              >
+                Description
+              </Text>
+            </View>
+
+            <Text
+              style={styles.packageDetailItem}
+            >
+              {pkg.description?.trim()
+                ? pkg.description
+                : "No description provided."}
+            </Text>
+          </View>
+
+          {/* Services */}
+          <View
+            style={
+              styles.packageInfoSection
+            }
+          >
+            <View
+              style={
+                styles.sectionTitleWithIcon
+              }
+            >
+              <Ionicons
+                name="list-outline"
+                size={16}
+                color={PRIMARY}
+              />
+
+              <Text
+                style={
+                  styles.servicesLabel
+                }
+              >
+                What's Included
+              </Text>
+            </View>
+
+            <Text
+              style={styles.packageDetailItem}
+            >
+              {pkg.services || "N/A"}
+            </Text>
+          </View>
+
+          {/* Fixed Durations */}
+          <View
+            style={
+              styles.packageInfoSection
+            }
+          >
+            <View
+              style={
+                styles.sectionTitleWithIcon
+              }
+            >
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color={PRIMARY}
+              />
+
+              <Text
+                style={
+                  styles.servicesLabel
+                }
+              >
+                Fixed Duration Options
+              </Text>
+            </View>
+
+            {Array.isArray(
+              pkg.durations
+            ) &&
+            pkg.durations.length > 0 ? (
+              <View
+                style={styles.durationList}
+              >
+                {pkg.durations.map(
+                  (
+                    duration: any,
+                    index: number
+                  ) => {
+                    const unit =
+                      duration.unit ===
+                      "DAYS"
+                        ? "day"
+                        : "hour";
+
+                    const displayUnit =
+                      Number(
+                        duration.value
+                      ) === 1
+                        ? unit
+                        : `${unit}s`;
+
+                    return (
+                      <View
+                        key={`${pkg._id}-duration-${index}`}
+                        style={
+                          styles.durationCard
+                        }
+                      >
+                        <View
+                          style={
+                            styles.durationLeft
+                          }
+                        >
+                          <View
+                            style={
+                              styles.durationIcon
+                            }
+                          >
+                            <Ionicons
+                              name={
+                                duration.unit ===
+                                "DAYS"
+                                  ? "calendar-outline"
+                                  : "time-outline"
+                              }
+                              size={16}
+                              color={PRIMARY}
+                            />
+                          </View>
+
+                          <View>
+                            <Text
+                              style={
+                                styles.durationValue
+                              }
+                            >
+                              {duration.value}{" "}
+                              {displayUnit}
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.durationType
+                              }
+                            >
+                              Fixed duration
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text
+                          style={
+                            styles.durationPrice
+                          }
+                        >
+                          Rs.{" "}
+                          {Number(
+                            duration.price ||
+                              0
+                          ).toLocaleString()}
+                        </Text>
+                      </View>
+                    );
+                  }
+                )}
+              </View>
+            ) : (
+              <Text
+                style={
+                  styles.noDurationText
+                }
+              >
+                No fixed durations available.
+              </Text>
+            )}
+          </View>
+
+          {/* Custom Duration */}
+          <View
+            style={
+              styles.packageInfoSection
+            }
+          >
+            <View
+              style={
+                styles.sectionTitleWithIcon
+              }
+            >
+              <Ionicons
+                name="options-outline"
+                size={16}
+                color={PRIMARY}
+              />
+
+              <Text
+                style={
+                  styles.servicesLabel
+                }
+              >
+                Custom Duration
+              </Text>
+            </View>
+
+            {pkg.allowCustomDuration ? (
+              <View
+                style={
+                  styles.customDurationBox
+                }
+              >
+                <View
+                  style={
+                    styles.customDurationHeader
+                  }
+                >
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color="#2E9D63"
+                  />
+
+                  <Text
+                    style={
+                      styles.customDurationTitle
+                    }
+                  >
+                    Custom Duration Available
+                  </Text>
+                </View>
+
+                <Text
+                  style={
+                    styles.customDurationText
+                  }
+                >
+                  Rate: Rs.{" "}
+                  {Number(
+                    pkg.customDurationRate ||
+                      0
+                  ).toLocaleString()}
+                  /
+                  {pkg.customDurationUnit ===
+                  "DAYS"
+                    ? "day"
+                    : "hour"}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={
+                  styles.customDurationDisabled
+                }
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={20}
+                  color="#999"
+                />
+
+                <Text
+                  style={
+                    styles.customDurationDisabledText
+                  }
+                >
+                  Custom duration is not available
+                  for this package.
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Base Price */}
+          <View
+            style={
+              styles.packagePriceFooter
+            }
+          >
+            <View>
+              <Text
+                style={
+                  styles.priceFooterLabel
+                }
+              >
+                Base Package Price
+              </Text>
+
+              <Text
+                testID="package-price"
+                style={styles.priceText}
+              >
+                Rs.{" "}
+                {Number(
+                  pkg.price || 0
+                ).toLocaleString()}
+                /-
+              </Text>
+            </View>
+
+            <TouchableOpacity
+  style={styles.cartButton}
+  onPress={() =>
+    router.push({
+      pathname: "/editpackage",
+      params: {
+        packageId: String(pkg._id),
+      },
+    })
+  }
+  activeOpacity={0.85}
+>
+              <Ionicons
+                name="create-outline"
+                size={14}
+                color="#FFFFFF"
+              />
+
+              <Text
+                style={
+                  styles.cartButtonText
+                }
+              >
+                Edit Package
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+    {/* Custom Package */}
+    {activePackage === null && (
+      <View
+        style={[
+          styles.card,
+          styles.customPackagePanel,
+        ]}
+      >
+        {/* existing custom package UI */}
+      </View>
+    )}
+  </View>
+)}
       {activeTab === "Reviews" && (
     <View style={styles.tabContent}>
 
@@ -2604,6 +3031,128 @@ noPhotosText: {
     marginTop: 8,
     fontWeight: '600',
 },
+
+packageInfoSection: {
+    padding: 16,
+    paddingBottom: 8,
+},
+
+packageImagesRow: {
+    paddingTop: 10,
+    paddingRight: 8,
+},
+
+packageDetailImage: {
+    width: 150,
+    height: 105,
+    borderRadius: 14,
+    marginRight: 10,
+    backgroundColor: '#F3E8F0',
+},
+
+durationList: {
+    marginTop: 10,
+    gap: 8,
+},
+
+durationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FBF7FA',
+    borderWidth: 1,
+    borderColor: '#F0DDE9',
+    borderRadius: 14,
+    padding: 11,
+},
+
+durationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+},
+
+durationIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: PRIMARY_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+},
+
+durationValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: TEXT_DARK,
+},
+
+durationType: {
+    fontSize: 10.5,
+    color: TEXT_MUTED,
+    marginTop: 2,
+},
+
+durationPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: PRIMARY,
+    marginLeft: 8,
+},
+
+noDurationText: {
+    fontSize: 12.5,
+    color: TEXT_MUTED,
+    marginTop: 8,
+},
+
+customDurationBox: {
+    marginTop: 8,
+    backgroundColor: '#F4FBF6',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D8EBDD',
+    padding: 12,
+},
+
+customDurationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+},
+
+customDurationTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2E6E4B',
+    marginLeft: 8,
+},
+
+customDurationText: {
+    fontSize: 12.5,
+    color: '#587364',
+    marginTop: 7,
+    marginLeft: 28,
+},
+
+customDurationDisabled: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F5F7',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E8E0E5',
+    padding: 12,
+},
+
+customDurationDisabledText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: TEXT_MUTED,
+    marginLeft: 8,
+},
+
 });
 
 export default VendorProfileDetailsScreen;

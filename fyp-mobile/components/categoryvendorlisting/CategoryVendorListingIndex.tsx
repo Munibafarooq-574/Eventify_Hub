@@ -283,7 +283,20 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     const city = item?.contactDetails?.city || "Pakistan";
 
     return (
-      <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={() => router.push(`/vendorprofiledetails?id=${item._id}`)}>
+      <TouchableOpacity activeOpacity={0.85} style={styles.card}
+       onPress={() =>
+  router.push({
+    pathname: "/vendorpackages",
+    params: {
+      vendorId: item._id,
+      eventDate: eventTiming?.eventDate || "",
+      startTime: eventTiming?.startTime || "",
+      endTime: eventTiming?.endTime || "",
+      durationMinutes: String(eventTiming?.durationMinutes || 0),
+    },
+  })
+}
+       >
         <View style={styles.cardTopRow}>
           <Image source={{ uri: item?.contactDetails?.brandLogo || item?.ContactDetails?.brandLogo || item?.coverImage || item?.images?.[0] || "https://via.placeholder.com/300" }} style={styles.image} />
           <View style={styles.cardContent}>
@@ -326,7 +339,20 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
           <Text style={styles.price}>{price ? `Rs ${price}` : "N/A"}</Text>
         </View>
 
-        <TouchableOpacity style={styles.viewButton} onPress={() => router.push(`/vendorprofiledetails?id=${item._id}`)}>
+        <TouchableOpacity style={styles.viewButton}
+         onPress={() =>
+  router.push({
+    pathname: "/vendorpackages",
+    params: {
+      vendorId: item._id,
+      eventDate: eventTiming?.eventDate || "",
+      startTime: eventTiming?.startTime || "",
+      endTime: eventTiming?.endTime || "",
+      durationMinutes: String(eventTiming?.durationMinutes || 0),
+    },
+  })
+}
+         >
           <Text style={styles.viewButtonText}>View</Text>
           <Ionicons name="chevron-forward" size={scale(14)} color="white" />
         </TouchableOpacity>
