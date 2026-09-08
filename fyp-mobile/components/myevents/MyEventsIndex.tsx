@@ -183,7 +183,7 @@ const MyEventsScreen = () => {
         <Text style={styles.title}>My Events</Text>
 
         <TouchableOpacity
-          onPress={() => router.push('/cartmanagment')}
+          //onPress={() => router.push('/cartmanagment')}
           style={styles.headerIconButton}
         >
           <Ionicons name="cart-outline" size={22} color="#7B2869" />

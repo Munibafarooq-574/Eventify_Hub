@@ -325,7 +325,9 @@ const Header = () => (
                 <View style={styles.packageRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.packageName}>{pkg.packageName}</Text>
-                    <Text style={styles.packagePrice}>Rs. {pkg.price.toLocaleString()}</Text>
+                    <Text style={styles.packagePrice}>
+  Rs. {Number(pkg.price ?? 0).toLocaleString()}
+</Text>
                      {isFeatured && activePromotion && (
   <>
     <View style={styles.featuredTag}>

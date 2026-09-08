@@ -119,7 +119,7 @@ const Header: React.FC = () => {
 
         <View style={styles.iconGroup}>
           <TouchableOpacity
-            onPress={() => router.push('/cartmanagment')}
+            //onPress={() => router.push('/cartmanagement')}
             style={styles.iconButton}
             activeOpacity={0.7}
           >

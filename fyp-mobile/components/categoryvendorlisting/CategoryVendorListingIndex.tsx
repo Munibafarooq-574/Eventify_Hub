@@ -285,16 +285,17 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     return (
       <TouchableOpacity activeOpacity={0.85} style={styles.card}
        onPress={() =>
-  router.push({
-    pathname: "/vendorpackages",
-    params: {
-      vendorId: item._id,
-      eventDate: eventTiming?.eventDate || "",
-      startTime: eventTiming?.startTime || "",
-      endTime: eventTiming?.endTime || "",
-      durationMinutes: String(eventTiming?.durationMinutes || 0),
-    },
-  })
+router.push({
+  pathname: "/vendorprofiledetails",   
+  params: {
+    id: item._id,                      
+    eventDate: eventTiming?.eventDate || "",
+    startTime: eventTiming?.startTime || "",
+    endTime: eventTiming?.endTime || "",
+    durationMinutes: String(eventTiming?.durationMinutes || 0),
+    openTab: "Packages",
+  },
+})
 }
        >
         <View style={styles.cardTopRow}>
@@ -342,15 +343,16 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
         <TouchableOpacity style={styles.viewButton}
          onPress={() =>
   router.push({
-    pathname: "/vendorpackages",
-    params: {
-      vendorId: item._id,
-      eventDate: eventTiming?.eventDate || "",
-      startTime: eventTiming?.startTime || "",
-      endTime: eventTiming?.endTime || "",
-      durationMinutes: String(eventTiming?.durationMinutes || 0),
-    },
-  })
+  pathname: "/vendorprofiledetails",
+  params: {
+    id: item._id,                     
+    eventDate: eventTiming?.eventDate || "",
+    startTime: eventTiming?.startTime || "",
+    endTime: eventTiming?.endTime || "",
+    durationMinutes: String(eventTiming?.durationMinutes || 0),
+    openTab: "Packages",
+  },
+})
 }
          >
           <Text style={styles.viewButtonText}>View</Text>

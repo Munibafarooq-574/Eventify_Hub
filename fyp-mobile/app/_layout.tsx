@@ -96,7 +96,7 @@ export default function RootLayout() {
         <Stack.Screen name="VPD" options={{ headerShown: false }} />
         <Stack.Screen name="vendoreditprofile" options={{ headerShown: false }} />
         <Stack.Screen name="contactus" options={{ headerShown: false }} />
-        <Stack.Screen name="cartmanagment" options={{ headerShown: false }} />
+        <Stack.Screen name="cartmanagement" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
