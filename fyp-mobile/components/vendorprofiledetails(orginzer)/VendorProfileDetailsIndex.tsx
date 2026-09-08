@@ -32,6 +32,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -72,6 +73,53 @@ const DAY_CODES = [
   'FRI',
   'SAT',
 ];
+
+const getTodayDateKey = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const timeStringToMinutes = (time: string) => {
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+const minutesToTimeString = (mins: number) => {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const breakIntoHourlySlots = (
+  start: string,
+  end: string,
+  intervalMinutes: number = 60,
+) => {
+  const slots: { start: string; end: string }[] = [];
+
+  let cursor = timeStringToMinutes(start);
+  const endMinutes = timeStringToMinutes(end);
+
+  while (cursor < endMinutes) {
+    const slotEnd = cursor + intervalMinutes;
+
+    if (slotEnd > endMinutes) {
+      break;
+    }
+
+    slots.push({
+      start: minutesToTimeString(cursor),
+      end: minutesToTimeString(slotEnd),
+    });
+
+    cursor = slotEnd;
+  }
+
+  return slots;
+};
 
 const formatEventDate = (
   date?: string | string[],
@@ -177,9 +225,8 @@ const getBookingNoticeMinutes = (
     return null;
   }
 
-  const dateValue = Array.isArray(date)
-    ? date[0]
-    : date;
+  const dateValue =
+  (Array.isArray(date) ? date[0] : date) || getTodayDateKey();
 
   // 1. First check selected day's custom notice
   if (dateValue) {
@@ -206,6 +253,26 @@ const getBookingNoticeMinutes = (
           ...dayConfig.advanceNoticeOptionsMinutes,
         );
       }
+    }
+  }
+
+    // 1b. No specific event date (browse mode) —
+  // check across all enabled days and use the smallest notice
+  if (
+    !dateValue &&
+    Array.isArray(availability.daySlots) &&
+    availability.daySlots.length > 0
+  ) {
+    const allDayNotices = availability.daySlots
+      .filter((day) => day.enabled)
+      .flatMap((day) =>
+        Array.isArray(day.advanceNoticeOptionsMinutes)
+          ? day.advanceNoticeOptionsMinutes
+          : [],
+      );
+
+    if (allDayNotices.length > 0) {
+      return Math.min(...allDayNotices);
     }
   }
 
@@ -327,6 +394,9 @@ const VendorDetailsScreen: React.FC =
     const [loading, setLoading] =
       useState<boolean>(true);
 
+      const [refreshing, setRefreshing] =
+      useState<boolean>(false);
+
     const [rating, setRating] =
       useState<number | null>(null);
 
@@ -353,6 +423,17 @@ const VendorDetailsScreen: React.FC =
 
     const [viewerIndex, setViewerIndex] =
       useState(0);
+
+      const [packageImageViewerVisible, setPackageImageViewerVisible] =
+      useState(false);
+
+    const [selectedPackageImage, setSelectedPackageImage] =
+      useState<string | null>(null);
+
+    const openPackageImageViewer = (image: string) => {
+      setSelectedPackageImage(image);
+      setPackageImageViewerVisible(true);
+    };
 
     const [reviewSummary, setReviewSummary] =
       useState<ReviewSummary | null>(null);
@@ -403,6 +484,9 @@ const VendorDetailsScreen: React.FC =
       } | null>(null);
 
     const [availabilityLoading, setAvailabilityLoading] =
+      useState(false);
+
+      const [slotsExpanded, setSlotsExpanded] =
       useState(false);
 
     const isEventMode =
@@ -489,57 +573,82 @@ const VendorDetailsScreen: React.FC =
       bookingMode,
     ]);
 
-    const getWeeklyVendorSlots = (
-      availability: VendorAvailabilityResponse | null,
-    ) => {
-      if (!availability) {
-        return [];
-      }
+  type TodayAvailabilitySummary = {
+  day: string;
+  rangeStart: string;
+  rangeEnd: string;
+  hourlySlots: { start: string; end: string }[];
+};
 
-      if (
-        Array.isArray(
-          availability.daySlots,
-        ) &&
-        availability.daySlots.length > 0
-      ) {
-        return availability.daySlots
-          .filter(
-            (day) => day.enabled,
-          )
-          .flatMap(
-            (day) =>
-              (
-                day.slots || []
-              ).map((slot) => ({
-                day: day.day,
-                start: slot.start,
-                end: slot.end,
-              })),
-          );
-      }
+const getTodayVendorSlots = (
+  availability: VendorAvailabilityResponse | null,
+): TodayAvailabilitySummary | null => {
+  if (!availability) {
+    return null;
+  }
 
-      if (
-        availability.workingHoursStart &&
-        availability.workingHoursEnd
-      ) {
-        return [
-          {
-            day: 'ALL',
-            start:
-              availability.workingHoursStart,
-            end:
-              availability.workingHoursEnd,
-          },
-        ];
-      }
+  const todayKey = getTodayDateKey();
+  const parsedDate = new Date(`${todayKey}T00:00:00`);
+  const dayCode = DAY_CODES[parsedDate.getDay()];
 
-      return [];
-    };
+  let windows: { start: string; end: string }[] = [];
 
-    const weeklyVendorSlots =
-      getWeeklyVendorSlots(
-        vendorAvailability,
-      );
+  if (
+    Array.isArray(availability.daySlots) &&
+    availability.daySlots.length > 0
+  ) {
+    const dayConfig = availability.daySlots.find(
+      (day) => day.day === dayCode,
+    );
+
+    if (!dayConfig || !dayConfig.enabled) {
+      return null;
+    }
+
+    windows = Array.isArray(dayConfig.slots)
+      ? dayConfig.slots
+      : [];
+  } else if (
+    availability.workingHoursStart &&
+    availability.workingHoursEnd
+  ) {
+    windows = [
+      {
+        start: availability.workingHoursStart,
+        end: availability.workingHoursEnd,
+      },
+    ];
+  } else {
+    return null;
+  }
+
+  if (windows.length === 0) {
+    return null;
+  }
+
+  const hourlySlots = windows.flatMap((window) =>
+    breakIntoHourlySlots(window.start, window.end),
+  );
+
+  if (hourlySlots.length === 0) {
+    return null;
+  }
+
+  const rangeStart = windows[0].start;
+  const rangeEnd = windows[windows.length - 1].end;
+
+  return {
+    day: dayCode,
+    rangeStart,
+    rangeEnd,
+    hourlySlots,
+  };
+};
+
+const todayAvailabilitySummary =
+  getTodayVendorSlots(
+    vendorAvailability,
+  );
 
     const REVIEWS_LIMIT = 20;
 
@@ -945,6 +1054,20 @@ const VendorDetailsScreen: React.FC =
       activeSort,
     ]);
 
+        const handleRefresh = async () => {
+      setRefreshing(true);
+
+      try {
+        await Promise.all([
+          fetchVendorDetails(true),
+          fetchVendorAvailability(),
+          fetchReviewSummary(),
+          fetchReviews(1, false),
+        ]);
+      } finally {
+        setRefreshing(false);
+      }
+    };
     const loadMoreReviews =
       async () => {
         if (
@@ -1247,70 +1370,72 @@ const VendorDetailsScreen: React.FC =
     // Fetch Vendor
     // ---------------------------------------------------------
 
-    useEffect(() => {
-      const fetchVendorDetails =
-        async () => {
-          try {
-            const vendorId =
-              Array.isArray(id)
-                ? id[0]
-                : id;
+        const fetchVendorDetails =
+      async (isRefresh: boolean = false) => {
+        try {
+          const vendorId =
+            Array.isArray(id)
+              ? id[0]
+              : id;
 
-            if (!vendorId) {
-              return;
-            }
+          if (!vendorId) {
+            return;
+          }
 
-            const response =
-              await axios.get(
-                `https://eventify-hub.onrender.com/vendor?userId=${vendorId}`,
-              );
-
-            const vendor =
-              response.data;
-
-            setVendorData(
-              vendor,
+          const response =
+            await axios.get(
+              `https://eventify-hub.onrender.com/vendor?userId=${vendorId}`,
             );
 
-            const routePackageId =
-              typeof packageId ===
-                'string' &&
-              packageId
-                ? packageId
-                : null;
+          const vendor =
+            response.data;
 
-            const firstPackageId =
-              vendor?.packages?.[0]
-                ?._id ||
-              null;
+          setVendorData(
+            vendor,
+          );
 
-            const validRoutePackage =
-              routePackageId &&
-              vendor?.packages?.some(
-                (pkg: any) =>
-                  String(
-                    pkg._id,
-                  ) ===
-                  String(
-                    routePackageId,
-                  ),
-              )
-                ? routePackageId
-                : firstPackageId;
+          const routePackageId =
+            typeof packageId ===
+              'string' &&
+            packageId
+              ? packageId
+              : null;
 
-            setActivePackage(
-              validRoutePackage,
-            );
-          } catch (error) {
-            console.error(
-              'Error fetching vendor data:',
-              error,
-            );
-          } finally {
+          const firstPackageId =
+            vendor?.packages?.[0]
+              ?._id ||
+            null;
+
+          const validRoutePackage =
+            routePackageId &&
+            vendor?.packages?.some(
+              (pkg: any) =>
+                String(
+                  pkg._id,
+                ) ===
+                String(
+                  routePackageId,
+                ),
+            )
+              ? routePackageId
+              : firstPackageId;
+
+          setActivePackage(
+            validRoutePackage,
+          );
+        } catch (error) {
+          console.error(
+            'Error fetching vendor data:',
+            error,
+          );
+        } finally {
+          if (!isRefresh) {
             setLoading(false);
           }
-        };
+        }
+      };
 
+    useEffect(() => {
       if (id) {
         fetchVendorDetails();
       }
@@ -1440,7 +1565,7 @@ const VendorDetailsScreen: React.FC =
             : 0
         }
       >
-        <ScrollView
+                <ScrollView
           ref={scrollViewRef}
           style={styles.container}
           contentContainerStyle={
@@ -1454,6 +1579,14 @@ const VendorDetailsScreen: React.FC =
           }
           showsVerticalScrollIndicator={
             false
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[PRIMARY]}
+              tintColor={PRIMARY}
+            />
           }
         >
           <Toast />
@@ -2338,8 +2471,7 @@ const VendorDetailsScreen: React.FC =
                           styles.generalAvailabilitySubtitle
                         }
                       >
-                        Regular working
-                        slots
+                       Today's working slots
                       </Text>
                     </View>
 
@@ -2381,84 +2513,129 @@ const VendorDetailsScreen: React.FC =
                         availability...
                       </Text>
                     </View>
-                  ) : weeklyVendorSlots.length >
-                    0 ? (
-                    <>
-                      <Text
-                        style={
-                          styles.generalSectionLabel
-                        }
-                      >
-                        Available
-                        Slots
-                      </Text>
+                  ) : todayAvailabilitySummary ? (
+  <>
+    <Text
+      style={
+        styles.generalSectionLabel
+      }
+    >
+      Today's
+      Slots
+    </Text>
 
-                      <View
-                        style={
-                          styles.weeklySlotList
-                        }
-                      >
-                        {weeklyVendorSlots.map(
-                          (
-                            slot,
-                            index,
-                          ) => (
-                            <View
-                              key={`${slot.day}-${slot.start}-${slot.end}-${index}`}
-                              style={
-                                styles.weeklySlotRow
-                              }
-                            >
-                              <View
-                                style={
-                                  styles.weeklySlotDay
-                                }
-                              >
-                                <Text
-                                  style={
-                                    styles.weeklySlotDayText
-                                  }
-                                >
-                                  {slot.day ===
-                                  'ALL'
-                                    ? 'Daily'
-                                    : slot.day}
-                                </Text>
-                              </View>
+    <TouchableOpacity
+      testID="today-slots-toggle"
+      style={
+        styles.slotSummaryCard
+      }
+      onPress={() =>
+        setSlotsExpanded(
+          (prev) => !prev,
+        )
+      }
+      activeOpacity={0.8}
+    >
+      <View
+        style={
+          styles.slotSummaryDay
+        }
+      >
+        <Text
+          style={
+            styles.weeklySlotDayText
+          }
+        >
+          {
+            todayAvailabilitySummary.day
+          }
+        </Text>
+      </View>
 
-                              <View
-                                style={
-                                  styles.weeklySlotTime
-                                }
-                              >
-                                <Ionicons
-                                  name="time-outline"
-                                  size={15}
-                                  color={
-                                    PRIMARY
-                                  }
-                                />
+      <View
+        style={
+          styles.slotSummaryTime
+        }
+      >
+        <Ionicons
+          name="time-outline"
+          size={15}
+          color={
+            PRIMARY
+          }
+        />
 
-                                <Text
-                                  style={
-                                    styles.weeklySlotTimeText
-                                  }
-                                >
-                                  {formatTimeDisplay(
-                                    slot.start,
-                                  )}{' '}
-                                  -{' '}
-                                  {formatTimeDisplay(
-                                    slot.end,
-                                  )}
-                                </Text>
-                              </View>
-                            </View>
-                          ),
-                        )}
-                      </View>
-                    </>
-                  ) : (
+        <Text
+          style={
+            styles.weeklySlotTimeText
+          }
+        >
+          {formatTimeDisplay(
+            todayAvailabilitySummary.rangeStart,
+          )}{' '}
+          -{' '}
+          {formatTimeDisplay(
+            todayAvailabilitySummary.rangeEnd,
+          )}
+        </Text>
+      </View>
+
+      <Ionicons
+        name={
+          slotsExpanded
+            ? 'chevron-up'
+            : 'chevron-down'
+        }
+        size={18}
+        color={PRIMARY}
+      />
+    </TouchableOpacity>
+
+    {slotsExpanded && (
+      <View
+        style={
+          styles.hourlySlotList
+        }
+      >
+        {todayAvailabilitySummary.hourlySlots.map(
+          (
+            slot,
+            index,
+          ) => (
+            <View
+              key={`${slot.start}-${slot.end}-${index}`}
+              style={
+                styles.hourlySlotRow
+              }
+            >
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={
+                  PRIMARY
+                }
+              />
+
+              <Text
+                style={
+                  styles.hourlySlotText
+                }
+              >
+                {formatTimeDisplay(
+                  slot.start,
+                )}{' '}
+                -{' '}
+                {formatTimeDisplay(
+                  slot.end,
+                )}
+              </Text>
+            </View>
+          ),
+        )}
+      </View>
+    )}
+  </>
+) : (
                     <View
                       style={
                         styles.noGeneralAvailability
@@ -3086,7 +3263,7 @@ const VendorDetailsScreen: React.FC =
                               </Text>
                             </View>
 
-                            <ScrollView
+                                                    <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={
                                 false
@@ -3100,16 +3277,23 @@ const VendorDetailsScreen: React.FC =
                                   image: string,
                                   index: number,
                                 ) => (
-                                  <Image
+                                  <TouchableOpacity
                                     key={`${image}-${index}`}
-                                    source={{
-                                      uri: image,
-                                    }}
-                                    style={
-                                      styles.packageDetailImage
+                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                      openPackageImageViewer(image)
                                     }
-                                    resizeMode="cover"
-                                  />
+                                  >
+                                    <Image
+                                      source={{
+                                        uri: image,
+                                      }}
+                                      style={
+                                        styles.packageDetailImage
+                                      }
+                                      resizeMode="cover"
+                                    />
+                                  </TouchableOpacity>
                                 ),
                               )}
                             </ScrollView>
@@ -4395,7 +4579,7 @@ const VendorDetailsScreen: React.FC =
                 </TouchableOpacity>
               </View>
 
-              <MediaViewerModal
+                            <MediaViewerModal
                 visible={
                   viewerVisible
                 }
@@ -4413,6 +4597,41 @@ const VendorDetailsScreen: React.FC =
               />
             </View>
           )}
+
+          <Modal
+            visible={packageImageViewerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() =>
+              setPackageImageViewerVisible(false)
+            }
+          >
+            <View style={styles.packageImageViewerOverlay}>
+              <TouchableOpacity
+                style={styles.packageImageViewerClose}
+                onPress={() =>
+                  setPackageImageViewerVisible(false)
+                }
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="close"
+                  size={28}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              {selectedPackageImage && (
+                <Image
+                  source={{
+                    uri: selectedPackageImage,
+                  }}
+                  style={styles.packageImageViewerImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+          </Modal>
 
           <View
             style={{
@@ -4884,8 +5103,55 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  weeklySlotList: {
+    weeklySlotList: {
     gap: 8,
+  },
+
+  slotSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY_SOFT,
+    borderWidth: 1,
+    borderColor: '#E9C7DD',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+
+  slotSummaryDay: {
+    width: 48,
+  },
+
+  slotSummaryTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: 4,
+    gap: 6,
+  },
+
+  hourlySlotList: {
+    marginTop: 8,
+    gap: 6,
+    paddingLeft: 6,
+  },
+
+  hourlySlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FBF7FA',
+    borderWidth: 1,
+    borderColor: '#F0DDE9',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 7,
+  },
+
+  hourlySlotText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: TEXT_DARK,
   },
 
   weeklySlotRow: {
@@ -5308,13 +5574,43 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
 
-  packageDetailImage: {
+    packageDetailImage: {
     width: 150,
     height: 105,
     borderRadius: 14,
     marginRight: 10,
     backgroundColor:
       '#F3E8F0',
+  },
+
+  packageImageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+
+  packageImageViewerImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+  },
+
+  packageImageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 99999,
+    elevation: 99999,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   packageInfoSection: {
