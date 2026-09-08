@@ -24,11 +24,12 @@ export type VendorAvailabilityResponse = {
       end: string;
     }[];
     maxEventDurationMinutes?: number[];
+    advanceNoticeOptionsMinutes?: number[];
   }[];
 
   blockedDates?: string[];
 
-  minimumAdvanceMinutes?: number[];
+  minimumAdvanceMinutes?: number;
 
   advanceNoticeOptionsMinutes?: number[];
 

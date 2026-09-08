@@ -288,13 +288,14 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
 router.push({
   pathname: "/vendorprofiledetails",   
   params: {
-    id: item._id,                      
-    eventDate: eventTiming?.eventDate || "",
-    startTime: eventTiming?.startTime || "",
-    endTime: eventTiming?.endTime || "",
-    durationMinutes: String(eventTiming?.durationMinutes || 0),
-    openTab: "Packages",
-  },
+  id: item._id,
+  eventDate: eventTiming?.eventDate || "",
+  startTime: eventTiming?.startTime || "",
+  endTime: eventTiming?.endTime || "",
+  durationMinutes: String(eventTiming?.durationMinutes || 0),
+  openTab: "Packages",
+  bookingMode: eventTiming ? "event" : "browse",
+},
 })
 }
        >
@@ -344,14 +345,15 @@ router.push({
          onPress={() =>
   router.push({
   pathname: "/vendorprofiledetails",
-  params: {
-    id: item._id,                     
-    eventDate: eventTiming?.eventDate || "",
-    startTime: eventTiming?.startTime || "",
-    endTime: eventTiming?.endTime || "",
-    durationMinutes: String(eventTiming?.durationMinutes || 0),
-    openTab: "Packages",
-  },
+   params: {
+  id: item._id,
+  eventDate: eventTiming?.eventDate || "",
+  startTime: eventTiming?.startTime || "",
+  endTime: eventTiming?.endTime || "",
+  durationMinutes: String(eventTiming?.durationMinutes || 0),
+  openTab: "Packages",
+  bookingMode: eventTiming ? "event" : "browse",
+},
 })
 }
          >

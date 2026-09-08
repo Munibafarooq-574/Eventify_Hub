@@ -329,10 +329,10 @@ const bookingNoticeLabel = useMemo(() => {
   const minMinutes = Math.min(...options);
   if (minMinutes % 1440 === 0 && minMinutes >= 1440) {
     const days = minMinutes / 1440;
-    return `Book at least ${days} ${days === 1 ? 'day' : 'days'} before`;
+    return `Book at least ${days} ${days === 1 ? 'day' : 'days'} before your event`;
   }
   const hours = minMinutes / 60;
-  return `Book at least ${hours % 1 === 0 ? hours : hours.toFixed(1)} ${hours === 1 ? 'hour' : 'hours'} before`;
+  return `Book at least ${hours % 1 === 0 ? hours : hours.toFixed(1)} ${hours === 1 ? 'hour' : 'hours'} before your event`;
 }, [availability, selectedDate, getDaySlotConfig]);
 
 const workingHoursLabel = useMemo(() => {
