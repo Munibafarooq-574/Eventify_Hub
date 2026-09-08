@@ -47,7 +47,6 @@ export default function RootLayout() {
         <Stack.Screen name="feedbacknreview" options={{ headerShown: false }} />
         <Stack.Screen name="vendorcategories" options={{ headerShown: false }} />
         <Stack.Screen name="categoryvendorlisting" options={{ headerShown: false }} />
-        <Stack.Screen name="photographyvendor" options={{ headerShown: false }} />
         <Stack.Screen name="bussinessselection" options={{ headerShown: false }} />
         <Stack.Screen name="makeupfilter" options={{ headerShown: false }} />
         <Stack.Screen name="vendorprofiledetails" options={{ headerShown: false }} />
@@ -97,13 +96,7 @@ export default function RootLayout() {
         <Stack.Screen name="VPD" options={{ headerShown: false }} />
         <Stack.Screen name="vendoreditprofile" options={{ headerShown: false }} />
         <Stack.Screen name="contactus" options={{ headerShown: false }} />
-
-
-
-
-
-
-        <Stack.Screen name="cartmanagement" options={{ headerShown: false }} />
+        <Stack.Screen name="cartmanagment" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>

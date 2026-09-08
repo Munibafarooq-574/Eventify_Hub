@@ -445,30 +445,57 @@ if (!user?._id) {
 
                     <View style={styles.chartCard}>
                         {hasChartData ? (
-                            <LineChart
-                                data={{
-                                    labels: monthNameArray,
-                                    datasets: [
-                                        { data: orderAmountArray, color: () => "#8641F4", strokeWidth: 3 },
-                                        { data: orderCountArray, color: () => "#E4405F", strokeWidth: 3 },
-                                    ],
-                                }}
-                                width={screenWidth - 64}
-                                height={200}
-                                chartConfig={chartConfig}
-                                withInnerLines={true}
-                                withOuterLines={false}
-                                bezier
-                                style={styles.chart}
-                            />
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Ionicons name="bar-chart-outline" size={30} color="#C9AFCF" />
-                                <Text style={styles.emptyStateText}>
-                                    {loading ? "Loading your sales data…" : "No sales data yet this period"}
-                                </Text>
-                            </View>
-                        )}
+    Platform.OS === "web" ? (
+        <View style={styles.emptyState}>
+            <Ionicons
+                name="bar-chart-outline"
+                size={30}
+                color="#C9AFCF"
+            />
+            <Text style={styles.emptyStateText}>
+                Sales chart is available on Android and iOS
+            </Text>
+        </View>
+    ) : (
+        <LineChart
+            data={{
+                labels: monthNameArray,
+                datasets: [
+                    {
+                        data: orderAmountArray,
+                        color: () => "#8641F4",
+                        strokeWidth: 3,
+                    },
+                    {
+                        data: orderCountArray,
+                        color: () => "#E4405F",
+                        strokeWidth: 3,
+                    },
+                ],
+            }}
+            width={screenWidth - 64}
+            height={200}
+            chartConfig={chartConfig}
+            withInnerLines={true}
+            withOuterLines={false}
+            bezier
+            style={styles.chart}
+        />
+    )
+) : (
+    <View style={styles.emptyState}>
+        <Ionicons
+            name="bar-chart-outline"
+            size={30}
+            color="#C9AFCF"
+        />
+        <Text style={styles.emptyStateText}>
+            {loading
+                ? "Loading your sales data…"
+                : "No sales data yet this period"}
+        </Text>
+    </View>
+)}
                     </View>
                 </View>
 
