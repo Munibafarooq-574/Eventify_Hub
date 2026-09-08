@@ -30,7 +30,7 @@ const sortLabels: Record<ReviewSort, string> = {
 
 const VendorProfileDetailsScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'Details' | 'Packages' | 'Reviews'>('Details');
-    const [activePackage, setActivePackage] = useState<number | null>(null);
+    const [activePackage, setActivePackage] = useState<string | null>(null);
     const [activeReviewTab, setActiveReviewTab] = useState<'Eventify' | 'Google'>('Eventify');
     const [vendorData, setVendorData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -41,6 +41,8 @@ const [replyText, setReplyText] = useState('');
 const [submittingReply, setSubmittingReply] = useState(false);
 const [replyError, setReplyError] = useState<string | null>(null);
     const [mediaViewerVisible, setMediaViewerVisible] = useState(false);
+    const [packageImageViewerVisible, setPackageImageViewerVisible] =  useState(false);
+const [selectedPackageImage, setSelectedPackageImage] =  useState<string | null>(null);
     const [selectedReviewMedia, setSelectedReviewMedia] = useState<ReviewMedia[]>([]);
     const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
@@ -50,6 +52,10 @@ const [replyError, setReplyError] = useState<string | null>(null);
     setSelectedReviewMedia(review.media);
     setSelectedMediaIndex(index);
     setMediaViewerVisible(true);
+};
+const openPackageImageViewer = (image: string) => {
+    setSelectedPackageImage(image);
+    setPackageImageViewerVisible(true);
 };
     const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
     const [summaryLoading, setSummaryLoading] = useState<boolean>(true);
@@ -785,7 +791,7 @@ const category =
     >
       {vendorData.packages?.map((pkg: any) => {
         const isActive =
-          activePackage === pkg._id;
+  String(activePackage) === String(pkg._id);
 
         return (
           <TouchableOpacity
@@ -850,9 +856,9 @@ const category =
     {/* ONLY SHOW SELECTED PACKAGE INSIDE PACKAGES TAB */}
     {vendorData.packages
       ?.filter(
-        (pkg: any) =>
-          pkg._id === activePackage
-      )
+  (pkg: any) =>
+    String(pkg._id) === String(activePackage)
+)
       .map((pkg: any) => (
         <View
           key={pkg._id}
@@ -944,22 +950,29 @@ const category =
                   }
                 >
                   {pkg.images.map(
-                    (
-                      image: string,
-                      index: number
-                    ) => (
-                      <Image
-                        key={`${image}-${index}`}
-                        source={{
-                          uri: image,
-                        }}
-                        style={
-                          styles.packageDetailImage
-                        }
-                        resizeMode="cover"
-                      />
-                    )
-                  )}
+  (
+    image: string,
+    index: number
+  ) => (
+    <TouchableOpacity
+      key={`${image}-${index}`}
+      activeOpacity={0.9}
+      onPress={() =>
+        openPackageImageViewer(image)
+      }
+    >
+      <Image
+        source={{
+          uri: image,
+        }}
+        style={
+          styles.packageDetailImage
+        }
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  )
+)}
                 </ScrollView>
               </View>
             )}
@@ -1913,6 +1926,44 @@ const category =
     initialIndex={selectedMediaIndex}
     onClose={() => setMediaViewerVisible(false)}
 />
+
+<Modal
+    visible={packageImageViewerVisible}
+    transparent={true}
+    animationType="fade"
+    onRequestClose={() =>
+        setPackageImageViewerVisible(false)
+    }
+>
+    <View style={styles.packageImageViewerOverlay}>
+
+        {/* Close Button */}
+        <TouchableOpacity
+            style={styles.packageImageViewerClose}
+            onPress={() =>
+                setPackageImageViewerVisible(false)
+            }
+            activeOpacity={0.8}
+        >
+            <Ionicons
+                name="close"
+                size={28}
+                color="#FFFFFF"
+            />
+        </TouchableOpacity>
+
+        {/* Full Screen Image */}
+        {selectedPackageImage && (
+            <Image
+                source={{
+                    uri: selectedPackageImage,
+                }}
+                style={styles.packageImageViewerImage}
+                resizeMode="contain"
+            />
+        )}
+    </View>
+</Modal>
     </View>
 )}
             <View style={{ height: 24 }} />
@@ -3151,6 +3202,31 @@ customDurationDisabledText: {
     fontSize: 12.5,
     color: TEXT_MUTED,
     marginLeft: 8,
+},
+
+packageImageViewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
+packageImageViewerImage: {
+    width: "100%",
+    height: "100%",
+},
+
+packageImageViewerClose: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
 },
 
 });

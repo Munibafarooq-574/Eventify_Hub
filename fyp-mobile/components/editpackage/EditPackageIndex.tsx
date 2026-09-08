@@ -12,6 +12,7 @@ import {
 } from "@/store";
 
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { uploadPackageImages } from "@/services/uploadPackageImages";
 import { router, useLocalSearchParams } from "expo-router";
@@ -229,47 +230,105 @@ const [uploadProgress, setUploadProgress] =
   // -------------------------------------------------------
 
   const fetchPackageDetails = async (
-    id: string,
-  ) => {
-    setLoading(true);
+  id: string,
+) => {
+  setLoading(true);
 
-    try {
-      const user = await readUser();
+  try {
+    // ---------------------------------------------------
+    // 1. First try local cache
+    // ---------------------------------------------------
 
-      if (!user || !user.packages) {
+    const user = await readUser();
+
+    let packageObj =
+      user?.packages?.find(
+        (x: any) =>
+          String(x._id) === String(id),
+      );
+
+    // ---------------------------------------------------
+    // 2. If not found locally, fetch fresh vendor data
+    // ---------------------------------------------------
+
+    if (!packageObj && user?._id) {
+      try {
+        console.log(
+          "Package not found in local cache. Fetching vendor from API..."
+        );
+
+        const response =
+          await axios.get(
+            `https://eventify-hub.onrender.com/vendor?userId=${user._id}`
+          );
+
+        const vendor =
+          response?.data;
+
+        packageObj =
+          vendor?.packages?.find(
+            (x: any) =>
+              String(x._id) ===
+              String(id),
+          );
+
+        // -------------------------------------------------
+        // Sync fresh vendor packages into local cache
+        // -------------------------------------------------
+
+        if (
+          vendor &&
+          Array.isArray(
+            vendor.packages,
+          ) &&
+          user
+        ) {
+          user.packages =
+            vendor.packages;
+
+          await writeUser(user);
+        }
+      } catch (apiError) {
         console.error(
-          "User or packages not found",
-        );
-
-        setPackageDetails(null);
-        return;
-      }
-
-      const pkg =
-        user.packages.find(
-          (x: any) =>
-            String(x._id) === String(id),
-        );
-
-      if (!pkg) {
-        console.error(
-          "Package not found for id:",
-          id,
+          "Error fetching vendor packages from API:",
+          apiError
         );
       }
+    }
 
-      setPackageDetails(pkg || null);
-    } catch (error) {
+    // ---------------------------------------------------
+    // 3. Final check
+    // ---------------------------------------------------
+
+    if (!packageObj) {
       console.error(
-        "Error fetching package details:",
-        error,
+        "Package not found for id:",
+        id,
       );
 
       setPackageDetails(null);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    console.log(
+      "Package found:",
+      packageObj,
+    );
+
+    setPackageDetails(
+      packageObj,
+    );
+  } catch (error) {
+    console.error(
+      "Error fetching package details:",
+      error,
+    );
+
+    setPackageDetails(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // -------------------------------------------------------
   // Populate editable state
