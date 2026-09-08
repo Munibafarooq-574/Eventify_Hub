@@ -1,3 +1,4 @@
+//fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
 import deletePackage from '@/services/deletePackage';
 import { getSecureData, saveSecureData, getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons'; // For icons

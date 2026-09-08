@@ -669,19 +669,83 @@ advanceNoticeOptionsMinutes: number[];
 export const VendorAvailabilitySettingsSchema =
   SchemaFactory.createForClass(VendorAvailabilitySettings);
 
+// ==========================================
+// Package Duration Option
+// ==========================================
+
+@Schema({ _id: false })
+export class PackageDurationOption {
+  @Prop({ required: true, min: 1 })
+  value: number;
+
+  @Prop({
+    required: true,
+    enum: ['HOURS', 'DAYS'],
+  })
+  unit: 'HOURS' | 'DAYS';
+
+  @Prop({ required: true, min: 0 })
+  price: number;
+}
+
+export const PackageDurationOptionSchema =
+  SchemaFactory.createForClass(PackageDurationOption);
+
+
+// ==========================================
+// Vendor Package
+// ==========================================
+
 @Schema()
 export class Package {
   @Prop({ required: true })
   packageName: string;
 
-  @Prop({ required: true })
-  price: number;
+  @Prop({ default: '' })
+  description: string;
+
+  // Old packages ke liye backward compatibility
+  @Prop({ required: false, min: 0 })
+  price?: number;
 
   @Prop({ required: true })
   services: string;
+
+  // Fixed duration options
+  @Prop({
+    type: [PackageDurationOptionSchema],
+    default: [],
+  })
+  durations: PackageDurationOption[];
+
+  // Custom duration allow karni hai ya nahi
+  @Prop({ default: false })
+  allowCustomDuration: boolean;
+
+  // Custom duration ki calculation kis unit mein hogi
+  @Prop({
+    enum: ['HOURS', 'DAYS'],
+    required: false,
+  })
+  customDurationUnit?: 'HOURS' | 'DAYS';
+
+  // Custom duration ki base rate
+  // Example:
+  // 20,000 per hour
+  // ya 180,000 per day
+  @Prop({ required: false, min: 0 })
+  customDurationRate?: number;
+
+  // Package-specific images
+  @Prop({
+    type: [String],
+    default: [],
+  })
+  images: string[];
 }
 
 export const PackageSchema = SchemaFactory.createForClass(Package);
+
 
 @Schema({ timestamps: true })
 export class User extends Document {

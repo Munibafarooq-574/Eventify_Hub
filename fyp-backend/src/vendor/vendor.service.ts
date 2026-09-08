@@ -316,26 +316,42 @@ async updateContactDetails(
 
     return await user.save();
 }
+async addPackages(
+    userId: string,
+    createPackagesDto: CreatePackagesDto,
+): Promise<User> {
+    const user = await this.userModel.findById(userId);
 
-   /* async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> {
-        const user = await this.userModel.findById(userId);
-        if (!user) throw new NotFoundException('User not found');
+    if (!user) {
+        throw new NotFoundException('User not found');
+    }
 
-        user.packages = createPackagesDto.packages; // Replace the current packages
-        await user.save();
-        return user;
-    } */
+    // Normalize new packages so they always match the Package schema
+    const newPackages = createPackagesDto.packages.map((pkg) => ({
+        packageName: pkg.packageName,
+        description: pkg.description ?? '',
+        price: pkg.price ?? 0,
+        services: pkg.services,
+        durations: pkg.durations ?? [],
+        allowCustomDuration: pkg.allowCustomDuration ?? false,
+        customDurationUnit: pkg.customDurationUnit,
+        customDurationRate: pkg.customDurationRate,
+        images: pkg.images ?? [],
+    }));
 
-    async addPackages(userId: string, createPackagesDto: CreatePackagesDto): Promise<User> { 
-        const user = await this.userModel.findById(userId); 
-        if (!user) throw new NotFoundException('User not found'); // ✅ Existing packages ko preserve karo aur naye add karo
-         user.packages = [ 
-            ...(user.packages || []), 
-            ...createPackagesDto.packages, ]; 
-            user.markModified('packages'); 
-            await user.save(); 
-            return user; 
-        }
+    // Existing packages ko preserve karo aur naye packages add karo
+    user.packages = [
+        ...(user.packages || []),
+        ...newPackages,
+    ];
+
+    user.markModified('packages');
+
+    await user.save();
+
+    return user;
+}
+
 
     async getContactDetails(userId: string) {
         const user = await this.userModel.findById(userId).select('contactDetails');
@@ -409,6 +425,37 @@ async updateContactDetails(
         await user.save();
     }
 
+    async associateImagesWithPackage(
+    packageId: string,
+    urls: string[],
+): Promise<User> {
+    const user = await this.userModel.findOne({
+        'packages._id': packageId,
+    });
+
+    if (!user) {
+        throw new NotFoundException('Package not found');
+    }
+
+    const packageItem = user.packages.find(
+        (pkg: any) => pkg._id.toString() === packageId,
+    );
+
+    if (!packageItem) {
+        throw new NotFoundException('Package not found');
+    }
+
+    packageItem.images = [
+        ...(packageItem.images || []),
+        ...urls,
+    ];
+
+    user.markModified('packages');
+
+    await user.save();
+
+    return user;
+}
     async findAllVendorPackagesForService(service: string, guests: number) {
         // Find category by service name (case-insensitive exact match)
         const categoryObj = await this.categoryModel.findOne({
@@ -577,24 +624,76 @@ async updateContactDetails(
         };
     }
 
-    async updatePackage(packageId: string, updateDto: UpdatePackageDto) {
-        const updatePayload: any = {};
-        if (updateDto.packageName !== undefined) updatePayload['packages.$.packageName'] = updateDto.packageName;
-        if (updateDto.price !== undefined) updatePayload['packages.$.price'] = updateDto.price;
-        if (updateDto.services !== undefined) updatePayload['packages.$.services'] = updateDto.services;
+async updatePackage(
+    packageId: string,
+    updateDto: UpdatePackageDto,
+) {
+    const updatePayload: Record<string, any> = {};
 
-        const result = await this.userModel.updateOne(
-            { 'packages._id': packageId },
-            { $set: updatePayload }
-        );
-
-        if (result.modifiedCount === 0) {
-            throw new NotFoundException('Package not updated');
-        }
-
-        const updatedUser = await this.userModel.findOne({ 'packages._id': packageId });
-        return updatedUser?.packages.find((pkg: any) => pkg._id.toString() === packageId);
+    if (updateDto.packageName !== undefined) {
+        updatePayload['packages.$.packageName'] = updateDto.packageName;
     }
+
+    if (updateDto.description !== undefined) {
+        updatePayload['packages.$.description'] = updateDto.description;
+    }
+
+    if (updateDto.price !== undefined) {
+        updatePayload['packages.$.price'] = updateDto.price;
+    }
+
+    if (updateDto.services !== undefined) {
+        updatePayload['packages.$.services'] = updateDto.services;
+    }
+
+    if (updateDto.durations !== undefined) {
+        updatePayload['packages.$.durations'] = updateDto.durations;
+    }
+
+    if (updateDto.allowCustomDuration !== undefined) {
+        updatePayload['packages.$.allowCustomDuration'] =
+            updateDto.allowCustomDuration;
+    }
+
+    if (updateDto.customDurationUnit !== undefined) {
+        updatePayload['packages.$.customDurationUnit'] =
+            updateDto.customDurationUnit;
+    }
+
+    if (updateDto.customDurationRate !== undefined) {
+        updatePayload['packages.$.customDurationRate'] =
+            updateDto.customDurationRate;
+    }
+
+    if (updateDto.images !== undefined) {
+        updatePayload['packages.$.images'] = updateDto.images;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+        throw new NotFoundException('No package fields provided for update');
+    }
+
+    const result = await this.userModel.updateOne(
+        { 'packages._id': packageId },
+        { $set: updatePayload },
+    );
+
+    if (result.matchedCount === 0) {
+        throw new NotFoundException('Package not found');
+    }
+
+    if (result.modifiedCount === 0) {
+        throw new NotFoundException('Package not updated');
+    }
+
+    const updatedUser = await this.userModel.findOne({
+        'packages._id': packageId,
+    });
+
+    return updatedUser?.packages.find(
+        (pkg: any) => pkg._id.toString() === packageId,
+    );
+}
 
     async deletePackage(packageId: string) {
         const result = await this.userModel.updateOne(

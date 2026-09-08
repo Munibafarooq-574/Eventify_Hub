@@ -169,6 +169,38 @@ async uploadImages(
     };
 }
 
+@Post('package/:packageId/images')
+@UseInterceptors(
+  FilesInterceptor('files', 50, {
+    limits: {
+      fileSize: 200 * 1024 * 1024,
+    },
+  }),
+)
+async uploadPackageImages(
+  @Param('packageId') packageId: string,
+  @UploadedFiles() files: Express.Multer.File[],
+) {
+  if (!files || files.length === 0) {
+    throw new HttpException(
+      'No files provided',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
+  const urls =
+    await this.fileUploadService.uploadMultipleFiles(files);
+
+  await this.vendorService.associateImagesWithPackage(
+    packageId,
+    urls,
+  );
+
+  return {
+    message: 'Package media uploaded successfully',
+    urls,
+  };
+}
     @Patch('package/:id')
     async updatePackage(
         @Param('id') id: string,
