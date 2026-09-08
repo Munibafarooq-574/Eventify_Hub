@@ -169,6 +169,19 @@ async uploadImages(
     };
 }
 
+@Delete('image')
+async deleteVendorImage(
+  @Body()
+  body: {
+    userId: string;
+    imageUrl: string;
+  },
+) {
+  return this.vendorService.deleteVendorImage(
+    body.userId,
+    body.imageUrl,
+  );
+}
 @Post('package/:packageId/images')
 @UseInterceptors(
   FilesInterceptor('files', 50, {

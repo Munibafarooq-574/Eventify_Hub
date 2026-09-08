@@ -949,30 +949,29 @@ const category =
                     styles.packageImagesRow
                   }
                 >
-                  {pkg.images.map(
-  (
-    image: string,
-    index: number
-  ) => (
-    <TouchableOpacity
-      key={`${image}-${index}`}
-      activeOpacity={0.9}
-      onPress={() =>
-        openPackageImageViewer(image)
-      }
-    >
-      <Image
-        source={{
-          uri: image,
-        }}
-        style={
-          styles.packageDetailImage
-        }
-        resizeMode="cover"
-      />
-    </TouchableOpacity>
-  )
-)}
+                {pkg.images.map(
+                    (
+                        image: string,
+                        index: number
+                    ) => (
+                        <TouchableOpacity
+                        key={`${image}-${index}`}
+                        style={styles.packageImageTouchable}
+                        activeOpacity={0.85}
+                        onPress={() =>
+                            openPackageImageViewer(image)
+                        }
+                        >
+                        <Image
+                            source={{
+                            uri: image,
+                            }}
+                            style={styles.packageDetailImage}
+                            resizeMode="cover"
+                        />
+                        </TouchableOpacity>
+                    )
+                    )}
                 </ScrollView>
               </View>
             )}
@@ -1926,46 +1925,53 @@ const category =
     initialIndex={selectedMediaIndex}
     onClose={() => setMediaViewerVisible(false)}
 />
-
-<Modal
-    visible={packageImageViewerVisible}
-    transparent={true}
-    animationType="fade"
-    onRequestClose={() =>
-        setPackageImageViewerVisible(false)
-    }
->
-    <View style={styles.packageImageViewerOverlay}>
-
-        {/* Close Button */}
-        <TouchableOpacity
-            style={styles.packageImageViewerClose}
-            onPress={() =>
-                setPackageImageViewerVisible(false)
-            }
-            activeOpacity={0.8}
-        >
-            <Ionicons
-                name="close"
-                size={28}
-                color="#FFFFFF"
-            />
-        </TouchableOpacity>
-
-        {/* Full Screen Image */}
-        {selectedPackageImage && (
-            <Image
-                source={{
-                    uri: selectedPackageImage,
-                }}
-                style={styles.packageImageViewerImage}
-                resizeMode="contain"
-            />
-        )}
-    </View>
-</Modal>
     </View>
 )}
+
+            {/*
+              FIX: Package image full-screen viewer moved OUTSIDE the
+              "Reviews" tab block so it also works while the "Packages"
+              tab is active (previously it only rendered inside Reviews,
+              so tapping a package image on the Packages tab did nothing).
+            */}
+            <Modal
+                visible={packageImageViewerVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() =>
+                    setPackageImageViewerVisible(false)
+                }
+            >
+                <View style={styles.packageImageViewerOverlay}>
+
+                    {/* Close Button */}
+                    <TouchableOpacity
+                        style={styles.packageImageViewerClose}
+                        onPress={() =>
+                            setPackageImageViewerVisible(false)
+                        }
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons
+                            name="close"
+                            size={28}
+                            color="#FFFFFF"
+                        />
+                    </TouchableOpacity>
+
+                    {/* Full Screen Image */}
+                    {selectedPackageImage && (
+                        <Image
+                            source={{
+                                uri: selectedPackageImage,
+                            }}
+                            style={styles.packageImageViewerImage}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
+
             <View style={{ height: 24 }} />
         </ScrollView>
     );
@@ -3097,7 +3103,6 @@ packageDetailImage: {
     width: 150,
     height: 105,
     borderRadius: 14,
-    marginRight: 10,
     backgroundColor: '#F3E8F0',
 },
 
@@ -3209,24 +3214,33 @@ packageImageViewerOverlay: {
     backgroundColor: "rgba(0,0,0,0.95)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 9999,
+    elevation: 9999,
 },
 
 packageImageViewerImage: {
     width: "100%",
     height: "100%",
+    maxWidth: "100%",
+    maxHeight: "100%",
 },
 
 packageImageViewerClose: {
     position: "absolute",
     top: 50,
     right: 20,
-    zIndex: 10,
+    zIndex: 99999,
+    elevation: 99999,
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
+},
+
+packageImageTouchable: {
+  marginRight: 10,
 },
 
 });

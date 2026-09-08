@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -14,8 +15,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+
+import * as ImagePicker from 'expo-image-picker';
+import { uploadMultipleImages } from '@/services/uploadMultipleImages';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#780C60';
@@ -148,12 +152,16 @@ const ZoomableImage: React.FC<{ uri: string }> = ({ uri }) => {
 const PhotosScreen: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const { vendorId } = useLocalSearchParams();
+  const { vendorId } = useLocalSearchParams<{
+  vendorId?: string;
+}>();
   console.log("📸 Received vendorId:", vendorId);
   const [vendorData, setVendorData] = useState<any>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+const [selectedIndex, setSelectedIndex] = useState(0);
+const [uploading, setUploading] = useState(false);
+const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
 
   const fetchImages = async () => {
     try {
@@ -176,6 +184,89 @@ const PhotosScreen: React.FC = () => {
     setModalVisible(true);
   };
 
+  const addVendorPhotos = async () => {
+  try {
+    if (!vendorId) {
+      Alert.alert("Error", "Vendor ID is missing.");
+      return;
+    }
+
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission Required",
+        "Please allow gallery access to add photos."
+      );
+      return;
+    }
+
+    const remainingSlots = 10 - images.length;
+
+    if (remainingSlots <= 0) {
+      Alert.alert(
+        "Image Limit",
+        "You can add up to 10 profile images."
+      );
+      return;
+    }
+
+    const result =
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: remainingSlots,
+        quality: 0.8,
+      });
+
+    if (result.canceled || !result.assets?.length) {
+      return;
+    }
+
+    const assets = result.assets.map((asset, index) => ({
+      uri: asset.uri,
+      name:
+        asset.fileName ||
+        `vendor-image-${Date.now()}-${index}.jpg`,
+      type:
+        asset.mimeType || "image/jpeg",
+    }));
+
+    setUploading(true);
+
+    const uploadedUrls =
+      await uploadMultipleImages(
+        String(vendorId),
+        assets
+      );
+
+    if (uploadedUrls.length > 0) {
+      setImages((prev) => [
+        ...prev,
+        ...uploadedUrls,
+      ]);
+    }
+
+    Alert.alert(
+      "Success",
+      "Photos added successfully."
+    );
+  } catch (error: any) {
+    console.error(
+      "Error adding vendor photos:",
+      error?.response?.data || error
+    );
+
+    Alert.alert(
+      "Error",
+      "Failed to add photos."
+    );
+  } finally {
+    setUploading(false);
+  }
+};
+
   const showPrev = () => {
     setSelectedIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
   };
@@ -184,15 +275,117 @@ const PhotosScreen: React.FC = () => {
     setSelectedIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
   };
 
-  const renderItem = ({ item, index }: { item: string; index: number }) => (
+  const deleteVendorPhoto = (index: number) => {
+  const imageUrl = images[index];
+
+  Alert.alert(
+    "Remove Photo",
+    "Are you sure you want to remove this photo?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            if (!vendorId) {
+              Alert.alert(
+                "Error",
+                "Vendor ID is missing."
+              );
+              return;
+            }
+
+            setDeletingIndex(index);
+
+            await axios.delete(
+              `https://eventify-hub.onrender.com/vendor/image`,
+              {
+                data: {
+                  userId: String(vendorId),
+                  imageUrl,
+                },
+              }
+            );
+
+            setImages((prev) =>
+              prev.filter(
+                (_, i) => i !== index
+              )
+            );
+
+            if (modalVisible) {
+              setModalVisible(false);
+            }
+
+            setSelectedIndex(0);
+
+            Alert.alert(
+              "Success",
+              "Photo removed successfully."
+            );
+          } catch (error: any) {
+            console.error(
+              "Delete photo error:",
+              error?.response?.data || error
+            );
+
+            Alert.alert(
+              "Error",
+              "Failed to remove photo."
+            );
+          } finally {
+            setDeletingIndex(null);
+          }
+        },
+      },
+    ]
+  );
+};
+  const renderItem = ({
+  item,
+  index,
+}: {
+  item: string;
+  index: number;
+}) => (
+  <View style={styles.imageContainer}>
     <TouchableOpacity
-      style={styles.imageContainer}
       activeOpacity={0.85}
       onPress={() => openViewer(index)}
     >
-      <Image source={{ uri: item }} style={styles.image} />
+      <Image
+        source={{ uri: item }}
+        style={styles.image}
+      />
     </TouchableOpacity>
-  );
+
+    <TouchableOpacity
+      style={styles.photoDeleteButton}
+      onPress={() =>
+        deleteVendorPhoto(index)
+      }
+      disabled={deletingIndex === index}
+      activeOpacity={0.8}
+    >
+      {deletingIndex === index ? (
+        <ActivityIndicator
+          size="small"
+          color="#FFFFFF"
+        />
+      ) : (
+        <Ionicons
+          name="trash-outline"
+          size={15}
+          color="#FFFFFF"
+        />
+      )}
+    </TouchableOpacity>
+  </View>
+);
 
   if (loading) {
     return (
@@ -207,18 +400,52 @@ const PhotosScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="arrow-back" size={22} color={PRIMARY} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Photos</Text>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{images.length}</Text>
-        </View>
-      </View>
+  <TouchableOpacity
+    onPress={() => router.back()}
+    style={styles.backButton}
+    activeOpacity={0.75}
+  >
+    <Ionicons
+      name="arrow-back"
+      size={22}
+      color={PRIMARY}
+    />
+  </TouchableOpacity>
+
+  <Text style={styles.title}>Photos</Text>
+
+  <View style={styles.headerRight}>
+    <TouchableOpacity
+      onPress={addVendorPhotos}
+      disabled={uploading}
+      style={styles.addPhotoButton}
+      activeOpacity={0.8}
+    >
+      {uploading ? (
+        <ActivityIndicator
+          size="small"
+          color={PRIMARY}
+        />
+      ) : (
+        <Ionicons
+          name="add"
+          size={18}
+          color={PRIMARY}
+        />
+      )}
+
+      <Text style={styles.addPhotoText}>
+        {uploading ? "Adding..." : "Add"}
+      </Text>
+    </TouchableOpacity>
+
+    <View style={styles.countBadge}>
+      <Text style={styles.countBadgeText}>
+        {images.length}
+      </Text>
+    </View>
+  </View>
+</View>
 
       {images.length === 0 ? (
         <View style={styles.emptyState}>
@@ -245,14 +472,36 @@ const PhotosScreen: React.FC = () => {
               contentContainerStyle={{ paddingRight: 6 }}
             >
               {images.map((image, index) => (
-                <TouchableOpacity
-                  key={index}
-                  activeOpacity={0.85}
-                  onPress={() => openViewer(index)}
-                >
-                  <Image source={{ uri: image }} style={styles.photo} />
-                </TouchableOpacity>
-              ))}
+  <View
+    key={index}
+    style={styles.previewPhotoWrapper}
+  >
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => openViewer(index)}
+    >
+      <Image
+        source={{ uri: image }}
+        style={styles.photo}
+      />
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={styles.previewDeleteButton}
+      onPress={() =>
+        deleteVendorPhoto(index)
+      }
+      disabled={deletingIndex === index}
+      activeOpacity={0.8}
+    >
+      <Ionicons
+        name="trash-outline"
+        size={13}
+        color="#FFFFFF"
+      />
+    </TouchableOpacity>
+  </View>
+))}
             </ScrollView>
           </View>
 
@@ -350,6 +599,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 18,
   },
+
+  headerRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+
+addPhotoButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#F3D9EC',
+  borderRadius: 18,
+  paddingHorizontal: 10,
+  paddingVertical: 7,
+  gap: 3,
+},
+
+addPhotoText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: PRIMARY,
+},
   backButton: {
     width: 40,
     height: 40,
@@ -549,6 +820,38 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.75,
   },
+  photoDeleteButton: {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: 'rgba(0,0,0,0.72)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 5,
+  elevation: 5,
+},
+
+previewPhotoWrapper: {
+  position: 'relative',
+  marginRight: 10,
+},
+
+previewDeleteButton: {
+  position: 'absolute',
+  top: 6,
+  right: 6,
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  backgroundColor: 'rgba(0,0,0,0.72)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 5,
+  elevation: 5,
+},
 });
 
 export default PhotosScreen;

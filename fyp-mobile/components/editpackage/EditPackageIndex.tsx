@@ -555,6 +555,28 @@ const removeNewImage = (
     )
   );
 };
+
+const removeExistingImage = (index: number) => {
+  Alert.alert(
+    "Remove Image",
+    "Are you sure you want to remove this image from the package?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          setExistingImages((prev) =>
+            prev.filter((_, i) => i !== index)
+          );
+        },
+      },
+    ]
+  );
+};
   // -------------------------------------------------------
   // Validation
   // -------------------------------------------------------
@@ -1842,38 +1864,47 @@ const removeNewImage = (
         }
       >
         {existingImages.map(
-          (image, index) => (
-            <View
-              key={`existing-${index}`}
-              style={
-                styles.imagePreviewContainer
-              }
-            >
-              <Image
-                source={{
-                  uri: image,
-                }}
-                style={
-                  styles.imagePreview
-                }
-              />
+  (image, index) => (
+    <View
+      key={`existing-${index}`}
+      style={styles.imagePreviewContainer}
+    >
+      <Image
+        source={{
+          uri: image,
+        }}
+        style={styles.imagePreview}
+      />
 
-              <View
-                style={
-                  styles.existingBadge
-                }
-              >
-                <Text
-                  style={
-                    styles.existingBadgeText
-                  }
-                >
-                  Existing
-                </Text>
-              </View>
-            </View>
-          )
-        )}
+      {/* Existing badge */}
+      <View
+        style={styles.existingBadge}
+      >
+        <Text
+          style={styles.existingBadgeText}
+        >
+          Existing
+        </Text>
+      </View>
+
+      {/* Delete button */}
+      <TouchableOpacity
+        style={styles.imageRemoveButton}
+        onPress={() =>
+          removeExistingImage(index)
+        }
+        disabled={uploadingImages}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={styles.imageRemoveText}
+        >
+          ×
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+)}
       </ScrollView>
     </View>
   )}

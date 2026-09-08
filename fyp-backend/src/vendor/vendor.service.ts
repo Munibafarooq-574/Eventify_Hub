@@ -425,6 +425,39 @@ async addPackages(
         await user.save();
     }
 
+    async deleteVendorImage(
+  userId: string,
+  imageUrl: string,
+) {
+  const user = await this.userModel.findById(userId);
+
+  if (!user) {
+    throw new NotFoundException('Vendor not found');
+  }
+
+  const currentImages = Array.isArray(user.images)
+    ? user.images
+    : [];
+
+  const imageExists = currentImages.includes(imageUrl);
+
+  if (!imageExists) {
+    throw new NotFoundException(
+      'Image not found in vendor profile',
+    );
+  }
+
+  user.images = currentImages.filter(
+    (image) => image !== imageUrl,
+  );
+
+  await user.save();
+
+  return {
+    message: 'Vendor image removed successfully',
+    images: user.images,
+  };
+}
     async associateImagesWithPackage(
     packageId: string,
     urls: string[],
