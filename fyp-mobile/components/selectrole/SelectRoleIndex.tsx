@@ -150,7 +150,7 @@ export default function SelectRoleScreen() {
               />
 
               <Text style={styles.optionText}>
-                Organizer
+                Client
               </Text>
             </TouchableOpacity>
 
