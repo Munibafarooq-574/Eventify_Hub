@@ -4,7 +4,7 @@
 import { PackageDto } from "@/dto/CreatePackage.dto";
 import postAddPackages from "@/services/postAddPackages";
 import { uploadPackageImages } from "@/services/uploadPackageImages";
-import { getSecureData } from "@/store";
+import { getUserData } from "@/store";
 
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -458,18 +458,16 @@ const PackagesScreen: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      const secureUser = await getSecureData("user");
+    const user = await getUserData();
 
-      if (!secureUser) {
-        Alert.alert(
-          "Error",
-          "User information not found. Please login again.",
-        );
+if (!user?._id) {
+  Alert.alert(
+    "Error",
+    "User information not found. Please login again.",
+  );
 
-        return;
-      }
-
-      const user = JSON.parse(secureUser);
+  return;
+}
 
       // -----------------------------------------------------
       // Clean package data

@@ -6,6 +6,9 @@ import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-detai
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
 import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details.dto';
 import { CreateCateringBusinessDetailsDto } from './dto/create-catering-business-details.dto';
+import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
+import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-details.dto';
+import { CreateGenericBusinessDetailsDto } from './dto/create-generic-business-details.dto';
 import { User } from 'src/schemas/user.schema';
 import { CreatePackagesDto } from './dto/create-package.dto';
 import { diskStorage } from 'multer';
@@ -94,11 +97,14 @@ async updateContactDetails(
     async createPhotographerBuisnessDetails(
         @Query("userId") userId: string,
         @Body() dto:
-            CreatePhotographerBusinessDetailsDto |
-            CreateSalonBusinessDetailsDto |
-            CreateVenueBusinessDetailsDto |
-            CreateCateringBusinessDetailsDto |
-            CreateCakeBusinessDetailsDto
+        | CreatePhotographerBusinessDetailsDto
+        | CreateSalonBusinessDetailsDto
+        | CreateVenueBusinessDetailsDto
+        | CreateCateringBusinessDetailsDto
+        | CreateCakeBusinessDetailsDto
+        | CreateMehndiBusinessDetailsDto
+        | CreateSoundBusinessDetailsDto
+        | CreateGenericBusinessDetailsDto
         ) {
         this.logger.log(userId, "buisnessDetails");
         return await this.vendorService.createBuisnessDetails(userId, dto);

@@ -13,10 +13,36 @@ export interface QuickActionItem {
 }
 
 const DEFAULT_ACTIONS: QuickActionItem[] = [
-  { label: "View Bookings", icon: "calendar-outline", route: "/admin/bookings", accentColor: AdminColors.primary },
-  { label: "Review Refunds", icon: "return-down-back-outline", route: "/admin/refunds", accentColor: AdminColors.pending },
-  { label: "Resolve Disputes", icon: "shield-outline", route: "/admin/disputes", accentColor: AdminColors.dispute },
-  { label: "Process Payouts", icon: "cash-outline", route: "/admin/payouts", accentColor: AdminColors.processing },
+  {
+    label: "View Bookings",
+    icon: "calendar-outline",
+    route: "/admin/bookings",
+    accentColor: AdminColors.primary,
+  },
+  {
+    label: "Review Refunds",
+    icon: "return-down-back-outline",
+    route: "/admin/refunds",
+    accentColor: AdminColors.pending,
+  },
+  {
+    label: "Resolve Disputes",
+    icon: "shield-outline",
+    route: "/admin/disputes",
+    accentColor: AdminColors.dispute,
+  },
+  {
+    label: "Process Payouts",
+    icon: "cash-outline",
+    route: "/admin/payouts",
+    accentColor: AdminColors.processing,
+  },
+  {
+    label: "Category Requests",
+    icon: "pricetags-outline",
+    route: "/admin/category-requests",
+    accentColor: AdminColors.primary,
+  },
 ];
 
 interface AdminQuickActionProps {

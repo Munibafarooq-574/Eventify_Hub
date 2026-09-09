@@ -13,7 +13,10 @@ export default async function getAllVendorsByCategoryId(categoryId: string) {
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error("Error fetching vendor categories:", error);
+        console.error(
+    "Error fetching vendors by category:",
+    error
+);
         throw error;
     }
 }

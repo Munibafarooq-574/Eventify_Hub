@@ -1,36 +1,70 @@
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
+export class CreateVenueBusinessDetailsDto {
+  @IsArray()
+  @IsString({ each: true })
+  typeOfVenue: string[];
 
-/*export class CreateVenueBusinessDetailsDto {
-    typeOfVenue: string; // ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET']
-    expertise: string;
-    amenities: string;
-    maximumPeopleCapacity?: number; // Optional
-    catering?: string; // ['INTERNAL', 'EXTERNAL'], Optional
-    parking: boolean;
-    staff: string; // ['MALE', 'FEMALE', 'TRANSGENDER']
-    minimumPrice?: number; // Optional
-    description: string;
-    additionalInfo?: string; // Optional
-    downPaymentType: 'PERCENTAGE' | 'FIXED';
-    downPayment: number;
-    cancellationPolicy: 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE';
-    covidCompliant: 'YES' | 'NO';
-} */
+  @IsString()
+  expertise: string;
 
-    //fyp-backend/src/vendor/dto/create-venue-business-details.dto.ts
-    export class CreateVenueBusinessDetailsDto {
-    typeOfVenue: string[]; // ['HALL', 'OUTDOOR', 'MARQUEE/BANQUET']
-    expertise: string;
-    amenities: string;
-    maximumPeopleCapacity?: number;
-    catering?: string[]; // ['INTERNAL', 'EXTERNAL'] - multi-select, optional
-    parking: boolean;
-    staff: string[]; // ['MALE', 'FEMALE', 'TRANSGENDER'] - multi-select
-    minimumPrice?: number;
-    description: string;
-    additionalInfo?: string;
-    downPaymentType: 'PERCENTAGE' | 'FIXED';
-    downPayment: number;
-    cancellationPolicy: 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE';
-    covidCompliant: 'YES' | 'NO';
+  @IsString()
+  amenities: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maximumPeopleCapacity?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  catering?: string[];
+
+  @IsBoolean()
+  parking: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
+  staff: string[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minimumPrice?: number;
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
+
+  @IsIn(['PERCENTAGE', 'FIXED'])
+  downPaymentType: 'PERCENTAGE' | 'FIXED';
+
+  @IsNumber()
+  @Min(0)
+  downPayment: number;
+
+  @IsIn([
+    'REFUNDABLE',
+    'NON-REFUNDABLE',
+    'PARTIALLY REFUNDABLE',
+  ])
+  cancellationPolicy:
+    | 'REFUNDABLE'
+    | 'NON-REFUNDABLE'
+    | 'PARTIALLY REFUNDABLE';
+
+  @IsIn(['YES', 'NO'])
+  covidCompliant: 'YES' | 'NO';
 }

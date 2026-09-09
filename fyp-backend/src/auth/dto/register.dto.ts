@@ -1,4 +1,10 @@
-import { IsArray, IsEmail, IsOptional, IsString, MinLength, isString } from 'class-validator';
+import {
+  IsEmail,
+  IsMongoId,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -14,15 +20,27 @@ export class RegisterDto {
   @IsString()
   role: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   mobileNumber?: string;
 
-  @IsString()
+  /**
+   * NEW canonical field.
+   * Frontend should migrate to this.
+   */
   @IsOptional()
-  buisnessCategories?: string
+  @IsMongoId()
+  categoryId?: string;
 
-  @IsString()
+  /**
+   * TEMPORARY backward compatibility.
+   * Remove after old mobile registration flow is migrated.
+   */
   @IsOptional()
-  address?: string
+  @IsMongoId()
+  buisnessCategories?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 }

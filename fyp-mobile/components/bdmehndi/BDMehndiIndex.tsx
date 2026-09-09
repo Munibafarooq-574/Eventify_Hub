@@ -23,9 +23,7 @@ const MEHNDI_TYPES = [
 ];
 
 const STAFF_GENDERS = [
-    { label: 'MALE', icon: 'male' },
-    { label: 'FEMALE', icon: 'female' },
-    { label: 'TRANSGENDER', icon: 'transgender-alt' },
+  { label: "FEMALE", icon: "female" },
 ];
 
 const BDMehndiIndex = () => {

@@ -38,8 +38,8 @@ export class CreateCakeBusinessDetailsDto {
   @IsString()
   additionalInfo?: string;
 
-  @IsEnum(["PERCENTAGE", "FIXED AMOUNT"])
-  downPaymentType: string;
+  @IsEnum(["PERCENTAGE", "FIXED"])
+  downPaymentType: "PERCENTAGE" | "FIXED";
 
   @IsNumber()
   downPayment: number;

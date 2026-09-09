@@ -1,7 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { BusinessDetails, CateringBusinessDetails, PhotographerBusinessDetails, SalonBusinessDetails, User, VenueBusinessDetails, CakeBusinessDetails, MehndiBusinessDetails, SoundBusinessDetails } from '../schemas/user.schema';
+import {
+  CateringBusinessDetails,
+  PhotographerBusinessDetails,
+  SalonBusinessDetails,
+  User,
+  VenueBusinessDetails,
+  CakeBusinessDetails,
+  MehndiBusinessDetails,
+  SoundBusinessDetails,
+  GenericBusinessDetails,
+} from '../schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
@@ -11,9 +21,13 @@ import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details
 import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
 import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
-import { Category } from 'src/schemas/category.schema';
+import {
+  BusinessDetailsType,
+  Category,
+} from 'src/schemas/category.schema';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { UpdatePackageDto } from './dto/update-package.dto';
+import { CreateGenericBusinessDetailsDto } from './dto/create-generic-business-details.dto';
 
 interface VendorPackage {
     vendorId: string;
@@ -63,52 +77,53 @@ export class VendorService {
                         { photographerBusinessDetails: { $exists: true, $ne: null } },
                         { cakeBusinessDetails: { $exists: true, $ne: null } },
                         { mehndiBusinessDetails: { $exists: true, $ne: null } },
-                        { soundBusinessDetails: { $exists: true, $ne: null } }
+                        { soundBusinessDetails: { $exists: true, $ne: null } },
+                        { genericBusinessDetails: { $exists: true, $ne: null } }
                     ]
                 }
             },
             {
                 // Add the BusinessDetails field by checking which business detail exists
-                $addFields: {
-                    BusinessDetails: {
-                        $cond: [
-                            { $ifNull: ['$salonBusinessDetails', false] },
-                            '$salonBusinessDetails',
-                            {
-                                $cond: [
-                                    { $ifNull: ['$venueBusinessDetails', false] },
+                        $addFields: {
+                            BusinessDetails: {
+                            $ifNull: [
+                                '$salonBusinessDetails',
+                                {
+                                $ifNull: [
                                     '$venueBusinessDetails',
                                     {
-                                        $cond: [
-                                            { $ifNull: ['$cateringBusinessDetails', false] },
-                                            '$cateringBusinessDetails',
+                                    $ifNull: [
+                                        '$cateringBusinessDetails',
+                                        {
+                                        $ifNull: [
+                                            '$photographerBusinessDetails',
                                             {
-                                                $cond: [
-                                                    { $ifNull: ['$photographerBusinessDetails', false] },
-                                                    '$photographerBusinessDetails',
+                                            $ifNull: [
+                                                '$cakeBusinessDetails',
+                                                {
+                                                $ifNull: [
+                                                    '$mehndiBusinessDetails',
                                                     {
-                                                        $cond: [
-                                                            { $ifNull: ['$cakeBusinessDetails', false] },
-                                                            '$cakeBusinessDetails',
-                                                            {
-                                                                $cond: [
-                                                                    { $ifNull: ['$mehndiBusinessDetails', false] },
-                                                                    '$mehndiBusinessDetails',
-                                                                    '$soundBusinessDetails'
-                                                                ]
-                                                            }
-                                                        ]
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                }
-            },
+                                                    $ifNull: [
+                                                        '$soundBusinessDetails',
+                                                        '$genericBusinessDetails',
+                                                    ],
+                                                    },
+                                                ],
+                                                },
+                                            ],
+                                            },
+                                        ],
+                                        },
+                                    ],
+                                    },
+                                ],
+                                },
+                            ],
+                            },
+                        },
+                        },
+            
             {
                 // Optionally, exclude the original separate business detail fields
                 $project: {
@@ -118,7 +133,8 @@ export class VendorService {
                     photographerBusinessDetails: 0,
                     cakeBusinessDetails: 0,
                     mehndiBusinessDetails: 0,
-                    soundBusinessDetails: 0
+                    soundBusinessDetails: 0,
+                    genericBusinessDetails: 0
                 }
             }
         ];
@@ -182,139 +198,240 @@ async updateContactDetails(
   return await user.save();
 }
 
-   async createBuisnessDetails(
-        userId: string,
-        dto:
-            CreatePhotographerBusinessDetailsDto |
-            CreateSalonBusinessDetailsDto |
-            CreateVenueBusinessDetailsDto |
-            CreateCateringBusinessDetailsDto |
-            CreateCakeBusinessDetailsDto |
-            CreateMehndiBusinessDetailsDto |
-            CreateSoundBusinessDetailsDto,
-    ): Promise<User> {
-        const user = await this.userModel.findById(userId).populate('buisnessCategory').exec();
-        if (!user) {
-            throw new NotFoundException(`User not found or not defined yet.`);
-        }
-        const category = user.buisnessCategory as Category;
-        const categoryName = category.name.trim().toLowerCase();
-
-        console.log("Category:", JSON.stringify(category.name));
-        console.log("Normalized:", categoryName);
-        if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
-        if (categoryName === "venues") {
-            user.venueBusinessDetails = { ...dto } as unknown as VenueBusinessDetails;
-        } else if (categoryName === "caterings") {
-            user.cateringBusinessDetails = { ...dto } as unknown as CateringBusinessDetails;
-        } else if (categoryName === "photography") {
-            user.photographerBusinessDetails = { ...dto } as PhotographerBusinessDetails;
-        } else if (categoryName === "makeup") {
-            user.salonBusinessDetails = { ...dto } as unknown as SalonBusinessDetails;
-        } else if (categoryName === "mehndi") {
-            user.mehndiBusinessDetails = { ...dto } as unknown as MehndiBusinessDetails;
-        } else if (categoryName === "cakes") {
-           user.cakeBusinessDetails = { ...dto } as unknown as CakeBusinessDetails;
-       } else if (categoryName === "dj & sound" || categoryName === "sound" || categoryName === "sounds" || categoryName === "dj") {
-           user.soundBusinessDetails = { ...dto } as unknown as SoundBusinessDetails;
-       }
-        else {
-            console.log("No Buisness Category", category);
-            throw new NotFoundException(`Business Category not found or not defined yet.`);
-        }
-        return await user.save();
-    } 
-
-   async updateBusinessDetails(
-    userId: string,
-    dto:
-        | CreatePhotographerBusinessDetailsDto
-        | CreateSalonBusinessDetailsDto
-        | CreateVenueBusinessDetailsDto
-        | CreateCateringBusinessDetailsDto
-        | CreateCakeBusinessDetailsDto
-        | CreateMehndiBusinessDetailsDto
-        | CreateSoundBusinessDetailsDto,
+  async createBuisnessDetails(
+  userId: string,
+  dto:
+    | CreatePhotographerBusinessDetailsDto
+    | CreateSalonBusinessDetailsDto
+    | CreateVenueBusinessDetailsDto
+    | CreateCateringBusinessDetailsDto
+    | CreateCakeBusinessDetailsDto
+    | CreateMehndiBusinessDetailsDto
+    | CreateSoundBusinessDetailsDto
+    | CreateGenericBusinessDetailsDto,
 ): Promise<User> {
+  const user = await this.userModel
+    .findById(userId)
+    .populate('buisnessCategory')
+    .exec();
 
-    const user = await this.userModel
-        .findById(userId)
-        .populate('buisnessCategory')
-        .exec();
+  if (!user) {
+    throw new NotFoundException(
+      `User with ID ${userId} not found`,
+    );
+  }
 
-    if (!user) {
-        throw new NotFoundException('User not found');
-    }
+  const category =
+    user.buisnessCategory as Category;
 
-    const category = user.buisnessCategory as Category;
-    const categoryName = category.name.trim().toLowerCase();
+  if (!category) {
+    throw new NotFoundException(
+      'Vendor category not found',
+    );
+  }
 
-    if (categoryName === "venues") {
-        user.venueBusinessDetails = {
-            ...((user.venueBusinessDetails as any)?.toObject?.() ?? user.venueBusinessDetails),
-            ...dto,
-        } as VenueBusinessDetails;
-        user.markModified('venueBusinessDetails');
-    }
+  const businessDetailsType =
+    category.businessDetailsType ??
+    BusinessDetailsType.GENERIC;
 
-    else if (categoryName === "caterings") {
-        user.cateringBusinessDetails = {
-            ...((user.cateringBusinessDetails as any)?.toObject?.() ?? user.cateringBusinessDetails),
-            ...dto,
-        } as CateringBusinessDetails;
-        user.markModified('cateringBusinessDetails');
-    }
+  switch (businessDetailsType) {
+    case BusinessDetailsType.VENUE:
+      user.venueBusinessDetails = {
+        ...dto,
+      } as unknown as VenueBusinessDetails;
+      break;
 
-    else if (categoryName === "photography") {
-        user.photographerBusinessDetails = {
-            ...((user.photographerBusinessDetails as any)?.toObject?.() ?? user.photographerBusinessDetails),
-            ...dto,
-        } as PhotographerBusinessDetails;
-        user.markModified('photographerBusinessDetails');
-    }
+    case BusinessDetailsType.CATERING:
+      user.cateringBusinessDetails = {
+        ...dto,
+      } as unknown as CateringBusinessDetails;
+      break;
 
-    else if (categoryName === "makeup") {
-        user.salonBusinessDetails = {
-            ...((user.salonBusinessDetails as any)?.toObject?.() ?? user.salonBusinessDetails),
-            ...dto,
-        } as SalonBusinessDetails;
-        user.markModified('salonBusinessDetails');
-    }
+    case BusinessDetailsType.PHOTOGRAPHY:
+      user.photographerBusinessDetails = {
+        ...dto,
+      } as unknown as PhotographerBusinessDetails;
+      break;
 
-    else if (categoryName === "cakes") {
-        user.cakeBusinessDetails = {
-            ...((user.cakeBusinessDetails as any)?.toObject?.() ?? user.cakeBusinessDetails),
-            ...dto,
-        } as CakeBusinessDetails;
-        user.markModified('cakeBusinessDetails');
-    }
+    case BusinessDetailsType.MAKEUP:
+      user.salonBusinessDetails = {
+        ...dto,
+      } as unknown as SalonBusinessDetails;
+      break;
 
-    else if (categoryName === "mehndi") {
-        user.mehndiBusinessDetails = {
-            ...((user.mehndiBusinessDetails as any)?.toObject?.() ?? user.mehndiBusinessDetails),
-            ...dto,
-        } as MehndiBusinessDetails;
-        user.markModified('mehndiBusinessDetails');
-    }
+    case BusinessDetailsType.MEHNDI:
+      user.mehndiBusinessDetails = {
+        ...dto,
+      } as unknown as MehndiBusinessDetails;
+      break;
 
-    else if (
-        categoryName === "dj & sound" ||
-        categoryName === "dj" ||
-        categoryName === "sound" ||
-        categoryName === "sounds"
-    ) {
-        user.soundBusinessDetails = {
-            ...((user.soundBusinessDetails as any)?.toObject?.() ?? user.soundBusinessDetails),
-            ...dto,
-        } as SoundBusinessDetails;
-        user.markModified('soundBusinessDetails');
-    }
+    case BusinessDetailsType.CAKE:
+      user.cakeBusinessDetails = {
+        ...dto,
+      } as unknown as CakeBusinessDetails;
+      break;
 
-    else {
-        throw new NotFoundException("Business Category not found");
-    }
+    case BusinessDetailsType.SOUND:
+      user.soundBusinessDetails = {
+        ...dto,
+      } as unknown as SoundBusinessDetails;
+      break;
 
-    return await user.save();
+    case BusinessDetailsType.GENERIC:
+    default:
+      user.genericBusinessDetails = {
+        ...dto,
+      } as unknown as GenericBusinessDetails;
+      break;
+  }
+
+  return user.save();
+}
+
+ async updateBusinessDetails(
+  userId: string,
+  dto:
+    | CreatePhotographerBusinessDetailsDto
+    | CreateSalonBusinessDetailsDto
+    | CreateVenueBusinessDetailsDto
+    | CreateCateringBusinessDetailsDto
+    | CreateCakeBusinessDetailsDto
+    | CreateMehndiBusinessDetailsDto
+    | CreateSoundBusinessDetailsDto
+    | CreateGenericBusinessDetailsDto,
+): Promise<User> {
+  const user = await this.userModel
+    .findById(userId)
+    .populate('buisnessCategory')
+    .exec();
+
+  if (!user) {
+    throw new NotFoundException(
+      'User not found',
+    );
+  }
+
+  const category =
+    user.buisnessCategory as Category;
+
+  if (!category) {
+    throw new NotFoundException(
+      'Vendor category not found',
+    );
+  }
+
+  const businessDetailsType =
+    category.businessDetailsType ??
+    BusinessDetailsType.GENERIC;
+
+  switch (businessDetailsType) {
+    case BusinessDetailsType.VENUE:
+      user.venueBusinessDetails = {
+        ...((user.venueBusinessDetails as any)
+          ?.toObject?.() ??
+          user.venueBusinessDetails),
+        ...dto,
+      } as VenueBusinessDetails;
+
+      user.markModified(
+        'venueBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.CATERING:
+      user.cateringBusinessDetails = {
+        ...((user.cateringBusinessDetails as any)
+          ?.toObject?.() ??
+          user.cateringBusinessDetails),
+        ...dto,
+      } as CateringBusinessDetails;
+
+      user.markModified(
+        'cateringBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.PHOTOGRAPHY:
+      user.photographerBusinessDetails = {
+        ...((user.photographerBusinessDetails as any)
+          ?.toObject?.() ??
+          user.photographerBusinessDetails),
+        ...dto,
+      } as PhotographerBusinessDetails;
+
+      user.markModified(
+        'photographerBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.MAKEUP:
+      user.salonBusinessDetails = {
+        ...((user.salonBusinessDetails as any)
+          ?.toObject?.() ??
+          user.salonBusinessDetails),
+        ...dto,
+      } as SalonBusinessDetails;
+
+      user.markModified(
+        'salonBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.CAKE:
+      user.cakeBusinessDetails = {
+        ...((user.cakeBusinessDetails as any)
+          ?.toObject?.() ??
+          user.cakeBusinessDetails),
+        ...dto,
+      } as CakeBusinessDetails;
+
+      user.markModified(
+        'cakeBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.MEHNDI:
+      user.mehndiBusinessDetails = {
+        ...((user.mehndiBusinessDetails as any)
+          ?.toObject?.() ??
+          user.mehndiBusinessDetails),
+        ...dto,
+      } as MehndiBusinessDetails;
+
+      user.markModified(
+        'mehndiBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.SOUND:
+      user.soundBusinessDetails = {
+        ...((user.soundBusinessDetails as any)
+          ?.toObject?.() ??
+          user.soundBusinessDetails),
+        ...dto,
+      } as SoundBusinessDetails;
+
+      user.markModified(
+        'soundBusinessDetails',
+      );
+      break;
+
+    case BusinessDetailsType.GENERIC:
+    default:
+      user.genericBusinessDetails = {
+        ...((user.genericBusinessDetails as any)
+          ?.toObject?.() ??
+          user.genericBusinessDetails),
+        ...dto,
+      } as GenericBusinessDetails;
+
+      user.markModified(
+        'genericBusinessDetails',
+      );
+      break;
+  }
+
+  return user.save();
 }
 async addPackages(
     userId: string,
@@ -361,8 +478,8 @@ async addPackages(
 
     async getBusinessDetails(userId: string) {
         const user = await this.userModel.findById(userId).select(
-            'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails mehndiBusinessDetails soundBusinessDetails',
-        );
+  'salonBusinessDetails photographerBusinessDetails cateringBusinessDetails venueBusinessDetails cakeBusinessDetails mehndiBusinessDetails soundBusinessDetails genericBusinessDetails',
+);
 
         if (!user) throw new NotFoundException('User not found');
 
@@ -375,6 +492,7 @@ async addPackages(
             ...(user.cakeBusinessDetails && { cakeBusinessDetails: user.cakeBusinessDetails}),
             ...(user.mehndiBusinessDetails && { mehndiBusinessDetails: user.mehndiBusinessDetails}),
             ...(user.soundBusinessDetails && { soundBusinessDetails: user.soundBusinessDetails}),
+            ...(user.genericBusinessDetails && { genericBusinessDetails: user.genericBusinessDetails}),
         };
 
         return businessDetails;
@@ -402,9 +520,11 @@ async addPackages(
                      user.cakeBusinessDetails :
                      user?.mehndiBusinessDetails ?
                      user.mehndiBusinessDetails :
-                     user?.soundBusinessDetails ?
-                     user.soundBusinessDetails :
-                     undefined
+                     user?.soundBusinessDetails
+                        ? user.soundBusinessDetails
+                        : user?.genericBusinessDetails
+                            ? user.genericBusinessDetails
+                            : undefined
         }
         if (!user) throw new NotFoundException('User not found');
         return userObjToReturn;

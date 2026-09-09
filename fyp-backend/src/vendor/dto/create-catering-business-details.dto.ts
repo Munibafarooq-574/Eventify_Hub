@@ -1,64 +1,81 @@
-//Fyp-backend/src/vendor/dto/create-catering-business-details.dto.ts
-
-/*export class CreateCateringBusinessDetailsDto {
-    expertise: string;
-    travelsToClientHome: boolean;
-    cityCovered: string;
-    staff: string; // ['MALE', 'FEMALE', 'TRANSGENDER']
-    provideFoodTesting?: boolean; // Optional
-    provideDecoration?: boolean; // Optional
-    provideSoundSystem?: boolean; // Optional
-    provideSeatingArrangement?: boolean; // Optional
-    provideWaiters?: boolean; // Optional
-    provideCutleryAndPlates?: boolean; // Optional
-    minimumPrice?: number; // Optional
-    description: string;
-    additionalInfo?: string; // Optional
-    downPaymentType: 'PERCENTAGE' | 'FIXED';
-    downPayment: number;
-    cancellationPolicy: 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE';
-    covidCompliant: 'YES' | 'NO';
-}*/
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateCateringBusinessDetailsDto {
+  @IsArray()
+  @IsString({ each: true })
+  expertise: string[];
 
-    // Multiple Expertise
-    expertise: string[];
+  @IsBoolean()
+  travelsToClientHome: boolean;
 
-    travelsToClientHome: boolean;
+  @IsString()
+  cityCovered: string;
 
-    //  Cities
-     cityCovered: string;
+  @IsArray()
+  @IsString({ each: true })
+  staff: string[];
 
-    // Multiple Staff
-    staff: string[];
+  @IsOptional()
+  @IsBoolean()
+  provideFoodTesting?: boolean;
 
-    provideFoodTesting?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  provideDecoration?: boolean;
 
-    provideDecoration?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  provideSoundSystem?: boolean;
 
-    provideSoundSystem?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  provideSeatingArrangement?: boolean;
 
-    provideSeatingArrangement?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  provideWaiters?: boolean;
 
-    provideWaiters?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  provideCutleryAndPlates?: boolean;
 
-    provideCutleryAndPlates?: boolean;
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minimumPrice?: number;
 
-    minimumPrice?: number;
+  @IsString()
+  description: string;
 
-    description: string;
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
 
-    additionalInfo?: string;
+  @IsIn(['PERCENTAGE', 'FIXED'])
+  downPaymentType: 'PERCENTAGE' | 'FIXED';
 
-    downPaymentType: "PERCENTAGE" | "FIXED";
+  @IsNumber()
+  @Min(0)
+  downPayment: number;
 
-    downPayment: number;
+  @IsIn([
+    'REFUNDABLE',
+    'NON-REFUNDABLE',
+    'PARTIALLY REFUNDABLE',
+  ])
+  cancellationPolicy:
+    | 'REFUNDABLE'
+    | 'NON-REFUNDABLE'
+    | 'PARTIALLY REFUNDABLE';
 
-    cancellationPolicy:
-        | "REFUNDABLE"
-        | "NON-REFUNDABLE"
-        | "PARTIALLY REFUNDABLE";
-
-    covidCompliant: "YES" | "NO";
+  @IsIn(['YES', 'NO'])
+  covidCompliant: 'YES' | 'NO';
 }

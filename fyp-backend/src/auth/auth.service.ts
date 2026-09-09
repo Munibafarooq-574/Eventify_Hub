@@ -26,38 +26,117 @@ export class AuthService {
   ) { }
 
   async register(registerDto: RegisterDto) {
-    const { email, password, role, buisnessCategories } = registerDto;
-    this.logger.log(registerDto, "Register");
+  const {
+    email,
+    password,
+    role,
+    categoryId,
+    buisnessCategories,
+  } = registerDto;
 
-    const category = await this.categoryModel.findById(buisnessCategories || new Types.ObjectId("682729b2b7d619074bb00135"));
-    console.log(category);
-    if (!category && role !== "Organizer") {
-      throw new NotFoundException('Category doesnt exists')
+  this.logger.log(
+    {
+      email,
+      role,
+      categoryId: categoryId ?? buisnessCategories,
+    },
+    'Register',
+  );
+
+  const normalizedRole = role?.trim().toLowerCase();
+  const isVendor = normalizedRole === 'vendor';
+
+  /**
+   * categoryId is the new canonical property.
+   * buisnessCategories remains temporarily supported for
+   * backward compatibility with the current mobile app.
+   */
+  const selectedCategoryId =
+    categoryId ?? buisnessCategories;
+
+  let category: Category | null = null;
+
+  if (isVendor) {
+    if (!selectedCategoryId) {
+      throw new NotFoundException(
+        'Vendor category is required',
+      );
     }
 
-    // Check if the user already exists
-    const existingUser = await this.userModel.findOne({ email });
-    if (existingUser) {
-      throw new UnauthorizedException('Email already exists');
+    if (!Types.ObjectId.isValid(selectedCategoryId)) {
+      throw new NotFoundException(
+        'Invalid category ID',
+      );
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create the user
-    const user = await this.userModel.create({
-      ...registerDto,
-      buisnessCategory: category?._id || new Types.ObjectId("682729b2b7d619074bb00135"),
-      role: role,
-      password: hashedPassword,
-      phone_number: registerDto.mobileNumber,
-      address: registerDto.address
+    category = await this.categoryModel.findOne({
+      _id: new Types.ObjectId(selectedCategoryId),
+      isActive: { $ne: false },
     });
 
-    // Generate JWT token
-    const token = this.jwtService.sign({ id: user._id });
-    return { token, user };
+    if (!category) {
+      throw new NotFoundException(
+        'Category does not exist or is inactive',
+      );
+    }
   }
+
+  const existingUser = await this.userModel.findOne({
+    email: email.trim().toLowerCase(),
+  });
+
+  if (existingUser) {
+    throw new UnauthorizedException(
+      'Email already exists',
+    );
+  }
+
+  const hashedPassword = await bcrypt.hash(
+    password,
+    10,
+  );
+
+  const userPayload: Record<string, any> = {
+    ...registerDto,
+
+    email: email.trim().toLowerCase(),
+
+    password: hashedPassword,
+
+    phone_number: registerDto.mobileNumber,
+
+    address: registerDto.address,
+
+    role,
+  };
+
+  /**
+   * Only vendors should have a business category.
+   */
+  if (isVendor && category) {
+    userPayload.buisnessCategory = category._id;
+  }
+
+  /**
+   * These DTO-only transition fields should not be persisted
+   * separately into User.
+   */
+  delete userPayload.categoryId;
+  delete userPayload.buisnessCategories;
+  delete userPayload.mobileNumber;
+
+  const user =
+    await this.userModel.create(userPayload);
+
+  const token = this.jwtService.sign({
+    id: user._id,
+  });
+
+  return {
+    token,
+    user,
+  };
+}
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
@@ -205,8 +284,11 @@ export class AuthService {
         { 'photographerBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
         { 'salonBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
         { 'cateringBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
-        // VenueBusinessDetails may not have cityCovered, so optionally include:
-        { 'venueBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } }
+        { 'venueBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
+        { 'cakeBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
+        { 'mehndiBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
+        { 'soundBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } },
+        { 'genericBusinessDetails.cityCovered': { $regex: filters.city, $options: 'i' } }
       ];
     }
 
@@ -258,16 +340,21 @@ export class AuthService {
   }
 
   private attachBusinessDetails(user: any): any {
-    return {
-      ...user,
-      BusinessDetails:
-        user?.photographerBusinessDetails ??
-        user?.cateringBusinessDetails ??
-        user?.venueBusinessDetails ??
-        user?.salonBusinessDetails ??
-        undefined,
-    };
-  }
+  return {
+    ...user,
+
+    BusinessDetails:
+      user?.photographerBusinessDetails ??
+      user?.cateringBusinessDetails ??
+      user?.venueBusinessDetails ??
+      user?.salonBusinessDetails ??
+      user?.cakeBusinessDetails ??
+      user?.mehndiBusinessDetails ??
+      user?.soundBusinessDetails ??
+      user?.genericBusinessDetails ??
+      undefined,
+  };
+}
 
   async updatePushToken(dto: UpdatePushTokenDto) {
     const user = await this.userModel.findById(dto.userId);

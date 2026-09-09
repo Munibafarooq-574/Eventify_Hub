@@ -17,11 +17,24 @@ const COLORS = {
 };
 
 export interface ICategory {
-  _id: string
-  createdAt: string
-  description: string
-  image: string
-  name: string
+  _id: string;
+  name: string;
+  image: string;
+  description: string;
+
+  normalizedName?: string;
+
+  businessDetailsType?:
+    | "PHOTOGRAPHY"
+    | "CATERING"
+    | "VENUE"
+    | "MAKEUP"
+    | "CAKE"
+    | "MEHNDI"
+    | "SOUND"
+    | "GENERIC";
+
+  isActive?: boolean;
 }
 
 const CategoryItem: React.FC<{ item: ICategory }> = ({ item }) => (

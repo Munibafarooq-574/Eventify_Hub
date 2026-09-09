@@ -292,3 +292,50 @@ export interface AnalyticsOverview {
   vendorPerformance: VendorPerformanceItem[];
   demandInsights: DemandInsightItem[];
 }
+
+// ---------------------------------------------------------------------------
+// Category Requests
+// ---------------------------------------------------------------------------
+
+export type CategoryRequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "MERGED";
+
+export interface AdminCategoryRequest {
+  _id: string;
+  requestedName: string;
+  normalizedName: string;
+  description: string;
+  status: CategoryRequestStatus;
+
+  requestedBy?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+
+  approvedCategoryId?: string | null;
+  adminNote?: string | null;
+
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CategoryRequestReviewAction =
+  | "REJECT"
+  | "MERGE";
+
+export interface ReviewCategoryRequestInput {
+  action: CategoryRequestReviewAction;
+  adminNote?: string;
+  mergeCategoryId?: string;
+}
+
+export interface AdminCategoryOption {
+  _id: string;
+  name: string;
+  image?: string;
+  description?: string;
+  businessDetailsType?: string;
+  isActive?: boolean;
+}

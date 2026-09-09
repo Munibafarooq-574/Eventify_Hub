@@ -40,9 +40,7 @@ const EDITING_SERVICES = [
 ];
 
 const STAFF_GENDERS = [
-  { label: "MALE", icon: "male" },
   { label: "FEMALE", icon: "female" },
-  { label: "TRANSGENDER", icon: "transgender-alt" },
 ];
 
 const PHOTO_STYLES = [

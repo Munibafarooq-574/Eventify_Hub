@@ -37,7 +37,7 @@ const [password, setPassword] = useState("");
 const [confirmPassword, setConfirmPassword] = useState("");
 
 const [role, setRole] = useState("");
-const [buisnessCategory, setBuisnessCategory] = useState("");
+const [categoryId, setCategoryId] = useState("");
 
 const [showPassword, setShowPassword] = useState(false);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -102,10 +102,10 @@ const getRole = async () => {
   setRole(roleData || "");
 };
 
-// Get Business Category
+
 const getSelectedCategory = async () => {
-  const category = await getSecureData("buisness");
-  setBuisnessCategory(category || "");
+  const selectedCategoryId = await getSecureData("categoryId");
+  setCategoryId(selectedCategoryId || "");
 };
 
 // Email Validation
@@ -242,6 +242,14 @@ const pickAvatar = async () => {
 // Register Function
 const handleRegister = async () => {
   try {
+    if (role === "Vendor" && !categoryId) {
+      Toast.show({
+        type: "error",
+        text1: "Category Required",
+        text2: "Please select your business category first.",
+      });
+      return;
+    }
     setIsLoading(true);
     setIsDisabled(true);
 
@@ -250,7 +258,7 @@ const handleRegister = async () => {
       password,
       name,
       role,
-      buisnessCategory,
+      categoryId,
       phone
     );
 

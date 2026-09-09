@@ -1,15 +1,81 @@
-//fyp-backend/src/vendor/dto/create-contact-details.dto.ts
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MinLength,
+} from 'class-validator';
 
 export class CreateContactDetailsDto {
-    brandName: string;
-    brandLogo?: string;
-    contactNumber: string;
-    contactNumberSecondary?: string;
-    instagramLink: string;
-    facebookLink?: string;
-    bookingEmail: string;
-    website?: string;
-    city: string;
-    officialAddress?: string;
-    officialGoogleLink?: string;
+  @IsString()
+  @MinLength(2)
+  brandName: string;
+
+  @IsOptional()
+  @IsString()
+  brandLogo?: string;
+
+  @IsString()
+  @MinLength(7)
+  contactNumber: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(7)
+  contactNumberSecondary?: string;
+
+  @IsOptional()
+  @IsUrl(
+    {
+      require_protocol: true,
+    },
+    {
+      message: 'instagramLink must be a valid URL',
+    },
+  )
+  instagramLink?: string;
+
+  @IsOptional()
+  @IsUrl(
+    {
+      require_protocol: true,
+    },
+    {
+      message: 'facebookLink must be a valid URL',
+    },
+  )
+  facebookLink?: string;
+
+  @IsEmail()
+  bookingEmail: string;
+
+  @IsOptional()
+  @IsUrl(
+    {
+      require_protocol: true,
+    },
+    {
+      message: 'website must be a valid URL',
+    },
+  )
+  website?: string;
+
+  @IsString()
+  @MinLength(2)
+  city: string;
+
+  @IsOptional()
+  @IsString()
+  officialAddress?: string;
+
+  @IsOptional()
+  @IsUrl(
+    {
+      require_protocol: true,
+    },
+    {
+      message: 'officialGoogleLink must be a valid URL',
+    },
+  )
+  officialGoogleLink?: string;
 }

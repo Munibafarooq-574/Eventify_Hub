@@ -58,8 +58,16 @@ import { AdminDisputeController } from './admin-dispute.controller';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 
+// Category module
+// CategoryService is exported from this module and will be reused
+// by AdminController for category request management.
+import { CategoryModule } from '../category/category.module';
+
 @Module({
     imports: [
+        // Reuse existing CategoryService + Category/CategoryRequest models
+        CategoryModule,
+
         MongooseModule.forFeature([
             // Existing admin models
             {

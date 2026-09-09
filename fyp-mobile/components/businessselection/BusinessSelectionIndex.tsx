@@ -19,6 +19,7 @@ const BusinessSelectionIndex: React.FC = () => {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // Track selected category
     const [flippedCard, setFlippedCard] = useState<string | null>(null);
     const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null); // Track selected category
+    const [selectedBusinessDetailsType, setSelectedBusinessDetailsType] = useState<string | null>(null);
     const [categories, setCategories] = useState<ICategory[]>([]);
     const image = require('@/assets/images/GetStarted.png');
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -127,6 +128,9 @@ const BusinessSelectionIndex: React.FC = () => {
 
         setSelectedCategory(category._id);
         setSelectedCategoryName(category.name);
+        setSelectedBusinessDetailsType(
+            category.businessDetailsType || "GENERIC"
+        );
 
         if (flippedCard === category._id) {
             setFlippedCard(null);
@@ -173,7 +177,22 @@ flippedCard === category._id && (
     ))}
 </View>
 
-            <View style={styles.footer}>
+{/* Category not found */}
+<TouchableOpacity
+    style={styles.otherCategoryButton}
+    activeOpacity={0.85}
+    onPress={() => router.push("/categoryrequest" as any)}
+>
+    <Text style={styles.otherCategoryTitle}>
+        Can't find your business category?
+    </Text>
+
+    <Text style={styles.otherCategoryText}>
+        My category isn't listed →
+    </Text>
+</TouchableOpacity>
+
+<View style={styles.footer}>
 
     <TouchableOpacity
         style={styles.cancelButton}
@@ -192,18 +211,22 @@ flippedCard === category._id && (
         onPress={async () => {
 
             if (selectedCategory && selectedCategoryName) {
-
                 await saveSecureData(
-                    "buisness",
-                    selectedCategory.toString()
+                    "categoryId",
+                    selectedCategory
                 );
 
                 await saveSecureData(
-                    "buisnessName",
+                    "categoryName",
                     selectedCategoryName
                 );
 
-                router.push('/signup');
+                await saveSecureData(
+                    "businessDetailsType",
+                    selectedBusinessDetailsType || "GENERIC"
+                );
+
+                router.push("/signup");
             }
 
         }}
@@ -338,7 +361,37 @@ footer: {
     flexDirection: 'row',
     marginTop: 15,
 },
+otherCategoryButton: {
+    width: '100%',
+    backgroundColor: '#FFF',
+    borderWidth: 2,
+    borderColor: '#E8C5E3',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 5,
+    marginBottom: 10,
+    elevation: 3,
+    shadowColor: '#780C60',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+},
 
+otherCategoryTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'center',
+},
+
+otherCategoryText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#780C60',
+    textAlign: 'center',
+},
 cancelButton: {
     flex: 1,
     backgroundColor: '#fff',

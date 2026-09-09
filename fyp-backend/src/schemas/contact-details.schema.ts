@@ -1,3 +1,4 @@
+//fyp-backend/src/schemas/contact-details.schema.ts
 import { Schema, Document } from 'mongoose';
 
 export interface ContactDetails {
@@ -5,7 +6,7 @@ export interface ContactDetails {
     brandLogo: string;
     contactNumber: string;
     contactNumberSecondary?: string;
-    instagramLink: string;
+    instagramLink?: string;
     facebookLink?: string;
     bookingEmail: string;
     website?: string;
@@ -19,7 +20,7 @@ export const ContactDetailsSchema = new Schema<ContactDetails>({
     brandLogo: { type: String, required: true },
     contactNumber: { type: String, required: true },
     contactNumberSecondary: { type: String },
-    instagramLink: { type: String, required: true },
+    instagramLink: { type: String },
     facebookLink: { type: String },
     bookingEmail: { type: String, required: true },
     website: { type: String },

@@ -1,22 +1,23 @@
+// fyp-mobile/components/vendorcontactdetails/VendorContactDetailsIndex.tsx
 
-import postContactDetails from '@/services/postContactDetails';
-import { getSecureData } from '@/store';
-import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import postContactDetails from "@/services/postContactDetails";
+import { getSecureData } from "@/store";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 
 const ContactDetailsScreen = () => {
@@ -33,46 +34,71 @@ const ContactDetailsScreen = () => {
   const [logoUri, setLogoUri] = useState<string | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-const translateAnim = useRef(new Animated.Value(40)).current;
-const buttonScale = useRef(new Animated.Value(1)).current;
+  const translateAnim = useRef(new Animated.Value(40)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
-const animateButtonIn = () => {
-  Animated.spring(buttonScale, {
-    toValue: 0.96,
-    useNativeDriver: true,
-  }).start();
-};
+  /**
+   * Business-detail screen routing is based on the reusable
+   * businessDetailsType stored on the selected category.
+   *
+   * IMPORTANT:
+   * We do NOT route using category names anymore.
+   *
+   * Future categories can use GENERIC and automatically
+   * continue to /bdgeneric without adding name-based if/else blocks.
+   */
+  const businessDetailsRoutes: Record<string, string> = {
+    PHOTOGRAPHY: "/bdphotographer",
+    CATERING: "/bdcatering",
+    VENUE: "/bdvenue",
+    MAKEUP: "/bdsalon",
+    CAKE: "/bdcakes",
+    MEHNDI: "/bdmehndi",
+    SOUND: "/bdsounds",
+  };
 
-const animateButtonOut = () => {
-  Animated.spring(buttonScale, {
-    toValue: 1,
-    friction: 4,
-    useNativeDriver: true,
-  }).start();
-};
+  const animateButtonIn = () => {
+    Animated.spring(buttonScale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+    }).start();
+  };
 
-useEffect(() => {
-  Animated.parallel([
-    Animated.timing(fadeAnim, {
+  const animateButtonOut = () => {
+    Animated.spring(buttonScale, {
       toValue: 1,
-      duration: 800,
-      easing: Easing.out(Easing.ease),
+      friction: 4,
       useNativeDriver: true,
-    }),
+    }).start();
+  };
 
-    Animated.timing(translateAnim, {
-      toValue: 0,
-      duration: 700,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }),
-  ]).start();
-}, []);
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+
+      Animated.timing(translateAnim, {
+        toValue: 0,
+        duration: 700,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.status !== 'granted') {
-      Alert.alert("Permission Denied", "Please allow access to media library to select logo.");
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.status !== "granted") {
+      Alert.alert(
+        "Permission Denied",
+        "Please allow access to media library to select logo."
+      );
       return;
     }
 
@@ -88,364 +114,465 @@ useEffect(() => {
     }
   };
 
-
   const submit = async () => {
-     if (!brandName || !contactNumber || !instagramLink || !bookingEmail || !city) {
-      Alert.alert("Error", "Please fill in all the required fields marked with *.");
+    /**
+     * Instagram is optional.
+     *
+     * Required fields:
+     * - Brand Name
+     * - Contact Number
+     * - Booking Email
+     * - City
+     */
+    if (!brandName || !contactNumber || !bookingEmail || !city) {
+      Alert.alert(
+        "Error",
+        "Please fill in all the required fields marked with *."
+      );
       return;
     }
+
     if (!logoUri) {
-      Alert.alert("Logo Required", "Please upload your business logo to continue.");
+      Alert.alert(
+        "Logo Required",
+        "Please upload your business logo to continue."
+      );
       return;
     }
+
     try {
-      const user = JSON.parse(await getSecureData("user") || "");
+      const storedUser = await getSecureData("user");
+
+      if (!storedUser) {
+        Alert.alert(
+          "Error",
+          "User information could not be found. Please log in again."
+        );
+        return;
+      }
+
+      const user = JSON.parse(storedUser);
+
+      if (!user?._id) {
+        Alert.alert(
+          "Error",
+          "User information is invalid. Please log in again."
+        );
+        return;
+      }
+
       const formData = new FormData();
-      formData.append('userId', user._id);
-      formData.append('brandName', brandName);
-      formData.append('contactNumber', contactNumber);
-      formData.append('instagramLink', instagramLink);
-      formData.append('facebookLink', facebookLink);
-      formData.append('bookingEmail', bookingEmail);
-      formData.append('city', city);
-      formData.append('website', website);
-      formData.append('officialAddress', address);
-      formData.append('officialGoogleLink', googleLink);
 
-      if (logoUri) {
-        const filename = logoUri.split('/').pop()!;
-        const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : `image`;
+      formData.append("userId", user._id);
+      formData.append("brandName", brandName);
+      formData.append("contactNumber", contactNumber);
 
-        formData.append('file', {
+      // Optional fields can safely be sent as empty strings.
+      formData.append("instagramLink", instagramLink);
+      formData.append("facebookLink", facebookLink);
+
+      formData.append("bookingEmail", bookingEmail);
+      formData.append("city", city);
+      formData.append("website", website);
+      formData.append("officialAddress", address);
+      formData.append("officialGoogleLink", googleLink);
+
+      const filename = logoUri.split("/").pop() || "business-logo.jpg";
+      const match = /\.(\w+)$/.exec(filename);
+
+      const type = match
+        ? `image/${match[1]}`
+        : "image/jpeg";
+
+      formData.append(
+        "file",
+        {
           uri: logoUri,
           name: filename,
           type,
-        } as any); // `as any` to suppress TypeScript error
-      }
+        } as any
+      );
+
+      /**
+       * Save contact details first.
+       */
       await postContactDetails(user._id, formData);
-      const categoryName = await getSecureData("buisnessName");
-      console.log(categoryName);
-      if (categoryName === "Venues") {
-        console.log("bdvenue")
-        router.push("/bdvenue")
+
+      /**
+       * Read reusable business-details type that was stored
+       * when vendor selected their category.
+       *
+       * Examples:
+       *
+       * Photography -> PHOTOGRAPHY
+       * Caterings   -> CATERING
+       * Venues      -> VENUE
+       *
+       * Future categories:
+       *
+       * Florist     -> GENERIC
+       * Decoration  -> GENERIC
+       * Transport   -> GENERIC
+       */
+      const businessDetailsType =
+        (await getSecureData("businessDetailsType")) || "GENERIC";
+
+      const normalizedBusinessDetailsType =
+        businessDetailsType.toUpperCase();
+
+      const nextRoute =
+        businessDetailsRoutes[normalizedBusinessDetailsType];
+
+      Alert.alert(
+        "Success",
+        "Contact details saved successfully!"
+      );
+
+      /**
+       * Existing specialized business-detail screens.
+       */
+      if (nextRoute) {
+        router.push(nextRoute as any);
+        return;
       }
-      else if (categoryName === "Caterings") {
-        console.log("bdcatering")
-        router.push("/bdcatering")
-      }
-      else if (categoryName === "Photography") {
-        console.log("bdphotographer")
-        router.push("/bdphotographer")
-      }
-      else if (categoryName === "Makeup") {
-        console.log("bdsalon")
-        router.push("/bdsalon")
-      }
-      else if (categoryName === "Mehndi") {
-        console.log("bdmehndi")
-        router.push("/bdmehndi")
-      }
-      else if (categoryName === "DJ & Sound") {
-        console.log("bdsounds")
-        router.push("/bdsounds")
-      }
-      else if (categoryName === "Cakes") {
-        console.log("bdcakes")
-        router.push("/bdcakes")
-      }
-      Alert.alert("Success", "Contact details saved successfully!");
-      // router.push("/bdphotographer");
+
+      /**
+       * Future/new categories automatically use generic form.
+       */
+      router.push("/bdgeneric" as any);
     } catch (error) {
-      console.log(error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      console.log(
+        "Contact details submit error:",
+        error
+      );
+
+      Alert.alert(
+        "Error",
+        "Something went wrong. Please try again."
+      );
     }
   };
 
   return (
     <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
-  >
-  <Animated.ScrollView
-    testID="scrollView"
-    keyboardShouldPersistTaps="handled"
-  keyboardDismissMode="interactive"
-    showsVerticalScrollIndicator={false}
-    contentContainerStyle={styles.container}
-    style={{
-      opacity: fadeAnim,
-      transform: [
-        {
-          translateY: translateAnim,
-        },
-      ],
-    }}
-  >
-      {/* Added testID for testing ScrollView accessibility in UI tests */}
-      <View style={styles.header}>
-  <Text style={styles.subtitle}>
-    Business Profile
-  </Text>
-
-  <Text style={styles.title}>
-    Contact Details
-  </Text>
-
-  <Text style={styles.description}>
-    Help customers connect with your business by
-    adding your contact information.
-  </Text>
-</View>
-      <TouchableOpacity
-  style={styles.logoCard}
-  activeOpacity={0.8}
-  onPress={pickImage}
->
-  {logoUri ? (
-    <Image
-      source={{ uri: logoUri }}
-      style={styles.logo}
-    />
-  ) : (
-    <View style={styles.initialLogo}>
-      <Text style={styles.initialText}>
-        {brandName
-          ? brandName
-              .trim()
-              .split(" ")
-              .map(word => word[0])
-              .join("")
-              .substring(0, 2)
-              .toUpperCase()
-          : "BN"}
-      </Text>
-    </View>
-  )}
-
-  <Text style={styles.logoTitle}>
-    Business Logo *
-  </Text>
-
-  <Text style={styles.logoText}>
-    Tap to upload your brand logo
-  </Text>
-</TouchableOpacity>
-
-      <View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Brand Name *
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="Enter Brand Name"
-    placeholderTextColor="#999"
-    value={brandName}
-    onChangeText={setBrandName}
-  />
-</View>
-
-      <View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Contact Number *
-  </Text>
-
-  <View style={styles.phoneInputContainer}>
-    <Text style={styles.flag}>🇵🇰</Text>
-
-    <TextInput
-      style={styles.phoneInput}
-      placeholder="+92 3001234567"
-      placeholderTextColor="#999"
-      keyboardType="phone-pad"
-      value={contactNumber}
-      onChangeText={setContactNumber}
-    />
-  </View>
-</View>
-
-      <View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Instagram *
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="https://instagram.com/yourpage"
-    placeholderTextColor="#999"
-    value={instagramLink}
-    onChangeText={setInstagramLink}
-  />
-</View>
-
-      <View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Facebook
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="https://facebook.com/yourpage"
-    placeholderTextColor="#999"
-    value={facebookLink}
-    onChangeText={setFacebookLink}
-  />
-</View>
-
-<View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Booking Email *
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="example@email.com"
-    placeholderTextColor="#999"
-    keyboardType="email-address"
-    autoCapitalize="none"
-    value={bookingEmail}
-    onChangeText={setBookingEmail}
-  />
-</View>
-
-<View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Website
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="https://yourwebsite.com"
-    placeholderTextColor="#999"
-    autoCapitalize="none"
-    value={website}
-    onChangeText={setWebsite}
-  />
-</View>
-
-<View style={styles.inputCard}>
-  <Text style={styles.label}>
-    City *
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="Enter City"
-    placeholderTextColor="#999"
-    value={city}
-    onChangeText={setCity}
-  />
-</View>
-
-<View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Official Address
-  </Text>
-
-  <TextInput
-    style={[styles.input, { minHeight: 60 }]}
-    placeholder="Office Address"
-    placeholderTextColor="#999"
-    multiline
-    value={address}
-    onChangeText={setAddress}
-  />
-</View>
-
-<View style={styles.inputCard}>
-  <Text style={styles.label}>
-    Google Maps Link
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="https://maps.google.com/..."
-    placeholderTextColor="#999"
-    autoCapitalize="none"
-    value={googleLink}
-    onChangeText={setGoogleLink}
-  />
-</View>
-
-<View style={styles.buttonContainer}>
-
-  <TouchableOpacity
-    style={styles.backButton}
-    activeOpacity={0.85}
-    onPress={() => router.back()}
-  >
-    <Text style={styles.backButtonText}>
-      Back
-    </Text>
-  </TouchableOpacity>
-
-  <Animated.View
-    style={{
-      flex: 1,
-      marginLeft: 12,
-      transform: [{ scale: buttonScale }],
-    }}
-  >
-    <Pressable
-      onPressIn={animateButtonIn}
-      onPressOut={animateButtonOut}
-      onPress={submit}
-      style={styles.saveButton}
+      style={{ flex: 1 }}
+      behavior={
+        Platform.OS === "ios"
+          ? "padding"
+          : "height"
+      }
     >
-      <Text style={styles.saveButtonText}>
-        Save & Continue
-      </Text>
-    </Pressable>
-  </Animated.View>
+      <Animated.ScrollView
+        testID="scrollView"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+        style={{
+          opacity: fadeAnim,
+          transform: [
+            {
+              translateY: translateAnim,
+            },
+          ],
+        }}
+      >
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>
+            Business Profile
+          </Text>
 
-</View>
+          <Text style={styles.title}>
+            Contact Details
+          </Text>
 
-<View style={{ height: 40 }} />
+          <Text style={styles.description}>
+            Help customers connect with your business by
+            adding your contact information.
+          </Text>
+        </View>
 
-</Animated.ScrollView>
+        {/* Business Logo */}
 
-</KeyboardAvoidingView>
+        <TouchableOpacity
+          style={styles.logoCard}
+          activeOpacity={0.8}
+          onPress={pickImage}
+        >
+          {logoUri ? (
+            <Image
+              source={{ uri: logoUri }}
+              style={styles.logo}
+            />
+          ) : (
+            <View style={styles.initialLogo}>
+              <Text style={styles.initialText}>
+                {brandName
+                  ? brandName
+                      .trim()
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .substring(0, 2)
+                      .toUpperCase()
+                  : "BN"}
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.logoTitle}>
+            Business Logo *
+          </Text>
+
+          <Text style={styles.logoText}>
+            Tap to upload your brand logo
+          </Text>
+        </TouchableOpacity>
+
+        {/* Brand Name */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Brand Name *
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter Brand Name"
+            placeholderTextColor="#999"
+            value={brandName}
+            onChangeText={setBrandName}
+          />
+        </View>
+
+        {/* Contact Number */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Contact Number *
+          </Text>
+
+          <View style={styles.phoneInputContainer}>
+            <Text style={styles.flag}>
+              🇵🇰
+            </Text>
+
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="+92 3001234567"
+              placeholderTextColor="#999"
+              keyboardType="phone-pad"
+              value={contactNumber}
+              onChangeText={setContactNumber}
+            />
+          </View>
+        </View>
+
+        {/* Instagram - OPTIONAL */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Instagram
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="https://instagram.com/yourpage"
+            placeholderTextColor="#999"
+            value={instagramLink}
+            onChangeText={setInstagramLink}
+            autoCapitalize="none"
+          />
+        </View>
+
+        {/* Facebook */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Facebook
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="https://facebook.com/yourpage"
+            placeholderTextColor="#999"
+            value={facebookLink}
+            onChangeText={setFacebookLink}
+            autoCapitalize="none"
+          />
+        </View>
+
+        {/* Booking Email */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Booking Email *
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="example@email.com"
+            placeholderTextColor="#999"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={bookingEmail}
+            onChangeText={setBookingEmail}
+          />
+        </View>
+
+        {/* Website */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Website
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="https://yourwebsite.com"
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            value={website}
+            onChangeText={setWebsite}
+          />
+        </View>
+
+        {/* City */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            City *
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Enter City"
+            placeholderTextColor="#999"
+            value={city}
+            onChangeText={setCity}
+          />
+        </View>
+
+        {/* Official Address */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Official Address
+          </Text>
+
+          <TextInput
+            style={[
+              styles.input,
+              {
+                minHeight: 60,
+              },
+            ]}
+            placeholder="Office Address"
+            placeholderTextColor="#999"
+            multiline
+            value={address}
+            onChangeText={setAddress}
+          />
+        </View>
+
+        {/* Google Maps */}
+
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>
+            Google Maps Link
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="https://maps.google.com/..."
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+            value={googleLink}
+            onChangeText={setGoogleLink}
+          />
+        </View>
+
+        {/* Buttons */}
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            activeOpacity={0.85}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>
+              Back
+            </Text>
+          </TouchableOpacity>
+
+          <Animated.View
+            style={{
+              flex: 1,
+              marginLeft: 12,
+              transform: [
+                {
+                  scale: buttonScale,
+                },
+              ],
+            }}
+          >
+            <Pressable
+              onPressIn={animateButtonIn}
+              onPressOut={animateButtonOut}
+              onPress={submit}
+              style={styles.saveButton}
+            >
+              <Text style={styles.saveButtonText}>
+                Save & Continue
+              </Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        <View style={{ height: 40 }} />
+      </Animated.ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-  flexGrow: 1,
-  backgroundColor: "#F9F3F8",
-  paddingHorizontal: 22,
-  paddingTop: 65,
-  paddingBottom: 120,
-},
+    flexGrow: 1,
+    backgroundColor: "#F9F3F8",
+    paddingHorizontal: 22,
+    paddingTop: 65,
+    paddingBottom: 120,
+  },
 
   header: {
-  marginBottom: 28,
-  alignItems: "center",
-},
+    marginBottom: 28,
+    alignItems: "center",
+  },
 
-subtitle: {
-  fontSize: 15,
-  color: "#780C60",
-  fontWeight: "600",
-  marginBottom: 8,
-  textAlign: "center",
-},
+  subtitle: {
+    fontSize: 15,
+    color: "#780C60",
+    fontWeight: "600",
+    marginBottom: 8,
+    textAlign: "center",
+  },
 
-title: {
-  fontSize: 34,
-  fontWeight: "800",
-  color: "#1F1F1F",
-  marginBottom: 12,
-  textAlign: "center",
-},
+  title: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#1F1F1F",
+    marginBottom: 12,
+    textAlign: "center",
+  },
 
-description: {
-  fontSize: 16,
-  color: "#6D6D6D",
-  lineHeight: 24,
-  textAlign: "center",
-  maxWidth: 320,
-},
+  description: {
+    fontSize: 16,
+    color: "#6D6D6D",
+    lineHeight: 24,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+
   logoCard: {
     backgroundColor: "#fff",
     borderRadius: 24,
@@ -487,23 +614,23 @@ description: {
   },
 
   initialLogo: {
-  width: 100,
-  height: 100,
-  borderRadius: 50,
-  backgroundColor: "#780C60",
-  justifyContent: "center",
-  alignItems: "center",
-  marginBottom: 16,
-  borderWidth: 3,
-  borderColor: "#F4D8EC",
-},
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#780C60",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: "#F4D8EC",
+  },
 
-initialText: {
-  color: "#FFFFFF",
-  fontSize: 34,
-  fontWeight: "800",
-  letterSpacing: 1,
-},
+  initialText: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
 
   inputCard: {
     backgroundColor: "#fff",

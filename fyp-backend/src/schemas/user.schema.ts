@@ -441,7 +441,10 @@ export class CakeBusinessDetails extends BusinessDetails {
   @Prop()
   additionalInfo: string;
 
-  @Prop()
+    @Prop({
+    enum: ['PERCENTAGE', 'FIXED'],
+    default: 'PERCENTAGE',
+  })
   downPaymentType: string;
 
   @Prop()
@@ -566,6 +569,61 @@ export const SoundBusinessDetailsSchema = SchemaFactory.createForClass(
   SoundBusinessDetails,
 );
 
+// ==========================================
+// Generic Business Details
+// Future / database-driven categories
+// ==========================================
+
+@Schema({ _id: false })
+export class GenericBusinessDetails {
+  @Prop({ required: true, trim: true })
+  description: string;
+
+  @Prop({ trim: true })
+  cityCovered?: string;
+
+  @Prop({ min: 0 })
+  minimumPrice?: number;
+
+  @Prop({ trim: true })
+  additionalInfo?: string;
+
+  @Prop({ type: Boolean })
+  travelsToClientHome?: boolean;
+
+  @Prop({
+    enum: ['PERCENTAGE', 'FIXED'],
+    default: 'PERCENTAGE',
+  })
+  downPaymentType?: string;
+
+  @Prop({ min: 0 })
+  downPayment?: number;
+
+  @Prop({
+    enum: [
+      'REFUNDABLE',
+      'NON-REFUNDABLE',
+      'PARTIALLY REFUNDABLE',
+    ],
+  })
+  cancellationPolicy?: string;
+
+  /**
+   * Optional category-specific values that don't justify
+   * creating another hard-coded User schema field.
+   */
+  @Prop({
+    type: MongooseSchema.Types.Mixed,
+    default: {},
+  })
+  customFields?: Record<string, unknown>;
+}
+
+export const GenericBusinessDetailsSchema =
+  SchemaFactory.createForClass(
+    GenericBusinessDetails,
+  );
 // ==========================================
 // Vendor Availability Settings
 // ==========================================
@@ -817,11 +875,18 @@ cakeBusinessDetails?: CakeBusinessDetails;
   @Prop({ type: MehndiBusinessDetailsSchema })
   mehndiBusinessDetails?: MehndiBusinessDetails;
 
-  @Prop({ type: SoundBusinessDetailsSchema })
-  soundBusinessDetails?: SoundBusinessDetails;
+ @Prop({ type: SoundBusinessDetailsSchema })
+soundBusinessDetails?: SoundBusinessDetails;
 
-  @Prop({ type: [PackageSchema], default: [] })
-  packages: Package[];
+/**
+ * Used by all future categories that do not require
+ * one of the legacy specialized detail schemas.
+ */
+@Prop({ type: GenericBusinessDetailsSchema })
+genericBusinessDetails?: GenericBusinessDetails;
+
+@Prop({ type: [PackageSchema], default: [] })
+packages: Package[];
 
     @Prop({
     type: VendorAvailabilitySettingsSchema,
