@@ -52,14 +52,10 @@ async placeOrder(@Body() body: {
                 } catch (error) {
             console.error('Error placing order:', error);
 
-            // Agar service ne pehle se HttpException throw ki hai
-            // (jaise ConflictException 409, BadRequestException 400 wagera),
-            // usay waisa hi aage jane do — status code preserve rahega.
+
             if (error instanceof HttpException) {
                 throw error;
             }
-
-            // Sirf genuinely unexpected errors ke liye 500 throw karo.
             throw new InternalServerErrorException('Failed to place order');
         }
     }

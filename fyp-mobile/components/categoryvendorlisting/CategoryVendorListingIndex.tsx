@@ -95,18 +95,15 @@ return {
     }
   };
 
-  const formatTime = (time?: string) => {
+const formatTime = (time?: string) => {
   if (!time) return "";
 
   const [hours, minutes] = time.split(":").map(Number);
 
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
 
-  return date.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return `${hour12}:${String(minutes).padStart(2, "0")}${period}`;
 };
 
   const fetchData = async () => {

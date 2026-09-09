@@ -1,4 +1,4 @@
-// fyp-mobile/components/personalizedexperience/PersonalizedExperienceScreen.tsx
+//fyp-mobile/components/EventDetailsForm/EventDetailsFormIndex.tsx
 import getAllCategories from "@/services/getAllCategories";
 import { saveSecureData } from "@/store";
 import { useVendorsAvailability } from "@/hooks/useVendorsAvailability";
@@ -26,7 +26,6 @@ import { ICategory } from "../dashboard/CategoryGrid";
 
 const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
-const ACCENT = "#B84B9A";
 
 const DURATION_OPTIONS = [
   { label: "1 hour", value: 60 },
@@ -61,6 +60,7 @@ const formatDuration = (minutes: number) => {
   return `${hours}h ${mins}m`;
 };
 
+
 const PersonalizedExperienceScreen: React.FC = () => {
   // -------------------------------------------------------
   // STEP 1 & 2 — EVENT NAME / TYPE
@@ -84,7 +84,27 @@ const PersonalizedExperienceScreen: React.FC = () => {
   });
 
   const [durationMinutes, setDurationMinutes] = useState(120);
+  const [isCustomDuration, setIsCustomDuration] = useState(false);
+const [customHours, setCustomHours] = useState("");
+const [customMinutes, setCustomMinutes] = useState("");
 
+const updateCustomDuration = (
+  hours: string,
+  minutes: string
+) => {
+  setCustomHours(hours);
+  setCustomMinutes(minutes);
+
+  const parsedHours = Number(hours) || 0;
+  const parsedMinutes = Number(minutes) || 0;
+
+  const totalMinutes =
+    parsedHours * 60 + parsedMinutes;
+
+  if (totalMinutes > 0) {
+    setDurationMinutes(totalMinutes);
+  }
+};
   // -------------------------------------------------------
   // STEP 6 — TOTAL GUESTS
   // -------------------------------------------------------
@@ -616,13 +636,21 @@ const handleContinue = async () => {
       </TouchableOpacity>
 
       {showTimePicker && (
-        <DateTimePicker
-          value={startTime}
-          mode="time"
-          display="default"
-          onChange={onChangeTime}
-        />
-      )}
+  <DateTimePicker
+    value={startTime}
+    mode="time"
+    display="default"
+    onValueChange={(_, selected) => {
+      if (selected) {
+        setStartTime(selected);
+      }
+      setShowTimePicker(false);
+    }}
+    onDismiss={() => {
+      setShowTimePicker(false);
+    }}
+  />
+)}
 
       {/* ==================================================
           STEP 5 — EVENT DURATION
@@ -638,47 +666,158 @@ const handleContinue = async () => {
       </Text>
 
       <View style={styles.durationGrid}>
-        {DURATION_OPTIONS.map((option) => {
-          const active =
-            durationMinutes === option.value;
+  {DURATION_OPTIONS.map((option) => {
+    const active =
+      !isCustomDuration &&
+      durationMinutes === option.value;
 
-          return (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.durationChip,
-                active &&
-                  styles.durationChipActive,
-              ]}
-              onPress={() =>
-                setDurationMinutes(
-                  option.value
-                )
-              }
-            >
-              <Ionicons
-                name="time-outline"
-                size={15}
-                color={
-                  active
-                    ? "#FFFFFF"
-                    : PRIMARY
-                }
-              />
+    return (
+      <TouchableOpacity
+        key={option.value}
+        style={[
+          styles.durationChip,
+          active && styles.durationChipActive,
+        ]}
+        onPress={() => {
+          setIsCustomDuration(false);
+          setDurationMinutes(option.value);
+        }}
+      >
+        <Ionicons
+          name="time-outline"
+          size={15}
+          color={active ? "#FFFFFF" : PRIMARY}
+        />
 
-              <Text
-                style={[
-                  styles.durationText,
-                  active &&
-                    styles.durationTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        <Text
+          style={[
+            styles.durationText,
+            active && styles.durationTextActive,
+          ]}
+        >
+          {option.label}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+
+  {/* CUSTOM */}
+  <TouchableOpacity
+    style={[
+      styles.durationChip,
+      isCustomDuration &&
+        styles.durationChipActive,
+    ]}
+    onPress={() => {
+      setIsCustomDuration(true);
+
+      if (!customHours && !customMinutes) {
+        setCustomHours("1");
+        setCustomMinutes("0");
+        setDurationMinutes(60);
+      }
+    }}
+  >
+    <Ionicons
+      name="create-outline"
+      size={15}
+      color={
+        isCustomDuration
+          ? "#FFFFFF"
+          : PRIMARY
+      }
+    />
+
+    <Text
+      style={[
+        styles.durationText,
+        isCustomDuration &&
+          styles.durationTextActive,
+      ]}
+    >
+      Custom
+    </Text>
+  </TouchableOpacity>
+</View>
+
+{/* CUSTOM DURATION INPUT */}
+{isCustomDuration && (
+  <View style={styles.customDurationCard}>
+    <Text style={styles.customDurationTitle}>
+      Enter Custom Duration
+    </Text>
+
+    <Text style={styles.customDurationHelper}>
+      Enter the exact duration required for your event.
+    </Text>
+
+    <View style={styles.customDurationRow}>
+      <View style={styles.customDurationInputWrapper}>
+        <TextInput
+          style={styles.customDurationInput}
+          value={customHours}
+          onChangeText={(value) =>
+            updateCustomDuration(
+              value.replace(/[^0-9]/g, ""),
+              customMinutes
+            )
+          }
+          keyboardType="numeric"
+          placeholder="0"
+          placeholderTextColor="#AAAAAA"
+          maxLength={3}
+        />
+
+        <Text style={styles.customDurationUnit}>
+          Hours
+        </Text>
       </View>
+
+      <View style={styles.customDurationInputWrapper}>
+        <TextInput
+          style={styles.customDurationInput}
+          value={customMinutes}
+          onChangeText={(value) => {
+            const cleanValue =
+              value.replace(/[^0-9]/g, "");
+
+            const numericValue =
+              Number(cleanValue) || 0;
+
+            if (numericValue > 59) {
+              return;
+            }
+
+            updateCustomDuration(
+              customHours,
+              cleanValue
+            );
+          }}
+          keyboardType="numeric"
+          placeholder="0"
+          placeholderTextColor="#AAAAAA"
+          maxLength={2}
+        />
+
+        <Text style={styles.customDurationUnit}>
+          Minutes
+        </Text>
+      </View>
+    </View>
+
+    <View style={styles.customDurationPreview}>
+      <Ionicons
+        name="time-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.customDurationPreviewText}>
+        Duration: {formatDuration(durationMinutes)}
+      </Text>
+    </View>
+  </View>
+)}
 
       {/* ==================================================
           STEP 6 — TOTAL GUESTS
@@ -1296,6 +1435,85 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
+  customDurationCard: {
+  width: "100%",
+  backgroundColor: "#FFFFFF",
+  borderRadius: 14,
+  padding: 15,
+  marginTop: -8,
+  marginBottom: 20,
+
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.07,
+  shadowRadius: 4,
+  elevation: 2,
+},
+
+customDurationTitle: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: "#222222",
+  marginBottom: 4,
+},
+
+customDurationHelper: {
+  fontSize: 11,
+  color: "#888888",
+  marginBottom: 12,
+},
+
+customDurationRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  gap: 10,
+},
+
+customDurationInputWrapper: {
+  flex: 1,
+  height: 50,
+  borderWidth: 1,
+  borderColor: "#E7D8E2",
+  borderRadius: 11,
+  backgroundColor: "#FAFAFA",
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 10,
+},
+
+customDurationInput: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: "700",
+  color: PRIMARY,
+  textAlign: "center",
+},
+
+customDurationUnit: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: "#777777",
+},
+
+customDurationPreview: {
+  marginTop: 12,
+  backgroundColor: PRIMARY_LIGHT,
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 9,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 7,
+},
+
+customDurationPreviewText: {
+  fontSize: 11,
+  fontWeight: "700",
+  color: PRIMARY,
+},
   availabilityCard: {
     width: "100%",
     backgroundColor: "#FFFFFF",
