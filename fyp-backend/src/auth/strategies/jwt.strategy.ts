@@ -1,5 +1,3 @@
-
-//fyp-backend/src/auth.strategies/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       id: payload.id,
+      role: payload.role,
     };
   }
 }

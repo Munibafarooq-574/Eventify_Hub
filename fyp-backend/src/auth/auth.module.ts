@@ -1,4 +1,4 @@
-//fyp-backend/src/auth.auth.module.ts
+// fyp-backend/src/auth/auth.module.ts
 
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
@@ -14,11 +14,17 @@ import { Reviews, ReviewsSchema } from '../schemas/reviews.schema';
 import { Category, CategorySchema } from '../schemas/category.schema';
 import { Message, MessageSchema } from '../schemas/message.schema';
 import { Review, ReviewSchema } from '../schemas/review.schema';
-import { Notification, NotificationSchema } from '../schemas/notification.schema';
+import {
+  Notification,
+  NotificationSchema,
+} from '../schemas/notification.schema';
 
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
+
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { AdminRoleGuard } from './admin-role.guard';
 
 import { FileUploadService } from '../file-upload/file-upload.service';
 
@@ -29,15 +35,24 @@ import { FileUploadService } from '../file-upload/file-upload.service';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const secret = configService.get<string>('JWT_SECRET');
+
+      useFactory: (
+        configService: ConfigService,
+      ) => {
+        const secret =
+          configService.get<string>(
+            'JWT_SECRET',
+          );
 
         if (!secret) {
-          throw new Error('JWT_SECRET is not configured');
+          throw new Error(
+            'JWT_SECRET is not configured',
+          );
         }
 
         return {
           secret,
+
           signOptions: {
             expiresIn: '1d',
           },
@@ -46,23 +61,52 @@ import { FileUploadService } from '../file-upload/file-upload.service';
     }),
 
     MongooseModule.forFeature([
-      { name: User.name, schema: UserSchema },
-      { name: Reviews.name, schema: ReviewsSchema },
-      { name: Category.name, schema: CategorySchema },
-      { name: Message.name, schema: MessageSchema },
-      { name: Review.name, schema: ReviewSchema },
-      { name: Notification.name, schema: NotificationSchema },
+      {
+        name: User.name,
+        schema: UserSchema,
+      },
+      {
+        name: Reviews.name,
+        schema: ReviewsSchema,
+      },
+      {
+        name: Category.name,
+        schema: CategorySchema,
+      },
+      {
+        name: Message.name,
+        schema: MessageSchema,
+      },
+      {
+        name: Review.name,
+        schema: ReviewSchema,
+      },
+      {
+        name: Notification.name,
+        schema: NotificationSchema,
+      },
     ]),
   ],
 
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+  ],
 
   providers: [
     AuthService,
     FileUploadService,
+
     JwtStrategy,
     GoogleStrategy,
     FacebookStrategy,
+
+    JwtAuthGuard,
+    AdminRoleGuard,
+  ],
+
+  exports: [
+    JwtAuthGuard,
+    AdminRoleGuard,
   ],
 })
 export class AuthModule {}

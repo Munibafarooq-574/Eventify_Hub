@@ -4,43 +4,43 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import {
-    VendorOrder,
-    VendorOrderSchema,
+  VendorOrder,
+  VendorOrderSchema,
 } from 'src/schemas/vendor-order.schema';
 
 import {
-    Order,
-    OrderSchema,
+  Order,
+  OrderSchema,
 } from 'src/schemas/order.schema';
 
 import {
-    Payment,
-    PaymentSchema,
+  Payment,
+  PaymentSchema,
 } from 'src/schemas/payment.schema';
 
 import {
-    Payout,
-    PayoutSchema,
+  Payout,
+  PayoutSchema,
 } from 'src/schemas/payout.schema';
 
 import {
-    Refund,
-    RefundSchema,
+  Refund,
+  RefundSchema,
 } from 'src/schemas/refund.schema';
 
 import {
-    CommissionConfig,
-    CommissionConfigSchema,
+  CommissionConfig,
+  CommissionConfigSchema,
 } from 'src/schemas/commission-config.schema';
 
 import {
-    Dispute,
-    DisputeSchema,
+  Dispute,
+  DisputeSchema,
 } from 'src/schemas/dispute.schema';
 
 import {
-    User,
-    UserSchema,
+  User,
+  UserSchema,
 } from 'src/schemas/user.schema';
 
 import { AdminService } from './admin.service';
@@ -58,91 +58,106 @@ import { AdminDisputeController } from './admin-dispute.controller';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 
-// Category module
-// CategoryService is exported from this module and will be reused
-// by AdminController for category request management.
+// Reuse existing authentication infrastructure.
+// JwtAuthGuard + AdminRoleGuard are exported from AuthModule.
+import { AuthModule } from '../auth/auth.module';
+
+// Reuse existing category/category-request business logic.
 import { CategoryModule } from '../category/category.module';
 
 @Module({
-    imports: [
-        // Reuse existing CategoryService + Category/CategoryRequest models
-        CategoryModule,
+  imports: [
+    // =====================================================
+    // ADMIN AUTHENTICATION / AUTHORIZATION
+    // =====================================================
+    AuthModule,
 
-        MongooseModule.forFeature([
-            // Existing admin models
-            {
-                name: VendorOrder.name,
-                schema: VendorOrderSchema,
-            },
-            {
-                name: Order.name,
-                schema: OrderSchema,
-            },
+    // =====================================================
+    // CATEGORY / CATEGORY REQUESTS
+    // =====================================================
+    CategoryModule,
 
-            // Finance models
-            {
-                name: Payment.name,
-                schema: PaymentSchema,
-            },
-            {
-                name: Payout.name,
-                schema: PayoutSchema,
-            },
-            {
-                name: Refund.name,
-                schema: RefundSchema,
-            },
+    // =====================================================
+    // ADMIN DATABASE MODELS
+    // =====================================================
+    MongooseModule.forFeature([
+      // Booking models
+      {
+        name: VendorOrder.name,
+        schema: VendorOrderSchema,
+      },
+      {
+        name: Order.name,
+        schema: OrderSchema,
+      },
 
-            // Phase 13: Commission configuration
-            {
-                name: CommissionConfig.name,
-                schema: CommissionConfigSchema,
-            },
+      // Finance models
+      {
+        name: Payment.name,
+        schema: PaymentSchema,
+      },
+      {
+        name: Payout.name,
+        schema: PayoutSchema,
+      },
+      {
+        name: Refund.name,
+        schema: RefundSchema,
+      },
 
-            // Existing dispute / analytics models
-            {
-                name: Dispute.name,
-                schema: DisputeSchema,
-            },
-            {
-                name: User.name,
-                schema: UserSchema,
-            },
-        ]),
-    ],
+      // Commission configuration
+      {
+        name: CommissionConfig.name,
+        schema: CommissionConfigSchema,
+      },
 
-    controllers: [
-        // Existing admin controller
-        AdminController,
+      // Dispute model
+      {
+        name: Dispute.name,
+        schema: DisputeSchema,
+      },
 
-        // Phase 13: Commission
-        AdminCommissionController,
+      // User model
+      // Used by AdminService / AdminAnalyticsService.
+      {
+        name: User.name,
+        schema: UserSchema,
+      },
+    ]),
+  ],
 
-        // Finance
-        AdminFinanceController,
+  controllers: [
+    // Core admin
+    AdminController,
 
-        // Existing dispute
-        AdminDisputeController,
+    // Commission
+    AdminCommissionController,
 
-        // Existing analytics
-        AdminAnalyticsController,
-    ],
+    // Finance
+    AdminFinanceController,
 
-    providers: [
-        // Existing admin service
-        AdminService,
+    // Disputes
+    AdminDisputeController,
 
-        // Phase 13: Commission
-        AdminCommissionService,
+    // Analytics
+    AdminAnalyticsController,
+  ],
 
-        // Finance
-        AdminFinanceService,
+  providers: [
+    // Core admin
+    AdminService,
 
-        // Existing dispute
-        AdminDisputeService,
+    // Commission
+    AdminCommissionService,
 
-        // Existing analytics
-        AdminAnalyticsService,
-    ],
+    // Finance
+    AdminFinanceService,
+
+    // Disputes
+    AdminDisputeService,
+
+    // Analytics
+    AdminAnalyticsService,
+  ],
 })
 export class AdminModule {}
