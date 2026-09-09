@@ -373,6 +373,7 @@ const VendorDetailsScreen: React.FC =
       id,
       packageId,
       openTab,
+      eventId,
       eventDate,
       startTime,
       endTime,
@@ -1212,159 +1213,231 @@ const todayAvailabilitySummary =
         }
       };
 
-    // ---------------------------------------------------------
+       // ---------------------------------------------------------
     // Cart
     // ---------------------------------------------------------
 
-    const handleAddToCart =
-      async (pkg: any) => {
-        // Normal browse mode:
-        // Add to Cart should never be available.
-        if (!isEventMode) {
-          Toast.show({
-            type: 'info',
-            text1:
-              'Event Required',
-            text2:
-              'Please create/select an event before adding a vendor package to cart.',
-            position:
-              'bottom',
-          });
+     // ---------------------------------------------------------
+    // Duration-based price resolution
+    //
+    // Step 1: exact match in pkg.durations (fixed tiers)
+    // Step 2: no exact match -> use customDurationRate if allowed
+    // Step 3: no match + custom not allowed -> block, return null
+    // ---------------------------------------------------------
 
-          return;
+        const resolvePackagePrice = (
+      pkg: any,
+      selectedDurationMinutes: number,
+    ): { price: number | null; reason?: string; basis?: 'fixed' | 'custom' } => {
+      const durations = Array.isArray(pkg.durations) ? pkg.durations : [];
+      const selectedHours = selectedDurationMinutes / 60;
+
+      // Step 1 — exact fixed-duration match
+      const exactMatch = durations.find((d: any) => {
+        const value = Number(d.value);
+        if (d.unit === 'HOURS') {
+          return value === selectedHours;
         }
-
-        // Event mode:
-        // Vendor must be available for the selected event.
-        if (
-          !availabilityCheck?.available
-        ) {
-          Toast.show({
-            type: 'error',
-            text1:
-              'Vendor Not Available',
-            text2:
-              availabilityCheck?.reason ||
-              'This vendor is not available for the selected event time.',
-            position:
-              'bottom',
-          });
-
-          return;
+        if (d.unit === 'DAYS') {
+          return value * 24 === selectedHours;
         }
+        return false;
+      });
+      if (exactMatch) {
+        return { price: Number(exactMatch.price), basis: 'fixed' };
+      }
 
-        try {
-          const existingCartData =
-            await getSecureData(
-              'cartData',
-            );
+      // Step 2 — custom duration rate
+      if (pkg.allowCustomDuration && Number(pkg.customDurationRate) > 0) {
+        const rate = Number(pkg.customDurationRate);
+        const multiplier =
+          pkg.customDurationUnit === 'DAYS'
+            ? selectedHours / 24
+            : selectedHours;
 
-          let cart =
-            existingCartData
-              ? JSON.parse(
-                  existingCartData,
-                )
-              : {
-                  vendors: [],
-                };
+        return { price: Math.round(rate * multiplier), basis: 'custom' };
+      }
 
-          if (
-            !Array.isArray(
-              cart.vendors,
-            )
-          ) {
-            cart.vendors = [];
-          }
-
-          const vendorIndex =
-            cart.vendors.findIndex(
-              (vendor: any) =>
-                vendor.vendor?._id ===
-                vendorData?._id,
-            );
-
-          if (
-            vendorIndex !==
-            -1
-          ) {
-            const packageExists =
-              cart.vendors[
-                vendorIndex
-              ].packages?.some(
-                (
-                  existingPkg: any,
-                ) =>
-                  String(
-                    existingPkg._id,
-                  ) ===
-                  String(
-                    pkg._id,
-                  ),
-              );
-
-            if (
-              !packageExists
-            ) {
-              if (
-                !Array.isArray(
-                  cart.vendors[
-                    vendorIndex
-                  ].packages,
-                )
-              ) {
-                cart.vendors[
-                  vendorIndex
-                ].packages =
-                  [];
-              }
-
-              cart.vendors[
-                vendorIndex
-              ].packages.push(
-                pkg,
-              );
-            }
-          } else {
-            cart.vendors.push(
-              {
-                vendor:
-                  vendorData,
-                packages: [pkg],
-              },
-            );
-          }
-
-          await saveSecureData(
-            'cartData',
-            JSON.stringify(
-              cart,
-            ),
-          );
-
-          Toast.show({
-            type: 'success',
-            text1:
-              'Added to Cart',
-            text2: `${pkg.packageName} has been added to your cart!`,
-            position:
-              'bottom',
-          });
-        } catch (error) {
-          console.error(
-            'Error handling add to cart:',
-            error,
-          );
-
-          Toast.show({
-            type: 'error',
-            text1: 'Error',
-            text2:
-              'Failed to add to cart. Please try again.',
-            position:
-              'bottom',
-          });
-        }
+      // Step 3 — no match, custom not allowed
+      return {
+        price: null,
+        reason:
+          "This vendor doesn't offer this exact duration and doesn't support custom durations. Please choose a different duration or package.",
       };
+    };
+
+       const handleAddToCart = async (pkg: any) => {
+      // Normal browse mode:
+      // Add to Cart should never be available.
+      if (!isEventMode) {
+        Toast.show({
+          type: 'info',
+          text1: 'Event Required',
+          text2:
+            'Please create/select an event before adding a vendor package to cart.',
+          position: 'bottom',
+        });
+        return;
+      }
+
+      // Event mode:
+      // Vendor must be available for the selected event.
+      if (!availabilityCheck?.available) {
+        Toast.show({
+          type: 'error',
+          text1: 'Vendor Not Available',
+          text2:
+            availabilityCheck?.reason ||
+            'This vendor is not available for the selected event time.',
+          position: 'bottom',
+        });
+        return;
+      }
+
+      const resolvedEventId = String(
+        Array.isArray(eventId) ? eventId[0] : eventId || '',
+      );
+
+      if (!resolvedEventId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Event Required',
+          text2: 'Missing event information. Please select your event again.',
+          position: 'bottom',
+        });
+        return;
+      }
+      const resolvedVendorId = String(
+        Array.isArray(id) ? id[0] : id || vendorData?._id || '',
+      );
+
+      if (!resolvedVendorId || vendorData?._id !== resolvedVendorId) {
+        Toast.show({
+          type: 'error',
+          text1: 'Please Wait',
+          text2: 'Vendor details are still loading. Try again in a moment.',
+          position: 'bottom',
+        });
+        return;
+      }
+
+      const vendorDisplayName =
+        vendorData?.contactDetails?.brandName ||
+        vendorData?.ContactDetails?.brandName ||
+        vendorData?.name ||
+        'Vendor';
+
+      const selectedDurationMinutes = Number(durationMinutes);
+
+      const { price: resolvedPrice, reason, basis } = resolvePackagePrice(
+        pkg,
+        selectedDurationMinutes,
+      );
+
+      // Step 3 — no fixed match AND custom duration not allowed
+      if (resolvedPrice === null) {
+        Toast.show({
+          type: 'error',
+          text1: 'Duration Not Available',
+          text2:
+            reason ||
+            'This package does not support your selected event duration.',
+          position: 'bottom',
+        });
+        return;
+      }
+
+      try {
+        const existingCartData = await getSecureData('cartData');
+
+        let cart = existingCartData
+          ? JSON.parse(existingCartData)
+          : { vendors: [] };
+
+        if (!Array.isArray(cart.vendors)) {
+          cart.vendors = [];
+        }
+
+        const cartPackageItem = {
+          packageId: String(pkg._id),
+          packageName: pkg.packageName,
+          price: resolvedPrice,
+          basePrice: Number(pkg.price || 0),
+          priceBasis: basis || 'fixed',
+          eventId: resolvedEventId,
+          eventDate: String(
+            Array.isArray(eventDate) ? eventDate[0] : eventDate,
+          ),
+          startTime: String(
+            Array.isArray(startTime) ? startTime[0] : startTime,
+          ),
+          endTime: String(
+            Array.isArray(endTime) ? endTime[0] : endTime,
+          ),
+          durationMinutes: selectedDurationMinutes,
+          quantity: 1,
+        };
+
+        // Match strictly on the resolved vendor id — never on a nested
+        // object that might be stale or undefined.
+        const vendorIndex = cart.vendors.findIndex(
+          (v: any) =>
+            String(v.vendorId || v.vendor?._id || '') === resolvedVendorId,
+        );
+
+        if (vendorIndex !== -1) {
+          if (!Array.isArray(cart.vendors[vendorIndex].packages)) {
+            cart.vendors[vendorIndex].packages = [];
+          }
+
+          const existingIdx = cart.vendors[vendorIndex].packages.findIndex(
+            (p: any) =>
+              p.packageId === cartPackageItem.packageId &&
+              p.eventId === cartPackageItem.eventId,
+          );
+
+          if (existingIdx !== -1) {
+            cart.vendors[vendorIndex].packages[existingIdx] = {
+              ...cart.vendors[vendorIndex].packages[existingIdx],
+              quantity:
+                (cart.vendors[vendorIndex].packages[existingIdx].quantity ||
+                  1) + 1,
+            };
+          } else {
+            cart.vendors[vendorIndex].packages.push(cartPackageItem);
+          }
+
+          // Keep vendorId/vendorName fresh in case they were missing before.
+          cart.vendors[vendorIndex].vendorId = resolvedVendorId;
+          cart.vendors[vendorIndex].vendorName = vendorDisplayName;
+        } else {
+          cart.vendors.push({
+            vendorId: resolvedVendorId,
+            vendorName: vendorDisplayName,
+            vendor: vendorData,
+            packages: [cartPackageItem],
+          });
+        }
+
+        await saveSecureData('cartData', JSON.stringify(cart));
+
+        Toast.show({
+          type: 'success',
+          text1: 'Added to Cart',
+          text2: `${pkg.packageName} — Rs. ${resolvedPrice.toLocaleString()} added to your cart!`,
+          position: 'bottom',
+        });
+      } catch (error) {
+        console.error('Error handling add to cart:', error);
+
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to add to cart. Please try again.',
+          position: 'bottom',
+        });
+      }
+    };
 
     // ---------------------------------------------------------
     // Fetch Vendor

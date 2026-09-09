@@ -180,36 +180,74 @@ const CartManagementIndexScreen: React.FC = () => {
         });
     };
 
+    const handleUpdateQuantity = (
+    vendorIndex: number,
+    packageIndex: number,
+    delta: number
+) => {
+    if (!cartData?.vendors) return;
+
+    const updatedCart = {
+        ...cartData,
+        vendors: [...cartData.vendors],
+    };
+
+    const vendor = {
+        ...updatedCart.vendors[vendorIndex],
+        packages: [
+            ...updatedCart.vendors[vendorIndex].packages,
+        ],
+    };
+
+    const pkg = {
+        ...vendor.packages[packageIndex],
+    };
+
+    pkg.quantity = Math.max(
+        1,
+        Number(pkg.quantity || 1) + delta
+    );
+
+    vendor.packages[packageIndex] = pkg;
+    updatedCart.vendors[vendorIndex] = vendor;
+
+    saveSecureData(
+        'cartData',
+        JSON.stringify(updatedCart)
+    );
+
+    setCartData(updatedCart);
+};
+
     // -----------------------------------------
     // Calculate total
     // -----------------------------------------
 
-    const calculateTotalAmount = () => {
-        if (!cartData?.vendors) return 0;
+   const calculateTotalAmount = () => {
+    if (!cartData?.vendors) return 0;
 
-        let totalAmount = 0;
+    let totalAmount = 0;
 
-        cartData.vendors.forEach((vendor: any) => {
-            if (!vendor?.packages) return;
+    cartData.vendors.forEach((vendor: any) => {
+        if (!vendor?.packages) return;
 
-            vendor.packages.forEach((pkg: any) => {
-                const isCatering =
-                    cateringCategory?._id &&
-                    vendor?.vendor?.buisnessCategory ===
-                        cateringCategory._id;
+        vendor.packages.forEach((pkg: any) => {
+            const isCatering =
+                cateringCategory?._id &&
+                vendor?.vendor?.buisnessCategory ===
+                    cateringCategory._id;
 
-                if (isCatering) {
-                    totalAmount +=
-                        Number(pkg?.price || 0) *
-                        Number(guests || 0);
-                } else {
-                    totalAmount += Number(pkg?.price || 0);
-                }
-            });
+            const quantity = Number(pkg?.quantity || 1);
+            const unitPrice = Number(pkg?.price || 0);
+
+            totalAmount += isCatering
+                ? unitPrice * Number(guests || 0) * quantity
+                : unitPrice * quantity;
         });
+    });
 
-        return totalAmount;
-    };
+    return totalAmount;
+};
 
     // -----------------------------------------
     // Checkout
@@ -256,12 +294,17 @@ const CartManagementIndexScreen: React.FC = () => {
 
     const vendorCount = cartData?.vendors?.length || 0;
 
-    const packageCount =
-        cartData?.vendors?.reduce(
-            (total: number, vendor: any) =>
-                total + (vendor?.packages?.length || 0),
-            0
-        ) || 0;
+   const packageCount =
+    cartData?.vendors?.reduce(
+        (total: number, vendor: any) =>
+            total +
+            (vendor?.packages?.reduce(
+                (s: number, p: any) =>
+                    s + Number(p?.quantity || 1),
+                0
+            ) || 0),
+        0
+    ) || 0;
 
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('en-PK');
@@ -403,9 +446,11 @@ const CartManagementIndexScreen: React.FC = () => {
                         {cartData.vendors.map(
                             (vendor: any, vendorIndex: number) => {
 
-                                const vendorName =
+                                 const vendorName =
+                                    vendor?.vendorName ||
+                                    vendor?.vendor?.contactDetails?.brandName ||
+                                    vendor?.vendor?.ContactDetails?.brandName ||
                                     vendor?.vendor?.name ||
-                                    vendor?.vendor?.brandName ||
                                     'Vendor';
 
                                 const packages =
@@ -589,6 +634,76 @@ const CartManagementIndexScreen: React.FC = () => {
                                                                     finalPrice
                                                                 )}
                                                             </Text>
+                                                                                                                        <Text
+                                                                style={{
+                                                                    fontSize: 10,
+                                                                    color: MUTED,
+                                                                    marginTop: 2,
+                                                                }}
+                                                            >
+                                                                {pkg.eventDate} • {pkg.startTime}–{pkg.endTime}
+                                                            </Text>
+
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 10,
+                                                                    color: MUTED,
+                                                                    marginTop: 2,
+                                                                }}
+                                                            >
+                                                                Duration: {pkg.durationMinutes ? `${(pkg.durationMinutes / 60).toFixed(pkg.durationMinutes % 60 === 0 ? 0 : 1)} hr` : 'N/A'}
+                                                                {pkg.priceBasis === 'custom' ? ' • Custom rate' : ' • Fixed rate'}
+                                                                {typeof pkg.basePrice === 'number' && pkg.basePrice !== pkg.price ? ` • Base: Rs. ${pkg.basePrice.toLocaleString()}` : ''}
+                                                            </Text>
+
+                                                            <View
+                                                                style={{
+                                                                    flexDirection: 'row',
+                                                                    alignItems: 'center',
+                                                                    marginTop: 6,
+                                                                }}
+                                                            >
+                                                                <TouchableOpacity
+                                                                    onPress={() =>
+                                                                        handleUpdateQuantity(
+                                                                            vendorIndex,
+                                                                            packageIndex,
+                                                                            -1
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Ionicons
+                                                                        name="remove-circle-outline"
+                                                                        size={20}
+                                                                        color={PRIMARY}
+                                                                    />
+                                                                </TouchableOpacity>
+
+                                                                <Text
+                                                                    style={{
+                                                                        marginHorizontal: 8,
+                                                                        fontWeight: '700',
+                                                                    }}
+                                                                >
+                                                                    {pkg.quantity || 1}
+                                                                </Text>
+
+                                                                <TouchableOpacity
+                                                                    onPress={() =>
+                                                                        handleUpdateQuantity(
+                                                                            vendorIndex,
+                                                                            packageIndex,
+                                                                            1
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Ionicons
+                                                                        name="add-circle-outline"
+                                                                        size={20}
+                                                                        color={PRIMARY}
+                                                                    />
+                                                                </TouchableOpacity>
+                                                            </View>
                                                         </View>
 
                                                         <TouchableOpacity

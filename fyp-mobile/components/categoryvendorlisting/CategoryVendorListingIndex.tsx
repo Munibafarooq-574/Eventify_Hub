@@ -34,6 +34,7 @@ export default function App() {
   const [vendorPackages, setVendorPackages] = useState<Record<string, any[]>>({});
   const [loadingVendorDetails, setLoadingVendorDetails] = useState(false);
   const [eventTiming, setEventTiming] = useState<{
+  eventId?: string;
   eventDate: string;
   startTime: string;
   endTime: string;
@@ -84,6 +85,7 @@ const endMinutes = endDateTime
   .padStart(2, "0");
 
 return {
+  eventId: parsed.eventId,
   eventDate: dateOnly,
   startTime: parsed.startTime,
   durationMinutes: parsed.durationMinutes,
@@ -286,6 +288,7 @@ router.push({
   pathname: "/vendorprofiledetails",   
   params: {
   id: item._id,
+  eventId: eventTiming?.eventId || "",
   eventDate: eventTiming?.eventDate || "",
   startTime: eventTiming?.startTime || "",
   endTime: eventTiming?.endTime || "",
@@ -344,6 +347,7 @@ router.push({
   pathname: "/vendorprofiledetails",
    params: {
   id: item._id,
+  eventId: eventTiming?.eventId || "",
   eventDate: eventTiming?.eventDate || "",
   startTime: eventTiming?.startTime || "",
   endTime: eventTiming?.endTime || "",

@@ -1,3 +1,4 @@
+//fyp-mobile/components/cart/cart.index
 import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';

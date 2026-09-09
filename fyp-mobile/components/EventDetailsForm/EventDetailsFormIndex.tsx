@@ -1,6 +1,6 @@
 //fyp-mobile/components/EventDetailsForm/EventDetailsFormIndex.tsx
 import getAllCategories from "@/services/getAllCategories";
-import { saveSecureData } from "@/store";
+import { saveSecureData, getSecureData } from "@/store";
 import { useVendorsAvailability } from "@/hooks/useVendorsAvailability";
 
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -35,6 +35,11 @@ const DURATION_OPTIONS = [
   { label: "5 hours", value: 300 },
   { label: "6 hours", value: 360 },
 ];
+
+const generateEventId = () =>
+  `evt_${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
 
 const formatTime = (date: Date) => {
   return date.toLocaleTimeString("en-US", {
@@ -337,25 +342,39 @@ const updateCustomDuration = (
     }
 
     try {
-      await saveSecureData(
-        "eventDetails",
-        JSON.stringify({
-          eventName,
-          eventType,
-          eventDate,
-          startTime: timeToHHMM(startTime),
-          durationMinutes,
-          guests,
-          selectedServices,
+  let eventId: string | undefined;
 
-          // Will be populated later when
-          // vendors are selected.
-          vendorIds,
-        })
-      );
+  try {
+    const existingRaw = await getSecureData("eventDetails");
 
-      return true;
-    } catch (error) {
+    if (existingRaw) {
+      eventId = JSON.parse(existingRaw)?.eventId;
+    }
+  } catch {
+    // Existing event details invalid hon to new ID generate hogi
+  }
+
+  if (!eventId) {
+    eventId = generateEventId();
+  }
+
+  await saveSecureData(
+    "eventDetails",
+    JSON.stringify({
+      eventId,
+      eventName,
+      eventType,
+      eventDate,
+      startTime: timeToHHMM(startTime),
+      durationMinutes,
+      guests,
+      selectedServices,
+      vendorIds,
+    })
+  );
+
+  return true;
+} catch (error) {
       console.error(
         "Error saving event details:",
         error
