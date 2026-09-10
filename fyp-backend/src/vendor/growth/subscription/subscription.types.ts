@@ -1,39 +1,55 @@
-//fyp-backend/src/vendor/growth/subscription/subscription.types.ts
-//
-// Shared enums/types for the whole Vendor Growth system (subscription,
-// plan-config, feature-access, and later promotion/discount/badge modules
-// will all import from here — single source of truth).
+// fyp-backend/src/vendor/growth/subscription/subscription.types.ts
 
 export enum SubscriptionPlan {
+  // LEGACY ONLY.
+  // Old database documents may still contain "free".
+  // New subscriptions must never create this plan.
   FREE = 'free',
+
+  TRIAL = 'trial',
+  BASIC = 'basic',
   GROWTH = 'growth',
   PREMIUM = 'premium',
 }
 
 export enum SubscriptionStatus {
   ACTIVE = 'active',
+
+  // A vendor has submitted subscription payment details
+  // and is waiting for Admin verification.
+  PENDING_PAYMENT = 'pending_payment',
+
   EXPIRED = 'expired',
+
+  // Renewal disabled. Existing access remains until endDate.
   CANCELLED = 'cancelled',
+
+  // Submitted subscription payment was rejected.
+  REJECTED = 'rejected',
 }
 
-// Kept deliberately generic so a real payment gateway can slot in later
-// without changing the schema.
 export enum PaymentStatus {
-  NONE = 'none', // Free plan — no payment involved
-  DEMO = 'demo', // Manual/Demo Activation (current mode)
-  PENDING = 'pending', // reserved for real gateway flow
-  PAID = 'paid', // reserved for real gateway flow
-  FAILED = 'failed', // reserved for real gateway flow
+  NONE = 'none',
+
+  // Development-only compatibility.
+  DEMO = 'demo',
+
+  PENDING = 'pending',
+  PAID = 'paid',
+  FAILED = 'failed',
 }
 
 export enum PaymentProvider {
   NONE = 'none',
+
+  // Development-only.
   DEMO = 'demo',
-  // future real providers go here, e.g. STRIPE = 'stripe', JAZZCASH = 'jazzcash'
+
+  BANK_TRANSFER = 'bank_transfer',
+  JAZZCASH = 'jazzcash',
+  EASYPAISA = 'easypaisa',
 }
 
-// Every togglable feature across Growth/Premium. Boolean-style features
-// (does the vendor get this at all) live here.
 export enum FeatureKey {
   FEATURED_VENDOR = 'featuredVendor',
   FEATURED_PACKAGE = 'featuredPackage',
@@ -50,7 +66,6 @@ export enum FeatureKey {
   PRIORITY_SUPPORT = 'prioritySupport',
 }
 
-// Numeric-limit features (how many of X is the vendor allowed).
 export enum LimitKey {
   FEATURED_VENDOR_LIMIT = 'featuredVendorLimit',
   FEATURED_PACKAGE_LIMIT = 'featuredPackageLimit',
@@ -58,6 +73,12 @@ export enum LimitKey {
   DISCOUNT_CODE_LIMIT = 'discountCodeLimit',
 }
 
-// Demo activation cycle length. Single source so it's easy to change
-// later, or to expand into real per-plan billing periods.
-export const DEMO_SUBSCRIPTION_DURATION_DAYS = 30;
+// Exactly seven days from Vendor account creation.
+export const VENDOR_TRIAL_DURATION_DAYS = 7;
+
+// One paid subscription billing cycle.
+export const SUBSCRIPTION_DURATION_DAYS = 30;
+
+// Existing demo flow compatibility.
+export const DEMO_SUBSCRIPTION_DURATION_DAYS =
+  SUBSCRIPTION_DURATION_DAYS;

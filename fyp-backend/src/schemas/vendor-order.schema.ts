@@ -104,6 +104,7 @@ status:
         enum: [
             'UNPAID',
             'PAYMENT_REQUIRED',
+            'PARTIALLY_PAID',
             'PAID',
             'PAYMENT_FAILED',
             'PAYMENT_EXPIRED',

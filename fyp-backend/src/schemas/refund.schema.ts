@@ -1,4 +1,5 @@
 // fyp-backend/src/schemas/refund.schema.ts
+
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -17,10 +18,10 @@ export class Refund extends Document {
     vendorId: Types.ObjectId;
 
     @Prop({ required: true })
-    amountPaid: number; // what organizer had paid so far
+    amountPaid: number; // what client had paid so far
 
     @Prop({ required: true })
-    refundAmount: number; // what organizer gets back
+    refundAmount: number; // what client should get back
 
     @Prop({ required: true })
     withheldAmount: number; // amountPaid - refundAmount
@@ -36,11 +37,16 @@ export class Refund extends Document {
     daysBeforeEvent: number;
 
     @Prop({ required: true })
-    cancellationPolicyApplied: string; // e.g. 'PARTIALLY REFUNDABLE'
+    cancellationPolicyApplied: string;
 
     @Prop({
         type: String,
-        enum: ['PENDING', 'PROCESSING', 'PAID'],
+        enum: [
+            'PENDING',
+            'PROCESSING',
+            'REFUNDED',
+            'REJECTED',
+        ],
         default: 'PENDING',
     })
     status: string;
@@ -48,8 +54,17 @@ export class Refund extends Document {
     @Prop({ type: Date, default: null })
     processedAt?: Date | null;
 
+    // Legacy field kept for backward compatibility with old refund records
     @Prop({ type: Date, default: null })
     paidAt?: Date | null;
+
+    // New clearer field for successful refund settlement
+    @Prop({ type: Date, default: null })
+    refundedAt?: Date | null;
+
+    // Used when admin rejects a refund claim
+    @Prop({ type: Date, default: null })
+    rejectedAt?: Date | null;
 
     @Prop({ type: String, default: null })
     notes?: string | null;
@@ -57,4 +72,7 @@ export class Refund extends Document {
 
 export const RefundSchema = SchemaFactory.createForClass(Refund);
 
-RefundSchema.index({ vendorOrderId: 1 }, { unique: true });
+RefundSchema.index(
+    { vendorOrderId: 1 },
+    { unique: true },
+);

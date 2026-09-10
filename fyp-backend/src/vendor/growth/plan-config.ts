@@ -1,59 +1,128 @@
 // fyp-backend/src/vendor/growth/plan-config.ts
-//
-// SINGLE SOURCE OF TRUTH for what each plan includes. Nothing else in the
-// codebase should hardcode `if (plan === 'premium')`-style feature checks —
-// everything should go through FeatureAccessService, which reads from here.
-//
-// To change a limit (e.g. Growth coupon limit 5 -> 8), edit this file only.
 
-import { FeatureKey, LimitKey, SubscriptionPlan } from './subscription/subscription.types';
+import {
+  FeatureKey,
+  LimitKey,
+  SubscriptionPlan,
+} from './subscription/subscription.types';
 
 export interface PlanDefinition {
   key: SubscriptionPlan;
   name: string;
-  priceLabel: string; // display only — demo mode has no real billing yet
+
+  // Real backend-controlled subscription price.
+  // null means Admin has not configured a price yet.
+  monthlyPrice: number | null;
+
+  priceLabel: string;
+
+  isPurchasable: boolean;
   isMostPopular: boolean;
+
   description: string;
+
   features: Record<FeatureKey, boolean>;
   limits: Record<LimitKey, number>;
 }
 
-export const PLAN_CONFIG: Record<SubscriptionPlan, PlanDefinition> = {
+type StaticPlanDefinition = Omit<
+  PlanDefinition,
+  'monthlyPrice' | 'priceLabel'
+>;
+
+const BASE_FEATURES: Record<FeatureKey, boolean> = {
+  [FeatureKey.FEATURED_VENDOR]: false,
+  [FeatureKey.FEATURED_PACKAGE]: false,
+  [FeatureKey.PROMOTIONAL_BADGES]: false,
+  [FeatureKey.COUPONS]: false,
+  [FeatureKey.DISCOUNT_CODES]: false,
+  [FeatureKey.ADVANCED_PROMOTIONS]: false,
+  [FeatureKey.GROWTH_ANALYTICS]: false,
+  [FeatureKey.ADVANCED_ANALYTICS]: false,
+  [FeatureKey.BUSINESS_INSIGHTS]: false,
+  [FeatureKey.PREMIUM_BADGE]: false,
+  [FeatureKey.PRIORITY_VISIBILITY]: false,
+  [FeatureKey.PRIORITY_NOTIFICATIONS]: false,
+  [FeatureKey.PRIORITY_SUPPORT]: false,
+};
+
+const BASE_LIMITS: Record<LimitKey, number> = {
+  [LimitKey.FEATURED_VENDOR_LIMIT]: 0,
+  [LimitKey.FEATURED_PACKAGE_LIMIT]: 0,
+  [LimitKey.COUPON_LIMIT]: 0,
+  [LimitKey.DISCOUNT_CODE_LIMIT]: 0,
+};
+
+export const PLAN_CONFIG: Record<
+  SubscriptionPlan,
+  StaticPlanDefinition
+> = {
+  // ---------------------------------------------------------
+  // LEGACY FREE
+  // ---------------------------------------------------------
+  // Existing old database documents may still contain this.
+  // It is never returned as a purchasable plan.
   [SubscriptionPlan.FREE]: {
     key: SubscriptionPlan.FREE,
-    name: 'Free',
-    priceLabel: 'Rs. 0 / month',
+    name: 'Legacy Free',
+    isPurchasable: false,
     isMostPopular: false,
-    description: 'Basic business tools',
+    description:
+      'Legacy subscription state retained only for database compatibility.',
     features: {
-      [FeatureKey.FEATURED_VENDOR]: false,
-      [FeatureKey.FEATURED_PACKAGE]: false,
-      [FeatureKey.PROMOTIONAL_BADGES]: false, // earned/system badges only
-      [FeatureKey.COUPONS]: false,
-      [FeatureKey.DISCOUNT_CODES]: false,
-      [FeatureKey.ADVANCED_PROMOTIONS]: false,
-      [FeatureKey.GROWTH_ANALYTICS]: false,
-      [FeatureKey.ADVANCED_ANALYTICS]: false,
-      [FeatureKey.BUSINESS_INSIGHTS]: false,
-      [FeatureKey.PREMIUM_BADGE]: false,
-      [FeatureKey.PRIORITY_VISIBILITY]: false,
-      [FeatureKey.PRIORITY_NOTIFICATIONS]: false,
-      [FeatureKey.PRIORITY_SUPPORT]: false,
+      ...BASE_FEATURES,
     },
     limits: {
-      [LimitKey.FEATURED_VENDOR_LIMIT]: 0,
-      [LimitKey.FEATURED_PACKAGE_LIMIT]: 0,
-      [LimitKey.COUPON_LIMIT]: 0,
-      [LimitKey.DISCOUNT_CODE_LIMIT]: 0,
+      ...BASE_LIMITS,
     },
   },
 
+  // ---------------------------------------------------------
+  // 7-DAY TRIAL
+  // ---------------------------------------------------------
+  [SubscriptionPlan.TRIAL]: {
+    key: SubscriptionPlan.TRIAL,
+    name: '7-Day Free Trial',
+    isPurchasable: false,
+    isMostPopular: false,
+    description:
+      'Seven-day introductory access automatically provided to newly registered vendors.',
+    features: {
+      ...BASE_FEATURES,
+    },
+    limits: {
+      ...BASE_LIMITS,
+    },
+  },
+
+  // ---------------------------------------------------------
+  // BASIC
+  // ---------------------------------------------------------
+  [SubscriptionPlan.BASIC]: {
+    key: SubscriptionPlan.BASIC,
+    name: 'Basic',
+    isPurchasable: true,
+    isMostPopular: false,
+    description:
+      'Core Eventify Hub vendor access after the free trial.',
+    features: {
+      ...BASE_FEATURES,
+    },
+    limits: {
+      ...BASE_LIMITS,
+    },
+  },
+
+  // ---------------------------------------------------------
+  // GROWTH
+  // ---------------------------------------------------------
   [SubscriptionPlan.GROWTH]: {
     key: SubscriptionPlan.GROWTH,
     name: 'Growth',
-    priceLabel: 'Rs. XXX / month',
+    isPurchasable: true,
     isMostPopular: true,
-    description: 'More customers, featured visibility, coupons, advanced analytics',
+    description:
+      'More visibility, featured placement, coupons and growth analytics.',
     features: {
       [FeatureKey.FEATURED_VENDOR]: true,
       [FeatureKey.FEATURED_PACKAGE]: true,
@@ -77,12 +146,16 @@ export const PLAN_CONFIG: Record<SubscriptionPlan, PlanDefinition> = {
     },
   },
 
+  // ---------------------------------------------------------
+  // PREMIUM
+  // ---------------------------------------------------------
   [SubscriptionPlan.PREMIUM]: {
     key: SubscriptionPlan.PREMIUM,
     name: 'Premium',
-    priceLabel: 'Rs. XXX / month',
+    isPurchasable: true,
     isMostPopular: false,
-    description: 'More visibility, advanced promotions, advanced analytics, business insights',
+    description:
+      'Advanced promotions, analytics, business insights and priority benefits.',
     features: {
       [FeatureKey.FEATURED_VENDOR]: true,
       [FeatureKey.FEATURED_PACKAGE]: true,
@@ -107,14 +180,109 @@ export const PLAN_CONFIG: Record<SubscriptionPlan, PlanDefinition> = {
   },
 };
 
-export function getPlanDefinition(plan: SubscriptionPlan): PlanDefinition {
-  return PLAN_CONFIG[plan];
+function parseConfiguredPrice(
+  value: string | undefined,
+): number | null {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (
+    !Number.isFinite(parsed) ||
+    parsed <= 0
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function getConfiguredPlanPrice(
+  plan: SubscriptionPlan,
+): number | null {
+  switch (plan) {
+    case SubscriptionPlan.BASIC:
+      return parseConfiguredPrice(
+        process.env.SUBSCRIPTION_BASIC_PRICE_PKR,
+      );
+
+    case SubscriptionPlan.GROWTH:
+      return parseConfiguredPrice(
+        process.env.SUBSCRIPTION_GROWTH_PRICE_PKR,
+      );
+
+    case SubscriptionPlan.PREMIUM:
+      return parseConfiguredPrice(
+        process.env.SUBSCRIPTION_PREMIUM_PRICE_PKR,
+      );
+
+    case SubscriptionPlan.TRIAL:
+    case SubscriptionPlan.FREE:
+    default:
+      return 0;
+  }
+}
+
+function formatPriceLabel(
+  plan: SubscriptionPlan,
+  price: number | null,
+): string {
+  if (
+    plan === SubscriptionPlan.TRIAL
+  ) {
+    return 'Free for 7 days';
+  }
+
+  if (
+    plan === SubscriptionPlan.FREE
+  ) {
+    return 'Legacy';
+  }
+
+  if (price === null) {
+    return 'Price not configured';
+  }
+
+  return `Rs. ${price.toLocaleString('en-PK')} / month`;
+}
+
+export function getPlanDefinition(
+  plan: SubscriptionPlan,
+): PlanDefinition {
+  const base = PLAN_CONFIG[plan];
+
+  if (!base) {
+    throw new Error(
+      `Unknown subscription plan: ${plan}`,
+    );
+  }
+
+  const monthlyPrice =
+    getConfiguredPlanPrice(plan);
+
+  return {
+    ...base,
+    monthlyPrice,
+    priceLabel: formatPriceLabel(
+      plan,
+      monthlyPrice,
+    ),
+  };
 }
 
 export function getAllPlanDefinitions(): PlanDefinition[] {
+  // Only actual paid plans appear in purchase UI.
   return [
-    PLAN_CONFIG[SubscriptionPlan.FREE],
-    PLAN_CONFIG[SubscriptionPlan.GROWTH],
-    PLAN_CONFIG[SubscriptionPlan.PREMIUM],
+    getPlanDefinition(
+      SubscriptionPlan.BASIC,
+    ),
+    getPlanDefinition(
+      SubscriptionPlan.GROWTH,
+    ),
+    getPlanDefinition(
+      SubscriptionPlan.PREMIUM,
+    ),
   ];
 }

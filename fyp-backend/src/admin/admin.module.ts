@@ -1,7 +1,12 @@
 // fyp-backend/src/admin/admin.module.ts
 
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
+import {
+  Module,
+} from '@nestjs/common';
+
+import {
+  MongooseModule,
+} from '@nestjs/mongoose';
 
 import {
   VendorOrder,
@@ -43,120 +48,156 @@ import {
   UserSchema,
 } from 'src/schemas/user.schema';
 
-import { AdminService } from './admin.service';
-import { AdminController } from './admin.controller';
+import {
+  AdminService,
+} from './admin.service';
 
-import { AdminCommissionService } from './admin-commission.service';
-import { AdminCommissionController } from './admin-commission.controller';
+import {
+  AdminController,
+} from './admin.controller';
 
-import { AdminFinanceService } from './admin-finance.service';
-import { AdminFinanceController } from './admin-finance.controller';
+import {
+  AdminCommissionService,
+} from './admin-commission.service';
 
-import { AdminDisputeService } from './admin-dispute.service';
-import { AdminDisputeController } from './admin-dispute.controller';
+import {
+  AdminCommissionController,
+} from './admin-commission.controller';
 
-import { AdminAnalyticsService } from './admin-analytics.service';
-import { AdminAnalyticsController } from './admin-analytics.controller';
+import {
+  AdminFinanceService,
+} from './admin-finance.service';
 
-// Reuse existing authentication infrastructure.
-// JwtAuthGuard + AdminRoleGuard are exported from AuthModule.
-import { AuthModule } from '../auth/auth.module';
+import {
+  AdminFinanceController,
+} from './admin-finance.controller';
 
-// Reuse existing category/category-request business logic.
-import { CategoryModule } from '../category/category.module';
+import {
+  AdminDisputeService,
+} from './admin-dispute.service';
+
+import {
+  AdminDisputeController,
+} from './admin-dispute.controller';
+
+import {
+  AdminAnalyticsService,
+} from './admin-analytics.service';
+
+import {
+  AdminAnalyticsController,
+} from './admin-analytics.controller';
+
+import {
+  AuthModule,
+} from '../auth/auth.module';
+
+import {
+  CategoryModule,
+} from '../category/category.module';
+
+// Reuse the existing Vendor Growth / Subscription module.
+// SubscriptionService is already exported by this module.
+import {
+  VendorGrowthModule,
+} from '../vendor/growth/vendor-growth.module';
 
 @Module({
   imports: [
     // =====================================================
-    // ADMIN AUTHENTICATION / AUTHORIZATION
+    // AUTH
     // =====================================================
+
     AuthModule,
 
     // =====================================================
-    // CATEGORY / CATEGORY REQUESTS
+    // CATEGORY
     // =====================================================
+
     CategoryModule,
+
+    // =====================================================
+    // EXISTING SUBSCRIPTION SYSTEM
+    // =====================================================
+
+    VendorGrowthModule,
 
     // =====================================================
     // ADMIN DATABASE MODELS
     // =====================================================
+
     MongooseModule.forFeature([
-      // Booking models
       {
-        name: VendorOrder.name,
-        schema: VendorOrderSchema,
-      },
-      {
-        name: Order.name,
-        schema: OrderSchema,
+        name:
+          VendorOrder.name,
+        schema:
+          VendorOrderSchema,
       },
 
-      // Finance models
       {
-        name: Payment.name,
-        schema: PaymentSchema,
-      },
-      {
-        name: Payout.name,
-        schema: PayoutSchema,
-      },
-      {
-        name: Refund.name,
-        schema: RefundSchema,
+        name:
+          Order.name,
+        schema:
+          OrderSchema,
       },
 
-      // Commission configuration
       {
-        name: CommissionConfig.name,
-        schema: CommissionConfigSchema,
+        name:
+          Payment.name,
+        schema:
+          PaymentSchema,
       },
 
-      // Dispute model
       {
-        name: Dispute.name,
-        schema: DisputeSchema,
+        name:
+          Payout.name,
+        schema:
+          PayoutSchema,
       },
 
-      // User model
-      // Used by AdminService / AdminAnalyticsService.
       {
-        name: User.name,
-        schema: UserSchema,
+        name:
+          Refund.name,
+        schema:
+          RefundSchema,
+      },
+
+      {
+        name:
+          CommissionConfig.name,
+        schema:
+          CommissionConfigSchema,
+      },
+
+      {
+        name:
+          Dispute.name,
+        schema:
+          DisputeSchema,
+      },
+
+      {
+        name:
+          User.name,
+        schema:
+          UserSchema,
       },
     ]),
   ],
 
   controllers: [
-    // Core admin
     AdminController,
-
-    // Commission
     AdminCommissionController,
-
-    // Finance
     AdminFinanceController,
-
-    // Disputes
     AdminDisputeController,
-
-    // Analytics
     AdminAnalyticsController,
   ],
 
   providers: [
-    // Core admin
     AdminService,
-
-    // Commission
     AdminCommissionService,
-
-    // Finance
     AdminFinanceService,
-
-    // Disputes
     AdminDisputeService,
-
-    // Analytics
     AdminAnalyticsService,
   ],
 })

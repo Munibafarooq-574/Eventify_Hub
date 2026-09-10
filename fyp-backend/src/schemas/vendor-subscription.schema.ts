@@ -1,6 +1,17 @@
 // fyp-backend/src/schemas/vendor-subscription.schema.ts
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+
+import {
+  Prop,
+  Schema,
+  SchemaFactory,
+} from '@nestjs/mongoose';
+
+import {
+  Document,
+  Schema as MongooseSchema,
+  Types,
+} from 'mongoose';
+
 import {
   PaymentProvider,
   PaymentStatus,
@@ -8,52 +19,171 @@ import {
   SubscriptionStatus,
 } from '../vendor/growth/subscription/subscription.types';
 
-// One document per subscription "cycle". We never delete old documents —
-// when a vendor upgrades/downgrades/renews, the old doc is kept for
-// history (isCurrent: false) and a new doc becomes the current one.
-// This matches "Do not simply delete data when a subscription expires."
-
 @Schema({ timestamps: true })
 export class VendorSubscription extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
-  vendorId: MongooseSchema.Types.ObjectId;
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
+  vendorId: Types.ObjectId;
 
-  @Prop({ type: String, enum: SubscriptionPlan, required: true, default: SubscriptionPlan.FREE })
+  @Prop({
+    type: String,
+    enum: SubscriptionPlan,
+    required: true,
+    default: SubscriptionPlan.TRIAL,
+  })
   plan: SubscriptionPlan;
 
-  @Prop({ type: String, enum: SubscriptionStatus, required: true, default: SubscriptionStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: SubscriptionStatus,
+    required: true,
+    default: SubscriptionStatus.ACTIVE,
+  })
   status: SubscriptionStatus;
 
-  @Prop({ type: Date, required: true, default: () => new Date() })
+  @Prop({
+    type: Date,
+    required: true,
+    default: () => new Date(),
+  })
   startDate: Date;
 
-  // null for the Free plan — Free never expires on its own.
-  @Prop({ type: Date, default: null })
+  @Prop({
+    type: Date,
+    default: null,
+  })
   endDate: Date | null;
 
-  // --- Payment-related fields ---
-  // Kept even though we're not charging money yet, so a real payment
-  // gateway can be dropped in later without a schema migration.
-  @Prop({ type: String, enum: PaymentStatus, required: true, default: PaymentStatus.NONE })
+  // ---------------------------------------------------------
+  // PAYMENT
+  // ---------------------------------------------------------
+
+  @Prop({
+    type: String,
+    enum: PaymentStatus,
+    required: true,
+    default: PaymentStatus.NONE,
+    index: true,
+  })
   paymentStatus: PaymentStatus;
 
-  @Prop({ type: String, enum: PaymentProvider, required: true, default: PaymentProvider.NONE })
+  @Prop({
+    type: String,
+    enum: PaymentProvider,
+    required: true,
+    default: PaymentProvider.NONE,
+  })
   paymentProvider: PaymentProvider;
 
-  @Prop({ type: String, default: null })
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
   paymentReference: string | null;
 
-  @Prop({ type: Number, default: 0 })
+  // Price snapshot captured by BACKEND when request is made.
+  // Later plan-price changes will not modify this request.
+  @Prop({
+    type: Number,
+    min: 0,
+    default: 0,
+  })
+  amountDue: number;
+
+  @Prop({
+    type: Number,
+    min: 0,
+    default: 0,
+  })
   amountPaid: number;
 
-  // Only one document per vendor should have isCurrent: true at a time.
-  @Prop({ type: Boolean, default: true, index: true })
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  paymentSubmittedAt: Date | null;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  verifiedAt: Date | null;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  })
+  verifiedBy: Types.ObjectId | null;
+
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
+  rejectionReason: string | null;
+
+  // ---------------------------------------------------------
+  // SUBSCRIPTION LIFECYCLE
+  // ---------------------------------------------------------
+
+  @Prop({
+    type: Boolean,
+    default: true,
+    index: true,
+  })
   isCurrent: boolean;
 
-  @Prop({ type: String, default: null })
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
   cancelledReason: string | null;
 }
 
-export const VendorSubscriptionSchema = SchemaFactory.createForClass(VendorSubscription);
+export const VendorSubscriptionSchema =
+  SchemaFactory.createForClass(
+    VendorSubscription,
+  );
 
-VendorSubscriptionSchema.index({ vendorId: 1, isCurrent: 1 });
+VendorSubscriptionSchema.index({
+  vendorId: 1,
+  isCurrent: 1,
+});
+
+VendorSubscriptionSchema.index({
+  vendorId: 1,
+  paymentStatus: 1,
+});
+
+VendorSubscriptionSchema.index({
+  paymentStatus: 1,
+  createdAt: -1,
+});
+
+VendorSubscriptionSchema.index({
+  plan: 1,
+  status: 1,
+});
+
+// Prevent two simultaneous pending payment requests
+// for the same vendor.
+VendorSubscriptionSchema.index(
+  {
+    vendorId: 1,
+    paymentStatus: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      paymentStatus:
+        PaymentStatus.PENDING,
+    },
+  },
+);
