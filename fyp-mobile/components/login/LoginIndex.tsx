@@ -1,5 +1,6 @@
 import Login from '@/services/login';
 import { saveSecureData, saveUserData } from '@/store';
+import { connectSocket, registerUser } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
 import { router } from 'expo-router';
@@ -31,15 +32,24 @@ export default function LoginScreen() {
     console.log('Facebook Login pressed!');
   };
 
-  const handleLogin = async () => {
+ const handleLogin = async () => {
   try {
     setIsLoading(true);
     setIsDisabled(true);
 
     const response = await Login(email, password);
 
+    // Save authenticated session first
     await saveSecureData("token", response.token);
     await saveUserData(response.user);
+
+    // Register authenticated user for app-level realtime presence.
+    // User should become Online immediately after login,
+    // without needing to open the Messages screen.
+    if (response?.user?._id) {
+      connectSocket();
+      registerUser(String(response.user._id));
+    }
 
     console.log(response.user.role);
 
@@ -53,13 +63,17 @@ export default function LoginScreen() {
     }
   } catch (e: any) {
     console.log(e);
+
     setIsLoading(false);
     setIsDisabled(false);
 
     Toast.show({
       type: "error",
       text1: "Failed",
-      text2: e,
+      text2:
+        typeof e === "string"
+          ? e
+          : e?.message || "Unable to login. Please try again.",
     });
   }
 };

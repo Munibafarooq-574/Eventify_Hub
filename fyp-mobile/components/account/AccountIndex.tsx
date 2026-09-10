@@ -2,6 +2,7 @@
 //(Organizer Account Screen)
 
 import { deleteSecureData, deleteUserData, getUserData } from '@/store';
+import { disconnectSocket } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -80,17 +81,25 @@ const AccountScreen: React.FC = () => {
   };
 
   const confirmLogout = async () => {
-    setModalVisible(false);
-    try {
-      await deleteSecureData("token");
-      await deleteUserData();
-      await deleteSecureData("cartData");
-      console.log("Logout data deleted successfully");
-    } catch (error) {
-      console.error("Failed to clear logout data:", error);
-    }
-    router.replace('/intro');
-  };
+  setModalVisible(false);
+
+  try {
+    // Disconnect current realtime session first.
+    // Backend handleDisconnect() will mark the client offline
+    // when this is their last active socket.
+    disconnectSocket();
+
+    await deleteSecureData("token");
+    await deleteUserData();
+    await deleteSecureData("cartData");
+
+    console.log("Logout data deleted successfully");
+  } catch (error) {
+    console.error("Failed to clear logout data:", error);
+  }
+
+  router.replace('/intro');
+};
 
   const cancelLogout = () => setModalVisible(false);
 

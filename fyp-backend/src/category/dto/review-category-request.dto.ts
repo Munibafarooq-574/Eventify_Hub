@@ -6,6 +6,10 @@ import {
   MaxLength,
 } from 'class-validator';
 
+import {
+  BusinessDetailsType,
+} from '../../schemas/category.schema';
+
 export enum CategoryRequestReviewAction {
   APPROVE = 'APPROVE',
   REJECT = 'REJECT',
@@ -21,11 +25,16 @@ export class ReviewCategoryRequestDto {
   @MaxLength(300)
   adminNote?: string;
 
-  /**
-   * Required when action = MERGE.
-   * Existing Category _id.
-   */
   @IsOptional()
   @IsMongoId()
   mergeCategoryId?: string;
+
+  // Used only when APPROVE is selected
+  @IsOptional()
+  @IsString()
+  pictureUrl?: string;
+
+  @IsOptional()
+  @IsEnum(BusinessDetailsType)
+  businessDetailsType?: BusinessDetailsType;
 }

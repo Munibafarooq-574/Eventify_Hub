@@ -1,5 +1,6 @@
 //vendor account index page
 import { deleteSecureData, deleteUserData, getUserData } from '@/store';
+import { disconnectSocket } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -101,10 +102,14 @@ const AccountScreen: React.FC = () => {
       .catch((err) => console.error('An error occurred', err));
   };
 
-  const confirmLogout = async () => {
+const confirmLogout = async () => {
   setModalVisible(false);
 
   try {
+    // Disconnect realtime session before removing local auth data.
+    // Backend will mark vendor offline when no other socket remains.
+    disconnectSocket();
+
     // Token is stored in SecureStore
     await deleteSecureData("token");
 

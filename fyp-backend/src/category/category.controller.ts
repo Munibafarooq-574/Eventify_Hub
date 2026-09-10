@@ -5,15 +5,13 @@ import {
   Controller,
   Get,
   Post,
-  UploadedFile,
-  UseInterceptors,
 } from '@nestjs/common';
 
-import { FileInterceptor } from '@nestjs/platform-express';
-
 import { CategoryService } from './category.service';
-import { CreateDto } from './dto/create.dto';
-import { CreateCategoryRequestDto } from './dto/create-category-request.dto';
+
+import {
+  CreateCategoryRequestDto,
+} from './dto/create-category-request.dto';
 
 @Controller('category')
 export class CategoryController {
@@ -21,45 +19,37 @@ export class CategoryController {
     private readonly categoryService: CategoryService,
   ) {}
 
-  // ============================
-  // CREATE CATEGORY
-  // POST /category
-  // ============================
-
-  @Post()
-  @UseInterceptors(FileInterceptor('file'))
-  create(
-    @Body() createDto: CreateDto,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    return this.categoryService.create(
-      createDto,
-      file,
-    );
-  }
-
-  // ============================
+  // ============================================================
   // GET ACTIVE CATEGORIES
   // GET /category
-  // ============================
+  //
+  // Public/mobile category discovery.
+  // Only active categories are returned.
+  // ============================================================
 
   @Get()
   getAll() {
     return this.categoryService.getAll();
   }
 
-  // ============================
+  // ============================================================
   // CREATE CATEGORY REQUEST
   // POST /category/requests
   //
-  // Vendor / registration side
-  // can submit a missing category request.
-  // Admin review endpoints live under /admin.
-  // ============================
+  // Vendor / registration side can request a missing category.
+  //
+  // Vendor/public user cannot directly create a real category.
+  // Actual category creation is handled by:
+  //
+  // POST /admin/categories
+  //
+  // which is protected by Admin authentication/role guards.
+  // ============================================================
 
   @Post('requests')
   createCategoryRequest(
-    @Body() dto: CreateCategoryRequestDto,
+    @Body()
+    dto: CreateCategoryRequestDto,
   ) {
     return this.categoryService.createCategoryRequest(
       dto,

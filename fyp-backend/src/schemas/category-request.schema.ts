@@ -3,6 +3,7 @@ import {
   Schema,
   SchemaFactory,
 } from '@nestjs/mongoose';
+
 import {
   HydratedDocument,
   Types,
@@ -23,13 +24,44 @@ export enum CategoryRequestStatus {
   collection: 'category_requests',
 })
 export class CategoryRequest {
+  // ---------------------------------------------------------
+  // REQUESTER DETAILS
+  //
+  // Optional at schema/database level for backward
+  // compatibility with old category request documents.
+  //
+  // New requests are still REQUIRED to provide these fields
+  // through CreateCategoryRequestDto.
+  // ---------------------------------------------------------
+
   @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
+  requesterName?: string | null;
+
+  @Prop({
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: null,
+  })
+  requesterEmail?: string | null;
+
+  // ---------------------------------------------------------
+  // REQUESTED CATEGORY
+  // ---------------------------------------------------------
+
+  @Prop({
+    type: String,
     required: true,
     trim: true,
   })
   requestedName: string;
 
   @Prop({
+    type: String,
     required: true,
     trim: true,
     lowercase: true,
@@ -38,18 +70,30 @@ export class CategoryRequest {
   normalizedName: string;
 
   @Prop({
+    type: String,
     required: true,
     trim: true,
   })
   description: string;
 
+  // ---------------------------------------------------------
+  // REQUEST STATUS
+  // ---------------------------------------------------------
+
   @Prop({
     type: String,
-    enum: Object.values(CategoryRequestStatus),
-    default: CategoryRequestStatus.PENDING,
+    enum: Object.values(
+      CategoryRequestStatus,
+    ),
+    default:
+      CategoryRequestStatus.PENDING,
     index: true,
   })
   status: CategoryRequestStatus;
+
+  // ---------------------------------------------------------
+  // OPTIONAL USER RELATION
+  // ---------------------------------------------------------
 
   @Prop({
     type: Types.ObjectId,
@@ -57,6 +101,10 @@ export class CategoryRequest {
     default: null,
   })
   requestedBy?: Types.ObjectId | null;
+
+  // ---------------------------------------------------------
+  // ADMIN REVIEW
+  // ---------------------------------------------------------
 
   @Prop({
     type: Types.ObjectId,
@@ -77,16 +125,19 @@ export class CategoryRequest {
     default: null,
   })
   approvedCategoryId?: Types.ObjectId | null;
-@Prop({
-  type: String,
-  trim: true,
-  default: null,
-})
-adminNote?: string | null;
+
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
+  adminNote?: string | null;
 }
 
 export const CategoryRequestSchema =
-  SchemaFactory.createForClass(CategoryRequest);
+  SchemaFactory.createForClass(
+    CategoryRequest,
+  );
 
 CategoryRequestSchema.index({
   normalizedName: 1,

@@ -11,12 +11,21 @@ export async function backendFetch(
 ) {
   const url = `${BACKEND_API_URL}${path}`;
 
+  const headers = new Headers(options.headers || {});
+
+  // Only set JSON content type when body is NOT FormData.
+  // FormData needs its own multipart boundary generated automatically.
+  if (!(options.body instanceof FormData)) {
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+  } else {
+    headers.delete("Content-Type");
+  }
+
   return fetch(url, {
     ...options,
     cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers,
   });
 }

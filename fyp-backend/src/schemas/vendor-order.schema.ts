@@ -9,7 +9,11 @@ export class VendorOrder extends Document {
     @Prop({ type: Types.ObjectId, required: true, ref: 'Order' })
     orderId: Types.ObjectId;
 
-    @Prop({ type: Types.ObjectId, required: true, ref: 'Vendor' })
+    @Prop({
+        type: Types.ObjectId,
+        required: true,
+        ref: 'User',
+    })
     vendorId: Types.ObjectId;
 
     @Prop({ required: true })

@@ -24,6 +24,60 @@ import { SearchVendorsDto } from './dto/search-vendors.dto';
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 
+/**
+ * =============================================================
+ * PUBLIC VENDOR PROJECTION
+ * =============================================================
+ *
+ * /auth/vendor-search is a PUBLIC endpoint.
+ *
+ * Never return the complete User document from this endpoint.
+ * Only explicitly allowed public vendor/profile fields should
+ * leave the backend.
+ *
+ * Sensitive fields such as:
+ *
+ * - password
+ * - pushToken
+ * - providerId
+ * - authentication/internal fields
+ *
+ * are intentionally NOT selected.
+ */
+const PUBLIC_VENDOR_SELECT = [
+  '_id',
+  'name',
+  'role',
+
+  'buisnessCategory',
+  'categoryId',
+  'categoryName',
+  'businessDetailsType',
+
+  'contactDetails',
+
+  'coverImage',
+  'images',
+  'packages',
+
+  'photographerBusinessDetails',
+  'cateringBusinessDetails',
+  'venueBusinessDetails',
+  'salonBusinessDetails',
+  'cakeBusinessDetails',
+  'mehndiBusinessDetails',
+  'soundBusinessDetails',
+  'genericBusinessDetails',
+
+  'availabilitySettings',
+
+  'isOnline',
+  'lastSeen',
+
+  'createdAt',
+  'updatedAt',
+].join(' ');
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger('fyp');
@@ -551,6 +605,17 @@ export class AuthService {
 
   // =========================================================
   // SEARCH VENDORS
+  //
+  // PUBLIC ENDPOINT SECURITY:
+  //
+  // Never return complete User documents from this method.
+  // PUBLIC_VENDOR_SELECT is applied in BOTH:
+  //
+  // 1. no-filter vendor listing
+  // 2. filtered vendor listing
+  //
+  // This prevents password/authentication fields from being
+  // exposed through GET /auth/vendor-search.
   // =========================================================
 
   async searchVendorsByFilters(
@@ -572,12 +637,29 @@ export class AuthService {
           value !== '',
       );
 
+    // =====================================================
+    // NO FILTERS
+    // =====================================================
+
     if (!hasFilters) {
       const allVendors =
         await this.userModel
           .find({
             role: 'Vendor',
           })
+
+          /**
+           * SECURITY:
+           * Positive allowlist only.
+           *
+           * Password, pushToken and other authentication
+           * fields cannot be returned because they are
+           * not part of PUBLIC_VENDOR_SELECT.
+           */
+          .select(
+            PUBLIC_VENDOR_SELECT,
+          )
+
           .lean();
 
       return allVendors.map(
@@ -779,6 +861,16 @@ export class AuthService {
     const users =
       await this.userModel
         .find(query)
+
+        /**
+         * SECURITY:
+         * The filtered query must use exactly the same
+         * public allowlist as the no-filter query.
+         */
+        .select(
+          PUBLIC_VENDOR_SELECT,
+        )
+
         .lean();
 
     // =====================================================
