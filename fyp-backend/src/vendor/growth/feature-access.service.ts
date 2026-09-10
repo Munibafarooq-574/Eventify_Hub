@@ -7,6 +7,7 @@ import { SubscriptionService } from './subscription/subscription.service';
 import {
   FeatureKey,
   LimitKey,
+  PaymentStatus,
   SubscriptionPlan,
   SubscriptionStatus,
 } from './subscription/subscription.types';
@@ -18,6 +19,7 @@ export class FeatureAccessService {
   constructor(
     private readonly subscriptionService: SubscriptionService,
   ) {}
+
 
   async getCurrentPlan(
     vendorId: string,
@@ -38,7 +40,9 @@ export class FeatureAccessService {
         vendorId,
       );
 
-    return this.hasUsableAccess(subscription);
+    return this.hasUsableAccess(
+      subscription,
+    );
   }
 
   async hasPaidSubscription(
@@ -49,7 +53,20 @@ export class FeatureAccessService {
         vendorId,
       );
 
-    if (!this.hasUsableAccess(subscription)) {
+    if (
+      !this.hasUsableAccess(
+        subscription,
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      subscription.status !==
+        SubscriptionStatus.ACTIVE ||
+      subscription.paymentStatus !==
+        PaymentStatus.PAID
+    ) {
       return false;
     }
 
@@ -57,7 +74,9 @@ export class FeatureAccessService {
       SubscriptionPlan.BASIC,
       SubscriptionPlan.GROWTH,
       SubscriptionPlan.PREMIUM,
-    ].includes(subscription.plan);
+    ].includes(
+      subscription.plan,
+    );
   }
 
   async canUseFeature(
@@ -69,13 +88,18 @@ export class FeatureAccessService {
         vendorId,
       );
 
-    if (!this.hasUsableAccess(subscription)) {
+    if (
+      !this.hasUsableAccess(
+        subscription,
+      )
+    ) {
       return false;
     }
 
     return (
-      getPlanDefinition(subscription.plan)
-        .features[feature] === true
+      getPlanDefinition(
+        subscription.plan,
+      ).features[feature] === true
     );
   }
 
@@ -88,13 +112,18 @@ export class FeatureAccessService {
         vendorId,
       );
 
-    if (!this.hasUsableAccess(subscription)) {
+    if (
+      !this.hasUsableAccess(
+        subscription,
+      )
+    ) {
       return 0;
     }
 
     return (
-      getPlanDefinition(subscription.plan)
-        .limits[limit] ?? 0
+      getPlanDefinition(
+        subscription.plan,
+      ).limits[limit] ?? 0
     );
   }
 
@@ -115,6 +144,7 @@ export class FeatureAccessService {
   private hasUsableAccess(
     subscription: any,
   ): boolean {
+  
     if (
       subscription.status ===
       SubscriptionStatus.EXPIRED
@@ -122,8 +152,20 @@ export class FeatureAccessService {
       return false;
     }
 
-    // CANCELLED means renewal was cancelled.
-    // Existing paid access continues until endDate.
+    if (
+      subscription.status ===
+      SubscriptionStatus.PENDING_PAYMENT
+    ) {
+      return false;
+    }
+
+    if (
+      subscription.status ===
+      SubscriptionStatus.REJECTED
+    ) {
+      return false;
+    }
+
     if (
       subscription.status ===
       SubscriptionStatus.CANCELLED
@@ -132,13 +174,16 @@ export class FeatureAccessService {
         subscription.endDate &&
           new Date(
             subscription.endDate,
-          ).getTime() > Date.now(),
+          ).getTime() >
+            Date.now(),
       );
     }
 
     if (
       subscription.status !==
-      SubscriptionStatus.ACTIVE
+        SubscriptionStatus.ACTIVE &&
+      subscription.status !==
+        SubscriptionStatus.TRIAL
     ) {
       return false;
     }
@@ -150,7 +195,8 @@ export class FeatureAccessService {
     return (
       new Date(
         subscription.endDate,
-      ).getTime() > Date.now()
+      ).getTime() >
+      Date.now()
     );
   }
 }

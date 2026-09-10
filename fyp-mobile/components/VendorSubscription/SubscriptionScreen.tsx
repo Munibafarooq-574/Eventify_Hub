@@ -1,307 +1,561 @@
 // fyp-mobile/components/VendorSubscription/SubscriptionScreen.tsx
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { ChevronLeft, Star, Crown, Check } from 'lucide-react-native';
-
-import { getSubscriptionPlans } from '../../services/getSubscriptionPlans';
-import { getVendorSubscription } from '../../services/getVendorSubscription';
-import { activateDemoSubscription } from '../../services/activateDemoSubscription';
-import { cancelSubscription } from '../../services/cancelSubscription';
 
 import {
+  ChevronLeft,
+  Check,
+  Clock3,
+  Crown,
+  Star,
+  WalletCards,
+} from 'lucide-react-native';
+
+import {
+  Stack,
+  useLocalSearchParams,
+  useRouter,
+} from 'expo-router';
+
+import {
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+
+import {
+  getSubscriptionPlans,
+} from '../../services/getSubscriptionPlans';
+
+import {
+  getSubscriptionAccessState,
+} from '../../services/getSubscriptionAccessState';
+
+import {
+  getSubscriptionHistory,
+} from '../../services/getSubscriptionHistory';
+
+import {
+  getSubscriptionPaymentInstructions,
+} from '../../services/getSubscriptionPaymentInstructions';
+
+import {
+  requestSubscriptionPayment,
+} from '../../services/requestSubscriptionPayment';
+
+import {
+  cancelSubscription,
+} from '../../services/cancelSubscription';
+
+import {
+  PaymentProvider,
+  PaymentStatus,
   PlanDefinition,
+  SubscriptionAccessState,
+  SubscriptionPaymentInstructions,
   SubscriptionPlan,
   SubscriptionStatus,
   VendorSubscription,
 } from '../../types/subscription.types';
 
-// TODO: swap these for EventifyHub's existing theme constants if you have
-// a theme/colors file already.
 const COLORS = {
   primary: '#7D0C72',
   primaryDark: '#57084F',
   primaryLight: '#F8E9F6',
   primarySoft: '#F1D3EC',
+
   text: '#1F2937',
   muted: '#6B7280',
+
   border: '#E9E4E8',
   background: '#FAF6F9',
   card: '#FFFFFF',
+
+  success: '#15803D',
+  successBg: '#F0FDF4',
+
+  warning: '#B45309',
+  warningBg: '#FFF7ED',
+
+  danger: '#DC2626',
+  dangerBg: '#FEF2F2',
+
+  info: '#1D4ED8',
+  infoBg: '#EFF6FF',
+
   popularBg: '#FEF3C7',
   popularText: '#92400E',
+
   gold: '#B8860B',
-  danger: '#DC2626',
 };
 
-// Bullet copy per plan.
-const PLAN_HIGHLIGHTS: Record<SubscriptionPlan, string[]> = {
-  [SubscriptionPlan.FREE]: [
-    'Vendor profile & packages',
-    'Booking management',
-    'Basic analytics',
+const PLAN_HIGHLIGHTS: Partial<
+  Record<SubscriptionPlan, string[]>
+> = {
+  [SubscriptionPlan.BASIC]: [
+    'Up to 5 packages',
+    'Up to 10 portfolio images',
+    'Up to 3 images per package',
+    'Standard marketplace listing',
+    'Bookings, messages & availability',
+    'Reviews and basic business stats',
   ],
 
   [SubscriptionPlan.GROWTH]: [
-    'More customers',
-    'Featured visibility',
-    'Coupons',
-    'Advanced analytics',
+    'Up to 10 packages',
+    'Up to 30 portfolio images',
+    'Up to 6 images per package',
+    '2 promotional campaigns per month',
+    'Growth visibility & featured eligibility',
+    'Advanced analytics & business insights',
   ],
 
   [SubscriptionPlan.PREMIUM]: [
-    'More visibility',
-    'Advanced promotions',
-    'Advanced analytics',
-    'Business insights',
+    'Up to 20 packages',
+    'Up to 60 portfolio images',
+    'Up to 10 images per package',
+    '5 promotional campaigns per month',
+    'Premium Partner visibility',
+    'Priority placement & support',
   ],
 };
 
-// Plan icons.
-const PLAN_ICON: Record<
-  SubscriptionPlan,
-  React.ComponentType<{
-    size?: number;
-    color?: string;
-    strokeWidth?: number;
-  }> | null
-> = {
-  [SubscriptionPlan.FREE]: null,
-  [SubscriptionPlan.GROWTH]: Star,
-  [SubscriptionPlan.PREMIUM]: Crown,
-};
+function formatDate(
+  value?: string | null,
+): string {
+  if (!value) {
+    return '';
+  }
 
-const PLAN_ICON_TINT: Record<
-  SubscriptionPlan,
-  { bg: string; color: string }
-> = {
-  [SubscriptionPlan.FREE]: {
-    bg: '#F3F4F6',
-    color: COLORS.muted,
-  },
+  return new Date(value).toLocaleDateString(
+    'en-GB',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    },
+  );
+}
 
-  [SubscriptionPlan.GROWTH]: {
-    bg: COLORS.primaryLight,
-    color: COLORS.primary,
-  },
+function getPlanName(
+  plan?: SubscriptionPlan | null,
+): string {
+  switch (plan) {
+    case SubscriptionPlan.BASIC:
+      return 'Basic';
 
-  [SubscriptionPlan.PREMIUM]: {
-    bg: '#FBF0D9',
-    color: COLORS.gold,
-  },
-};
+    case SubscriptionPlan.GROWTH:
+      return 'Growth';
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '';
+    case SubscriptionPlan.PREMIUM:
+      return 'Premium';
 
-  return new Date(dateStr).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+    default:
+      return 'Subscription';
+  }
 }
 
 export default function SubscriptionScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
-  const { vendorId } = useLocalSearchParams<{
-    vendorId?: string;
-  }>();
+  const insets =
+    useSafeAreaInsets();
 
-  const vendorIdValue = Array.isArray(vendorId)
-    ? vendorId[0]
-    : vendorId;
+  const params =
+    useLocalSearchParams<{
+      vendorId?: string | string[];
+    }>();
 
-  const [plans, setPlans] = useState<PlanDefinition[]>([]);
-  const [subscription, setSubscription] =
-    useState<VendorSubscription | null>(null);
+  const vendorId =
+    Array.isArray(params.vendorId)
+      ? params.vendorId[0]
+      : params.vendorId;
 
-  const [loading, setLoading] = useState(true);
-  const [activatingPlan, setActivatingPlan] =
-    useState<SubscriptionPlan | null>(null);
+  const [plans, setPlans] =
+    useState<PlanDefinition[]>([]);
 
-  const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [
+    accessState,
+    setAccessState,
+  ] =
+    useState<
+      SubscriptionAccessState | null
+    >(null);
 
-  const loadData = useCallback(async () => {
-    if (!vendorIdValue) {
-      setError('Missing vendorId');
-      setLoading(false);
-      return;
-    }
+  const [
+    history,
+    setHistory,
+  ] =
+    useState<VendorSubscription[]>([]);
 
-    try {
-      setError(null);
+  const [
+    paymentInstructions,
+    setPaymentInstructions,
+  ] =
+    useState<
+      SubscriptionPaymentInstructions | null
+    >(null);
 
-      const [planList, sub] = await Promise.all([
-        getSubscriptionPlans(),
-        getVendorSubscription(vendorIdValue),
-      ]);
+  const [
+    selectedPlan,
+    setSelectedPlan,
+  ] =
+    useState<PlanDefinition | null>(
+      null,
+    );
 
-      setPlans(planList);
-      setSubscription(sub);
-    } catch (e: any) {
-      setError(
-        e?.message || 'Failed to load subscription plans',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [vendorIdValue]);
+  const [
+    paymentReference,
+    setPaymentReference,
+  ] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    submitting,
+    setSubmitting,
+  ] =
+    useState(false);
+
+  const [
+    cancelling,
+    setCancelling,
+  ] =
+    useState(false);
+
+  const [error, setError] =
+    useState<string | null>(
+      null,
+    );
+
+  const loadData =
+    useCallback(async () => {
+      if (!vendorId) {
+        setError(
+          'Missing vendorId.',
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setError(null);
+
+        const [
+          planList,
+          access,
+          subscriptionHistory,
+          instructions,
+        ] =
+          await Promise.all([
+            getSubscriptionPlans(),
+
+            getSubscriptionAccessState(
+              vendorId,
+            ),
+
+            getSubscriptionHistory(
+              vendorId,
+            ),
+
+            getSubscriptionPaymentInstructions(),
+          ]);
+
+        setPlans(
+          planList.filter(
+            (plan) =>
+              plan.key !==
+              SubscriptionPlan.FREE,
+          ),
+        );
+
+        setAccessState(
+          access,
+        );
+
+        setHistory(
+          subscriptionHistory,
+        );
+
+        setPaymentInstructions(
+          instructions,
+        );
+      } catch (e: any) {
+        setError(
+          e?.message ||
+            'Failed to load subscription information.',
+        );
+      } finally {
+        setLoading(false);
+      }
+    }, [vendorId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleActivate = (plan: PlanDefinition) => {
-    Alert.alert(
-      'Demo Activation',
-      `This activates the ${plan.name} plan for 30 days as a DEMO — no real payment will be made. Your app's payment gateway isn't connected yet.`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Activate Demo Plan',
-          onPress: async () => {
-            try {
-              setActivatingPlan(plan.key);
+  const latestRejectedPayment =
+    useMemo(() => {
+      return history.find(
+        (item) =>
+          item.status ===
+            SubscriptionStatus.REJECTED ||
+          item.paymentStatus ===
+            PaymentStatus.FAILED,
+      );
+    }, [history]);
 
-              const updated = await activateDemoSubscription(
-                vendorIdValue,
-                plan.key,
-              );
+  const currentSubscription =
+    accessState?.subscription;
 
-              setSubscription(updated);
+  const isTrial =
+    accessState?.isTrial ===
+    true;
 
-              Alert.alert(
-                'Demo Activated',
-                `${plan.name} plan is now active (demo mode) until ${formatDate(
-                  updated.endDate,
-                )}.`,
-              );
-            } catch (e: any) {
-              Alert.alert(
-                'Activation Failed',
-                e?.message || 'Something went wrong',
-              );
-            } finally {
-              setActivatingPlan(null);
-            }
-          },
-        },
-      ],
-    );
-  };
+  const isExpired =
+    currentSubscription?.status ===
+    SubscriptionStatus.EXPIRED;
 
-  const handleCancel = () => {
-    if (!subscription?.endDate) {
+  const isCancellationScheduled =
+    currentSubscription?.status ===
+    SubscriptionStatus.CANCELLED;
+
+  const hasPendingPayment =
+    accessState
+      ?.hasPendingPayment ===
+    true;
+
+  const isActivePaid =
+    accessState?.isPaidPlan ===
+    true;
+
+  const selectPlan = (
+    plan: PlanDefinition,
+  ) => {
+    if (hasPendingPayment) {
       Alert.alert(
-        'Cancel Subscription',
-        'Are you sure you want to cancel your subscription?',
-        [
-          {
-            text: 'Keep Plan',
-            style: 'cancel',
-          },
-          {
-            text: 'Cancel Subscription',
-            style: 'destructive',
-            onPress: performCancellation,
-          },
-        ],
+        'Payment Under Review',
+        'You already have a subscription payment waiting for Admin verification.',
       );
 
       return;
     }
 
-    const planName =
-      subscription.plan === SubscriptionPlan.GROWTH
-        ? 'Growth'
-        : 'Premium';
+    if (
+      isActivePaid &&
+      currentSubscription?.plan ===
+        plan.key &&
+      !isCancellationScheduled
+    ) {
+      Alert.alert(
+        'Current Plan',
+        `${plan.name} is already your active subscription.`,
+      );
 
-    Alert.alert(
-      'Cancel Subscription',
-      `Your ${planName} subscription will be cancelled for renewal, but you will NOT lose your paid features immediately.\n\nFeatured Your Business and Featured Packages will remain active until ${formatDate(
-        subscription.endDate,
-      )}. After the expiry date, your subscription will automatically move to the Free plan.`,
-      [
-        {
-          text: 'Keep Plan',
-          style: 'cancel',
-        },
-        {
-          text: 'Cancel Subscription',
-          style: 'destructive',
-          onPress: performCancellation,
-        },
-      ],
+      return;
+    }
+
+    setSelectedPlan(
+      plan,
+    );
+
+    setPaymentReference(
+      '',
     );
   };
 
-  const performCancellation = async () => {
-    try {
-      setCancelling(true);
+  const submitPayment =
+    async () => {
+      if (!selectedPlan) {
+        return;
+      }
 
-      const updated = await cancelSubscription(
-        vendorIdValue,
-      );
+      const reference =
+        paymentReference
+          .trim()
+          .toUpperCase();
 
-      setSubscription(updated);
+      if (
+        reference.length <
+        2
+      ) {
+        Alert.alert(
+          'Payment Reference Required',
+          'Enter the Easypaisa transaction/reference ID after sending the payment.',
+        );
 
-      const planName =
-        updated.plan === SubscriptionPlan.GROWTH
-          ? 'Growth'
-          : updated.plan === SubscriptionPlan.PREMIUM
-            ? 'Premium'
-            : 'Paid';
+        return;
+      }
 
       Alert.alert(
-        'Subscription Cancelled',
-        `Your ${planName} subscription has been cancelled for renewal.\n\nYour paid features, including Featured Your Business and Featured Packages, will remain active until ${formatDate(
-          updated.endDate,
-        )}. After that date, your subscription will automatically move to the Free plan.`,
+        'Submit Payment?',
+        `Confirm that you have sent ${selectedPlan.priceLabel} through Easypaisa.\n\nReference: ${reference}`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text:
+              'Submit for Verification',
+
+            onPress:
+              async () => {
+                try {
+                  setSubmitting(
+                    true,
+                  );
+
+                  await requestSubscriptionPayment(
+                    {
+                      plan:
+                        selectedPlan.key as
+                          | SubscriptionPlan.BASIC
+                          | SubscriptionPlan.GROWTH
+                          | SubscriptionPlan.PREMIUM,
+
+                      paymentProvider:
+                        PaymentProvider.EASYPAISA,
+
+                      paymentReference:
+                        reference,
+                    },
+                  );
+
+                  setSelectedPlan(
+                    null,
+                  );
+
+                  setPaymentReference(
+                    '',
+                  );
+
+                  await loadData();
+
+                  Alert.alert(
+                    'Payment Submitted',
+                    'Your payment has been submitted for Admin verification. Your current subscription access will remain unchanged until the payment is approved.',
+                  );
+                } catch (
+                  e: any
+                ) {
+                  Alert.alert(
+                    'Submission Failed',
+                    e?.message ||
+                      'Could not submit payment.',
+                  );
+                } finally {
+                  setSubmitting(
+                    false,
+                  );
+                }
+              },
+          },
+        ],
       );
-    } catch (e: any) {
+    };
+
+  const handleCancel =
+    () => {
+      if (
+        !currentSubscription
+          ?.endDate
+      ) {
+        return;
+      }
+
       Alert.alert(
-        'Could not cancel',
-        e?.message || 'Something went wrong',
+        'Cancel Renewal',
+        `Your ${getPlanName(
+          currentSubscription.plan,
+        )} subscription will stop renewing.\n\nYour current paid access will remain available until ${formatDate(
+          currentSubscription.endDate,
+        )}.`,
+        [
+          {
+            text:
+              'Keep Subscription',
+            style: 'cancel',
+          },
+          {
+            text:
+              'Cancel Renewal',
+
+            style:
+              'destructive',
+
+            onPress:
+              performCancellation,
+          },
+        ],
       );
-    } finally {
-      setCancelling(false);
-    }
-  };
+    };
+
+  const performCancellation =
+    async () => {
+      try {
+        setCancelling(
+          true,
+        );
+
+        await cancelSubscription(
+          'Cancelled by vendor',
+        );
+
+        await loadData();
+
+        Alert.alert(
+          'Renewal Cancelled',
+          'Your current paid subscription remains usable until its expiry date.',
+        );
+      } catch (e: any) {
+        Alert.alert(
+          'Could Not Cancel',
+          e?.message ||
+            'Something went wrong.',
+        );
+      } finally {
+        setCancelling(
+          false,
+        );
+      }
+    };
 
   const Header = () => (
     <View
       style={[
         styles.header,
         {
-          paddingTop: insets.top + 40,
+          paddingTop:
+            insets.top +
+            34,
         },
       ]}
     >
       <TouchableOpacity
-        style={styles.headerIconBtn}
-        onPress={() => router.back()}
-        hitSlop={{
-          top: 8,
-          bottom: 8,
-          left: 8,
-          right: 8,
-        }}
+        style={
+          styles.headerIcon
+        }
+        onPress={() =>
+          router.back()
+        }
       >
         <ChevronLeft
           size={22}
@@ -310,59 +564,111 @@ export default function SubscriptionScreen() {
         />
       </TouchableOpacity>
 
-      <View style={styles.headerTitleWrap}>
-        <Text style={styles.headerTitle}>
+      <View
+        style={
+          styles.headerTextWrap
+        }
+      >
+        <Text
+          style={
+            styles.headerTitle
+          }
+        >
           Subscription
         </Text>
 
-        <Text style={styles.headerSubtitle}>
-          Compare plans & activate demo access
+        <Text
+          style={
+            styles.headerSubtitle
+          }
+        >
+          Choose the right plan
+          for your business
         </Text>
       </View>
 
-      {/* Empty space keeps the title perfectly centered */}
-      <View style={styles.headerIconBtnPlaceholder} />
+      <View
+        style={
+          styles.headerPlaceholder
+        }
+      />
     </View>
   );
 
   if (loading) {
     return (
-      <View style={styles.root}>
+      <View
+        style={styles.root}
+      >
         <Stack.Screen
-          options={{ headerShown: false }}
+          options={{
+            headerShown:
+              false,
+          }}
         />
 
         <Header />
 
-        <View style={styles.centered}>
+        <View
+          style={
+            styles.centered
+          }
+        >
           <ActivityIndicator
             size="large"
-            color={COLORS.primary}
+            color={
+              COLORS.primary
+            }
           />
         </View>
       </View>
     );
   }
 
-  if (error) {
+  if (
+    error ||
+    !accessState
+  ) {
     return (
-      <View style={styles.root}>
+      <View
+        style={styles.root}
+      >
         <Stack.Screen
-          options={{ headerShown: false }}
+          options={{
+            headerShown:
+              false,
+          }}
         />
 
         <Header />
 
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>
-            {error}
+        <View
+          style={
+            styles.centered
+          }
+        >
+          <Text
+            style={
+              styles.errorText
+            }
+          >
+            {error ||
+              'Unable to load subscription.'}
           </Text>
 
           <TouchableOpacity
-            style={styles.retryButton}
-            onPress={loadData}
+            style={
+              styles.primaryButton
+            }
+            onPress={
+              loadData
+            }
           >
-            <Text style={styles.retryButtonText}>
+            <Text
+              style={
+                styles.primaryButtonText
+              }
+            >
               Retry
             </Text>
           </TouchableOpacity>
@@ -371,597 +677,1678 @@ export default function SubscriptionScreen() {
     );
   }
 
-  const currentPlan = subscription?.plan;
-
-  const isPaidPlan =
-    currentPlan &&
-    currentPlan !== SubscriptionPlan.FREE;
-
-  const isCancellationScheduled =
-    subscription?.status ===
-    SubscriptionStatus.CANCELLED;
-
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+    >
       <Stack.Screen
-        options={{ headerShown: false }}
+        options={{
+          headerShown: false,
+        }}
       />
 
       <Header />
 
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+        style={
+          styles.container
+        }
+        contentContainerStyle={
+          styles.content
+        }
+        showsVerticalScrollIndicator={
+          false
+        }
       >
-        {/* Current subscription / cancellation status */}
-        {isPaidPlan &&
-          subscription?.endDate && (
+        {/* ================================================= */}
+        {/* CURRENT STATUS */}
+        {/* ================================================= */}
+
+        {isTrial && (
+          <View
+            style={[
+              styles.statusCard,
+              styles.infoCard,
+            ]}
+          >
+            <Clock3
+              size={20}
+              color={
+                COLORS.info
+              }
+            />
+
+            <View
+              style={
+                styles.statusTextWrap
+              }
+            >
+              <Text
+                style={
+                  styles.statusTitle
+                }
+              >
+                Free Basic Trial
+              </Text>
+
+              <Text
+                style={
+                  styles.statusDescription
+                }
+              >
+                You have{' '}
+                <Text
+                  style={
+                    styles.statusBold
+                  }
+                >
+                  {
+                    accessState.trialDaysRemaining
+                  }{' '}
+                  day
+                  {accessState.trialDaysRemaining ===
+                  1
+                    ? ''
+                    : 's'}
+                </Text>{' '}
+                remaining.
+              </Text>
+
+              {accessState.trialEndDate && (
+                <Text
+                  style={
+                    styles.statusSecondary
+                  }
+                >
+                  Trial ends{' '}
+                  {formatDate(
+                    accessState.trialEndDate,
+                  )}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {isActivePaid && (
+          <View
+            style={[
+              styles.statusCard,
+              styles.successCard,
+            ]}
+          >
+            <Check
+              size={20}
+              color={
+                COLORS.success
+              }
+            />
+
+            <View
+              style={
+                styles.statusTextWrap
+              }
+            >
+              <Text
+                style={
+                  styles.statusTitle
+                }
+              >
+                {getPlanName(
+                  accessState.effectivePlan,
+                )}{' '}
+                Plan Active
+              </Text>
+
+              <Text
+                style={
+                  styles.statusDescription
+                }
+              >
+                {
+                  accessState.daysRemaining
+                }{' '}
+                days remaining
+              </Text>
+
+              {currentSubscription?.endDate && (
+                <Text
+                  style={
+                    styles.statusSecondary
+                  }
+                >
+                  Valid until{' '}
+                  {formatDate(
+                    currentSubscription.endDate,
+                  )}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {isCancellationScheduled && (
+          <View
+            style={[
+              styles.statusCard,
+              styles.warningCard,
+            ]}
+          >
+            <Clock3
+              size={20}
+              color={
+                COLORS.warning
+              }
+            />
+
+            <View
+              style={
+                styles.statusTextWrap
+              }
+            >
+              <Text
+                style={
+                  styles.statusTitle
+                }
+              >
+                Renewal Cancelled
+              </Text>
+
+              <Text
+                style={
+                  styles.statusDescription
+                }
+              >
+                Your current access
+                remains available until{' '}
+                {formatDate(
+                  currentSubscription?.endDate,
+                )}
+                .
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {isExpired && (
+          <View
+            style={[
+              styles.statusCard,
+              styles.dangerCard,
+            ]}
+          >
+            <Clock3
+              size={20}
+              color={
+                COLORS.danger
+              }
+            />
+
+            <View
+              style={
+                styles.statusTextWrap
+              }
+            >
+              <Text
+                style={
+                  styles.statusTitle
+                }
+              >
+                Subscription Required
+              </Text>
+
+              <Text
+                style={
+                  styles.statusDescription
+                }
+              >
+                Your trial or paid
+                subscription has
+                expired. Choose a plan
+                below to continue using
+                subscription features.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {hasPendingPayment &&
+          accessState.pendingPayment && (
             <View
               style={[
-                styles.activeBanner,
-                isCancellationScheduled &&
-                  styles.cancelledBanner,
+                styles.statusCard,
+                styles.warningCard,
               ]}
             >
-              <View
-                style={[
-                  styles.activeDot,
-                  isCancellationScheduled &&
-                    styles.cancelledDot,
-                ]}
+              <WalletCards
+                size={20}
+                color={
+                  COLORS.warning
+                }
               />
 
-              <View style={styles.bannerTextWrap}>
+              <View
+                style={
+                  styles.statusTextWrap
+                }
+              >
                 <Text
-                  style={styles.currentPlanNote}
+                  style={
+                    styles.statusTitle
+                  }
                 >
-                  {isCancellationScheduled
-                    ? `Subscription cancelled — features remain active until ${formatDate(
-                        subscription.endDate,
-                      )}`
-                    : `Current plan active until ${formatDate(
-                        subscription.endDate,
-                      )}`}
+                  Payment Under Review
                 </Text>
 
-                {isCancellationScheduled && (
-                  <Text
-                    style={styles.bannerSubText}
-                  >
-                    Featured Your Business and Featured
-                    Packages will continue until the
-                    expiry date.
-                  </Text>
-                )}
+                <Text
+                  style={
+                    styles.statusDescription
+                  }
+                >
+                  Your{' '}
+                  {getPlanName(
+                    accessState
+                      .pendingPayment
+                      .plan,
+                  )}{' '}
+                  payment is waiting
+                  for Admin verification.
+                </Text>
+
+                <Text
+                  style={
+                    styles.statusSecondary
+                  }
+                >
+                  Reference:{' '}
+                  {accessState
+                    .pendingPayment
+                    .paymentReference ||
+                    '—'}
+                </Text>
               </View>
             </View>
           )}
 
-        {plans.map((plan) => {
-          const isCurrent =
-            plan.key === currentPlan;
-
-          const isActivating =
-            activatingPlan === plan.key;
-
-          const PlanIcon =
-            PLAN_ICON[plan.key];
-
-          const tint =
-            PLAN_ICON_TINT[plan.key];
-
-          return (
+        {!hasPendingPayment &&
+          latestRejectedPayment && (
             <View
-              key={plan.key}
               style={[
-                styles.planCard,
-                plan.isMostPopular &&
-                  styles.planCardPopular,
+                styles.statusCard,
+                styles.dangerCard,
               ]}
             >
-              {plan.isMostPopular && (
-                <View style={styles.popularTag}>
-                  <Text
-                    style={styles.popularTagText}
-                  >
-                    MOST POPULAR
-                  </Text>
-                </View>
-              )}
+              <WalletCards
+                size={20}
+                color={
+                  COLORS.danger
+                }
+              />
 
-              <View style={styles.planHeaderRow}>
-                {PlanIcon && (
-                  <View
-                    style={[
-                      styles.planIconBadge,
-                      {
-                        backgroundColor:
-                          tint.bg,
-                      },
-                    ]}
+              <View
+                style={
+                  styles.statusTextWrap
+                }
+              >
+                <Text
+                  style={
+                    styles.statusTitle
+                  }
+                >
+                  Previous Payment
+                  Rejected
+                </Text>
+
+                <Text
+                  style={
+                    styles.statusDescription
+                  }
+                >
+                  {getPlanName(
+                    latestRejectedPayment.plan,
+                  )}{' '}
+                  payment was not
+                  approved.
+                </Text>
+
+                {latestRejectedPayment.rejectionReason ? (
+                  <Text
+                    style={
+                      styles.statusSecondary
+                    }
                   >
-                    <PlanIcon
-                      size={16}
-                      color={tint.color}
-                      strokeWidth={2.25}
-                    />
+                    Reason:{' '}
+                    {
+                      latestRejectedPayment.rejectionReason
+                    }
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          )}
+
+        {/* ================================================= */}
+        {/* BASIC TRIAL ENTITLEMENTS */}
+        {/* ================================================= */}
+
+        {isTrial && (
+          <View
+            style={
+              styles.trialInfoCard
+            }
+          >
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Your Trial Includes
+            </Text>
+
+            <Text
+              style={
+                styles.trialLimitText
+              }
+            >
+              {
+                accessState
+                  .limits
+                  .maxPackages
+              }{' '}
+              packages
+            </Text>
+
+            <Text
+              style={
+                styles.trialLimitText
+              }
+            >
+              {
+                accessState
+                  .limits
+                  .maxPortfolioImages
+              }{' '}
+              portfolio images
+            </Text>
+
+            <Text
+              style={
+                styles.trialLimitText
+              }
+            >
+              {
+                accessState
+                  .limits
+                  .maxImagesPerPackage
+              }{' '}
+              images per package
+            </Text>
+
+            <Text
+              style={
+                styles.trialNotice
+              }
+            >
+              Trial provides Basic-level
+              access only. Growth and
+              Premium promotional
+              features are not included.
+            </Text>
+          </View>
+        )}
+
+        <View
+          style={
+            styles.sectionHeader
+          }
+        >
+          <Text
+            style={
+              styles.sectionTitle
+            }
+          >
+            Choose Your Plan
+          </Text>
+
+          <Text
+            style={
+              styles.sectionSubtitle
+            }
+          >
+            Monthly subscription ·
+            manual Easypaisa payment
+          </Text>
+        </View>
+
+        {/* ================================================= */}
+        {/* PLANS */}
+        {/* ================================================= */}
+
+        {plans.map(
+          (plan) => {
+            const isCurrentPaidPlan =
+              isActivePaid &&
+              currentSubscription?.plan ===
+                plan.key;
+
+            const highlights =
+              PLAN_HIGHLIGHTS[
+                plan.key
+              ] || [];
+
+            const PlanIcon =
+              plan.key ===
+              SubscriptionPlan.PREMIUM
+                ? Crown
+                : plan.key ===
+                    SubscriptionPlan.GROWTH
+                  ? Star
+                  : null;
+
+            return (
+              <View
+                key={
+                  plan.key
+                }
+                style={[
+                  styles.planCard,
+
+                  plan.isMostPopular &&
+                    styles.popularPlanCard,
+
+                  selectedPlan?.key ===
+                    plan.key &&
+                    styles.selectedPlanCard,
+                ]}
+              >
+                {plan.isMostPopular && (
+                  <View
+                    style={
+                      styles.popularBadge
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.popularBadgeText
+                      }
+                    >
+                      MOST POPULAR
+                    </Text>
                   </View>
                 )}
 
-                <View>
-                  <Text style={styles.planName}>
-                    {plan.name}
-                  </Text>
-
-                  <Text style={styles.planPrice}>
-                    {plan.priceLabel}
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={styles.planDescription}>
-                {plan.description}
-              </Text>
-
-              <View style={styles.highlightsWrap}>
-                {PLAN_HIGHLIGHTS[plan.key].map(
-                  (highlight) => (
-                    <View
-                      key={highlight}
-                      style={styles.highlightRow}
-                    >
-                      <View
-                        style={
-                          styles.checkCircle
-                        }
-                      >
-                        <Check
-                          size={11}
-                          color={
-                            COLORS.primary
-                          }
-                          strokeWidth={3}
-                        />
-                      </View>
-
-                      <Text
-                        style={
-                          styles.highlightText
-                        }
-                      >
-                        {highlight}
-                      </Text>
-                    </View>
-                  ),
-                )}
-              </View>
-
-              {isCurrent ? (
                 <View
                   style={
-                    styles.currentPlanButton
+                    styles.planHeader
                   }
+                >
+                  {PlanIcon && (
+                    <View
+                      style={
+                        styles.planIcon
+                      }
+                    >
+                      <PlanIcon
+                        size={18}
+                        color={
+                          plan.key ===
+                          SubscriptionPlan.PREMIUM
+                            ? COLORS.gold
+                            : COLORS.primary
+                        }
+                      />
+                    </View>
+                  )}
+
+                  <View
+                    style={{
+                      flex: 1,
+                    }}
+                  >
+                    <Text
+                      style={
+                        styles.planName
+                      }
+                    >
+                      {plan.name}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.planPrice
+                      }
+                    >
+                      {
+                        plan.priceLabel
+                      }
+                    </Text>
+                  </View>
+                </View>
+
+                <Text
+                  style={
+                    styles.planDescription
+                  }
+                >
+                  {plan.description}
+                </Text>
+
+                <View
+                  style={
+                    styles.highlights
+                  }
+                >
+                  {highlights.map(
+                    (
+                      highlight,
+                    ) => (
+                      <View
+                        key={
+                          highlight
+                        }
+                        style={
+                          styles.highlightRow
+                        }
+                      >
+                        <View
+                          style={
+                            styles.checkCircle
+                          }
+                        >
+                          <Check
+                            size={11}
+                            color={
+                              COLORS.primary
+                            }
+                            strokeWidth={
+                              3
+                            }
+                          />
+                        </View>
+
+                        <Text
+                          style={
+                            styles.highlightText
+                          }
+                        >
+                          {
+                            highlight
+                          }
+                        </Text>
+                      </View>
+                    ),
+                  )}
+                </View>
+
+                {isCurrentPaidPlan &&
+                !isCancellationScheduled ? (
+                  <View
+                    style={
+                      styles.currentPlanButton
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.currentPlanButtonText
+                      }
+                    >
+                      Current Plan
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryButton,
+
+                      hasPendingPayment &&
+                        styles.disabledButton,
+                    ]}
+                    disabled={
+                      hasPendingPayment
+                    }
+                    onPress={() =>
+                      selectPlan(
+                        plan,
+                      )
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.primaryButtonText
+                      }
+                    >
+                      {isTrial &&
+                      plan.key ===
+                        SubscriptionPlan.BASIC
+                        ? 'Subscribe to Basic'
+                        : `Choose ${plan.name}`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          },
+        )}
+
+        {/* ================================================= */}
+        {/* PAYMENT */}
+        {/* ================================================= */}
+
+        {selectedPlan &&
+          !hasPendingPayment && (
+            <View
+              style={
+                styles.paymentCard
+              }
+            >
+              <View
+                style={
+                  styles.paymentTitleRow
+                }
+              >
+                <WalletCards
+                  size={22}
+                  color={
+                    COLORS.primary
+                  }
+                />
+
+                <View
+                  style={{
+                    flex: 1,
+                  }}
                 >
                   <Text
                     style={
-                      styles.currentPlanButtonText
+                      styles.paymentTitle
                     }
                   >
-                    {isCancellationScheduled
-                      ? 'Cancellation Scheduled'
-                      : 'Current Plan'}
+                    Pay with
+                    Easypaisa
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.paymentSubtitle
+                    }
+                  >
+                    Manual payment ·
+                    Admin verification
                   </Text>
                 </View>
-              ) : plan.key ===
-                SubscriptionPlan.FREE ? (
-                // Free has no activation action.
-                <View style={{ height: 4 }} />
-              ) : (
-                <TouchableOpacity
-                  style={styles.activateButton}
-                  onPress={() =>
-                    handleActivate(plan)
-                  }
-                  disabled={isActivating}
-                  activeOpacity={0.85}
-                >
-                  {isActivating ? (
-                    <ActivityIndicator
-                      color="#fff"
-                      size="small"
-                    />
-                  ) : (
-                    <Text
-                      style={
-                        styles.activateButtonText
-                      }
-                    >
-                      Activate Demo Plan
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          );
-        })}
+              </View>
 
-        {/* Cancellation action */}
-        {isPaidPlan &&
+              <View
+                style={
+                  styles.selectedPlanSummary
+                }
+              >
+                <Text
+                  style={
+                    styles.summaryLabel
+                  }
+                >
+                  Selected Plan
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryValue
+                  }
+                >
+                  {
+                    selectedPlan.name
+                  }
+                </Text>
+
+                <Text
+                  style={
+                    styles.summaryPrice
+                  }
+                >
+                  {
+                    selectedPlan.priceLabel
+                  }
+                </Text>
+              </View>
+
+              <Text
+                style={
+                  styles.instructionText
+                }
+              >
+                Send the exact amount
+                shown above to the
+                Easypaisa account below.
+              </Text>
+
+              <View
+                style={
+                  styles.accountDetails
+                }
+              >
+                <Text
+                  style={
+                    styles.accountLabel
+                  }
+                >
+                  Account Title
+                </Text>
+
+                <Text
+                  style={
+                    styles.accountValue
+                  }
+                >
+                  {paymentInstructions
+                    ?.accountTitle ||
+                    'Not configured'}
+                </Text>
+
+                <View
+                  style={
+                    styles.accountDivider
+                  }
+                />
+
+                <Text
+                  style={
+                    styles.accountLabel
+                  }
+                >
+                  Easypaisa Number
+                </Text>
+
+                <Text
+                  style={
+                    styles.accountValue
+                  }
+                >
+                  {paymentInstructions
+                    ?.mobileNumber ||
+                    'Not configured'}
+                </Text>
+              </View>
+
+              <Text
+                style={
+                  styles.referenceLabel
+                }
+              >
+                Transaction / Reference
+                ID
+              </Text>
+
+              <TextInput
+                style={
+                  styles.referenceInput
+                }
+                value={
+                  paymentReference
+                }
+                onChangeText={
+                  setPaymentReference
+                }
+                placeholder="Enter Easypaisa transaction ID"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+                autoCorrect={
+                  false
+                }
+                maxLength={120}
+              />
+
+              <Text
+                style={
+                  styles.referenceHelp
+                }
+              >
+                Enter the transaction
+                reference shown in your
+                Easypaisa payment
+                confirmation.
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+
+                  submitting &&
+                    styles.disabledButton,
+                ]}
+                disabled={
+                  submitting
+                }
+                onPress={
+                  submitPayment
+                }
+              >
+                {submitting ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <Text
+                    style={
+                      styles.submitButtonText
+                    }
+                  >
+                    Submit Payment for
+                    Verification
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={
+                  styles.changePlanButton
+                }
+                disabled={
+                  submitting
+                }
+                onPress={() => {
+                  setSelectedPlan(
+                    null,
+                  );
+
+                  setPaymentReference(
+                    '',
+                  );
+                }}
+              >
+                <Text
+                  style={
+                    styles.changePlanText
+                  }
+                >
+                  Choose another plan
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+        {/* ================================================= */}
+        {/* CANCEL */}
+        {/* ================================================= */}
+
+        {isActivePaid &&
           !isCancellationScheduled && (
             <TouchableOpacity
-              style={styles.cancelLink}
-              onPress={handleCancel}
-              disabled={cancelling}
+              style={
+                styles.cancelButton
+              }
+              disabled={
+                cancelling
+              }
+              onPress={
+                handleCancel
+              }
             >
               <Text
-                style={styles.cancelLinkText}
+                style={
+                  styles.cancelButtonText
+                }
               >
                 {cancelling
                   ? 'Cancelling…'
-                  : 'Cancel subscription'}
+                  : 'Cancel subscription renewal'}
               </Text>
             </TouchableOpacity>
           )}
 
-        {/* Cancellation information */}
-        {isPaidPlan &&
-          isCancellationScheduled &&
-          subscription?.endDate && (
-            <View style={styles.cancellationInfo}>
-              <Text
-                style={styles.cancellationInfoTitle}
-              >
-                Subscription cancelled
-              </Text>
-
-              <Text
-                style={styles.cancellationInfoText}
-              >
-                Your paid features will remain
-                available until{' '}
-                <Text
-                  style={
-                    styles.cancellationInfoBold
-                  }
-                >
-                  {formatDate(
-                    subscription.endDate,
-                  )}
-                </Text>
-                .
-              </Text>
-
-              <Text
-                style={styles.cancellationInfoText}
-              >
-                Featured Your Business and Featured
-                Packages will continue to display
-                until your current subscription period
-                ends.
-              </Text>
-            </View>
-          )}
-
-        <Text style={styles.demoDisclaimer}>
-          Demo mode: activating a paid plan here does
-          not charge any money. A real payment method
-          will be added in a future update.
+        <Text
+          style={
+            styles.footerText
+          }
+        >
+          Subscription payments are
+          manually verified by Eventify
+          Hub. Your current access will
+          not change until a submitted
+          payment is approved.
         </Text>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
+const styles =
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor:
+        COLORS.background,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    marginBottom: 18,
-  },
 
-  headerIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor:
-      'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+    header: {
+      backgroundColor:
+        COLORS.primary,
 
-  headerIconBtnPlaceholder: {
-    width: 40,
-    height: 40,
-  },
+      paddingHorizontal: 18,
+      paddingBottom: 22,
 
-  headerTitleWrap: {
-    flex: 1,
-    alignItems: 'center',
-  },
+      flexDirection: 'row',
+      alignItems: 'center',
 
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
+      borderBottomLeftRadius: 26,
+      borderBottomRightRadius: 26,
 
-  headerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 2,
-    textAlign: 'center',
-  },
+      marginBottom: 8,
 
-  container: {
-    flex: 1,
-  },
+      elevation: 5,
 
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 32,
-  },
-
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.background,
-  },
-
-  errorText: {
-    color: COLORS.muted,
-    marginBottom: 12,
-  },
-
-  retryButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-
-  activeBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 12,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    marginTop: 16,
-  },
-
-  cancelledBanner: {
-    backgroundColor: '#FFF7ED',
-  },
-
-  activeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
-    marginRight: 8,
-    marginTop: 5,
-  },
-
-  cancelledDot: {
-    backgroundColor: '#EA580C',
-  },
-
-  bannerTextWrap: {
-    flex: 1,
-  },
-
-  currentPlanNote: {
-    fontSize: 12.5,
-    color: COLORS.primaryDark,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-
-  bannerSubText: {
-    fontSize: 11.5,
-    color: COLORS.muted,
-    marginTop: 4,
-    lineHeight: 16,
-  },
-
-  planCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginTop: 16,
-    shadowColor: '#3B0836',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 4,
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
     },
-    elevation: 1,
-  },
 
-  planCardPopular: {
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-  },
+    headerIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
 
-  popularTag: {
-    position: 'absolute',
-    top: -10,
-    left: 16,
-    backgroundColor: COLORS.popularBg,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
+      backgroundColor:
+        'rgba(255,255,255,0.15)',
 
-  popularTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.popularText,
-    letterSpacing: 0.5,
-  },
+      justifyContent:
+        'center',
 
-  planHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+      alignItems:
+        'center',
+    },
 
-  planIconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
+    headerPlaceholder: {
+      width: 40,
+      height: 40,
+    },
 
-  planName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
+    headerTextWrap: {
+      flex: 1,
+      alignItems:
+        'center',
 
-  planPrice: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginTop: 1,
-  },
+      paddingHorizontal: 8,
+    },
 
-  planDescription: {
-    fontSize: 12.5,
-    color: COLORS.muted,
-    marginTop: 10,
-  },
+    headerTitle: {
+      color: '#FFFFFF',
+      fontSize: 19,
+      fontWeight: '800',
+    },
 
-  highlightsWrap: {
-    marginTop: 14,
-    gap: 9,
-  },
+    headerSubtitle: {
+      color:
+        'rgba(255,255,255,0.78)',
 
-  highlightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+      fontSize: 11.5,
+      marginTop: 2,
 
-  checkCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 9,
-  },
+      textAlign:
+        'center',
+    },
 
-  highlightText: {
-    fontSize: 13.5,
-    color: COLORS.text,
-  },
+    container: {
+      flex: 1,
+    },
 
-  currentPlanButton: {
-    marginTop: 18,
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+    content: {
+      paddingHorizontal: 16,
+      paddingBottom: 40,
+    },
 
-  currentPlanButtonText: {
-    color: COLORS.muted,
-    fontWeight: '700',
-    fontSize: 14,
-  },
+    centered: {
+      flex: 1,
 
-  activateButton: {
-    marginTop: 18,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
+      justifyContent:
+        'center',
 
-  activateButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+      alignItems:
+        'center',
 
-  cancelLink: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
+      paddingHorizontal: 24,
+    },
 
-  cancelLinkText: {
-    color: COLORS.danger,
-    fontSize: 13.5,
-    fontWeight: '600',
-  },
+    errorText: {
+      color: COLORS.danger,
 
-  cancellationInfo: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryLight,
-    borderWidth: 1,
-    borderColor: COLORS.primarySoft,
-  },
+      textAlign:
+        'center',
 
-  cancellationInfoTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: COLORS.primaryDark,
-    marginBottom: 5,
-  },
+      marginBottom: 14,
+    },
 
-  cancellationInfoText: {
-    fontSize: 12,
-    color: COLORS.muted,
-    lineHeight: 17,
-    marginTop: 3,
-  },
+    statusCard: {
+      flexDirection: 'row',
+      alignItems:
+        'flex-start',
 
-  cancellationInfoBold: {
-    fontWeight: '800',
-    color: COLORS.primaryDark,
-  },
+      borderRadius: 14,
 
-  demoDisclaimer: {
-    fontSize: 11.5,
-    color: COLORS.muted,
-    textAlign: 'center',
-    marginTop: 24,
-    lineHeight: 16,
-  },
-});
+      padding: 14,
+
+      marginTop: 14,
+
+      borderWidth: 1,
+    },
+
+    infoCard: {
+      backgroundColor:
+        COLORS.infoBg,
+
+      borderColor:
+        '#BFDBFE',
+    },
+
+    successCard: {
+      backgroundColor:
+        COLORS.successBg,
+
+      borderColor:
+        '#BBF7D0',
+    },
+
+    warningCard: {
+      backgroundColor:
+        COLORS.warningBg,
+
+      borderColor:
+        '#FED7AA',
+    },
+
+    dangerCard: {
+      backgroundColor:
+        COLORS.dangerBg,
+
+      borderColor:
+        '#FECACA',
+    },
+
+    statusTextWrap: {
+      flex: 1,
+      marginLeft: 10,
+    },
+
+    statusTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+
+      color: COLORS.text,
+    },
+
+    statusDescription: {
+      marginTop: 4,
+
+      fontSize: 12.5,
+
+      lineHeight: 18,
+
+      color: COLORS.text,
+    },
+
+    statusSecondary: {
+      marginTop: 5,
+
+      fontSize: 11.5,
+
+      lineHeight: 17,
+
+      color: COLORS.muted,
+    },
+
+    statusBold: {
+      fontWeight: '800',
+    },
+
+    trialInfoCard: {
+      marginTop: 14,
+
+      borderRadius: 14,
+
+      backgroundColor:
+        COLORS.card,
+
+      borderWidth: 1,
+
+      borderColor:
+        COLORS.border,
+
+      padding: 15,
+    },
+
+    trialLimitText: {
+      marginTop: 7,
+
+      color: COLORS.text,
+
+      fontSize: 12.5,
+
+      fontWeight: '600',
+    },
+
+    trialNotice: {
+      marginTop: 12,
+
+      color: COLORS.muted,
+
+      fontSize: 11.5,
+
+      lineHeight: 17,
+    },
+
+    sectionHeader: {
+      marginTop: 24,
+      marginBottom: 2,
+    },
+
+    sectionTitle: {
+      color: COLORS.text,
+
+      fontSize: 17,
+
+      fontWeight: '800',
+    },
+
+    sectionSubtitle: {
+      marginTop: 4,
+
+      color: COLORS.muted,
+
+      fontSize: 12,
+    },
+
+    planCard: {
+      position:
+        'relative',
+
+      marginTop: 16,
+
+      padding: 18,
+
+      borderRadius: 18,
+
+      backgroundColor:
+        COLORS.card,
+
+      borderWidth: 1,
+
+      borderColor:
+        COLORS.border,
+
+      elevation: 1,
+
+      shadowColor:
+        '#3B0836',
+
+      shadowOpacity: 0.04,
+
+      shadowRadius: 10,
+
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+    },
+
+    popularPlanCard: {
+      borderColor:
+        COLORS.primary,
+
+      borderWidth: 2,
+    },
+
+    selectedPlanCard: {
+      borderColor:
+        COLORS.primary,
+
+      backgroundColor:
+        '#FFF9FE',
+    },
+
+    popularBadge: {
+      position:
+        'absolute',
+
+      top: -10,
+      left: 16,
+
+      backgroundColor:
+        COLORS.popularBg,
+
+      borderRadius: 7,
+
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+    },
+
+    popularBadgeText: {
+      color:
+        COLORS.popularText,
+
+      fontSize: 9.5,
+
+      fontWeight: '900',
+
+      letterSpacing: 0.5,
+    },
+
+    planHeader: {
+      flexDirection: 'row',
+
+      alignItems:
+        'center',
+
+      marginBottom: 10,
+    },
+
+    planIcon: {
+      width: 38,
+      height: 38,
+
+      borderRadius: 12,
+
+      backgroundColor:
+        COLORS.primaryLight,
+
+      justifyContent:
+        'center',
+
+      alignItems:
+        'center',
+
+      marginRight: 11,
+    },
+
+    planName: {
+      color: COLORS.text,
+
+      fontSize: 18,
+
+      fontWeight: '800',
+    },
+
+    planPrice: {
+      color:
+        COLORS.primary,
+
+      fontSize: 13.5,
+
+      fontWeight: '700',
+
+      marginTop: 2,
+    },
+
+    planDescription: {
+      color:
+        COLORS.muted,
+
+      fontSize: 12.5,
+
+      lineHeight: 18,
+    },
+
+    highlights: {
+      marginTop: 14,
+      gap: 9,
+    },
+
+    highlightRow: {
+      flexDirection: 'row',
+
+      alignItems:
+        'center',
+    },
+
+    checkCircle: {
+      width: 18,
+      height: 18,
+
+      borderRadius: 9,
+
+      backgroundColor:
+        COLORS.primaryLight,
+
+      justifyContent:
+        'center',
+
+      alignItems:
+        'center',
+
+      marginRight: 9,
+    },
+
+    highlightText: {
+      flex: 1,
+
+      color: COLORS.text,
+
+      fontSize: 12.5,
+
+      lineHeight: 17,
+    },
+
+    primaryButton: {
+      marginTop: 18,
+
+      backgroundColor:
+        COLORS.primary,
+
+      borderRadius: 12,
+
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+    },
+
+    primaryButtonText: {
+      color: '#FFFFFF',
+
+      fontSize: 13.5,
+
+      fontWeight: '800',
+    },
+
+    currentPlanButton: {
+      marginTop: 18,
+
+      backgroundColor:
+        COLORS.successBg,
+
+      borderRadius: 12,
+
+      paddingVertical: 12,
+
+      alignItems:
+        'center',
+
+      borderWidth: 1,
+
+      borderColor:
+        '#BBF7D0',
+    },
+
+    currentPlanButtonText: {
+      color:
+        COLORS.success,
+
+      fontSize: 13.5,
+
+      fontWeight: '800',
+    },
+
+    disabledButton: {
+      opacity: 0.55,
+    },
+
+    paymentCard: {
+      marginTop: 22,
+
+      padding: 18,
+
+      borderRadius: 18,
+
+      backgroundColor:
+        COLORS.card,
+
+      borderWidth: 2,
+
+      borderColor:
+        COLORS.primarySoft,
+    },
+
+    paymentTitleRow: {
+      flexDirection: 'row',
+
+      alignItems:
+        'center',
+
+      gap: 10,
+    },
+
+    paymentTitle: {
+      color: COLORS.text,
+
+      fontSize: 17,
+
+      fontWeight: '800',
+    },
+
+    paymentSubtitle: {
+      marginTop: 2,
+
+      color:
+        COLORS.muted,
+
+      fontSize: 11.5,
+    },
+
+    selectedPlanSummary: {
+      marginTop: 16,
+
+      padding: 13,
+
+      borderRadius: 12,
+
+      backgroundColor:
+        COLORS.primaryLight,
+    },
+
+    summaryLabel: {
+      color:
+        COLORS.muted,
+
+      fontSize: 11,
+    },
+
+    summaryValue: {
+      color:
+        COLORS.text,
+
+      fontWeight: '800',
+
+      fontSize: 15,
+
+      marginTop: 3,
+    },
+
+    summaryPrice: {
+      color:
+        COLORS.primary,
+
+      fontWeight: '800',
+
+      fontSize: 14,
+
+      marginTop: 2,
+    },
+
+    instructionText: {
+      marginTop: 15,
+
+      color:
+        COLORS.muted,
+
+      fontSize: 12,
+
+      lineHeight: 18,
+    },
+
+    accountDetails: {
+      marginTop: 12,
+
+      backgroundColor:
+        '#F9FAFB',
+
+      borderRadius: 12,
+
+      padding: 14,
+
+      borderWidth: 1,
+
+      borderColor:
+        '#E5E7EB',
+    },
+
+    accountLabel: {
+      color:
+        COLORS.muted,
+
+      fontSize: 10.5,
+
+      textTransform:
+        'uppercase',
+
+      letterSpacing: 0.4,
+    },
+
+    accountValue: {
+      marginTop: 4,
+
+      color:
+        COLORS.text,
+
+      fontWeight: '800',
+
+      fontSize: 14,
+    },
+
+    accountDivider: {
+      height: 1,
+
+      backgroundColor:
+        '#E5E7EB',
+
+      marginVertical: 12,
+    },
+
+    referenceLabel: {
+      marginTop: 16,
+
+      color:
+        COLORS.text,
+
+      fontSize: 12.5,
+
+      fontWeight: '700',
+    },
+
+    referenceInput: {
+      marginTop: 7,
+
+      borderWidth: 1,
+
+      borderColor:
+        COLORS.border,
+
+      borderRadius: 12,
+
+      backgroundColor:
+        '#FFFFFF',
+
+      color: COLORS.text,
+
+      paddingHorizontal: 13,
+
+      paddingVertical: 12,
+
+      fontSize: 13.5,
+    },
+
+    referenceHelp: {
+      marginTop: 6,
+
+      color:
+        COLORS.muted,
+
+      fontSize: 10.5,
+
+      lineHeight: 15,
+    },
+
+    submitButton: {
+      marginTop: 18,
+
+      backgroundColor:
+        COLORS.primary,
+
+      borderRadius: 12,
+
+      paddingVertical: 13,
+
+      justifyContent:
+        'center',
+
+      alignItems:
+        'center',
+    },
+
+    submitButtonText: {
+      color: '#FFFFFF',
+
+      fontSize: 13,
+
+      fontWeight: '800',
+
+      textAlign:
+        'center',
+    },
+
+    changePlanButton: {
+      marginTop: 12,
+
+      alignItems:
+        'center',
+    },
+
+    changePlanText: {
+      color:
+        COLORS.primary,
+
+      fontSize: 12.5,
+
+      fontWeight: '700',
+    },
+
+    cancelButton: {
+      marginTop: 24,
+
+      alignItems:
+        'center',
+
+      paddingVertical: 10,
+    },
+
+    cancelButtonText: {
+      color:
+        COLORS.danger,
+
+      fontSize: 13,
+
+      fontWeight: '700',
+    },
+
+    footerText: {
+      marginTop: 18,
+
+      color:
+        COLORS.muted,
+
+      fontSize: 10.5,
+
+      lineHeight: 16,
+
+      textAlign:
+        'center',
+
+      paddingHorizontal: 12,
+    },
+  });

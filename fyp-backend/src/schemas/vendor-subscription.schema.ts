@@ -19,133 +19,232 @@ import {
   SubscriptionStatus,
 } from '../vendor/growth/subscription/subscription.types';
 
-@Schema({ timestamps: true })
+@Schema({
+  timestamps: true,
+})
 export class VendorSubscription extends Document {
+  
   @Prop({
-    type: MongooseSchema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    index: true,
-  })
-  vendorId: Types.ObjectId;
+    type:
+      MongooseSchema.Types.ObjectId,
 
-  @Prop({
-    type: String,
-    enum: SubscriptionPlan,
-    required: true,
-    default: SubscriptionPlan.TRIAL,
-  })
-  plan: SubscriptionPlan;
+    ref:
+      'User',
 
-  @Prop({
-    type: String,
-    enum: SubscriptionStatus,
-    required: true,
-    default: SubscriptionStatus.ACTIVE,
+    required:
+      true,
+
+    index:
+      true,
   })
-  status: SubscriptionStatus;
+  vendorId:
+    Types.ObjectId;
+
 
   @Prop({
-    type: Date,
-    required: true,
-    default: () => new Date(),
+    type:
+      String,
+
+    enum:
+      SubscriptionPlan,
+
+    required:
+      true,
+
+    default:
+      SubscriptionPlan.BASIC,
   })
-  startDate: Date;
+  plan:
+    SubscriptionPlan;
 
   @Prop({
-    type: Date,
-    default: null,
-  })
-  endDate: Date | null;
+    type:
+      String,
 
-  // ---------------------------------------------------------
-  // PAYMENT
-  // ---------------------------------------------------------
+    enum:
+      SubscriptionStatus,
+
+    required:
+      true,
+
+    default:
+      SubscriptionStatus.TRIAL,
+  })
+  status:
+    SubscriptionStatus;
+
+  
+  @Prop({
+    type:
+      Date,
+
+    required:
+      true,
+
+    default:
+      () => new Date(),
+  })
+  startDate:
+    Date;
 
   @Prop({
-    type: String,
-    enum: PaymentStatus,
-    required: true,
-    default: PaymentStatus.NONE,
-    index: true,
+    type:
+      Date,
+
+    default:
+      null,
   })
-  paymentStatus: PaymentStatus;
+  endDate:
+    Date | null;
 
   @Prop({
-    type: String,
-    enum: PaymentProvider,
-    required: true,
-    default: PaymentProvider.NONE,
+    type:
+      String,
+
+    enum:
+      PaymentStatus,
+
+    required:
+      true,
+
+    default:
+      PaymentStatus.NONE,
+
+    index:
+      true,
   })
-  paymentProvider: PaymentProvider;
+  paymentStatus:
+    PaymentStatus;
 
   @Prop({
-    type: String,
-    trim: true,
-    default: null,
-  })
-  paymentReference: string | null;
+    type:
+      String,
 
-  // Price snapshot captured by BACKEND when request is made.
-  // Later plan-price changes will not modify this request.
-  @Prop({
-    type: Number,
-    min: 0,
-    default: 0,
-  })
-  amountDue: number;
+    enum:
+      PaymentProvider,
 
-  @Prop({
-    type: Number,
-    min: 0,
-    default: 0,
+    required:
+      true,
+
+    default:
+      PaymentProvider.NONE,
   })
-  amountPaid: number;
+  paymentProvider:
+    PaymentProvider;
 
   @Prop({
-    type: Date,
-    default: null,
+    type:
+      String,
+
+    trim:
+      true,
+
+    default:
+      null,
   })
-  paymentSubmittedAt: Date | null;
+  paymentReference:
+    string | null;
+
+ 
+  @Prop({
+    type:
+      Number,
+
+    min:
+      0,
+
+    default:
+      0,
+  })
+  amountDue:
+    number;
 
   @Prop({
-    type: Date,
-    default: null,
+    type:
+      Number,
+
+    min:
+      0,
+
+    default:
+      0,
   })
-  verifiedAt: Date | null;
+  amountPaid:
+    number;
 
   @Prop({
-    type: MongooseSchema.Types.ObjectId,
-    ref: 'User',
-    default: null,
+    type:
+      Date,
+
+    default:
+      null,
   })
-  verifiedBy: Types.ObjectId | null;
+  paymentSubmittedAt:
+    Date | null;
 
   @Prop({
-    type: String,
-    trim: true,
-    default: null,
-  })
-  rejectionReason: string | null;
+    type:
+      Date,
 
-  // ---------------------------------------------------------
-  // SUBSCRIPTION LIFECYCLE
-  // ---------------------------------------------------------
-
-  @Prop({
-    type: Boolean,
-    default: true,
-    index: true,
+    default:
+      null,
   })
-  isCurrent: boolean;
+  verifiedAt:
+    Date | null;
 
   @Prop({
-    type: String,
-    trim: true,
-    default: null,
+    type:
+      MongooseSchema.Types.ObjectId,
+
+    ref:
+      'User',
+
+    default:
+      null,
   })
-  cancelledReason: string | null;
+  verifiedBy:
+    Types.ObjectId | null;
+
+  @Prop({
+    type:
+      String,
+
+    trim:
+      true,
+
+    default:
+      null,
+  })
+  rejectionReason:
+    string | null;
+
+  @Prop({
+    type:
+      Boolean,
+
+    default:
+      true,
+
+    index:
+      true,
+  })
+  isCurrent:
+    boolean;
+
+  @Prop({
+    type:
+      String,
+
+    trim:
+      true,
+
+    default:
+      null,
+  })
+  cancelledReason:
+    string | null;
 }
+
 
 export const VendorSubscriptionSchema =
   SchemaFactory.createForClass(
@@ -153,34 +252,49 @@ export const VendorSubscriptionSchema =
   );
 
 VendorSubscriptionSchema.index({
-  vendorId: 1,
-  isCurrent: 1,
+  vendorId:
+    1,
+
+  isCurrent:
+    1,
 });
 
 VendorSubscriptionSchema.index({
-  vendorId: 1,
-  paymentStatus: 1,
+  vendorId:
+    1,
+
+  paymentStatus:
+    1,
 });
 
 VendorSubscriptionSchema.index({
-  paymentStatus: 1,
-  createdAt: -1,
+  paymentStatus:
+    1,
+
+  createdAt:
+    -1,
 });
 
 VendorSubscriptionSchema.index({
-  plan: 1,
-  status: 1,
+  plan:
+    1,
+
+  status:
+    1,
 });
 
-// Prevent two simultaneous pending payment requests
-// for the same vendor.
 VendorSubscriptionSchema.index(
   {
-    vendorId: 1,
-    paymentStatus: 1,
+    vendorId:
+      1,
+
+    paymentStatus:
+      1,
   },
   {
-    unique: true,
+    unique:
+      true,
+
     partialFilterExpression: {
       paymentStatus:
         PaymentStatus.PENDING,

@@ -84,6 +84,12 @@ export class SubscriptionController {
       .getPlans();
   }
 
+  @Get('payment-instructions')
+getPaymentInstructions() {
+  return this.subscriptionService
+    .getPaymentInstructions();
+}
+
   // =========================================================
   // CURRENT
   // =========================================================

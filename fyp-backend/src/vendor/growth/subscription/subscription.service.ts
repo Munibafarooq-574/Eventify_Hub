@@ -6,9 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  InjectModel,
-} from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 
 import {
   HydratedDocument,
@@ -67,6 +65,25 @@ export class SubscriptionService {
     return getAllPlanDefinitions();
   }
 
+  getPaymentInstructions() {
+  const accountTitle =
+    process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
+
+  const mobileNumber =
+    process.env.SUBSCRIPTION_EASYPAISA_MOBILE?.trim();
+
+  if (!accountTitle || !mobileNumber) {
+    throw new BadRequestException(
+      'Easypaisa subscription payment details are not configured.',
+    );
+  }
+
+  return {
+    provider: PaymentProvider.EASYPAISA,
+    accountTitle,
+    mobileNumber,
+  };
+}
   // =========================================================
   // CURRENT SUBSCRIPTION
   // =========================================================
@@ -94,11 +111,18 @@ export class SubscriptionService {
         );
     }
 
-    // Backward compatibility:
-    // old DB rows may still contain plan = "free".
+    /**
+     * Backward compatibility:
+     *
+     * Old database rows may still contain:
+     *
+     * plan = FREE
+     *
+     * Convert them into the new BASIC trial lifecycle.
+     */
     if (
-      current.plan ===
-      SubscriptionPlan.FREE
+      current.plan === SubscriptionPlan.FREE ||
+      String(current.plan) === 'trial'
     ) {
       current =
         await this.convertLegacyFreeToTrial(
@@ -142,13 +166,20 @@ export class SubscriptionService {
     paymentReference: string,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
+
     this.assertPurchasablePlan(plan);
 
     this.assertManualPaymentProvider(
       paymentProvider,
     );
 
-    // Verify vendor and normalize any current subscription state.
+    /**
+     * Verify Vendor and normalize current
+     * subscription lifecycle first.
+     *
+     * Existing trial/paid subscription remains
+     * current while payment waits for Admin review.
+     */
     await this.getCurrentSubscription(
       vendorId,
     );
@@ -159,8 +190,12 @@ export class SubscriptionService {
     const amountDue =
       getConfiguredPlanPrice(plan);
 
-    // Backend is the source of truth.
-    // Vendor/frontend cannot supply price.
+    /**
+     * Backend is the source of truth.
+     *
+     * Vendor/mobile frontend can NEVER provide
+     * subscription price.
+     */
     if (
       amountDue === null ||
       amountDue <= 0
@@ -184,9 +219,14 @@ export class SubscriptionService {
       );
     }
 
+    /**
+     * Vendor cannot submit two simultaneous
+     * pending subscription payments.
+     */
     const existingPending =
       await this.subscriptionModel.findOne({
         vendorId: vendorObjectId,
+
         paymentStatus:
           PaymentStatus.PENDING,
       });
@@ -197,11 +237,17 @@ export class SubscriptionService {
       );
     }
 
+    /**
+     * Same transaction/reference cannot be reused
+     * while pending or after being approved.
+     */
     const duplicateReference =
       await this.subscriptionModel.findOne({
         paymentProvider,
+
         paymentReference:
           normalizedReference,
+
         paymentStatus: {
           $in: [
             PaymentStatus.PENDING,
@@ -219,8 +265,20 @@ export class SubscriptionService {
     const now =
       new Date();
 
-    // A payment request is NOT current access yet.
-    // Current trial/paid plan continues until Admin approves.
+    /**
+     * A payment request itself is NOT current
+     * subscription access.
+     *
+     * Example:
+     *
+     * Current:
+     * BASIC + TRIAL
+     *
+     * Payment request:
+     * GROWTH + PENDING_PAYMENT
+     *
+     * The trial remains usable until Admin approves Growth.
+     */
     return this.subscriptionModel.create({
       vendorId:
         vendorObjectId,
@@ -230,7 +288,10 @@ export class SubscriptionService {
       status:
         SubscriptionStatus.PENDING_PAYMENT,
 
-      // startDate will be reset to the actual approval time.
+      /**
+       * Actual billing start date is reset
+       * when Admin approves the payment.
+       */
       startDate:
         now,
 
@@ -245,7 +306,9 @@ export class SubscriptionService {
       paymentReference:
         normalizedReference,
 
-      // Backend price snapshot.
+      /**
+       * Backend-controlled price snapshot.
+       */
       amountDue,
 
       amountPaid:
@@ -305,7 +368,10 @@ export class SubscriptionService {
         ],
       },
 
-      // Do not count demo subscriptions as real payments.
+      /**
+       * Demo subscriptions are not real
+       * subscription payments.
+       */
       paymentStatus: {
         $in: [
           PaymentStatus.PENDING,
@@ -392,8 +458,10 @@ export class SubscriptionService {
 
     return {
       total,
+
       limit:
         safeLimit,
+
       skip:
         safeSkip,
 
@@ -459,13 +527,13 @@ export class SubscriptionService {
             amountDue:
               Number(
                 subscription.amountDue ??
-                  0,
+                0,
               ),
 
             amountPaid:
               Number(
                 subscription.amountPaid ??
-                  0,
+                0,
               ),
 
             paymentSubmittedAt:
@@ -639,7 +707,7 @@ export class SubscriptionService {
     if (
       Number(
         paymentRequest.amountDue ??
-          0,
+        0,
       ) <= 0
     ) {
       throw new BadRequestException(
@@ -658,8 +726,12 @@ export class SubscriptionService {
         SUBSCRIPTION_DURATION_DAYS,
     );
 
-    // Growth/Premium replace Basic.
-    // Only one entitlement is current at a time.
+    /**
+     * Any approved Basic/Growth/Premium plan
+     * replaces the current entitlement.
+     *
+     * Only one current entitlement is allowed.
+     */
     await this.subscriptionModel.updateMany(
       {
         vendorId:
@@ -682,8 +754,12 @@ export class SubscriptionService {
     paymentRequest.paymentStatus =
       PaymentStatus.PAID;
 
-    // Admin never chooses the amount.
-    // Backend snapshot becomes paid amount.
+    /**
+     * Admin cannot manually choose amount.
+     *
+     * The backend snapshot created during
+     * payment request becomes amountPaid.
+     */
     paymentRequest.amountPaid =
       Number(
         paymentRequest.amountDue,
@@ -718,14 +794,20 @@ export class SubscriptionService {
   }
 
   // =========================================================
-  // DEMO ACTIVATION
+  // DEVELOPMENT-ONLY DEMO ACTIVATION
   // =========================================================
 
+  /**
+   * Kept temporarily for backward compatibility.
+   *
+   * Production Vendor UI must not use this flow.
+   */
   async activateDemoPlan(
     vendorId: string,
     plan: SubscriptionPlan,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
+
     this.assertPurchasablePlan(plan);
 
     getPlanDefinition(plan);
@@ -824,9 +906,14 @@ export class SubscriptionService {
         vendorId,
       );
 
+    /**
+     * BASIC trial cannot be cancelled as
+     * a paid subscription because it has
+     * no renewal/payment yet.
+     */
     if (
-      current.plan ===
-        SubscriptionPlan.TRIAL ||
+      current.status ===
+        SubscriptionStatus.TRIAL ||
       current.plan ===
         SubscriptionPlan.FREE
     ) {
@@ -932,11 +1019,27 @@ export class SubscriptionService {
       subscription.status ===
       SubscriptionStatus.EXPIRED;
 
+    /**
+     * Trial is now lifecycle status,
+     * not SubscriptionPlan.TRIAL.
+     */
     const isTrial =
-      subscription.plan ===
-      SubscriptionPlan.TRIAL;
+      subscription.status ===
+      SubscriptionStatus.TRIAL;
 
+    /**
+     * BASIC during TRIAL is not a paid plan.
+     *
+     * A paid plan must be:
+     *
+     * status        = ACTIVE
+     * paymentStatus = PAID
+     */
     const isPaidPlan =
+      subscription.status ===
+        SubscriptionStatus.ACTIVE &&
+      subscription.paymentStatus ===
+        PaymentStatus.PAID &&
       [
         SubscriptionPlan.BASIC,
         SubscriptionPlan.GROWTH,
@@ -945,6 +1048,11 @@ export class SubscriptionService {
         subscription.plan,
       );
 
+    /**
+     * Payment request exists separately from
+     * current access so active trial/paid plan
+     * remains untouched until approval.
+     */
     const pendingPayment =
       await this.subscriptionModel
         .findOne({
@@ -964,12 +1072,59 @@ export class SubscriptionService {
         })
         .lean();
 
-    return {
+    const planDefinition =
+  getPlanDefinition(
+    subscription.plan,
+  );
+
+/**
+ * Expired vendors keep their historical plan,
+ * but subscription-controlled entitlements
+ * must no longer be usable.
+ *
+ * We do NOT delete packages/images here.
+ * Actual create/upload enforcement will be
+ * added in Phase 14A.7.
+ */
+const entitlementFeatures =
+  expired
+    ? Object.fromEntries(
+        Object.keys(
+          planDefinition.features,
+        ).map((key) => [
+          key,
+          false,
+        ]),
+      )
+    : planDefinition.features;
+
+const entitlementLimits =
+  expired
+    ? Object.fromEntries(
+        Object.keys(
+          planDefinition.limits,
+        ).map((key) => [
+          key,
+          0,
+        ]),
+      )
+    : planDefinition.limits; 
+
+        return {
       subscription,
 
       isTrial,
+     
+      effectivePlan:
+  subscription.plan,
 
-      isPaidPlan,
+features:
+  entitlementFeatures,
+
+limits:
+  entitlementLimits,
+
+isPaidPlan,
 
       subscriptionRequired:
         expired,
@@ -993,7 +1148,7 @@ export class SubscriptionService {
               amountDue:
                 Number(
                   pendingPayment.amountDue ??
-                    0,
+                  0,
                 ),
 
               paymentProvider:
@@ -1011,6 +1166,12 @@ export class SubscriptionService {
             }
           : null,
 
+      /**
+       * Authoritative backend values.
+       *
+       * Mobile should display these instead
+       * of calculating its own trial duration.
+       */
       trialDaysRemaining:
         isTrial &&
         !expired
@@ -1021,11 +1182,16 @@ export class SubscriptionService {
         !expired
           ? remainingDays
           : 0,
+
+      trialEndDate:
+        isTrial
+          ? subscription.endDate
+          : null,
     };
   }
 
   // =========================================================
-  // INITIAL 7-DAY TRIAL
+  // INITIAL 7-DAY BASIC TRIAL
   // =========================================================
 
   private async createInitialTrial(
@@ -1058,6 +1224,16 @@ export class SubscriptionService {
       );
     }
 
+    /**
+     * IMPORTANT:
+     *
+     * Trial starts from original Vendor account
+     * creation date, not from the first time the
+     * subscription endpoint is opened.
+     *
+     * This prevents an old Vendor from receiving
+     * a fresh 7-day trial later.
+     */
     const vendorCreatedAt =
       (vendor as any).createdAt
         ? new Date(
@@ -1080,17 +1256,30 @@ export class SubscriptionService {
       trialEndDate.getTime() <=
       Date.now();
 
+    /**
+     * Final Phase 14A rule:
+     *
+     * Trial is BASIC plan entitlement.
+     *
+     * ACTIVE trial:
+     * plan   = BASIC
+     * status = TRIAL
+     *
+     * Expired trial:
+     * plan   = BASIC
+     * status = EXPIRED
+     */
     return this.subscriptionModel.create({
       vendorId:
         vendorObjectId,
 
       plan:
-        SubscriptionPlan.TRIAL,
+        SubscriptionPlan.BASIC,
 
       status:
         alreadyExpired
           ? SubscriptionStatus.EXPIRED
-          : SubscriptionStatus.ACTIVE,
+          : SubscriptionStatus.TRIAL,
 
       startDate:
         vendorCreatedAt,
@@ -1134,7 +1323,7 @@ export class SubscriptionService {
   }
 
   // =========================================================
-  // LEGACY FREE → TRIAL MIGRATION
+  // LEGACY FREE → BASIC TRIAL MIGRATION
   // =========================================================
 
   private async convertLegacyFreeToTrial(
@@ -1157,6 +1346,12 @@ export class SubscriptionService {
       );
     }
 
+    /**
+     * Use original account creation date.
+     *
+     * Never grant seven fresh days simply because
+     * an old FREE document is being migrated now.
+     */
     const vendorCreatedAt =
       (vendor as any).createdAt
         ? new Date(
@@ -1175,8 +1370,11 @@ export class SubscriptionService {
         VENDOR_TRIAL_DURATION_DAYS,
     );
 
+    /**
+     * Legacy FREE becomes BASIC entitlement.
+     */
     subscription.plan =
-      SubscriptionPlan.TRIAL;
+      SubscriptionPlan.BASIC;
 
     subscription.startDate =
       vendorCreatedAt;
@@ -1188,7 +1386,7 @@ export class SubscriptionService {
       trialEndDate.getTime() <=
       Date.now()
         ? SubscriptionStatus.EXPIRED
-        : SubscriptionStatus.ACTIVE;
+        : SubscriptionStatus.TRIAL;
 
     subscription.paymentStatus =
       PaymentStatus.NONE;
@@ -1243,6 +1441,11 @@ export class SubscriptionService {
       return subscription;
     }
 
+    /**
+     * Pending/rejected payment records are not
+     * lifecycle entitlements and should not be
+     * automatically expired here.
+     */
     if (
       subscription.status ===
         SubscriptionStatus.PENDING_PAYMENT ||
@@ -1263,11 +1466,28 @@ export class SubscriptionService {
       return subscription;
     }
 
+    /**
+     * Applies to:
+     *
+     * TRIAL
+     * ACTIVE
+     * CANCELLED
+     *
+     * once their endDate is reached.
+     */
     subscription.status =
       SubscriptionStatus.EXPIRED;
 
-    // Keep expired entitlement as current.
-    // UI can now show "Subscription Required".
+    /**
+     * Keep expired entitlement as current.
+     *
+     * This allows subscription/access endpoints
+     * to return:
+     *
+     * subscriptionRequired = true
+     *
+     * instead of silently creating a fresh trial.
+     */
     subscription.isCurrent =
       true;
 
