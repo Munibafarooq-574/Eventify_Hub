@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -11,6 +11,7 @@ import {
   MehndiBusinessDetails,
   SoundBusinessDetails,
   GenericBusinessDetails,
+  VendorApprovalStatus,
 } from '../schemas/user.schema';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
@@ -21,6 +22,8 @@ import { CreateCakeBusinessDetailsDto } from './dto/create-cake-business-details
 import { CreateMehndiBusinessDetailsDto } from './dto/create-mehndi-business-details.dto';
 import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-details.dto';
 import { CreatePackagesDto } from './dto/create-package.dto';
+import { FeatureAccessService } from './growth/feature-access.service';
+import { LimitKey } from './growth/subscription/subscription.types';
 import {
   BusinessDetailsType,
   Category,
@@ -48,10 +51,11 @@ export interface SmartPackageInput {
 @Injectable()
 export class VendorService {
     constructor(
-        @InjectModel(User.name) private userModel: Model<User>,
-        @InjectModel(Category.name) private categoryModel: Model<Category>,
-        private fileUploadService: FileUploadService
-    ) { }
+    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Category.name) private categoryModel: Model<Category>,
+    private fileUploadService: FileUploadService,
+    private readonly featureAccessService: FeatureAccessService,
+) { }
 
     async getAllVendorsByCategoryId(categoryId: string): Promise<User[]> {
         // Validate the categoryId
@@ -65,6 +69,7 @@ export class VendorService {
                 // Match vendors with the specified category and required fields
                 $match: {
                     role: 'Vendor',
+                    vendorApprovalStatus: VendorApprovalStatus.APPROVED,
                     buisnessCategory: new Types.ObjectId(categoryId),
                     contactDetails: { $exists: true, $ne: null },
                     coverImage: { $exists: true, $ne: null },
@@ -152,48 +157,138 @@ export class VendorService {
             .exec();
     }
 
-    async createContactDetails(
-        userId: string,
-        createContactDetailsDto: CreateContactDetailsDto,
-        file: Express.Multer.File
-    ): Promise<User> {
-        const user = await this.userModel.findById(userId).exec();
-        let fileUrl = null;
+async createContactDetails(
+  userId: string,
+  createContactDetailsDto: CreateContactDetailsDto,
+  file: Express.Multer.File,
+): Promise<User> {
+  const user = await this.userModel
+    .findById(userId)
+    .exec();
 
-            if (file) {
-            fileUrl = await this.fileUploadService.uploadFile(file);
-        }
-        if (!user) throw new NotFoundException(`User with ID ${userId} not found`);
+  if (!user) {
+    throw new NotFoundException(
+      `User with ID ${userId} not found`,
+    );
+  }
 
-        user.contactDetails = { ...createContactDetailsDto, brandLogo: fileUrl?.Location || "" }
-        return await user.save();
-    }
+  if (user.role?.toLowerCase() !== 'vendor') {
+    throw new BadRequestException(
+      'Only Vendor accounts can submit a vendor profile for review.',
+    );
+  }
+
+  let fileUrl: any = null;
+
+  if (file) {
+    fileUrl =
+      await this.fileUploadService.uploadFile(file);
+  }
+
+  user.contactDetails = {
+    ...createContactDetailsDto,
+    brandLogo:
+      fileUrl?.Location ||
+      user.contactDetails?.brandLogo ||
+      '',
+  };
+
+  // First profile submission always goes to Admin review
+  user.vendorApprovalStatus =
+    VendorApprovalStatus.PENDING_REVIEW;
+
+  user.vendorApprovalSubmittedAt =
+    new Date();
+
+  user.vendorApprovalReviewedAt =
+    null;
+
+  user.vendorApprovalReviewedBy =
+    null;
+
+  user.vendorApprovalRejectionReason =
+    null;
+
+  user.markModified('contactDetails');
+
+  return await user.save();
+}
+
+
 async updateContactDetails(
   userId: string,
   dto: CreateContactDetailsDto,
   file: Express.Multer.File,
 ): Promise<User> {
-
-  const user = await this.userModel.findById(userId);
+  const user = await this.userModel
+    .findById(userId);
 
   if (!user) {
-    throw new NotFoundException('User not found');
+    throw new NotFoundException(
+      'User not found',
+    );
   }
 
-  let logo = user.contactDetails?.brandLogo || "";
+  if (user.role?.toLowerCase() !== 'vendor') {
+    throw new BadRequestException(
+      'Only Vendor accounts can update vendor contact details.',
+    );
+  }
+
+  let logo =
+    user.contactDetails?.brandLogo || '';
 
   if (file) {
-    const uploaded = await this.fileUploadService.uploadFile(file);
-    logo = uploaded?.Location || logo;
+    const uploaded =
+      await this.fileUploadService.uploadFile(file);
+
+    logo =
+      uploaded?.Location || logo;
   }
 
   user.contactDetails = {
-    ...((user.contactDetails as any)?.toObject?.() ?? user.contactDetails),
+    ...(
+      (user.contactDetails as any)
+        ?.toObject?.() ??
+      user.contactDetails
+    ),
     ...dto,
     brandLogo: logo,
   };
 
   user.markModified('contactDetails');
+
+  /**
+   * If vendor was rejected or profile was incomplete,
+   * editing contact details means resubmitting for review.
+   *
+   * Approved vendors remain approved when they simply
+   * edit their contact details.
+   *
+   * Pending vendors remain pending.
+   */
+  if (
+    !user.vendorApprovalStatus ||
+    user.vendorApprovalStatus ===
+      VendorApprovalStatus.REJECTED ||
+    user.vendorApprovalStatus ===
+      VendorApprovalStatus.INCOMPLETE
+  ) {
+    user.vendorApprovalStatus =
+      VendorApprovalStatus.PENDING_REVIEW;
+
+    user.vendorApprovalSubmittedAt =
+      new Date();
+
+    user.vendorApprovalReviewedAt =
+      null;
+
+    user.vendorApprovalReviewedBy =
+      null;
+
+    user.vendorApprovalRejectionReason =
+      null;
+  }
 
   return await user.save();
 }
@@ -443,6 +538,24 @@ async addPackages(
         throw new NotFoundException('User not found');
     }
 
+    const incomingPackageCount = createPackagesDto.packages?.length ?? 0;
+    const existingPackageCount = user.packages?.length ?? 0;
+
+    const maxPackages = await this.featureAccessService.getFeatureLimit(
+        userId,
+        LimitKey.MAX_PACKAGES,
+    );
+
+    if (incomingPackageCount <= 0) {
+        throw new BadRequestException('At least one package is required.');
+    }
+
+    if (existingPackageCount + incomingPackageCount > maxPackages) {
+        throw new BadRequestException(
+            `Package limit reached. Your current subscription allows up to ${maxPackages} packages.`,
+        );
+    }
+
     // Normalize new packages so they always match the Package schema
     const newPackages = createPackagesDto.packages.map((pkg) => ({
         packageName: pkg.packageName,
@@ -469,6 +582,39 @@ async addPackages(
     return user;
 }
 
+async getVendorApprovalStatus(userId: string) {
+  const user = await this.userModel
+    .findById(userId)
+    .select(
+      'role vendorApprovalStatus vendorApprovalSubmittedAt vendorApprovalReviewedAt vendorApprovalRejectionReason',
+    )
+    .lean();
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  if (user.role?.toLowerCase() !== 'vendor') {
+    throw new BadRequestException(
+      'This account is not a Vendor.',
+    );
+  }
+
+  return {
+    status:
+      user.vendorApprovalStatus ??
+      VendorApprovalStatus.INCOMPLETE,
+
+    submittedAt:
+      user.vendorApprovalSubmittedAt ?? null,
+
+    reviewedAt:
+      user.vendorApprovalReviewedAt ?? null,
+
+    rejectionReason:
+      user.vendorApprovalRejectionReason ?? null,
+  };
+}
 
     async getContactDetails(userId: string) {
         const user = await this.userModel.findById(userId).select('contactDetails');
@@ -530,6 +676,38 @@ async addPackages(
         return userObjToReturn;
     }
 
+    async assertCanUploadPortfolioImages(
+    userId: string,
+    incomingImageCount: number,
+): Promise<void> {
+    const user = await this.userModel.findById(userId);
+
+    if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    if (incomingImageCount <= 0) {
+        throw new BadRequestException('At least one image is required.');
+    }
+
+    const existingImageCount = user.images?.length ?? 0;
+
+    const maxPortfolioImages =
+        await this.featureAccessService.getFeatureLimit(
+            userId,
+            LimitKey.MAX_PORTFOLIO_IMAGES,
+        );
+
+    if (
+        existingImageCount + incomingImageCount >
+        maxPortfolioImages
+    ) {
+        throw new BadRequestException(
+            `Portfolio image limit reached. Your current subscription allows up to ${maxPortfolioImages} portfolio images.`,
+        );
+    }
+}
+
     async associateImagesWithUser(userId: string, imageUrls: string[]): Promise<void> {
         // Fetch the user by userId
         const user = await this.userModel.findById(userId);
@@ -578,6 +756,49 @@ async addPackages(
     images: user.images,
   };
 }
+
+async assertCanUploadPackageImages(
+    packageId: string,
+    incomingImageCount: number,
+): Promise<void> {
+    const user = await this.userModel.findOne({
+        'packages._id': packageId,
+    });
+
+    if (!user) {
+        throw new NotFoundException('Package not found');
+    }
+
+    const packageItem = user.packages.find(
+        (pkg: any) => pkg._id.toString() === packageId,
+    );
+
+    if (!packageItem) {
+        throw new NotFoundException('Package not found');
+    }
+
+    if (incomingImageCount <= 0) {
+        throw new BadRequestException('At least one image is required.');
+    }
+
+    const existingImageCount = packageItem.images?.length ?? 0;
+
+    const maxImagesPerPackage =
+        await this.featureAccessService.getFeatureLimit(
+            user._id.toString(),
+            LimitKey.MAX_IMAGES_PER_PACKAGE,
+        );
+
+    if (
+        existingImageCount + incomingImageCount >
+        maxImagesPerPackage
+    ) {
+        throw new BadRequestException(
+            `Package image limit reached. Your current subscription allows up to ${maxImagesPerPackage} images per package.`,
+        );
+    }
+}
+
     async associateImagesWithPackage(
     packageId: string,
     urls: string[],
@@ -624,10 +845,15 @@ async addPackages(
         // Aggregation pipeline: vendors matching category
         const pipeline = [
             {
-                $match: {
-                    role: 'Vendor',
-                    packages: { $exists: true, $not: { $size: 0 } },
-                    buisnessCategory: categoryId,
+                     $match: {
+                role: 'Vendor',
+                vendorApprovalStatus:
+                    VendorApprovalStatus.APPROVED,
+                packages: {
+                    $exists: true,
+                    $not: { $size: 0 },
+                },
+                buisnessCategory: categoryId,
                 }
             },
             {
@@ -781,26 +1007,61 @@ async updatePackage(
     packageId: string,
     updateDto: UpdatePackageDto,
 ) {
+    const user = await this.userModel.findOne({
+        'packages._id': packageId,
+    });
+
+    if (!user) {
+        throw new NotFoundException('Package not found');
+    }
+
+    const existingPackage = user.packages.find(
+        (pkg: any) => pkg._id.toString() === packageId,
+    );
+
+    if (!existingPackage) {
+        throw new NotFoundException('Package not found');
+    }
+
+    // Prevent image-upload bypass through PATCH.
+    // Existing/smaller image lists are allowed.
+    // Any image increase must use the dedicated upload endpoint.
+    if (updateDto.images !== undefined) {
+        const existingImages = existingPackage.images ?? [];
+        const incomingImages = updateDto.images ?? [];
+
+        if (incomingImages.length > existingImages.length) {
+            throw new BadRequestException(
+                'New package images cannot be added through package update. Please use the package image upload endpoint.',
+            );
+        }
+    }
+
     const updatePayload: Record<string, any> = {};
 
     if (updateDto.packageName !== undefined) {
-        updatePayload['packages.$.packageName'] = updateDto.packageName;
+        updatePayload['packages.$.packageName'] =
+            updateDto.packageName;
     }
 
     if (updateDto.description !== undefined) {
-        updatePayload['packages.$.description'] = updateDto.description;
+        updatePayload['packages.$.description'] =
+            updateDto.description;
     }
 
     if (updateDto.price !== undefined) {
-        updatePayload['packages.$.price'] = updateDto.price;
+        updatePayload['packages.$.price'] =
+            updateDto.price;
     }
 
     if (updateDto.services !== undefined) {
-        updatePayload['packages.$.services'] = updateDto.services;
+        updatePayload['packages.$.services'] =
+            updateDto.services;
     }
 
     if (updateDto.durations !== undefined) {
-        updatePayload['packages.$.durations'] = updateDto.durations;
+        updatePayload['packages.$.durations'] =
+            updateDto.durations;
     }
 
     if (updateDto.allowCustomDuration !== undefined) {
@@ -819,11 +1080,14 @@ async updatePackage(
     }
 
     if (updateDto.images !== undefined) {
-        updatePayload['packages.$.images'] = updateDto.images;
+        updatePayload['packages.$.images'] =
+            updateDto.images;
     }
 
     if (Object.keys(updatePayload).length === 0) {
-        throw new NotFoundException('No package fields provided for update');
+        throw new BadRequestException(
+            'No package fields provided for update',
+        );
     }
 
     const result = await this.userModel.updateOne(
@@ -835,10 +1099,6 @@ async updatePackage(
         throw new NotFoundException('Package not found');
     }
 
-    if (result.modifiedCount === 0) {
-        throw new NotFoundException('Package not updated');
-    }
-
     const updatedUser = await this.userModel.findOne({
         'packages._id': packageId,
     });
@@ -847,7 +1107,6 @@ async updatePackage(
         (pkg: any) => pkg._id.toString() === packageId,
     );
 }
-
     async deletePackage(packageId: string) {
         const result = await this.userModel.updateOne(
             { 'packages._id': packageId },

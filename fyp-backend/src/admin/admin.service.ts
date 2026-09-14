@@ -1,6 +1,10 @@
 // fyp-backend/src/admin/admin.service.ts
 
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -9,8 +13,10 @@ import { Order } from 'src/schemas/order.schema';
 import { Payment } from 'src/schemas/payment.schema';
 import { Payout } from 'src/schemas/payout.schema';
 import { Refund } from 'src/schemas/refund.schema';
-import { User } from 'src/schemas/user.schema';
-
+import {
+  User,
+  VendorApprovalStatus,
+} from 'src/schemas/user.schema';
 import {
     AdminDashboardStats,
     AdminBookingRow,
@@ -483,12 +489,13 @@ export class AdminService {
     // ============================================================
 
     async getVendors(
-        search?: string,
-        categoryId?: string,
-        city?: string,
-        limit = 20,
-        skip = 0,
-    ) {
+  search?: string,
+  categoryId?: string,
+  city?: string,
+  approvalStatus?: VendorApprovalStatus,
+  limit = 20,
+  skip = 0,
+) {
         const safeLimit = Math.min(
             Math.max(
                 Number(limit) || 20,
@@ -509,6 +516,10 @@ export class AdminService {
             role: 'Vendor',
         };
 
+        if (approvalStatus) {
+        query.vendorApprovalStatus =
+            approvalStatus;
+        }
         // --------------------------------------------------------
         // SEARCH
         // --------------------------------------------------------
@@ -630,6 +641,11 @@ export class AdminService {
                         'phone_number',
 
                         'role',
+
+                        'vendorApprovalStatus',
+                        'vendorApprovalSubmittedAt',
+                        'vendorApprovalReviewedAt',
+                        'vendorApprovalRejectionReason',
 
                         'categoryId',
 
@@ -806,6 +822,21 @@ export class AdminService {
                                 .availabilitySettings,
                         ),
 
+                        approvalStatus:
+                    vendor.vendorApprovalStatus ??
+                    VendorApprovalStatus.INCOMPLETE,
+
+                    approvalSubmittedAt:
+                    vendor.vendorApprovalSubmittedAt ??
+                    null,
+
+                    approvalReviewedAt:
+                    vendor.vendorApprovalReviewedAt ??
+                    null,
+
+                    approvalRejectionReason:
+                    vendor.vendorApprovalRejectionReason ??
+                    null,
                     profileComplete:
                         Boolean(
                             vendor
@@ -856,6 +887,11 @@ export class AdminService {
                 'email',
                 'phone_number',
                 'role',
+                'vendorApprovalStatus',
+                'vendorApprovalSubmittedAt',
+                 'vendorApprovalReviewedAt',
+                'vendorApprovalReviewedBy',
+                'vendorApprovalRejectionReason',
                 'categoryId',
                 'buisnessCategory',
                 'contactDetails',
@@ -995,7 +1031,27 @@ export class AdminService {
             data.lastSeen ||
             null,
 
-        profileComplete:
+                    approvalStatus:
+            data.vendorApprovalStatus ??
+            VendorApprovalStatus.INCOMPLETE,
+
+            approvalSubmittedAt:
+            data.vendorApprovalSubmittedAt ??
+            null,
+
+            approvalReviewedAt:
+            data.vendorApprovalReviewedAt ??
+            null,
+
+            approvalReviewedBy:
+            data.vendorApprovalReviewedBy?.toString?.() ??
+            null,
+
+            approvalRejectionReason:
+            data.vendorApprovalRejectionReason ??
+            null,
+            
+            profileComplete:
             Boolean(
                 data.contactDetails &&
                 data.coverImage &&
@@ -1016,6 +1072,87 @@ export class AdminService {
     };
 }
 
+async reviewVendorProfile(
+  vendorId: string,
+  status: VendorApprovalStatus.APPROVED | VendorApprovalStatus.REJECTED,
+  adminId?: string,
+  reason?: string,
+) {
+  if (
+    status !== VendorApprovalStatus.APPROVED &&
+    status !== VendorApprovalStatus.REJECTED
+  ) {
+    throw new BadRequestException(
+      'Status must be APPROVED or REJECTED.',
+    );
+  }
+
+  if (
+    status === VendorApprovalStatus.REJECTED &&
+    !reason?.trim()
+  ) {
+    throw new BadRequestException(
+      'Rejection reason is required.',
+    );
+  }
+
+  const vendor =
+    await this.userModel.findOne({
+      _id: vendorId,
+      role: 'Vendor',
+    });
+
+  if (!vendor) {
+    throw new NotFoundException(
+      'Vendor not found.',
+    );
+  }
+
+  if (
+    vendor.vendorApprovalStatus !==
+    VendorApprovalStatus.PENDING_REVIEW
+  ) {
+    throw new BadRequestException(
+      'Only vendors pending review can be approved or rejected.',
+    );
+  }
+
+  vendor.vendorApprovalStatus = status;
+
+  vendor.vendorApprovalReviewedAt =
+    new Date();
+
+  vendor.vendorApprovalRejectionReason =
+    status === VendorApprovalStatus.REJECTED
+      ? reason!.trim()
+      : null;
+
+  if (adminId) {
+    vendor.vendorApprovalReviewedBy =
+      adminId as any;
+  }
+
+  await vendor.save();
+
+  return {
+    message:
+      status === VendorApprovalStatus.APPROVED
+        ? 'Vendor profile approved successfully.'
+        : 'Vendor profile rejected successfully.',
+
+    vendorId:
+      vendor._id.toString(),
+
+    status:
+      vendor.vendorApprovalStatus,
+
+    reviewedAt:
+      vendor.vendorApprovalReviewedAt,
+
+    rejectionReason:
+      vendor.vendorApprovalRejectionReason,
+  };
+}
     // ============================================================
     // ADMIN CLIENTS
     //

@@ -1,3 +1,4 @@
+//fyp-admin/app/vendors/page.tsx
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -25,6 +26,14 @@ type VendorRow = {
   lastSeen: string | null;
   availabilityConfigured: boolean;
   profileComplete: boolean;
+  approvalStatus:
+    | "INCOMPLETE"
+    | "PENDING_REVIEW"
+    | "APPROVED"
+    | "REJECTED";
+  approvalSubmittedAt: string | null;
+  approvalReviewedAt: string | null;
+  approvalRejectionReason: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -40,6 +49,7 @@ type PageProps = {
     search?: string;
     city?: string;
     categoryId?: string;
+    approvalStatus?: string;
     page?: string;
   }>;
 };
@@ -66,34 +76,58 @@ function vendorUrl({
   search,
   city,
   categoryId,
+  approvalStatus,
   page,
 }: {
   search?: string;
   city?: string;
   categoryId?: string;
+  approvalStatus?: string;
   page?: number;
 }) {
   const params = new URLSearchParams();
 
   if (search?.trim()) {
-    params.set("search", search.trim());
+    params.set(
+      "search",
+      search.trim(),
+    );
   }
 
   if (city?.trim()) {
-    params.set("city", city.trim());
+    params.set(
+      "city",
+      city.trim(),
+    );
   }
 
   if (categoryId?.trim()) {
-    params.set("categoryId", categoryId.trim());
+    params.set(
+      "categoryId",
+      categoryId.trim(),
+    );
+  }
+
+  if (approvalStatus?.trim()) {
+    params.set(
+      "approvalStatus",
+      approvalStatus.trim(),
+    );
   }
 
   if (page && page > 1) {
-    params.set("page", String(page));
+    params.set(
+      "page",
+      String(page),
+    );
   }
 
-  const query = params.toString();
+  const query =
+    params.toString();
 
-  return `/vendors${query ? `?${query}` : ""}`;
+  return `/vendors${
+    query ? `?${query}` : ""
+  }`;
 }
 
 function getInitials(
@@ -139,6 +173,11 @@ export default async function VendorsPage({
       ? params.categoryId.trim()
       : "";
 
+  const approvalStatus =
+    typeof params.approvalStatus === "string"
+      ? params.approvalStatus.trim()
+      : "";
+
   const parsedPage = Number(params.page);
 
   const currentPage =
@@ -182,6 +221,13 @@ export default async function VendorsPage({
     vendorQuery.set(
       "categoryId",
       categoryId,
+    );
+  }
+
+  if (approvalStatus) {
+    vendorQuery.set(
+      "approvalStatus",
+      approvalStatus,
     );
   }
 
@@ -239,6 +285,7 @@ export default async function VendorsPage({
         search,
         city,
         categoryId,
+        approvalStatus,
         page: 1,
       }),
     );
@@ -407,7 +454,7 @@ export default async function VendorsPage({
               <form
                 method="GET"
                 action="/vendors"
-                className="grid gap-4 xl:grid-cols-[2fr_1fr_1fr_auto]"
+                className="grid gap-4 xl:grid-cols-[2fr_1fr_1fr_1fr_auto]"
               >
                 <div>
                   <label
@@ -484,6 +531,41 @@ export default async function VendorsPage({
                   </select>
                 </div>
 
+                <div>
+                  <label
+                    htmlFor="approvalStatus"
+                    className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  >
+                    Approval Status
+                  </label>
+
+                  <select
+                    id="approvalStatus"
+                    name="approvalStatus"
+                    defaultValue={approvalStatus}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-slate-500"
+                  >
+                    <option value="">
+                      All Statuses
+                    </option>
+
+                    <option value="PENDING_REVIEW">
+                      Pending Review
+                    </option>
+
+                    <option value="APPROVED">
+                      Approved
+                    </option>
+
+                    <option value="REJECTED">
+                      Rejected
+                    </option>
+
+                    <option value="INCOMPLETE">
+                      Incomplete
+                    </option>
+                  </select>
+                </div>
                 <div className="flex items-end gap-2">
                   <button
                     type="submit"
@@ -556,6 +638,10 @@ export default async function VendorsPage({
 
                         <th className="px-5 py-4">
                           Profile
+                        </th>
+
+                        <th className="px-5 py-4">
+                          Approval
                         </th>
 
                         <th className="px-5 py-4">
@@ -656,6 +742,28 @@ export default async function VendorsPage({
                             </td>
 
                             <td className="px-5 py-5">
+                              <span
+                                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                                  vendor.approvalStatus === "APPROVED"
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : vendor.approvalStatus === "REJECTED"
+                                      ? "border-rose-200 bg-rose-50 text-rose-700"
+                                      : vendor.approvalStatus === "PENDING_REVIEW"
+                                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                                        : "border-slate-200 bg-slate-50 text-slate-600"
+                                }`}
+                              >
+                                {vendor.approvalStatus === "PENDING_REVIEW"
+                                  ? "Pending Review"
+                                  : vendor.approvalStatus === "APPROVED"
+                                    ? "Approved"
+                                    : vendor.approvalStatus === "REJECTED"
+                                      ? "Rejected"
+                                      : "Incomplete"}
+                              </span>
+                            </td>
+
+                            <td className="px-5 py-5">
                               <div className="space-y-1">
                                 <span
                                   className={`inline-flex items-center gap-2 text-xs font-semibold ${
@@ -731,6 +839,7 @@ export default async function VendorsPage({
                       search,
                       city,
                       categoryId,
+                      approvalStatus,
                       page:
                         currentPage -
                         1,
@@ -755,6 +864,7 @@ export default async function VendorsPage({
                       search,
                       city,
                       categoryId,
+                      approvalStatus,
                       page:
                         currentPage +
                         1,

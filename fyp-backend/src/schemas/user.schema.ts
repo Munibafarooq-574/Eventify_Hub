@@ -1,6 +1,10 @@
 //fyp-backend/src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import {
+  Document,
+  Schema as MongooseSchema,
+  Types,
+} from 'mongoose';
 import { ContactDetails, ContactDetailsSchema } from './contact-details.schema';
 
 
@@ -804,6 +808,12 @@ export class Package {
 
 export const PackageSchema = SchemaFactory.createForClass(Package);
 
+export enum VendorApprovalStatus {
+  INCOMPLETE = 'INCOMPLETE',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -838,6 +848,40 @@ export class User extends Document {
 
   @Prop()
   role: string;
+
+    @Prop({
+    type: String,
+    enum: Object.values(VendorApprovalStatus),
+    default: VendorApprovalStatus.INCOMPLETE,
+    index: true,
+  })
+  vendorApprovalStatus: VendorApprovalStatus;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  vendorApprovalSubmittedAt?: Date | null;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  vendorApprovalReviewedAt?: Date | null;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  })
+  vendorApprovalReviewedBy?: Types.ObjectId | null;
+
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
+  vendorApprovalRejectionReason?: string | null;
 
   @Prop()
   created_at: Date;

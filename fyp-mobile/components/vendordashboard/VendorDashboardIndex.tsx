@@ -2,6 +2,13 @@ import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
 import { VendorBadgeChips } from "../VendorFeature/VendorBadgeChips";
+import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
+import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import {
+    SubscriptionAccessState,
+    SubscriptionPlan,
+    SubscriptionStatus,
+} from "@/types/subscription.types";
 import { VendorAnalytics } from "@/types/vendorAnalytics";
 import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,10 +16,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     Alert,
     Dimensions,
     Image,
     Platform,
+    RefreshControl,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -68,14 +77,96 @@ const DashboardScreen = () => {
     const [hasNotifications, setHasNotifications] = useState<boolean>(true);
     const [loading, setLoading] = useState<boolean>(true);
 
+    const [checkingApproval, setCheckingApproval] =
+    useState<boolean>(true);
+  
+    const [initialLoading, setInitialLoading] = useState<boolean>(true);
+    const [refreshing, setRefreshing] = useState<boolean>(false);
+
     // ---- Analytics state ----
     const [analytics, setAnalytics] = useState<VendorAnalytics | null>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true);
     const [analyticsError, setAnalyticsError] = useState<boolean>(false);
+    const [subscriptionAccess, setSubscriptionAccess] =
+    useState<SubscriptionAccessState | null>(null);
+
+const [subscriptionLoading, setSubscriptionLoading] =
+    useState<boolean>(true);
+
+const [subscriptionError, setSubscriptionError] =
+    useState<boolean>(false);
+
+    const maxPackages =
+    subscriptionAccess?.limits?.maxPackages ?? 0;
+
+const packageLimitReached =
+    !subscriptionLoading &&
+    !subscriptionError &&
+    subscriptionAccess !== null &&
+    packages.length >= maxPackages;
 
     useEffect(() => {
         fetchUsername();
     }, []);
+
+   const checkVendorApproval = React.useCallback(async () => {
+    try {
+        const user = await getUserData();
+
+        if (!user?._id) {
+            console.warn(
+                "No user data found for vendor approval check.",
+            );
+
+            router.replace(
+                "/vendorprofilepending",
+            );
+            return;
+        }
+
+        const response = await fetch(
+            `https://eventify-hub.onrender.com/vendor/approval-status/${encodeURIComponent(
+                user._id,
+            )}`,
+        );
+
+        if (!response.ok) {
+            console.warn(
+                "Unable to check vendor approval status:",
+                response.status,
+            );
+
+            router.replace(
+                "/vendorprofilepending",
+            );
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if (
+            data?.status !==
+            "APPROVED"
+        ) {
+            router.replace(
+                "/vendorprofilepending",
+            );
+            return;
+        }
+
+        setCheckingApproval(false);
+    } catch (error) {
+        console.error(
+            "Vendor approval guard error:",
+            error,
+        );
+
+        router.replace(
+            "/vendorprofilepending",
+        );
+    }
+}, []);
 
     const fetchData = React.useCallback(async () => {
     try {
@@ -93,7 +184,27 @@ if (!user?._id) {
             return;
         }
 
-        setPackages(user.packages || []);
+        try {
+    const vendorPackages = await getVendorPackagesList(user._id);
+
+    setPackages(
+        Array.isArray(vendorPackages)
+            ? vendorPackages
+            : []
+    );
+} catch (packageError) {
+    console.error(
+        "Error fetching vendor packages:",
+        packageError
+    );
+
+    // Fallback only if API fails
+    setPackages(
+        Array.isArray(user.packages)
+            ? user.packages
+            : []
+    );
+}
 
         const statsData = await getVendorOrderStats("Vendor", user._id);
 
@@ -155,12 +266,65 @@ if (!user?._id) {
     }
 }, []);
 
-    useFocusEffect(
-        React.useCallback(() => {
-            fetchData();
-            fetchAnalytics();
-        }, [fetchData, fetchAnalytics]),
-    );
+const fetchSubscriptionAccess = React.useCallback(async () => {
+    try {
+        const user = await getUserData();
+
+        if (!user?._id) {
+            setSubscriptionAccess(null);
+            return;
+        }
+
+        setSubscriptionLoading(true);
+        setSubscriptionError(false);
+
+        const access = await getSubscriptionAccessState(user._id);
+
+        setSubscriptionAccess(access);
+    } catch (error) {
+        console.error("Error fetching subscription access:", error);
+
+        // Subscription failure must never break vendor dashboard.
+        setSubscriptionError(true);
+        setSubscriptionAccess(null);
+    } finally {
+        setSubscriptionLoading(false);
+    }
+}, []);
+
+    // Runs all three fetches together (in parallel) so the page loads
+    // as fast as possible instead of waiting for one after another.
+    const loadAllData = React.useCallback(async () => {
+        await Promise.allSettled([
+            fetchData(),
+            fetchAnalytics(),
+            fetchSubscriptionAccess(),
+        ]);
+        // Whatever the outcome (success or error on any of them), stop
+        // showing the full-screen loader after the first attempt.
+        setInitialLoading(false);
+    }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
+
+    // Pull-to-refresh handler
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        await Promise.allSettled([
+            fetchData(),
+            fetchAnalytics(),
+            fetchSubscriptionAccess(),
+        ]);
+        setRefreshing(false);
+    }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
+
+useFocusEffect(
+    React.useCallback(() => {
+        checkVendorApproval();
+        loadAllData();
+    }, [
+        checkVendorApproval,
+        loadAllData,
+    ]),
+);
 
    const fetchUsername = async () => {
     try {
@@ -198,12 +362,66 @@ if (!user?._id) {
         year: "numeric",
     });
 
+    if (checkingApproval) {
+    return (
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" />
+
+            <LinearGradient
+                colors={["#8A0F7C", "#5E0A55"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fullScreenLoader}
+            >
+                <ActivityIndicator
+                    size="large"
+                    color="#ffffff"
+                />
+
+                <Text
+                    style={styles.fullScreenLoaderText}
+                >
+                    Checking account status...
+                </Text>
+            </LinearGradient>
+        </View>
+    );
+}
+
+    // ---------- Full-screen loader shown only on first load ----------
+    if (initialLoading) {
+        return (
+            <View style={styles.container}>
+                <StatusBar barStyle="light-content" />
+                <LinearGradient
+                    colors={["#8A0F7C", "#5E0A55"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.fullScreenLoader}
+                >
+                    <ActivityIndicator size="large" color="#ffffff" />
+                    <Text style={styles.fullScreenLoaderText}>
+                        Loading your dashboard…
+                    </Text>
+                </LinearGradient>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#7D0C72"
+                        colors={["#7D0C72"]}
+                    />
+                }
             >
                 {/* ---------- Header ---------- */}
                 <LinearGradient
@@ -341,6 +559,38 @@ if (!user?._id) {
                     </ScrollView>
                 </LinearGradient>
 
+            {/* ---------- Subscription Status ---------- */}
+            <View style={styles.subscriptionSection}>
+                {subscriptionLoading ? (
+                    <View style={styles.subscriptionSkeleton} />
+                ) : subscriptionAccess ? (
+                    <SubscriptionStatusBanner
+                        access={subscriptionAccess}
+                        onPress={() =>
+                        router.push({
+                            pathname: "/subscriptionscreen",
+                            params: { vendorId },
+                        })
+                    }
+                    />
+                ) : subscriptionError ? (
+                    <TouchableOpacity
+                        style={styles.subscriptionLoadError}
+                        activeOpacity={0.8}
+                        onPress={fetchSubscriptionAccess}
+                    >
+                        <Ionicons
+                            name="refresh-outline"
+                            size={18}
+                            color="#7D0C72"
+                        />
+
+                        <Text style={styles.subscriptionLoadErrorText}>
+                            Unable to load subscription status. Tap to retry.
+                        </Text>
+                    </TouchableOpacity>
+                ) : null}
+            </View>
                 {/* ---------- Analytics error banner ---------- */}
                 {analyticsError && (
                     <View style={styles.errorBanner}>
@@ -702,16 +952,71 @@ if (!user?._id) {
 
                 {/* ---------- Packages ---------- */}
                 <View style={styles.sectionContainer}>
-                    <View style={styles.statisticsHeader}>
-                        <View>
-                            <Text style={styles.sectionTitle}>Current Packages</Text>
-                            <Text style={styles.sectionSubtitle}>Your active subscription plans</Text>
+                    <View style={styles.packageSectionHeader}>
+                        <View style={styles.packageSectionHeaderText}>
+                            <Text style={styles.sectionTitle}>
+                            Current Packages
+                        </Text>
+
+                        <Text style={styles.sectionSubtitle}>
+                            {subscriptionAccess
+                                ? `${packages.length} / ${maxPackages} packages`
+                                : `${packages.length} packages`}
+                        </Text>
                         </View>
+
+                        <TouchableOpacity
+                        style={[
+                            styles.addPackageButton,
+                            packageLimitReached &&
+                                styles.addPackageButtonDisabled,
+                        ]}
+                        activeOpacity={0.8}
+                        disabled={
+                            packageLimitReached ||
+                            subscriptionLoading
+                        }
+                        onPress={() => {
+                            if (packageLimitReached) {
+                                return;
+                            }
+
+                            router.push({
+                                pathname: "/vpdaddnewpackage",
+                            });
+                        }}
+                    >
+                        <Ionicons
+                            name={
+                                packageLimitReached
+                                    ? "lock-closed-outline"
+                                    : "add-circle-outline"
+                            }
+                            size={17}
+                            color={
+                                packageLimitReached
+                                    ? "#9F8C9B"
+                                    : "#FFFFFF"
+                            }
+                        />
+
+                        <Text
+                            style={[
+                                styles.addPackageButtonText,
+                                packageLimitReached &&
+                                    styles.addPackageButtonTextDisabled,
+                            ]}
+                        >
+                            {packageLimitReached
+                                ? "Limit Reached"
+                                : "Add Package"}
+                        </Text>
+                    </TouchableOpacity>
                     </View>
 
                     {packages.length > 0 ? (
                         <View style={styles.packageContainer}>
-                            {packages.map((pkg: any, index) => {
+                            {packages.slice(0, 6).map((pkg: any, index) => {
                                 const accent = PACKAGE_ACCENTS[index % PACKAGE_ACCENTS.length];
                                 return (
                                     <TouchableOpacity
@@ -750,6 +1055,40 @@ if (!user?._id) {
                             <Text style={styles.emptyStateText}>No active packages yet</Text>
                         </View>
                     )}
+
+                                {packages.length > 6 && (
+                <TouchableOpacity
+                    style={styles.viewAllPackagesButton}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                        if (!vendorId) {
+                            Alert.alert(
+                                "Error",
+                                "Vendor ID not found."
+                            );
+                            return;
+                        }
+
+                        router.push({
+                            pathname: "/VPD",
+                            params: {
+                                id: vendorId,
+                                tab: "Packages",
+                            },
+                        });
+                    }}
+                >
+                    <Text style={styles.viewAllPackagesText}>
+                        View All {packages.length} Packages
+                    </Text>
+
+                    <Ionicons
+                        name="arrow-forward"
+                        size={16}
+                        color="#7D0C72"
+                    />
+                </TouchableOpacity>
+            )}
                 </View>
 
                 {/* ---------- Vendor Profile CTA ---------- */}
@@ -772,6 +1111,233 @@ if (!user?._id) {
 
             <BottomNavigationFinal />
         </View>
+    );
+};
+
+type SubscriptionBannerConfig = {
+    title: string;
+    message: string;
+    buttonLabel: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    background: readonly [string, string];
+};
+
+const formatSubscriptionDate = (value?: string | null) => {
+    if (!value) return null;
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return date.toLocaleDateString("en-PK", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+};
+
+const getSubscriptionBannerConfig = (
+    access: SubscriptionAccessState,
+): SubscriptionBannerConfig => {
+    const subscription = access.subscription;
+
+    /*
+     * Pending payment gets priority because an existing paid plan may
+     * remain active while an upgrade/renewal payment is being reviewed.
+     */
+    if (access.hasPendingPayment && access.pendingPayment) {
+        const requestedPlan =
+            access.pendingPayment.plan === SubscriptionPlan.PREMIUM
+                ? "Premium"
+                : access.pendingPayment.plan === SubscriptionPlan.GROWTH
+                  ? "Growth"
+                  : "Basic";
+
+        return {
+            title: "Payment Under Review",
+            message: `Your ${requestedPlan} payment has been submitted and is awaiting verification.`,
+            buttonLabel: "View Subscription",
+            icon: "time-outline",
+            background: ["#FFF4D6", "#FFE5A3"],
+        };
+    }
+
+    if (subscription.status === SubscriptionStatus.REJECTED) {
+        return {
+            title: "Payment Rejected",
+            message:
+                subscription.rejectionReason ||
+                "Your subscription payment could not be verified. Review it and try again.",
+            buttonLabel: "View Plans",
+            icon: "alert-circle-outline",
+            background: ["#FDE8EC", "#F8D4DC"],
+        };
+    }
+
+    if (subscription.status === SubscriptionStatus.TRIAL) {
+        const trialEnd = formatSubscriptionDate(access.trialEndDate);
+
+        if (access.trialDaysRemaining <= 2) {
+            return {
+                title: "Your Free Basic Trial Is Ending Soon",
+                message:
+                    access.trialDaysRemaining > 0
+                        ? `${access.trialDaysRemaining} day${
+                              access.trialDaysRemaining === 1 ? "" : "s"
+                          } remaining${trialEnd ? ` • Ends ${trialEnd}` : ""}.`
+                        : "Your free Basic trial is ending today.",
+                buttonLabel: "Choose Plan",
+                icon: "hourglass-outline",
+                background: ["#FFF1D8", "#FFE0A8"],
+            };
+        }
+
+        return {
+            title: "Free Basic Trial Active",
+            message: `${access.trialDaysRemaining} days remaining${
+                trialEnd ? ` • Ends ${trialEnd}` : ""
+            }.`,
+            buttonLabel: "View Subscription",
+            icon: "gift-outline",
+            background: ["#F4E4FA", "#EAD2F5"],
+        };
+    }
+
+    if (subscription.status === SubscriptionStatus.EXPIRED) {
+        return {
+            title: "Subscription Expired",
+            message:
+                "Choose a plan to restore subscription benefits, visibility and growth features.",
+            buttonLabel: "Renew Subscription",
+            icon: "alert-circle-outline",
+            background: ["#FDE8EC", "#F8D4DC"],
+        };
+    }
+
+    if (subscription.status === SubscriptionStatus.CANCELLED) {
+        const validUntil = formatSubscriptionDate(subscription.endDate);
+
+        return {
+            title: "Renewal Cancelled",
+            message: validUntil
+                ? `Your current access remains available until ${validUntil}.`
+                : "Automatic renewal is cancelled.",
+            buttonLabel: "Manage Subscription",
+            icon: "calendar-outline",
+            background: ["#F1EDF3", "#E6DDE9"],
+        };
+    }
+
+    if (subscription.status === SubscriptionStatus.PENDING_PAYMENT) {
+        return {
+            title: "Payment Under Review",
+            message:
+                "Your payment has been submitted and is awaiting admin verification.",
+            buttonLabel: "View Subscription",
+            icon: "time-outline",
+            background: ["#FFF4D6", "#FFE5A3"],
+        };
+    }
+
+    const validUntil = formatSubscriptionDate(subscription.endDate);
+
+    if (subscription.status === SubscriptionStatus.ACTIVE) {
+        if (access.effectivePlan === SubscriptionPlan.PREMIUM) {
+            return {
+                title: "Premium Plan Active",
+                message: validUntil
+                    ? `Maximum exposure benefits active • Valid until ${validUntil}.`
+                    : "Maximum exposure benefits are active.",
+                buttonLabel: "Manage Subscription",
+                icon: "diamond-outline",
+                background: ["#F0E3FF", "#DFC5FF"],
+            };
+        }
+
+        if (access.effectivePlan === SubscriptionPlan.GROWTH) {
+            return {
+                title: "Growth Plan Active",
+                message: validUntil
+                    ? `Growth benefits active • Valid until ${validUntil}.`
+                    : "Your Growth benefits are active.",
+                buttonLabel: "Manage Subscription",
+                icon: "rocket-outline",
+                background: ["#E6F4FF", "#D5EAFF"],
+            };
+        }
+
+        return {
+            title: "Basic Plan Active",
+            message: validUntil
+                ? `Essential business features active • Valid until ${validUntil}.`
+                : "Essential business features are active.",
+            buttonLabel: "Manage Subscription",
+            icon: "checkmark-circle-outline",
+            background: ["#E7F7ED", "#D5F0DF"],
+        };
+    }
+
+    return {
+        title: "Subscription",
+        message: "View your current plan and subscription details.",
+        buttonLabel: "View Subscription",
+        icon: "card-outline",
+        background: ["#F4E4FA", "#EAD2F5"],
+    };
+};
+
+const SubscriptionStatusBanner = ({
+    access,
+    onPress,
+}: {
+    access: SubscriptionAccessState;
+    onPress: () => void;
+}) => {
+    const config = getSubscriptionBannerConfig(access);
+
+    return (
+        <LinearGradient
+            colors={config.background}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.subscriptionBanner}
+        >
+            <View style={styles.subscriptionBannerIcon}>
+                <Ionicons
+                    name={config.icon}
+                    size={22}
+                    color="#7D0C72"
+                />
+            </View>
+
+            <View style={styles.subscriptionBannerContent}>
+                <Text style={styles.subscriptionBannerTitle}>
+                    {config.title}
+                </Text>
+
+                <Text style={styles.subscriptionBannerMessage}>
+                    {config.message}
+                </Text>
+
+                <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.subscriptionBannerButton}
+                    onPress={onPress}
+                >
+                    <Text style={styles.subscriptionBannerButtonText}>
+                        {config.buttonLabel}
+                    </Text>
+
+                    <Ionicons
+                        name="arrow-forward"
+                        size={14}
+                        color="#FFFFFF"
+                    />
+                </TouchableOpacity>
+            </View>
+        </LinearGradient>
     );
 };
 
@@ -862,6 +1428,19 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#FBF4F8" },
+
+    // Full-screen initial loader
+    fullScreenLoader: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    fullScreenLoaderText: {
+        marginTop: 14,
+        color: "#ffffff",
+        fontSize: 14,
+        fontWeight: "600",
+    },
 
     // Header
     header: {
@@ -968,6 +1547,89 @@ headerActionButton: {
     retryButton: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#E4405F", borderRadius: 10 },
     retryButtonText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 
+    // Subscription status
+subscriptionSection: {
+    paddingHorizontal: 20,
+    marginTop: 18,
+},
+
+subscriptionSkeleton: {
+    height: 126,
+    borderRadius: 20,
+    backgroundColor: "#EFE1F0",
+},
+
+subscriptionBanner: {
+    flexDirection: "row",
+    borderRadius: 20,
+    padding: 17,
+    ...cardShadow(0.07),
+},
+
+subscriptionBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 13,
+},
+
+subscriptionBannerContent: {
+    flex: 1,
+},
+
+subscriptionBannerTitle: {
+    color: "#2B1730",
+    fontSize: 16,
+    fontWeight: "800",
+},
+
+subscriptionBannerMessage: {
+    color: "#6D5A72",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+},
+
+subscriptionBannerButton: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#7D0C72",
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    marginTop: 12,
+},
+
+subscriptionBannerButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+},
+
+subscriptionLoadError: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E8D7E7",
+},
+
+subscriptionLoadErrorText: {
+    flex: 1,
+    marginLeft: 8,
+    color: "#7D0C72",
+    fontSize: 12,
+    fontWeight: "600",
+},
     // Sections
     sectionContainer: { paddingHorizontal: 20, marginTop: 24 },
     statisticsHeader: {
@@ -1109,7 +1771,58 @@ headerActionButton: {
     skeleton: { backgroundColor: "#EFE1F0", borderRadius: 18 },
 
     // Packages
+    packageSectionHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 14,
+        gap: 12,
+    },
+    packageSectionHeaderText: {
+        flex: 1,
+    },
+    addPackageButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        backgroundColor: "#7B2869",
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+    },
+    addPackageButtonDisabled: {
+    backgroundColor: "#E8DFE5",
+    opacity: 0.8,
+},
+    addPackageButtonText: {
+        color: "#FFFFFF",
+        fontSize: 13,
+        fontWeight: "700",
+    },
+    addPackageButtonTextDisabled: {
+    color: "#9F8C9B",
+},
     packageContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+    viewAllPackagesButton: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#E6CFE1",
+    backgroundColor: "#FFF",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+},
+
+viewAllPackagesText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#7D0C72",
+},
     packageBox: {
         width: "48%",
         padding: 14,

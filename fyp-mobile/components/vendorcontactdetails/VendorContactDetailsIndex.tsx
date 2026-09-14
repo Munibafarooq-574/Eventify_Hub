@@ -33,29 +33,42 @@ const ContactDetailsScreen = () => {
 
   const [logoUri, setLogoUri] = useState<string | null>(null);
 
+  const [snackbarMessage, setSnackbarMessage] = useState<string>("");
+  const [snackbarVisible, setSnackbarVisible] = useState<boolean>(false);
+  const snackbarAnim = useRef(new Animated.Value(0)).current;
+  const snackbarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSnackbar = (message: string) => {
+    if (snackbarTimerRef.current) {
+      clearTimeout(snackbarTimerRef.current);
+    }
+
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+
+    snackbarAnim.stopAnimation();
+    snackbarAnim.setValue(0);
+
+    Animated.timing(snackbarAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+
+    snackbarTimerRef.current = setTimeout(() => {
+      Animated.timing(snackbarAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setSnackbarVisible(false);
+      });
+    }, 3200);
+  };
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateAnim = useRef(new Animated.Value(40)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-
-  /**
-   * Business-detail screen routing is based on the reusable
-   * businessDetailsType stored on the selected category.
-   *
-   * IMPORTANT:
-   * We do NOT route using category names anymore.
-   *
-   * Future categories can use GENERIC and automatically
-   * continue to /bdgeneric without adding name-based if/else blocks.
-   */
-  const businessDetailsRoutes: Record<string, string> = {
-    PHOTOGRAPHY: "/bdphotographer",
-    CATERING: "/bdcatering",
-    VENUE: "/bdvenue",
-    MAKEUP: "/bdsalon",
-    CAKE: "/bdcakes",
-    MEHNDI: "/bdmehndi",
-    SOUND: "/bdsounds",
-  };
 
   const animateButtonIn = () => {
     Animated.spring(buttonScale, {
@@ -90,6 +103,15 @@ const ContactDetailsScreen = () => {
     ]).start();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (snackbarTimerRef.current) {
+        clearTimeout(snackbarTimerRef.current);
+      }
+    };
+  }, []);
+
+
   const pickImage = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -115,27 +137,134 @@ const ContactDetailsScreen = () => {
   };
 
   const submit = async () => {
-    /**
-     * Instagram is optional.
-     *
-     * Required fields:
-     * - Brand Name
-     * - Contact Number
-     * - Booking Email
-     * - City
-     */
-    if (!brandName || !contactNumber || !bookingEmail || !city) {
-      Alert.alert(
-        "Error",
-        "Please fill in all the required fields marked with *."
+    const trimmedBrandName = brandName.trim();
+    const trimmedContactNumber = contactNumber.trim();
+    const trimmedInstagram = instagramLink.trim();
+    const trimmedFacebook = facebookLink.trim();
+    const trimmedBookingEmail = bookingEmail.trim();
+    const trimmedWebsite = website.trim();
+    const trimmedCity = city.trim();
+    const trimmedAddress = address.trim();
+    const trimmedGoogleLink = googleLink.trim();
+
+    const isValidEmail = (value: string) =>
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+    const isValidUrl = (value: string) => {
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
+      }
+    };
+
+    const isInstagramUrl = (value: string) => {
+      if (!isValidUrl(value)) return false;
+
+      try {
+        const hostname = new URL(value).hostname.toLowerCase();
+        return (
+          hostname === "instagram.com" ||
+          hostname === "www.instagram.com" ||
+          hostname.endsWith(".instagram.com")
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    const isFacebookUrl = (value: string) => {
+      if (!isValidUrl(value)) return false;
+
+      try {
+        const hostname = new URL(value).hostname.toLowerCase();
+        return (
+          hostname === "facebook.com" ||
+          hostname === "www.facebook.com" ||
+          hostname.endsWith(".facebook.com") ||
+          hostname === "fb.com" ||
+          hostname === "www.fb.com"
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    if (!logoUri) {
+      showSnackbar("Business Logo is required.");
+      return;
+    }
+
+    if (!trimmedBrandName) {
+      showSnackbar("Brand Name is required.");
+      return;
+    }
+
+    if (!trimmedContactNumber) {
+      showSnackbar("Contact Number is required.");
+      return;
+    }
+
+    if (!/^03\d{9}$/.test(trimmedContactNumber)) {
+      showSnackbar(
+        "Enter a valid Pakistani mobile number: 11 digits starting with 03."
       );
       return;
     }
 
-    if (!logoUri) {
-      Alert.alert(
-        "Logo Required",
-        "Please upload your business logo to continue."
+    const hasInstagram = trimmedInstagram.length > 0;
+    const hasFacebook = trimmedFacebook.length > 0;
+
+    if (!hasInstagram && !hasFacebook) {
+      showSnackbar("Add at least one: Instagram or Facebook.");
+      return;
+    }
+
+    if (hasInstagram && !isInstagramUrl(trimmedInstagram)) {
+      showSnackbar(
+        "Enter a valid Instagram URL, e.g. https://instagram.com/yourpage"
+      );
+      return;
+    }
+
+    if (hasFacebook && !isFacebookUrl(trimmedFacebook)) {
+      showSnackbar(
+        "Enter a valid Facebook URL, e.g. https://facebook.com/yourpage"
+      );
+      return;
+    }
+
+    if (!trimmedBookingEmail) {
+      showSnackbar("Booking Email is required.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedBookingEmail)) {
+      showSnackbar("Enter a valid Booking Email.");
+      return;
+    }
+
+    if (!trimmedCity) {
+      showSnackbar("City is required.");
+      return;
+    }
+
+    if (!/^[A-Za-zÀ-ÿ\s.'-]{2,}$/.test(trimmedCity)) {
+      showSnackbar("Enter a valid city name.");
+      return;
+    }
+
+    if (trimmedWebsite && !isValidUrl(trimmedWebsite)) {
+      showSnackbar(
+        "Enter a valid Website URL, e.g. https://yourwebsite.com"
+      );
+      return;
+    }
+
+    if (trimmedGoogleLink && !isValidUrl(trimmedGoogleLink)) {
+      showSnackbar(
+        "Enter a valid Google Maps URL beginning with http:// or https://"
       );
       return;
     }
@@ -144,45 +273,50 @@ const ContactDetailsScreen = () => {
       const storedUser = await getSecureData("user");
 
       if (!storedUser) {
-        Alert.alert(
-          "Error",
-          "User information could not be found. Please log in again."
-        );
+        showSnackbar("User information not found. Please log in again.");
         return;
       }
 
       const user = JSON.parse(storedUser);
 
       if (!user?._id) {
-        Alert.alert(
-          "Error",
-          "User information is invalid. Please log in again."
-        );
+        showSnackbar("User information is invalid. Please log in again.");
         return;
       }
 
       const formData = new FormData();
 
       formData.append("userId", user._id);
-      formData.append("brandName", brandName);
-      formData.append("contactNumber", contactNumber);
+      formData.append("brandName", trimmedBrandName);
+      formData.append("contactNumber", trimmedContactNumber);
 
-      // Optional fields can safely be sent as empty strings.
-      formData.append("instagramLink", instagramLink);
-      formData.append("facebookLink", facebookLink);
+      if (hasInstagram) {
+        formData.append("instagramLink", trimmedInstagram);
+      }
 
-      formData.append("bookingEmail", bookingEmail);
-      formData.append("city", city);
-      formData.append("website", website);
-      formData.append("officialAddress", address);
-      formData.append("officialGoogleLink", googleLink);
+      if (hasFacebook) {
+        formData.append("facebookLink", trimmedFacebook);
+      }
+
+      formData.append("bookingEmail", trimmedBookingEmail);
+      formData.append("city", trimmedCity);
+
+      if (trimmedWebsite) {
+        formData.append("website", trimmedWebsite);
+      }
+
+      if (trimmedAddress) {
+        formData.append("officialAddress", trimmedAddress);
+      }
+
+      if (trimmedGoogleLink) {
+        formData.append("officialGoogleLink", trimmedGoogleLink);
+      }
 
       const filename = logoUri.split("/").pop() || "business-logo.jpg";
       const match = /\.(\w+)$/.exec(filename);
 
-      const type = match
-        ? `image/${match[1]}`
-        : "image/jpeg";
+      const type = match ? `image/${match[1]}` : "image/jpeg";
 
       formData.append(
         "file",
@@ -193,62 +327,36 @@ const ContactDetailsScreen = () => {
         } as any
       );
 
-      /**
-       * Save contact details first.
-       */
       await postContactDetails(user._id, formData);
 
-      /**
-       * Read reusable business-details type that was stored
-       * when vendor selected their category.
-       *
-       * Examples:
-       *
-       * Photography -> PHOTOGRAPHY
-       * Caterings   -> CATERING
-       * Venues      -> VENUE
-       *
-       * Future categories:
-       *
-       * Florist     -> GENERIC
-       * Decoration  -> GENERIC
-       * Transport   -> GENERIC
-       */
-      const businessDetailsType =
-        (await getSecureData("businessDetailsType")) || "GENERIC";
-
-      const normalizedBusinessDetailsType =
-        businessDetailsType.toUpperCase();
-
-      const nextRoute =
-        businessDetailsRoutes[normalizedBusinessDetailsType];
-
       Alert.alert(
-        "Success",
-        "Contact details saved successfully!"
-      );
-
-      /**
-       * Existing specialized business-detail screens.
-       */
-      if (nextRoute) {
-        router.push(nextRoute as any);
-        return;
-      }
-
-      /**
-       * Future/new categories automatically use generic form.
-       */
-      router.push("/bdgeneric" as any);
-    } catch (error) {
+  "Profile Submitted",
+  "Your profile has been submitted for admin review. We’ll notify you by email once it is approved or rejected.",
+  [
+    {
+      text: "OK",
+      onPress: () => {
+        router.replace("/vendorprofilepending");
+      },
+    },
+  ]
+);
+    } catch (error: any) {
       console.log(
         "Contact details submit error:",
-        error
+        error?.response?.data || error?.message || error
       );
 
-      Alert.alert(
-        "Error",
-        "Something went wrong. Please try again."
+      const backendMessage =
+        error?.response?.data?.message?.message?.[0] ||
+        error?.response?.data?.message?.message ||
+        error?.response?.data?.message ||
+        "Something went wrong. Please try again.";
+
+      showSnackbar(
+        typeof backendMessage === "string"
+          ? backendMessage
+          : "Something went wrong. Please try again."
       );
     }
   };
@@ -357,18 +465,33 @@ const ContactDetailsScreen = () => {
               🇵🇰
             </Text>
 
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="+92 3001234567"
-              placeholderTextColor="#999"
-              keyboardType="phone-pad"
-              value={contactNumber}
-              onChangeText={setContactNumber}
-            />
+                  <TextInput
+        style={styles.phoneInput}
+        placeholder="03XXXXXXXXX"
+        placeholderTextColor="#999"
+        keyboardType="phone-pad"
+        value={contactNumber}
+        maxLength={11}
+        onChangeText={(text) => {
+          const digitsOnly = text.replace(/[^0-9]/g, "");
+
+          if (digitsOnly.length <= 11) {
+            setContactNumber(digitsOnly);
+          }
+        }}
+      />
           </View>
         </View>
 
-        {/* Instagram - OPTIONAL */}
+        {/* Social Media section note */}
+
+        <View style={styles.socialNoteBox}>
+          <Text style={styles.socialNoteText}>
+            Add at least one — Instagram or Facebook *
+          </Text>
+        </View>
+
+        {/* Instagram - at least one of Instagram/Facebook required */}
 
         <View style={styles.inputCard}>
           <Text style={styles.label}>
@@ -385,7 +508,7 @@ const ContactDetailsScreen = () => {
           />
         </View>
 
-        {/* Facebook */}
+        {/* Facebook - at least one of Instagram/Facebook required */}
 
         <View style={styles.inputCard}>
           <Text style={styles.label}>
@@ -531,6 +654,28 @@ const ContactDetailsScreen = () => {
 
         <View style={{ height: 40 }} />
       </Animated.ScrollView>
+
+      {snackbarVisible && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.snackbar,
+            {
+              opacity: snackbarAnim,
+              transform: [
+                {
+                  translateY: snackbarAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.snackbarText}>{snackbarMessage}</Text>
+        </Animated.View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -679,6 +824,23 @@ const styles = StyleSheet.create({
     color: "#222",
   },
 
+  socialNoteBox: {
+    backgroundColor: "#FBEFF7",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F0D6E7",
+  },
+
+  socialNoteText: {
+    color: "#780C60",
+    fontSize: 12.5,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
   buttonContainer: {
     flexDirection: "row",
     marginTop: 18,
@@ -729,6 +891,34 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
 
     elevation: 10,
+  },
+
+  snackbar: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: Platform.OS === "ios" ? 34 : 24,
+    backgroundColor: "#808080",
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 12,
+    zIndex: 999,
+  },
+
+  snackbarText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20,
+    textAlign: "center",
   },
 
   saveButtonText: {

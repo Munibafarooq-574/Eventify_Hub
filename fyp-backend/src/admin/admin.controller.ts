@@ -19,6 +19,9 @@ import {
 } from '@nestjs/platform-express';
 
 import { AdminService } from './admin.service';
+import {
+  VendorApprovalStatus,
+} from '../schemas/user.schema';
 import { CategoryService } from '../category/category.service';
 
 import {
@@ -75,21 +78,24 @@ export class AdminController {
   // ============================================================
 
   @Get('vendors')
-  getVendors(
-    @Query('search') search?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('city') city?: string,
-    @Query('limit') limit = 20,
-    @Query('skip') skip = 0,
-  ) {
-    return this.adminService.getVendors(
-      search,
-      categoryId,
-      city,
-      limit,
-      skip,
-    );
-  }
+getVendors(
+  @Query('search') search?: string,
+  @Query('categoryId') categoryId?: string,
+  @Query('city') city?: string,
+  @Query('approvalStatus')
+  approvalStatus?: VendorApprovalStatus,
+  @Query('limit') limit = 20,
+  @Query('skip') skip = 0,
+) {
+  return this.adminService.getVendors(
+    search,
+    categoryId,
+    city,
+    approvalStatus,
+    limit,
+    skip,
+  );
+}
 
   // ============================================================
   // ADMIN VENDOR DETAIL
@@ -105,6 +111,44 @@ export class AdminController {
     );
   }
 
+  // ============================================================
+// ADMIN REVIEW VENDOR PROFILE
+// PATCH /admin/vendors/:id/approval
+//
+// Body:
+// {
+//   status: "APPROVED" | "REJECTED",
+//   reason?: string
+// }
+//
+// Reject ke liye reason required hoga.
+// Logged-in Admin ID reviewedBy mein save hoga.
+// ============================================================
+
+@Patch('vendors/:id/approval')
+reviewVendorProfile(
+  @Param('id')
+  vendorId: string,
+
+  @Body()
+  body: {
+    status:
+      | VendorApprovalStatus.APPROVED
+      | VendorApprovalStatus.REJECTED;
+
+    reason?: string;
+  },
+
+  @Request()
+  req: any,
+) {
+  return this.adminService.reviewVendorProfile(
+    vendorId,
+    body.status,
+    req.user?.id,
+    body.reason,
+  );
+}
   // ============================================================
   // ADMIN CLIENTS
   // GET /admin/clients

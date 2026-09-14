@@ -1,3 +1,5 @@
+// fyp-admin/app/vendors/[id]/page.tsx
+
 import Link from "next/link";
 import {
   notFound,
@@ -5,8 +7,15 @@ import {
 } from "next/navigation";
 
 import LogoutButton from "@/components/LogoutButton";
+import VendorApprovalActions from "@/components/VendorApprovalActions";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+
+type VendorApprovalStatus =
+  | "INCOMPLETE"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED";
 
 type VendorPackage = {
   _id?: string;
@@ -52,6 +61,11 @@ type VendorDetail = {
   isOnline: boolean;
   lastSeen: string | null;
   profileComplete: boolean;
+  approvalStatus?: VendorApprovalStatus;
+  approvalSubmittedAt?: string | null;
+  approvalReviewedAt?: string | null;
+  approvalReviewedBy?: string | null;
+  approvalRejectionReason?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -161,6 +175,42 @@ function humanizeKey(
     );
 }
 
+function approvalClass(
+  status: VendorApprovalStatus,
+) {
+  switch (status) {
+    case "APPROVED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+    case "REJECTED":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+
+    case "PENDING_REVIEW":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+}
+
+function approvalLabel(
+  status: VendorApprovalStatus,
+) {
+  switch (status) {
+    case "APPROVED":
+      return "Approved";
+
+    case "REJECTED":
+      return "Rejected";
+
+    case "PENDING_REVIEW":
+      return "Pending Review";
+
+    default:
+      return "Incomplete";
+  }
+}
+
 export default async function VendorDetailPage({
   params,
 }: PageProps) {
@@ -244,6 +294,10 @@ export default async function VendorDetailPage({
         item._id ===
         vendor.categoryId,
     );
+
+  const approvalStatus: VendorApprovalStatus =
+    vendor.approvalStatus ??
+    "INCOMPLETE";
 
   const businessEntries =
     vendor.businessDetails
@@ -351,6 +405,16 @@ export default async function VendorDetailPage({
                     </span>
 
                     <span
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${approvalClass(
+                        approvalStatus,
+                      )}`}
+                    >
+                      {approvalLabel(
+                        approvalStatus,
+                      )}
+                    </span>
+
+                    <span
                       className={`rounded-full border px-3 py-1 text-xs font-semibold ${
                         vendor.isOnline
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -396,6 +460,78 @@ export default async function VendorDetailPage({
                 </div>
               </div>
             </section>
+
+            <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Vendor Approval
+                    </p>
+
+                    <h2 className="mt-2 text-lg font-bold">
+                      Admin Review
+                    </h2>
+
+                    <p className="mt-2 text-sm text-slate-500">
+                      Review the vendor profile before approving or rejecting it.
+                    </p>
+                  </div>
+
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold ${approvalClass(
+                      approvalStatus,
+                    )}`}
+                  >
+                    {approvalLabel(
+                      approvalStatus,
+                    )}
+                  </span>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <InfoRow
+                    label="Submitted At"
+                    value={formatDateTime(
+                      vendor.approvalSubmittedAt,
+                    )}
+                  />
+
+                  <InfoRow
+                    label="Reviewed At"
+                    value={formatDateTime(
+                      vendor.approvalReviewedAt,
+                    )}
+                  />
+
+                  <InfoRow
+                    label="Reviewed By"
+                    value={
+                      vendor.approvalReviewedBy ||
+                      "N/A"
+                    }
+                  />
+
+                  {vendor.approvalRejectionReason ? (
+                    <InfoRow
+                      label="Rejection Reason"
+                      value={
+                        vendor.approvalRejectionReason
+                      }
+                    />
+                  ) : null}
+                </div>
+              </section>
+
+              <VendorApprovalActions
+                vendorId={vendor.vendorId}
+                currentStatus={approvalStatus}
+                currentRejectionReason={
+                  vendor.approvalRejectionReason ??
+                  null
+                }
+              />
+            </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
               <InfoSection title="Account Information">

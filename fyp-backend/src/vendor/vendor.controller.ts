@@ -1,4 +1,22 @@
-import { Controller, Post, Body, Get, Query, UseInterceptors, HttpException, HttpStatus, UploadedFile, UseGuards, Request, Param, Logger, UploadedFiles, Patch, Delete, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  UseInterceptors,
+  HttpException,
+  HttpStatus,
+  UploadedFile,
+  Request,
+  Param,
+  Logger,
+  UploadedFiles,
+  Patch,
+  Delete,
+  NotFoundException,
+} from '@nestjs/common';
+
 import { SmartPackageInput, VendorService } from './vendor.service';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
@@ -11,226 +29,298 @@ import { CreateSoundBusinessDetailsDto } from './dto/create-sound-business-detai
 import { CreateGenericBusinessDetailsDto } from './dto/create-generic-business-details.dto';
 import { User } from 'src/schemas/user.schema';
 import { CreatePackagesDto } from './dto/create-package.dto';
-import { diskStorage } from 'multer';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { extname } from 'path';
+import {
+  FileInterceptor,
+  FilesInterceptor,
+} from '@nestjs/platform-express';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
 import { UpdatePackageDto } from './dto/update-package.dto';
 
 @Controller('vendor')
 export class VendorController {
-    private readonly logger = new Logger("fyp")
-    //constructor(private vendorService: VendorService, private fileUploadService: FileUploadService) { }
+  private readonly logger = new Logger('fyp');
 
-    constructor(
+  constructor(
     private vendorService: VendorService,
     private vendorAnalyticsService: VendorAnalyticsService,
     private fileUploadService: FileUploadService,
-) { }
-    @Get('getVendorsByCategoryId')
-    getVendorsByCategoryId(@Request() req: any, @Query('categoryId') categoryId: string) {
-        return this.vendorService.getAllVendorsByCategoryId(categoryId);
-    }
+  ) {}
 
-    @Get('packages')
-async getPackages(@Query('userId') userId: string) {
+  @Get('getVendorsByCategoryId')
+  getVendorsByCategoryId(
+    @Request() req: any,
+    @Query('categoryId') categoryId: string,
+  ) {
+    return this.vendorService.getAllVendorsByCategoryId(categoryId);
+  }
+
+  @Get('packages')
+  async getPackages(@Query('userId') userId: string) {
     return this.vendorService.getPackages(userId);
-}
+  }
 
-@Get('analytics/:id')
-async getVendorAnalytics(@Param('id') id: string) {
+  @Get('analytics/:id')
+  async getVendorAnalytics(@Param('id') id: string) {
     return this.vendorAnalyticsService.getVendorAnalytics(id);
-}
+  }
 
-@Get('reliability/:id')
-async getVendorReliability(@Param('id') id: string) {
+  @Get('reliability/:id')
+  async getVendorReliability(@Param('id') id: string) {
     return this.vendorAnalyticsService.getVendorReliability(id);
-}
+  }
 
- @Get('contact-details/:userId')
-     async getContactDetails(@Param('userId') userId: string) {
-    return this.vendorService.getContactDetails(userId);
-     }
-    // Get Business Details
-    @Get('business-details')
-    async getBusinessDetails(@Param('userId') userId: string) {
-        return this.vendorService.getBusinessDetails(userId);
-    }
-    
-  @Get()
-    async getVendor(@Query('userId') userId: string) {
-        return this.vendorService.getVendor(userId);
-    }
-
-    @Get(':id')
-    async getVendorById(@Param('id') id: string) {
-        const vendor = await this.vendorService.findVendorById(id);
-        if (!vendor || vendor.role.toLowerCase() !== 'vendor') {
-            throw new NotFoundException('Vendor not found or role mismatch');
-        }
-        return vendor;
-    }
-
-
-    @Post('contactDetails')
-    @UseInterceptors(FileInterceptor('file'))
-    async createContactDetails(
-        @Query("userId") userId: string,
-        @Body() createContactDetailsDto: CreateContactDetailsDto, @UploadedFile() file: Express.Multer.File): Promise<User> {
-        return await this.vendorService.createContactDetails(userId, createContactDetailsDto, file);
-    }
-
-    @Patch('contactDetails')
-@UseInterceptors(FileInterceptor('file'))
-async updateContactDetails(
-  @Query('userId') userId: string,
-  @Body() dto: CreateContactDetailsDto,
-  @UploadedFile() file: Express.Multer.File,
-): Promise<User> {
-    console.log("PATCH contactDetails userId:", userId);
-  console.log("PATCH contactDetails dto:", dto);
-  return await this.vendorService.updateContactDetails(userId, dto, file);
-}
-
-    @Post('buisnessDetails')
-    async createPhotographerBuisnessDetails(
-        @Query("userId") userId: string,
-        @Body() dto:
-        | CreatePhotographerBusinessDetailsDto
-        | CreateSalonBusinessDetailsDto
-        | CreateVenueBusinessDetailsDto
-        | CreateCateringBusinessDetailsDto
-        | CreateCakeBusinessDetailsDto
-        | CreateMehndiBusinessDetailsDto
-        | CreateSoundBusinessDetailsDto
-        | CreateGenericBusinessDetailsDto
-        ) {
-        this.logger.log(userId, "buisnessDetails");
-        return await this.vendorService.createBuisnessDetails(userId, dto);
-    }
-
-   @Patch('buisnessDetails')
-async updateBusinessDetails(
-  @Query('userId') userId: string,
-  @Body() dto:
-    | CreatePhotographerBusinessDetailsDto
-    | CreateSalonBusinessDetailsDto
-    | CreateVenueBusinessDetailsDto
-    | CreateCateringBusinessDetailsDto
-    | CreateCakeBusinessDetailsDto
+  @Get('approval-status/:userId')
+async getVendorApprovalStatus(
+  @Param('userId') userId: string,
 ) {
-  console.log("PATCH USER ID:", userId);
-  console.log("PATCH DTO:", dto);
-
-  return await this.vendorService.updateBusinessDetails(userId, dto);
-}
-
-    @Post('packages')
-    async addPackages(
-        @Query('userId') userId: string,
-        @Body() createPackagesDto: CreatePackagesDto,
-    ) {
-        return this.vendorService.addPackages(userId, createPackagesDto);
-    }
-
-    /*@Get('contact-details')
-    async getContactDetails(@Param('userId') userId: string) {
-        return this.vendorService.getContactDetails(userId);
-    } */
-
-    @Post('ai-package')
-    async getSmartPackage(@Body() smartPackageDto: SmartPackageInput) {
-        smartPackageDto.guests = parseInt(smartPackageDto.guests.toString());
-        smartPackageDto.budget = parseInt(smartPackageDto.budget.toString());
-        return this.vendorService.generateSmartPackage({ ...smartPackageDto });
-    }
-
-    @Post('image')
-@UseInterceptors(
-    FilesInterceptor('files', 50, {
-        limits: {
-            fileSize: 200 * 1024 * 1024, // 200 MB per file
-        },
-    }),
-)
-async uploadImages(
-    @Query('userId') userId: string,
-    @UploadedFiles() files: Express.Multer.File[],
-) {
-    if (!files || files.length === 0) {
-        throw new HttpException(
-            'No files provided',
-            HttpStatus.BAD_REQUEST,
-        );
-    }
-
-    const urls = await this.fileUploadService.uploadMultipleFiles(files);
-
-    await this.vendorService.associateImagesWithUser(userId, urls);
-
-    return {
-        message: 'Media uploaded successfully',
-        urls,
-    };
-}
-
-@Delete('image')
-async deleteVendorImage(
-  @Body()
-  body: {
-    userId: string;
-    imageUrl: string;
-  },
-) {
-  return this.vendorService.deleteVendorImage(
-    body.userId,
-    body.imageUrl,
+  return this.vendorService.getVendorApprovalStatus(
+    userId,
   );
 }
-@Post('package/:packageId/images')
-@UseInterceptors(
-  FilesInterceptor('files', 50, {
-    limits: {
-      fileSize: 200 * 1024 * 1024,
-    },
-  }),
-)
-async uploadPackageImages(
-  @Param('packageId') packageId: string,
-  @UploadedFiles() files: Express.Multer.File[],
-) {
-  if (!files || files.length === 0) {
-    throw new HttpException(
-      'No files provided',
-      HttpStatus.BAD_REQUEST,
+
+  @Get('contact-details/:userId')
+  async getContactDetails(@Param('userId') userId: string) {
+    return this.vendorService.getContactDetails(userId);
+  }
+
+  @Get('business-details')
+  async getBusinessDetails(@Query('userId') userId: string) {
+    return this.vendorService.getBusinessDetails(userId);
+  }
+
+  @Get()
+  async getVendor(@Query('userId') userId: string) {
+    return this.vendorService.getVendor(userId);
+  }
+
+  @Get(':id')
+  async getVendorById(@Param('id') id: string) {
+    const vendor = await this.vendorService.findVendorById(id);
+
+    if (!vendor || vendor.role.toLowerCase() !== 'vendor') {
+      throw new NotFoundException(
+        'Vendor not found or role mismatch',
+      );
+    }
+
+    return vendor;
+  }
+
+  @Post('contactDetails')
+  @UseInterceptors(FileInterceptor('file'))
+  async createContactDetails(
+    @Query('userId') userId: string,
+    @Body() createContactDetailsDto: CreateContactDetailsDto,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<User> {
+    return await this.vendorService.createContactDetails(
+      userId,
+      createContactDetailsDto,
+      file,
     );
   }
 
-  const urls =
-    await this.fileUploadService.uploadMultipleFiles(files);
+  @Patch('contactDetails')
+  @UseInterceptors(FileInterceptor('file'))
+  async updateContactDetails(
+    @Query('userId') userId: string,
+    @Body() dto: CreateContactDetailsDto,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<User> {
+    console.log('PATCH contactDetails userId:', userId);
+    console.log('PATCH contactDetails dto:', dto);
 
-  await this.vendorService.associateImagesWithPackage(
-    packageId,
-    urls,
-  );
+    return await this.vendorService.updateContactDetails(
+      userId,
+      dto,
+      file,
+    );
+  }
 
-  return {
-    message: 'Package media uploaded successfully',
-    urls,
-  };
-}
-    @Patch('package/:id')
-    async updatePackage(
-        @Param('id') id: string,
-        @Body() updatePackageDto: UpdatePackageDto,
-    ) {
-        return this.vendorService.updatePackage(id, updatePackageDto);
+  @Post('buisnessDetails')
+  async createPhotographerBuisnessDetails(
+    @Query('userId') userId: string,
+    @Body()
+    dto:
+      | CreatePhotographerBusinessDetailsDto
+      | CreateSalonBusinessDetailsDto
+      | CreateVenueBusinessDetailsDto
+      | CreateCateringBusinessDetailsDto
+      | CreateCakeBusinessDetailsDto
+      | CreateMehndiBusinessDetailsDto
+      | CreateSoundBusinessDetailsDto
+      | CreateGenericBusinessDetailsDto,
+  ) {
+    this.logger.log(userId, 'buisnessDetails');
+
+    return await this.vendorService.createBuisnessDetails(
+      userId,
+      dto,
+    );
+  }
+
+  @Patch('buisnessDetails')
+  async updateBusinessDetails(
+    @Query('userId') userId: string,
+    @Body()
+    dto:
+      | CreatePhotographerBusinessDetailsDto
+      | CreateSalonBusinessDetailsDto
+      | CreateVenueBusinessDetailsDto
+      | CreateCateringBusinessDetailsDto
+      | CreateCakeBusinessDetailsDto,
+  ) {
+    console.log('PATCH USER ID:', userId);
+    console.log('PATCH DTO:', dto);
+
+    return await this.vendorService.updateBusinessDetails(
+      userId,
+      dto,
+    );
+  }
+
+  @Post('packages')
+  async addPackages(
+    @Query('userId') userId: string,
+    @Body() createPackagesDto: CreatePackagesDto,
+  ) {
+    return this.vendorService.addPackages(
+      userId,
+      createPackagesDto,
+    );
+  }
+
+  @Post('ai-package')
+  async getSmartPackage(
+    @Body() smartPackageDto: SmartPackageInput,
+  ) {
+    smartPackageDto.guests = parseInt(
+      smartPackageDto.guests.toString(),
+    );
+
+    smartPackageDto.budget = parseInt(
+      smartPackageDto.budget.toString(),
+    );
+
+    return this.vendorService.generateSmartPackage({
+      ...smartPackageDto,
+    });
+  }
+
+  // =========================
+  // PORTFOLIO IMAGE UPLOAD
+  // =========================
+
+  @Post('image')
+  @UseInterceptors(
+    FilesInterceptor('files', 50, {
+      limits: {
+        fileSize: 200 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadImages(
+    @Query('userId') userId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    if (!files || files.length === 0) {
+      throw new HttpException(
+        'No files provided',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    @Delete(':packageId')
-    async delete(@Param('packageId') packageId: string) {
-        return await this.vendorService.deletePackage(packageId);
+    // Subscription portfolio limit check BEFORE S3 upload
+    await this.vendorService.assertCanUploadPortfolioImages(
+      userId,
+      files.length,
+    );
+
+    const urls =
+      await this.fileUploadService.uploadMultipleFiles(files);
+
+    await this.vendorService.associateImagesWithUser(
+      userId,
+      urls,
+    );
+
+    return {
+      message: 'Media uploaded successfully',
+      urls,
+    };
+  }
+
+  @Delete('image')
+  async deleteVendorImage(
+    @Body()
+    body: {
+      userId: string;
+      imageUrl: string;
+    },
+  ) {
+    return this.vendorService.deleteVendorImage(
+      body.userId,
+      body.imageUrl,
+    );
+  }
+
+  // =========================
+  // PACKAGE IMAGE UPLOAD
+  // =========================
+
+  @Post('package/:packageId/images')
+  @UseInterceptors(
+    FilesInterceptor('files', 50, {
+      limits: {
+        fileSize: 200 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadPackageImages(
+    @Param('packageId') packageId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    if (!files || files.length === 0) {
+      throw new HttpException(
+        'No files provided',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
+    // Subscription per-package image limit check BEFORE S3 upload
+    await this.vendorService.assertCanUploadPackageImages(
+      packageId,
+      files.length,
+    );
+
+    const urls =
+      await this.fileUploadService.uploadMultipleFiles(files);
+
+    await this.vendorService.associateImagesWithPackage(
+      packageId,
+      urls,
+    );
+
+    return {
+      message: 'Package media uploaded successfully',
+      urls,
+    };
+  }
+
+  @Patch('package/:id')
+  async updatePackage(
+    @Param('id') id: string,
+    @Body() updatePackageDto: UpdatePackageDto,
+  ) {
+    return this.vendorService.updatePackage(
+      id,
+      updatePackageDto,
+    );
+  }
+
+  @Delete(':packageId')
+  async delete(@Param('packageId') packageId: string) {
+    return await this.vendorService.deletePackage(packageId);
+  }
 }
