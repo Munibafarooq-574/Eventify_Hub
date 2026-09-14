@@ -10,7 +10,7 @@
 // everything the earlier phases already built.
 // Phase 9: Discovery added — public featured vendors/packages discovery.
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 // Subscription
@@ -119,7 +119,7 @@ import { VendorModule } from 'src/vendor/vendor.module';
     
     // Provides VendorAnalyticsService used by
     // BadgeService and AnalyticsService.
-    VendorModule,
+        forwardRef(() => VendorModule),
   ],
 
   controllers: [

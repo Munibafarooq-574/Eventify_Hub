@@ -1,5 +1,5 @@
 //fyp-backend/src/vendor/vendor.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 
 import { VendorService } from './vendor.service';
 import { VendorController } from './vendor.controller';
@@ -23,7 +23,7 @@ import {
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
-//import { VendorGrowthModule } from './growth/vendor-growth.module';
+import { VendorGrowthModule } from './growth/vendor-growth.module';
 
 @Module({
     imports: [
@@ -37,7 +37,7 @@ import { VendorAnalyticsService } from './vendor-analytics.service';
             { name: Message.name, schema: MessageSchema },
             { name: Conversation.name, schema: ConversationSchema },
         ]),
-        // VendorGrowthModule,
+                forwardRef(() => VendorGrowthModule),
     ],
 
     controllers: [VendorController],
