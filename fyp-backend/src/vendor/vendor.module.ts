@@ -24,6 +24,7 @@ import {
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
 import { VendorGrowthModule } from './growth/vendor-growth.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
     imports: [
@@ -38,6 +39,7 @@ import { VendorGrowthModule } from './growth/vendor-growth.module';
             { name: Conversation.name, schema: ConversationSchema },
         ]),
                 forwardRef(() => VendorGrowthModule),
+                AuthModule,
     ],
 
     controllers: [VendorController],

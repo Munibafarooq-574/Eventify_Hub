@@ -5,6 +5,7 @@ import {
   Get,
   Query,
   UseInterceptors,
+  UseGuards,
   HttpException,
   HttpStatus,
   UploadedFile,
@@ -15,6 +16,7 @@ import {
   Patch,
   Delete,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 
 import { SmartPackageInput, VendorService } from './vendor.service';
@@ -36,6 +38,7 @@ import {
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
 import { UpdatePackageDto } from './dto/update-package.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('vendor')
 export class VendorController {
@@ -71,9 +74,36 @@ export class VendorController {
   }
 
   @Get('approval-status/:userId')
+@UseGuards(JwtAuthGuard)
 async getVendorApprovalStatus(
   @Param('userId') userId: string,
+  @Request() req: any,
 ) {
+  const authenticatedUserId =
+    req.user?.id?.toString();
+
+  const authenticatedRole =
+    req.user?.role
+      ?.toString()
+      .toLowerCase();
+
+  if (
+    !authenticatedUserId ||
+    authenticatedUserId !== userId
+  ) {
+    throw new ForbiddenException(
+      'You can only view your own vendor approval status.',
+    );
+  }
+
+  if (
+    authenticatedRole !== 'vendor'
+  ) {
+    throw new ForbiddenException(
+      'Only Vendor accounts can access vendor approval status.',
+    );
+  }
+
   return this.vendorService.getVendorApprovalStatus(
     userId,
   );
