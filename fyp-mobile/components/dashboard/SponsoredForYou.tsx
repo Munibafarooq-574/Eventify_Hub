@@ -1,11 +1,16 @@
 import getSponsoredCampaigns, {
   SponsoredCampaign,
 } from "@/services/getSponsoredCampaigns";
+import {
+  recordCampaignClick,
+  recordCampaignImpression,
+} from "@/services/campaignAnalytics";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -37,6 +42,53 @@ const SponsoredForYou: React.FC = () => {
   const [loading, setLoading] =
     useState<boolean>(true);
 
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 500,
+  }).current;
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: any) => {
+      viewableItems.forEach((viewable: any) => {
+        const campaign =
+          viewable?.item as SponsoredCampaign | undefined;
+
+        if (
+          !campaign?._id ||
+          !viewable?.isViewable ||
+          impressedCampaignIds.has(
+            campaign._id,
+          )
+        ) {
+          return;
+        }
+
+        /*
+         * Mark before request so rapid FlatList callbacks
+         * cannot send duplicate impressions.
+         */
+        impressedCampaignIds.add(
+          campaign._id,
+        );
+
+        recordCampaignImpression(
+          campaign._id,
+        ).catch(() => {
+          /*
+           * Analytics failure must never break
+           * the Client Dashboard.
+           *
+           * Remove it so a later genuine visibility event
+           * may retry.
+           */
+          impressedCampaignIds.delete(
+            campaign._id,
+          );
+        });
+      });
+    },
+  ).current;
+
   const loadCampaigns = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,16 +113,21 @@ const SponsoredForYou: React.FC = () => {
     loadCampaigns();
   }, [loadCampaigns]);
 
-  const openCampaign = (
+    const openCampaign = async (
     campaign: SponsoredCampaign,
   ) => {
     /*
-     * Open the campaign's exact vendor and request
-     * the exact linked package.
+     * A Click means the Client intentionally tapped
+     * the sponsored campaign.
      *
-     * VendorProfileDetails already supports opening
-     * the Packages tab.
+     * Analytics failure must not block navigation.
      */
+    try {
+      recordCampaignClick(campaign._id).catch(() => {});
+    } catch {
+      // Do not block campaign navigation.
+    }
+
     router.push({
       pathname: "/vendorprofiledetails",
       params: {
@@ -258,13 +315,15 @@ const SponsoredForYou: React.FC = () => {
       </View>
 
       <FlatList
-        data={campaigns}
-        horizontal
-        keyExtractor={(item) => item._id}
-        renderItem={renderCampaign}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-      />
+  data={campaigns}
+  horizontal
+  keyExtractor={(item) => item._id}
+  renderItem={renderCampaign}
+  showsHorizontalScrollIndicator={false}
+  contentContainerStyle={styles.list}
+  onViewableItemsChanged={onViewableItemsChanged}
+  viewabilityConfig={viewabilityConfig}
+/>
     </View>
   );
 };
@@ -463,5 +522,9 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
 });
+
+// Keeps impression dedupe for the whole current app session.
+// Component re-mount hone par Set reset nahi hoga.
+const impressedCampaignIds = new Set<string>();
 
 export default SponsoredForYou;

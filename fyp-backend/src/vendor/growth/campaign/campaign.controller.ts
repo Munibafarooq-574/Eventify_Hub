@@ -35,6 +35,42 @@ export class CampaignController {
       .getActiveSponsoredCampaigns();
   }
 
+    // =========================================================
+  // Phase 14A.10 — Sponsored Campaign Analytics
+  // =========================================================
+
+  @Post('public/:campaignId/impression')
+  async recordCampaignImpression(
+    @Param('campaignId')
+    campaignId: string,
+  ) {
+    return this.campaignService
+      .recordCampaignImpression(
+        campaignId,
+      );
+  }
+
+  @Post('public/:campaignId/click')
+  async recordCampaignClick(
+    @Param('campaignId')
+    campaignId: string,
+  ) {
+    return this.campaignService
+      .recordCampaignClick(
+        campaignId,
+      );
+  }
+
+  @Post('public/:campaignId/package-visit')
+  async recordCampaignPackageVisit(
+    @Param('campaignId')
+    campaignId: string,
+  ) {
+    return this.campaignService
+      .recordCampaignPackageVisit(
+        campaignId,
+      );
+  }
   // =========================================================
   // Phase 14A.8 — Create Campaign
   // =========================================================

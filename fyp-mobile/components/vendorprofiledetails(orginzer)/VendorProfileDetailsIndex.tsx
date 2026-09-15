@@ -1,4 +1,4 @@
-// clietn side detail section
+// client side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
 
 import getVendorReviews from '@/services/getAllReviewsForVendor';
@@ -26,6 +26,7 @@ import getVendorAvailability, {
   VendorAvailabilityResponse,
 } from '@/services/getVendorAvailability';
 import checkVendorsAvailability from '@/services/checkVendorsAvailability';
+import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
 import {
   ActivityIndicator,
   Image,
@@ -379,6 +380,8 @@ const VendorDetailsScreen: React.FC =
       endTime,
       durationMinutes,
       bookingMode,
+      campaignId,
+      source,
     } = useGlobalSearchParams();
 
     const [activeTab, setActiveTab] =
@@ -406,6 +409,9 @@ const VendorDetailsScreen: React.FC =
 
     const scrollViewRef =
       useRef<ScrollView>(null);
+
+    const sponsoredVisitRecordedRef =
+      useRef<string | null>(null);
 
     const [selectedMedia, setSelectedMedia] =
       useState<ReviewMedia[]>([]);
@@ -657,6 +663,10 @@ const todayAvailabilitySummary =
     // Package handling
     // ---------------------------------------------------------
 
+        // ---------------------------------------------------------
+    // Package handling
+    // ---------------------------------------------------------
+
     useEffect(() => {
       if (
         typeof packageId === 'string' &&
@@ -677,41 +687,42 @@ const todayAvailabilitySummary =
       openTab,
     ]);
 
-    const getSelectedPackage = () => {
+        const getSelectedPackage = () => {
       if (
-        !vendorData?.packages?.length
+        !vendorData?.packages ||
+        !Array.isArray(vendorData.packages) ||
+        vendorData.packages.length === 0
       ) {
         return null;
       }
 
       if (activePackage) {
-        const selected =
+        const matchedPackage =
           vendorData.packages.find(
             (pkg: any) =>
               String(pkg._id) ===
               String(activePackage),
           );
 
-        if (selected) {
-          return selected;
+        if (matchedPackage) {
+          return matchedPackage;
         }
       }
 
-      return vendorData.packages[0];
+      return vendorData.packages[0] || null;
     };
 
     const handlePackageSelect = (
-      packageIdValue: string,
+      selectedPackageId: string,
     ) => {
       setActivePackage(
-        packageIdValue,
+        String(selectedPackageId),
       );
     };
 
     // ---------------------------------------------------------
     // Reviews
-    // ---------------------------------------------------------
-
+     // ---------------------------------------------------------
     const openMediaViewer = (
       review: Review,
       index: number,
@@ -1479,16 +1490,12 @@ const todayAvailabilitySummary =
               ?._id ||
             null;
 
-          const validRoutePackage =
+                    const validRoutePackage =
             routePackageId &&
             vendor?.packages?.some(
               (pkg: any) =>
-                String(
-                  pkg._id,
-                ) ===
-                String(
-                  routePackageId,
-                ),
+                String(pkg._id) ===
+                String(routePackageId),
             )
               ? routePackageId
               : firstPackageId;
@@ -1496,6 +1503,65 @@ const todayAvailabilitySummary =
           setActivePackage(
             validRoutePackage,
           );
+
+          /*
+           * Sponsored Package Visit
+           *
+           * Count only when:
+           * 1. Navigation came from a sponsored campaign.
+           * 2. campaignId exists.
+           * 3. Requested packageId exists.
+           * 4. That exact package really belongs to this vendor.
+           *
+           * Falling back to the vendor's first package must NOT
+           * count as a sponsored package visit.
+           */
+          const resolvedCampaignId =
+            typeof campaignId === 'string'
+              ? campaignId
+              : Array.isArray(campaignId)
+                ? campaignId[0]
+                : '';
+
+          const resolvedSource =
+            typeof source === 'string'
+              ? source
+              : Array.isArray(source)
+                ? source[0]
+                : '';
+
+          const exactSponsoredPackageExists =
+            !!routePackageId &&
+            vendor?.packages?.some(
+              (pkg: any) =>
+                String(pkg._id) ===
+                String(routePackageId),
+            );
+
+          if (
+            resolvedSource === 'sponsored' &&
+            resolvedCampaignId &&
+            exactSponsoredPackageExists &&
+            sponsoredVisitRecordedRef.current !==
+              resolvedCampaignId
+          ) {
+            /*
+             * Mark before request to prevent refresh/re-render
+             * from producing duplicate visits.
+             */
+            sponsoredVisitRecordedRef.current =
+              resolvedCampaignId;
+
+            recordCampaignPackageVisit(
+              resolvedCampaignId,
+            ).catch(() => {
+              /*
+               * Allow retry if the analytics request failed.
+               */
+              sponsoredVisitRecordedRef.current =
+                null;
+            });
+          }
         } catch (error) {
           console.error(
             'Error fetching vendor data:',

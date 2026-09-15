@@ -1059,6 +1059,136 @@ if (
       });
     }
 
-    return eligibleCampaigns;
+        return eligibleCampaigns;
+  }
+
+  // =========================================================
+  // Phase 14A.10 — Sponsored Campaign Analytics
+  // =========================================================
+
+  private async getTrackableActiveCampaign(
+    campaignId: string,
+  ) {
+    if (!Types.ObjectId.isValid(campaignId)) {
+      throw new BadRequestException(
+        'Invalid campaignId',
+      );
+    }
+
+    await this.syncCampaignLifecycle();
+
+    const now = new Date();
+
+    const campaign =
+      await this.campaignModel.findOne({
+        _id: new Types.ObjectId(campaignId),
+        status: CampaignStatus.ACTIVE,
+        startDate: {
+          $lte: now,
+        },
+        endDate: {
+          $gte: now,
+        },
+      });
+
+    if (!campaign) {
+      throw new NotFoundException(
+        'Active campaign not found',
+      );
+    }
+
+    /*
+     * Do not count analytics after the vendor loses
+     * Growth/Premium campaign access.
+     */
+    const campaignAccessEndDate =
+      await this.featureAccessService
+        .getCampaignAccessEndDate(
+          campaign.vendorId.toString(),
+        );
+
+    if (
+      !campaignAccessEndDate ||
+      campaignAccessEndDate.getTime() <
+        now.getTime()
+    ) {
+      throw new ForbiddenException(
+        'Campaign is no longer eligible for sponsored placement',
+      );
+    }
+
+    return campaign;
+  }
+
+  async recordCampaignImpression(
+    campaignId: string,
+  ) {
+    const campaign =
+      await this.getTrackableActiveCampaign(
+        campaignId,
+      );
+
+    await this.campaignModel.updateOne(
+      {
+        _id: campaign._id,
+      },
+      {
+        $inc: {
+          impressions: 1,
+        },
+      },
+    );
+
+    return {
+      success: true,
+    };
+  }
+
+  async recordCampaignClick(
+    campaignId: string,
+  ) {
+    const campaign =
+      await this.getTrackableActiveCampaign(
+        campaignId,
+      );
+
+    await this.campaignModel.updateOne(
+      {
+        _id: campaign._id,
+      },
+      {
+        $inc: {
+          clicks: 1,
+        },
+      },
+    );
+
+    return {
+      success: true,
+    };
+  }
+
+  async recordCampaignPackageVisit(
+    campaignId: string,
+  ) {
+    const campaign =
+      await this.getTrackableActiveCampaign(
+        campaignId,
+      );
+
+    await this.campaignModel.updateOne(
+      {
+        _id: campaign._id,
+      },
+      {
+        $inc: {
+          packageVisits: 1,
+        },
+      },
+    );
+
+    return {
+      success: true,
+    };
   }
 }
