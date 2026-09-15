@@ -25,6 +25,16 @@ export class CampaignController {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
+    // =========================================================
+  // Phase 14A.10 — Client Public Sponsored Campaigns
+  // =========================================================
+
+  @Get('public/active')
+  async getActiveSponsoredCampaigns() {
+    return this.campaignService
+      .getActiveSponsoredCampaigns();
+  }
+
   // =========================================================
   // Phase 14A.8 — Create Campaign
   // =========================================================

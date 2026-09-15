@@ -848,4 +848,153 @@ if (
         limit > 0 && used < limit,
     };
   }
+
+    // =========================================================
+  // Phase 14A.10 — Client Sponsored Campaigns
+  // Only campaigns that are live right now are publicly served.
+  // =========================================================
+
+  async getActiveSponsoredCampaigns() {
+    const now = new Date();
+
+    const campaigns = await this.campaignModel
+      .find({
+        status: CampaignStatus.ACTIVE,
+        startDate: {
+          $lte: now,
+        },
+        endDate: {
+          $gte: now,
+        },
+      })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    if (!campaigns.length) {
+      return [];
+    }
+
+    const vendorIds = [
+      ...new Set(
+        campaigns.map((campaign: any) =>
+          campaign.vendorId.toString(),
+        ),
+      ),
+    ];
+
+    const vendors = await this.userModel
+      .find({
+        _id: {
+          $in: vendorIds.map(
+            (id) => new Types.ObjectId(id),
+          ),
+        },
+        role: 'Vendor',
+      })
+      .select(
+        '_id name contactDetails packages buisnessCategory',
+      )
+      .lean();
+
+    const vendorMap = new Map(
+      vendors.map((vendor: any) => [
+        vendor._id.toString(),
+        vendor,
+      ]),
+    );
+
+    const eligibleCampaigns: any[] = [];
+
+    for (const campaign of campaigns as any[]) {
+      const vendorId =
+        campaign.vendorId.toString();
+
+      /*
+       * Campaign must still have valid Growth/Premium
+       * campaign access at serving time.
+       *
+       * Subscription expiry therefore immediately removes
+       * the campaign from public Sponsored placements
+       * without deleting campaign history.
+       */
+      const campaignAccessEndDate =
+        await this.featureAccessService
+          .getCampaignAccessEndDate(vendorId);
+
+      if (
+        !campaignAccessEndDate ||
+        campaignAccessEndDate.getTime() <
+          now.getTime()
+      ) {
+        continue;
+      }
+
+      const vendor = vendorMap.get(vendorId);
+
+      if (!vendor) {
+        continue;
+      }
+
+      const linkedPackage = (
+        (vendor as any).packages || []
+      ).find(
+        (pkg: any) =>
+          pkg?._id?.toString() ===
+          String(campaign.packageId),
+      );
+
+      /*
+       * Never publicly serve a campaign whose linked
+       * package no longer exists.
+       */
+      if (!linkedPackage) {
+        continue;
+      }
+
+      eligibleCampaigns.push({
+        _id: campaign._id,
+
+        title: campaign.title,
+        image: campaign.image,
+        description: campaign.description,
+        offerLabel:
+          campaign.offerLabel || null,
+
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+
+        vendorId,
+        vendorName:
+          (vendor as any).name || 'Vendor',
+
+        brandName:
+          (vendor as any).contactDetails
+            ?.brandName || null,
+
+        categoryId:
+          campaign.categoryId,
+
+        packageId:
+          campaign.packageId,
+
+        package: {
+          _id: linkedPackage._id,
+          packageName:
+            linkedPackage.packageName,
+          description:
+            linkedPackage.description,
+          price:
+            linkedPackage.price,
+          images:
+            linkedPackage.images || [],
+        },
+
+        sponsored: true,
+      });
+    }
+
+    return eligibleCampaigns;
+  }
 }

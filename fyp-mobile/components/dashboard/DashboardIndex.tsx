@@ -1,5 +1,5 @@
 //fyp-mobile/components/dashboard/DashboardIndex.tsx
-//organizer Dashboard Screen
+//client Dashboard Screen
 
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
@@ -9,6 +9,7 @@ import VenueList from './VenueList';
 import BottomNavigationFinal from './BottomNavigationFinal';
 import { FeaturedVendorsSection } from '../VendorFeature/FeaturedVendorsSection';
 import { FeaturedPackagesSection } from '../VendorFeature/FeaturedPackagesSection';
+import SponsoredForYou from './SponsoredForYou';
 
 const COLORS = {
   bg: '#FDF2F8',
@@ -24,11 +25,14 @@ const DashboardIndex: React.FC = () => {
         <Header />
         <View style={styles.content}>
           <CategoryGrid />
+          
+          <SponsoredForYou />
+
           <FeaturedVendorsSection />
 
-         <FeaturedPackagesSection />
+          <FeaturedPackagesSection />
 
-<VenueList />
+          <VenueList />
         </View>
       </ScrollView>
       <BottomNavigationFinal />
