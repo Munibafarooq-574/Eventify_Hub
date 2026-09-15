@@ -145,7 +145,7 @@ const CakeBusinessDetailsScreen: React.FC = () => {
 
                 Alert.alert("Success", "Business Details Saved");
 
-                router.push("/packages");
+                router.replace("/vendordashboard");
             }
         } catch (error) {
             console.log(error);

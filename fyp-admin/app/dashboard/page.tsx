@@ -1,3 +1,4 @@
+//fyp-admin/app/dashboard/page.tsx
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
 import RevenueChart from "@/components/RevenueChart";

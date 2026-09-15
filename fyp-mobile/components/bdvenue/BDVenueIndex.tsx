@@ -178,7 +178,7 @@ console.log("USER ID PARAM:", userId);
         "Business details saved successfully!"
     );
 
-    router.push("/packages");
+    router.replace("/vendordashboard");
 }
 
 } catch (error) {

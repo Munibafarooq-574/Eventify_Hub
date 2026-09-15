@@ -9,7 +9,13 @@ import * as ImagePicker from "expo-image-picker";
 import { uploadPackageImages } from "@/services/uploadPackageImages";
 import postAddPackages from "@/services/postAddPackages";
 import updatePackage from "@/services/updatePackage";
-import { getSecureData } from "@/store";
+import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
+import type { SubscriptionAccessState } from "@/types/subscription.types";
+import {
+  getSecureData,
+  getUserData,
+} from "@/store";
 
 type DurationUnit = "HOURS" | "DAYS";
 
@@ -72,8 +78,21 @@ const [imageAssets, setImageAssets] = useState<PackageImageAsset[]>([]);
 const [uploadProgress, setUploadProgress] = useState(0);
 const [uploadingImages, setUploadingImages] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingPackage, setLoadingPackage] =useState(isEditMode);
+const [loadingPackage, setLoadingPackage] = useState(isEditMode);
 
+const [subscriptionAccess, setSubscriptionAccess] =
+  useState<SubscriptionAccessState | null>(null);
+
+const [loadingSubscription, setLoadingSubscription] =
+  useState(true);
+
+  const [subscriptionLoadError, setSubscriptionLoadError] =
+  useState(false);
+
+const [vendorId, setVendorId] = useState<string | null>(null);
+const [currentPackageCount, setCurrentPackageCount] = useState(0);
+
+  
   // UI-only focus state
   const [focusedField, setFocusedField] = useState<
     string | null
@@ -108,6 +127,143 @@ const [uploadingImages, setUploadingImages] = useState(false);
     [],
   );
 
+  useEffect(() => {
+  const loadSubscriptionAccess = async () => {
+    setLoadingSubscription(true);
+    setSubscriptionLoadError(false);
+
+    try {
+      // =====================================================
+      // READ VENDOR FROM EITHER STORAGE
+      // =====================================================
+
+      let userData: any = null;
+
+      try {
+        const userRaw =
+          await getSecureData("user");
+
+        if (userRaw) {
+          userData =
+            JSON.parse(userRaw);
+        }
+      } catch (secureError) {
+        console.warn(
+          "[ADD PACKAGE] SecureStore user unavailable:",
+          secureError,
+        );
+      }
+
+      // Current app login commonly stores user here.
+      if (!userData) {
+        userData =
+          await getUserData();
+      }
+
+      if (!userData?._id) {
+        throw new Error(
+          "Logged-in vendor could not be found in storage",
+        );
+      }
+
+      const id = String(userData._id);
+
+      setVendorId(id);
+
+      console.log(
+        "[ADD PACKAGE VENDOR ID]",
+        id,
+      );
+
+      // =====================================================
+      // SUBSCRIPTION ACCESS
+      // =====================================================
+
+      const access =
+        await getSubscriptionAccessState(id);
+
+      console.log(
+        "[ADD PACKAGE ACCESS]",
+        JSON.stringify(access, null, 2),
+      );
+
+      setSubscriptionAccess(access);
+      setSubscriptionLoadError(false);
+
+      // =====================================================
+      // PACKAGE COUNT
+      // =====================================================
+
+      try {
+        const vendorPackages =
+          await getVendorPackagesList(id);
+
+        const count =
+          Array.isArray(vendorPackages)
+            ? vendorPackages.length
+            : 0;
+
+        setCurrentPackageCount(count);
+
+        console.log(
+          "[ADD PACKAGE COUNT]",
+          count,
+        );
+      } catch (packageError) {
+        console.error(
+          "[ADD PACKAGE COUNT ERROR]",
+          packageError,
+        );
+
+        setCurrentPackageCount(
+          Array.isArray(userData?.packages)
+            ? userData.packages.length
+            : 0,
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[ADD PACKAGE SUBSCRIPTION ERROR]",
+        error,
+      );
+
+      setSubscriptionAccess(null);
+      setSubscriptionLoadError(true);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  };
+
+  loadSubscriptionAccess();
+}, []);
+
+  const maxPackages =
+  subscriptionAccess?.limits?.maxPackages ?? 0;
+
+const maxImagesPerPackage =
+  subscriptionAccess?.limits?.maxImagesPerPackage ?? 0;
+
+const packageLimitReached =
+  !isEditMode &&
+  !loadingSubscription &&
+  !subscriptionLoadError &&
+  subscriptionAccess !== null &&
+  currentPackageCount >= maxPackages;
+
+const totalCurrentImages =
+  existingImages.length + imageAssets.length;
+
+const remainingPackageImageSlots = Math.max(
+  0,
+  maxImagesPerPackage - totalCurrentImages
+);
+
+const packageImageLimitReached =
+  !loadingSubscription &&
+  !subscriptionLoadError &&
+  subscriptionAccess !== null &&
+  remainingPackageImageSlots <= 0;
+
   // ---------------------------------------------------------
   // Load existing package in edit mode
   // ---------------------------------------------------------
@@ -122,21 +278,34 @@ const [uploadingImages, setUploadingImages] = useState(false);
       try {
         const userRaw = await getSecureData("user");
 
-        if (!userRaw) {
-          Alert.alert(
-            "Error",
-            "Vendor data not found. Please log in again.",
-          );
-          return;
-        }
+if (!userRaw) {
+  Alert.alert(
+    "Error",
+    "Vendor data not found. Please log in again.",
+  );
+  return;
+}
 
-        const userData = JSON.parse(userRaw);
+const userData = JSON.parse(userRaw);
 
-        const existingPackage =
-          userData?.packages?.find(
-            (pkg: any) =>
-              String(pkg._id) === String(packageId),
-          );
+const id: string | undefined = userData?._id;
+
+if (!id) {
+  Alert.alert(
+    "Error",
+    "Vendor ID not found. Please log in again.",
+  );
+  return;
+}
+
+const vendorPackages =
+  await getVendorPackagesList(id);
+
+const existingPackage =
+  vendorPackages.find(
+    (pkg) =>
+      String(pkg._id) === String(packageId),
+  );
 
         if (!existingPackage) {
           Alert.alert(
@@ -287,26 +456,58 @@ const pickPackageImages = async () => {
       return;
     }
 
-    const totalCurrentImages =
-      existingImages.length + imageAssets.length;
+    if (loadingSubscription) {
+  Alert.alert(
+    "Please Wait",
+    "Your subscription limits are still loading."
+  );
+  return;
+}
 
-    const remainingSlots = 10 - totalCurrentImages;
+if (subscriptionLoadError || !subscriptionAccess) {
+  Alert.alert(
+    "Subscription Unavailable",
+    "We could not verify your subscription limits. Please check your connection and try again."
+  );
+  return;
+}
 
-    if (remainingSlots <= 0) {
-      Alert.alert(
-        "Image Limit",
-        "You can add up to 10 images per package."
-      );
-      return;
-    }
+if (maxImagesPerPackage <= 0) {
+  Alert.alert(
+    "Image Upload Unavailable",
+    "Your current subscription does not allow new package image uploads. Please renew or upgrade your subscription."
+  );
+  return;
+}
 
-    const result =
-      await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        selectionLimit: remainingSlots,
-      });
+if (remainingPackageImageSlots <= 0) {
+  Alert.alert(
+    "Image Limit Reached",
+    `Your current subscription allows up to ${maxImagesPerPackage} images per package.`
+  );
+  return;
+}
+
+const remainingSlots =
+  remainingPackageImageSlots;
+
+const result =
+  await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+
+    // Select multiple package images in one gallery session
+    allowsMultipleSelection: true,
+
+    // Subscription-aware limit
+    selectionLimit: remainingSlots,
+
+    // Better multi-selection behavior on Android/Samsung
+    legacy: Platform.OS === "android",
+
+    allowsEditing: false,
+
+    quality: 0.8,
+  });
 
     if (result.canceled || !result.assets?.length) {
       return;
@@ -404,26 +605,72 @@ const removeImageAsset = (index: number) => {
     return;
   }
 
+  if (loadingSubscription) {
+  Alert.alert(
+    "Please Wait",
+    "Your subscription limits are still loading."
+  );
+  return;
+}
+
+if (subscriptionLoadError || !subscriptionAccess) {
+  Alert.alert(
+    "Subscription Unavailable",
+    "We could not verify your subscription limits. Please check your connection and try again."
+  );
+  return;
+}
+
+if (!isEditMode && packageLimitReached) {
+  Alert.alert(
+    "Package Limit Reached",
+    `Your current subscription allows up to ${maxPackages} packages.`
+  );
+  return;
+}
+
+if (
+  imageAssets.length > 0 &&
+  totalCurrentImages > maxImagesPerPackage
+) {
+  Alert.alert(
+    "Image Limit Reached",
+    `Your current subscription allows up to ${maxImagesPerPackage} images per package.`
+  );
+  return;
+}
   setLoading(true);
 
   try {
-    const userRaw =
-      await getSecureData("user");
+    let storedUser: any = null;
 
-    const userData = JSON.parse(
-      userRaw || "{}"
-    );
+const secureUser =
+  await getSecureData("user");
 
-    const userId: string | undefined =
-      userData?._id;
+if (secureUser) {
+  try {
+    storedUser =
+      JSON.parse(secureUser);
+  } catch {
+    storedUser = null;
+  }
+}
 
-    if (!userId) {
-      Alert.alert(
-        "Error",
-        "Could not find logged-in vendor. Please log in again."
-      );
-      return;
-    }
+if (!storedUser) {
+  storedUser =
+    await getUserData();
+}
+
+const userId: string | undefined =
+  storedUser?._id;
+
+if (!userId) {
+  Alert.alert(
+    "Error",
+    "Could not find logged-in vendor. Please log in again.",
+  );
+  return;
+}
 
     const cleanedDurations =
       durations.map((duration) => ({
@@ -1228,20 +1475,43 @@ const removeImageAsset = (index: number) => {
               </Text>
 
               <Text style={styles.sectionSubtitle}>
-                Select up to 10 images for this package.
+                {loadingSubscription
+              ? "Loading your package image limit..."
+              : `Your plan allows up to ${maxImagesPerPackage} images per package.`}
               </Text>
             </View>
 
             <TouchableOpacity
-              style={styles.addDurationButton}
-              onPress={pickPackageImages}
-              disabled={loading || uploadingImages}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.addDurationText}>
-                + Gallery
-              </Text>
-            </TouchableOpacity>
+          style={[
+            styles.addDurationButton,
+            (loading ||
+              uploadingImages ||
+              loadingSubscription ||
+              packageImageLimitReached) &&
+              styles.addDurationButtonDisabled,
+          ]}
+          onPress={pickPackageImages}
+          disabled={
+            loading ||
+            uploadingImages ||
+            loadingSubscription ||
+            packageImageLimitReached
+          }
+          activeOpacity={0.8}
+        >
+          <Text
+            style={[
+              styles.addDurationText,
+              (loadingSubscription ||
+                packageImageLimitReached) &&
+                styles.addDurationTextDisabled,
+            ]}
+          >
+            {packageImageLimitReached
+              ? "Limit Reached"
+              : "+ Gallery"}
+          </Text>
+        </TouchableOpacity>
           </View>
 
           {/* Existing images */}
@@ -1395,8 +1665,8 @@ const removeImageAsset = (index: number) => {
               }
             >
               {existingImages.length +
-                imageAssets.length}
-              /10 images
+              imageAssets.length}
+            /{maxImagesPerPackage} images
             </Text>
           )}
 
@@ -1613,6 +1883,44 @@ const removeImageAsset = (index: number) => {
           </View>
         )}
 
+{!isEditMode &&
+  !loadingSubscription &&
+  packageLimitReached && (
+    <View style={styles.limitWarningCard}>
+      <Text style={styles.limitWarningTitle}>
+        Package Limit Reached
+      </Text>
+
+      <Text style={styles.limitWarningText}>
+        Your current subscription allows up to{" "}
+        {maxPackages} packages. You currently have{" "}
+        {currentPackageCount}.
+      </Text>
+
+      <TouchableOpacity
+        style={styles.upgradeButton}
+        onPress={() => {
+          if (!vendorId) {
+            Alert.alert(
+              "Error",
+              "Vendor ID not found."
+            );
+            return;
+          }
+
+          router.push({
+            pathname: "/subscriptionscreen",
+            params: { vendorId },
+          });
+        }}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.upgradeButtonText}>
+          View Subscription Plans
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )}
         {/* -------------------------------------------------
             Save
         ------------------------------------------------- */}
@@ -1620,13 +1928,19 @@ const removeImageAsset = (index: number) => {
         <TouchableOpacity
           style={[
             styles.saveButton,
-            (!isFormValid || loading) &&
-              styles.saveButtonDisabled,
+            (!isFormValid ||
+            loading ||
+            loadingSubscription ||
+            packageLimitReached) &&
+            styles.saveButtonDisabled
           ]}
           onPress={handleSave}
           disabled={
-            loading || !isFormValid
-          }
+          loading ||
+          loadingSubscription ||
+          !isFormValid ||
+          packageLimitReached
+        }
           activeOpacity={0.85}
         >
           {loading ? (
@@ -2392,5 +2706,50 @@ uploadingRow: {
 uploadingText: {
   fontSize: 11,
   color: "#7A6973",
+},
+
+addDurationButtonDisabled: {
+  opacity: 0.5,
+},
+
+addDurationTextDisabled: {
+  color: "#A991A3",
+},
+
+limitWarningCard: {
+  backgroundColor: "#FFF7F0",
+  borderWidth: 1,
+  borderColor: "#F1D7BE",
+  borderRadius: 16,
+  padding: 16,
+  marginBottom: 16,
+},
+
+limitWarningTitle: {
+  fontSize: 14,
+  fontWeight: "800",
+  color: "#8A4B16",
+},
+
+limitWarningText: {
+  fontSize: 12.5,
+  color: "#7A6759",
+  lineHeight: 18,
+  marginTop: 6,
+},
+
+upgradeButton: {
+  marginTop: 12,
+  backgroundColor: "#7B2869",
+  borderRadius: 18,
+  paddingVertical: 11,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+upgradeButtonText: {
+  color: "#FFFFFF",
+  fontSize: 12.5,
+  fontWeight: "800",
 },
 });

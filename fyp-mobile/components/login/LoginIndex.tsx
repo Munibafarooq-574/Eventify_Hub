@@ -57,10 +57,59 @@ export default function LoginScreen() {
     reset();
 
     if (response.user.role === "Vendor") {
-      router.push("/vendordashboard");
-    } else {
-      router.push("/dashboard");
+  try {
+    const approvalResponse = await fetch(
+      `https://eventify-hub.onrender.com/vendor/approval-status/${encodeURIComponent(
+        response.user._id,
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${response.token}`,
+        },
+      },
+    );
+
+    if (!approvalResponse.ok) {
+      console.warn(
+        "Unable to verify vendor approval status:",
+        approvalResponse.status,
+      );
+
+      router.replace("/vendorprofilepending");
+      return;
     }
+
+    const approvalData =
+      await approvalResponse.json();
+
+    switch (approvalData?.status) {
+      case "APPROVED":
+        router.replace("/vendordashboard");
+        break;
+
+      case "INCOMPLETE":
+        router.replace("/vendorcontactdetails");
+        break;
+
+      case "PENDING_REVIEW":
+      case "REJECTED":
+      default:
+        router.replace("/vendorprofilepending");
+        break;
+    }
+  } catch (approvalError) {
+    console.error(
+      "Vendor approval check after login failed:",
+      approvalError,
+    );
+
+    router.replace("/vendorprofilepending");
+  }
+} else {
+  router.replace("/dashboard");
+}
   } catch (e: any) {
     console.log(e);
 

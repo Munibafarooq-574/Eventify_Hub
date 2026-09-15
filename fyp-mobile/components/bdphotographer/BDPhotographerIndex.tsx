@@ -277,7 +277,7 @@ if (edit === "true") {
     "Business Details Saved Successfully."
   );
 
-  router.push("/packages");
+  router.replace("/vendordashboard");
 }
 
     } catch (error) {

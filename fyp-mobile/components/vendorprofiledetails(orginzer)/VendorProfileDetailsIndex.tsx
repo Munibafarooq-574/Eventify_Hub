@@ -1,4 +1,4 @@
-// Organizer side detail section
+// clietn side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
 
 import getVendorReviews from '@/services/getAllReviewsForVendor';

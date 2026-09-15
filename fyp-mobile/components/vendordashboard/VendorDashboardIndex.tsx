@@ -10,7 +10,10 @@ import {
     SubscriptionStatus,
 } from "@/types/subscription.types";
 import { VendorAnalytics } from "@/types/vendorAnalytics";
-import { getUserData } from "@/store";
+import {
+  getSecureData,
+  getUserData,
+} from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -109,64 +112,96 @@ const packageLimitReached =
         fetchUsername();
     }, []);
 
-   const checkVendorApproval = React.useCallback(async () => {
+   const checkVendorApproval =
+  React.useCallback(async (): Promise<boolean> => {
     try {
-        const user = await getUserData();
+      const user =
+        await getUserData();
 
-        if (!user?._id) {
-            console.warn(
-                "No user data found for vendor approval check.",
-            );
-
-            router.replace(
-                "/vendorprofilepending",
-            );
-            return;
-        }
-
-        const response = await fetch(
-            `https://eventify-hub.onrender.com/vendor/approval-status/${encodeURIComponent(
-                user._id,
-            )}`,
-        );
-
-        if (!response.ok) {
-            console.warn(
-                "Unable to check vendor approval status:",
-                response.status,
-            );
-
-            router.replace(
-                "/vendorprofilepending",
-            );
-            return;
-        }
-
-        const data =
-            await response.json();
-
-        if (
-            data?.status !==
-            "APPROVED"
-        ) {
-            router.replace(
-                "/vendorprofilepending",
-            );
-            return;
-        }
-
-        setCheckingApproval(false);
-    } catch (error) {
-        console.error(
-            "Vendor approval guard error:",
-            error,
+      if (!user?._id) {
+        console.warn(
+          "No user data found for vendor approval check.",
         );
 
         router.replace(
-            "/vendorprofilepending",
+          "/vendorprofilepending",
         );
+
+        return false;
+      }
+
+      const token =
+        await getSecureData("token");
+
+      if (!token) {
+        console.warn(
+          "Authentication token not found.",
+        );
+
+        router.replace("/login");
+
+        return false;
+      }
+
+      const response =
+        await fetch(
+          `https://eventify-hub.onrender.com/vendor/approval-status/${encodeURIComponent(
+            user._id,
+          )}`,
+          {
+            method: "GET",
+
+            headers: {
+              Accept: "application/json",
+              Authorization:
+                `Bearer ${token}`,
+            },
+          },
+        );
+
+      if (!response.ok) {
+        console.warn(
+          "Unable to check vendor approval status:",
+          response.status,
+        );
+
+        router.replace(
+          "/vendorprofilepending",
+        );
+
+        return false;
+      }
+
+      const data =
+        await response.json();
+
+      if (
+        data?.status !==
+        "APPROVED"
+      ) {
+        router.replace(
+          "/vendorprofilepending",
+        );
+
+        return false;
+      }
+
+      setCheckingApproval(false);
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Vendor approval guard error:",
+        error,
+      );
+
+      router.replace(
+        "/vendorprofilepending",
+      );
+
+      return false;
     }
-}, []);
+  }, []);
 
     const fetchData = React.useCallback(async () => {
     try {
@@ -317,13 +352,33 @@ const fetchSubscriptionAccess = React.useCallback(async () => {
     }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
 
 useFocusEffect(
-    React.useCallback(() => {
-        checkVendorApproval();
-        loadAllData();
-    }, [
-        checkVendorApproval,
-        loadAllData,
-    ]),
+  React.useCallback(() => {
+    let active = true;
+
+    const loadDashboardSafely =
+      async () => {
+        const approved =
+          await checkVendorApproval();
+
+        if (
+          !active ||
+          !approved
+        ) {
+          return;
+        }
+
+        await loadAllData();
+      };
+
+    loadDashboardSafely();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    checkVendorApproval,
+    loadAllData,
+  ]),
 );
 
    const fetchUsername = async () => {

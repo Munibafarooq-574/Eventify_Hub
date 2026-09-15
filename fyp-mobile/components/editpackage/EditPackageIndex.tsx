@@ -15,6 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { uploadPackageImages } from "@/services/uploadPackageImages";
+import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
+import type { SubscriptionAccessState } from "@/types/subscription.types";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -129,6 +131,31 @@ const [uploadingImages, setUploadingImages] =
 const [uploadProgress, setUploadProgress] =
   useState(0);
 
+const [subscriptionAccess, setSubscriptionAccess] =
+  useState<SubscriptionAccessState | null>(null);
+
+const [loadingSubscription, setLoadingSubscription] =
+  useState(true);
+
+const [subscriptionLoadError, setSubscriptionLoadError] =
+  useState(false);
+
+const maxImagesPerPackage =
+  subscriptionAccess?.limits?.maxImagesPerPackage ?? 0;
+
+const totalPackageImages =
+  existingImages.length + newImageAssets.length;
+
+const remainingPackageImageSlots = Math.max(
+  0,
+  maxImagesPerPackage - totalPackageImages,
+);
+
+const packageImageLimitReached =
+  !loadingSubscription &&
+  maxImagesPerPackage > 0 &&
+  totalPackageImages >= maxImagesPerPackage;
+
   // -------------------------------------------------------
   // Keyboard listeners
   // -------------------------------------------------------
@@ -224,6 +251,42 @@ const [uploadProgress, setUploadProgress] =
       );
     }
   };
+
+  // -------------------------------------------------------
+  // Load subscription access
+  // -------------------------------------------------------
+
+  useEffect(() => {
+    const loadSubscriptionAccess = async () => {
+      setLoadingSubscription(true);
+      setSubscriptionLoadError(false);
+
+      try {
+        const user = await readUser();
+
+        if (!user?._id) {
+          throw new Error("Vendor ID not found.");
+        }
+
+        const access =
+          await getSubscriptionAccessState(user._id);
+
+        setSubscriptionAccess(access);
+      } catch (error) {
+        console.error(
+          "Failed to load subscription access:",
+          error,
+        );
+
+        setSubscriptionAccess(null);
+        setSubscriptionLoadError(true);
+      } finally {
+        setLoadingSubscription(false);
+      }
+    };
+
+    loadSubscriptionAccess();
+  }, []);
 
   // -------------------------------------------------------
   // Fetch package details
@@ -473,28 +536,48 @@ setNewImageAssets([]);
 
 const pickPackageImages = async () => {
   try {
+    if (loadingSubscription) {
+      Alert.alert(
+        "Please Wait",
+        "Your subscription limits are still loading.",
+      );
+      return;
+    }
+
+    if (
+      subscriptionLoadError ||
+      !subscriptionAccess
+    ) {
+      Alert.alert(
+        "Subscription Unavailable",
+        "We could not verify your subscription limits. Please try again.",
+      );
+      return;
+    }
+
+    if (maxImagesPerPackage <= 0) {
+      Alert.alert(
+        "Image Upload Unavailable",
+        "Your current subscription does not allow new package images.",
+      );
+      return;
+    }
+
+    if (remainingPackageImageSlots <= 0) {
+      Alert.alert(
+        "Image Limit Reached",
+        `Your current plan allows up to ${maxImagesPerPackage} images per package.`,
+      );
+      return;
+    }
+
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
       Alert.alert(
         "Permission Required",
-        "Please allow gallery access to select package images."
-      );
-      return;
-    }
-
-    const totalImages =
-      existingImages.length +
-      newImageAssets.length;
-
-    const remainingSlots =
-      10 - totalImages;
-
-    if (remainingSlots <= 0) {
-      Alert.alert(
-        "Image Limit",
-        "You can add up to 10 images per package."
+        "Please allow gallery access to select package images.",
       );
       return;
     }
@@ -503,7 +586,7 @@ const pickPackageImages = async () => {
       await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
-        selectionLimit: remainingSlots,
+        selectionLimit: remainingPackageImageSlots,
         quality: 0.8,
       });
 
@@ -524,24 +607,28 @@ const pickPackageImages = async () => {
           type:
             asset.mimeType ||
             "image/jpeg",
-        })
+        }),
       );
 
-    setNewImageAssets(
-      (prev) => [
-        ...prev,
-        ...selectedImages,
-      ].slice(0, remainingSlots)
-    );
+    const allowedImages =
+      selectedImages.slice(
+        0,
+        remainingPackageImageSlots,
+      );
+
+    setNewImageAssets((prev) => [
+      ...prev,
+      ...allowedImages,
+    ]);
   } catch (error) {
     console.error(
       "Image picker error:",
-      error
+      error,
     );
 
     Alert.alert(
       "Error",
-      "Could not select images."
+      "Could not select images.",
     );
   }
 };
@@ -632,6 +719,35 @@ const removeExistingImage = (index: number) => {
       "Please enter all required package details correctly.",
     );
     return;
+  }
+
+  // Subscription image-limit protection applies only when
+  // the vendor is trying to add NEW images. Existing images
+  // are preserved after downgrade/expiry.
+  if (newImageAssets.length > 0) {
+    if (
+      loadingSubscription ||
+      subscriptionLoadError ||
+      !subscriptionAccess
+    ) {
+      Alert.alert(
+        "Subscription Unavailable",
+        "We could not verify your package image limit. Please try again.",
+      );
+      return;
+    }
+
+    if (
+      existingImages.length +
+        newImageAssets.length >
+      maxImagesPerPackage
+    ) {
+      Alert.alert(
+        "Image Limit Reached",
+        `Your current plan allows up to ${maxImagesPerPackage} images per package.`,
+      );
+      return;
+    }
   }
 
   setUploadingImages(false);
@@ -1829,7 +1945,13 @@ const removeExistingImage = (index: number) => {
       </Text>
 
       <Text style={styles.sectionSubtitle}>
-        Add up to 10 images for this package.
+        {loadingSubscription
+          ? "Loading your package image limit..."
+          : subscriptionLoadError
+          ? "Unable to verify your package image limit."
+          : maxImagesPerPackage > 0
+          ? `Your current plan allows up to ${maxImagesPerPackage} images per package.`
+          : "Package image uploads are unavailable on your current subscription."}
       </Text>
     </View>
 
@@ -1838,7 +1960,12 @@ const removeExistingImage = (index: number) => {
       onPress={pickPackageImages}
       disabled={
         uploadingImages ||
-        loading
+        loading ||
+        loadingSubscription ||
+        subscriptionLoadError ||
+        !subscriptionAccess ||
+        maxImagesPerPackage <= 0 ||
+        packageImageLimitReached
       }
       activeOpacity={0.8}
     >
@@ -2006,7 +2133,7 @@ const removeExistingImage = (index: number) => {
     >
       {existingImages.length +
         newImageAssets.length}
-      /10 images
+      /{maxImagesPerPackage} images
     </Text>
   )}
 

@@ -74,6 +74,7 @@ export default function RootLayout() {
         <Stack.Screen name="easypaisa" options={{ headerShown: false }} />
         <Stack.Screen name="paymentconfirmation" options={{ headerShown: false }} />
         <Stack.Screen name="vendorcontactdetails" options={{ headerShown: false }} />
+        <Stack.Screen name="vendorprofilepending" options={{ headerShown: false, gestureEnabled: false, }}/>
         <Stack.Screen name="vendordashboard" options={{ headerShown: false }} />
         <Stack.Screen name="vendorpackages" options={{ headerShown: false }} />
         <Stack.Screen name="editpackage" options={{ headerShown: false }} />

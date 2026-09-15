@@ -28,6 +28,16 @@ import {
 } from '../../schemas/vendor-promotion.schema';
 import { PromotionService } from './promotion/promotion.service';
 import { PromotionController } from './promotion/promotion.controller';
+// Phase 14A.8 — Campaigns
+import { CampaignService } from './campaign/campaign.service';
+import { CampaignController } from './campaign/campaign.controller';
+import { FileUploadModule } from '../../file-upload/file-upload.module';
+
+// Phase 14A.8 — Vendor Campaigns
+import {
+  VendorCampaign,
+  VendorCampaignSchema,
+} from '../../schemas/vendor-campaign.schema';
 
 // Badges
 import { BadgeService } from './badges/badge.service';
@@ -80,10 +90,16 @@ import { VendorModule } from 'src/vendor/vendor.module';
         schema: VendorSubscriptionSchema,
       },
 
-      // Promotion
+            // Promotion
       {
         name: VendorPromotion.name,
         schema: VendorPromotionSchema,
+      },
+
+      // Phase 14A.8 — Campaigns
+      {
+        name: VendorCampaign.name,
+        schema: VendorCampaignSchema,
       },
 
       // Discount
@@ -120,11 +136,14 @@ import { VendorModule } from 'src/vendor/vendor.module';
     // Provides VendorAnalyticsService used by
     // BadgeService and AnalyticsService.
         forwardRef(() => VendorModule),
+
+        FileUploadModule,
   ],
 
   controllers: [
     SubscriptionController,
     PromotionController,
+    CampaignController,
     BadgeController,
     DiscountController,
     AnalyticsController,
@@ -143,6 +162,8 @@ import { VendorModule } from 'src/vendor/vendor.module';
     // Promotion / Featured Vendor / Featured Package
     PromotionService,
 
+    CampaignService,
+
     // Badges
     BadgeService,
 
@@ -160,6 +181,7 @@ import { VendorModule } from 'src/vendor/vendor.module';
     SubscriptionService,
     FeatureAccessService,
     PromotionService,
+    CampaignService,
     BadgeService,
     DiscountService,
     AnalyticsService,

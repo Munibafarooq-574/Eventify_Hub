@@ -127,7 +127,7 @@ export class FeatureAccessService {
     );
   }
 
-  async canCreateMore(
+    async canCreateMore(
     vendorId: string,
     limit: LimitKey,
     currentCount: number,
@@ -139,6 +139,51 @@ export class FeatureAccessService {
       );
 
     return currentCount < max;
+  }
+
+  // =========================================================
+  // Phase 14A.8 — Campaign entitlement
+  // =========================================================
+
+  async canCreateCampaign(
+    vendorId: string,
+  ): Promise<boolean> {
+    return this.canUseFeature(
+      vendorId,
+      FeatureKey.CAMPAIGNS,
+    );
+  }
+
+    async getCampaignAccessEndDate(
+    vendorId: string,
+  ): Promise<Date | null> {
+    const subscription =
+      await this.subscriptionService.getCurrentSubscription(
+        vendorId,
+      );
+
+    if (!subscription) {
+      return null;
+    }
+
+    if (!this.hasUsableAccess(subscription)) {
+      return null;
+    }
+
+    if (!subscription.endDate) {
+      return null;
+    }
+
+    return new Date(subscription.endDate);
+  }
+  
+  async getMonthlyCampaignLimit(
+    vendorId: string,
+  ): Promise<number> {
+    return this.getFeatureLimit(
+      vendorId,
+      LimitKey.MONTHLY_CAMPAIGN_LIMIT,
+    );
   }
 
   private hasUsableAccess(

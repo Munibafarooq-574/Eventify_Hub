@@ -243,8 +243,7 @@ export const PLAN_CONFIG: Record<
       [LimitKey.MAX_PORTFOLIO_IMAGES]:
         10,
 
-      [LimitKey.MAX_IMAGES_PER_PACKAGE]:
-        3,
+      [LimitKey.MAX_IMAGES_PER_PACKAGE]: 5,
 
       [LimitKey.MONTHLY_CAMPAIGN_LIMIT]:
         0,
@@ -343,8 +342,7 @@ export const PLAN_CONFIG: Record<
       [LimitKey.MAX_PORTFOLIO_IMAGES]:
         30,
 
-      [LimitKey.MAX_IMAGES_PER_PACKAGE]:
-        6,
+      [LimitKey.MAX_IMAGES_PER_PACKAGE]: 20,
 
       [LimitKey.MONTHLY_CAMPAIGN_LIMIT]:
         2,
@@ -443,8 +441,7 @@ export const PLAN_CONFIG: Record<
       [LimitKey.MAX_PORTFOLIO_IMAGES]:
         60,
 
-      [LimitKey.MAX_IMAGES_PER_PACKAGE]:
-        10,
+      [LimitKey.MAX_IMAGES_PER_PACKAGE]: 30,
 
       [LimitKey.MONTHLY_CAMPAIGN_LIMIT]:
         5,

@@ -34,7 +34,21 @@ const VendorProfileDetailsScreen: React.FC = () => {
     const [activeReviewTab, setActiveReviewTab] = useState<'Eventify' | 'Google'>('Eventify');
     const [vendorData, setVendorData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
-    const { id } = useGlobalSearchParams();
+    const { id, tab } = useGlobalSearchParams<{
+    id?: string;
+    tab?: string;
+}>();
+
+useEffect(() => {
+    if (tab === "Packages") {
+        setActiveTab("Packages");
+    } else if (tab === "Reviews") {
+        setActiveTab("Reviews");
+    } else if (tab === "Details") {
+        setActiveTab("Details");
+    }
+}, [tab]);
+
     const [reviews, setReviews] = useState<Review[]>([]);
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
 const [replyText, setReplyText] = useState('');
@@ -750,36 +764,17 @@ const category =
   <View style={styles.detailsContainer}>
 
     {/* Package Selector */}
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 10,
-      }}
-    >
-      <Text style={styles.packagesSectionTitle}>
-        Choose a Package
-      </Text>
+   <View style={styles.packagesTitleRow}>
+  <Text style={styles.packagesSectionTitle}>
+    Your Packages
+  </Text>
 
-      <TouchableOpacity
-        onPress={() =>
-          router.push({
-            pathname: "/vpdaddnewpackage",
-          })
-        }
-        style={styles.editPill}
-      >
-        <Ionicons
-          name="add-circle-outline"
-          size={14}
-          color={PRIMARY}
-        />
-        <Text style={styles.editLink}>
-          Add New
-        </Text>
-      </TouchableOpacity>
-    </View>
+  <View style={styles.packageCountBadge}>
+    <Text style={styles.packageCountText}>
+      {vendorData.packages?.length || 0}
+    </Text>
+  </View>
+</View>
 
     <ScrollView
       horizontal
@@ -2219,11 +2214,30 @@ const styles = StyleSheet.create({
         color: TEXT_MUTED,
         textAlign: 'center',
     },
-    packagesSectionTitle: {
+   packagesTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+},
+
+packagesSectionTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: TEXT_DARK,
-    marginBottom: 10,
+},
+
+packageCountBadge: {
+    backgroundColor: '#F3D9EC',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+},
+
+packageCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: PRIMARY,
 },
 packageCard: {
     width: 128,

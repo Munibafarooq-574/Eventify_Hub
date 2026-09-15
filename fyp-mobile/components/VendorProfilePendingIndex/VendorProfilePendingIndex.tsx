@@ -11,6 +11,7 @@ import React, {
 
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   RefreshControl,
   ScrollView,
@@ -114,21 +115,31 @@ const getUserId = async () => {
 
             return;
           }
+const token =
+  await getSecureData("token");
 
-          const response =
-            await fetch(
-              `${API_BASE_URL}/vendor/approval-status/${encodeURIComponent(
-                userId,
-              )}`,
-              {
-                method: "GET",
+if (!token) {
+  setError(
+    "Your session has expired. Please log in again.",
+  );
 
-                headers: {
-                  Accept:
-                    "application/json",
-                },
-              },
-            );
+  return;
+}
+
+const response =
+  await fetch(
+    `${API_BASE_URL}/vendor/approval-status/${encodeURIComponent(
+      userId,
+    )}`,
+    {
+      method: "GET",
+
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
 
           let data: any = null;
 
@@ -189,6 +200,22 @@ const getUserId = async () => {
   useEffect(() => {
     loadApprovalStatus();
   }, [loadApprovalStatus]);
+
+  useEffect(() => {
+  const subscription =
+    AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState === "active") {
+          loadApprovalStatus(false);
+        }
+      },
+    );
+
+  return () => {
+    subscription.remove();
+  };
+}, [loadApprovalStatus]);
 
   const handleRefresh =
     async () => {
