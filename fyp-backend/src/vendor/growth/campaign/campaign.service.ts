@@ -29,7 +29,67 @@ export class CampaignService {
     private readonly userModel: Model<User>,
 
     private readonly featureAccessService: FeatureAccessService,
-  ) {}
+    
+      ) {}
+
+  // =========================================================
+  // Campaign Lifecycle Sync
+  //
+  // APPROVED + start date reached -> ACTIVE
+  // APPROVED/ACTIVE + end date passed -> EXPIRED
+  //
+  // PENDING / REJECTED / CANCELLED are never changed here.
+  // =========================================================
+
+  private async syncCampaignLifecycle(): Promise<void> {
+    const now = new Date();
+
+    // -------------------------------------------------------
+    // 1. Expire finished campaigns first.
+    //
+    // Exact end boundary is still considered live.
+    // Only now > endDate becomes EXPIRED.
+    // -------------------------------------------------------
+    await this.campaignModel.updateMany(
+      {
+        status: {
+          $in: [
+            CampaignStatus.APPROVED,
+            CampaignStatus.ACTIVE,
+          ],
+        },
+        endDate: {
+          $lt: now,
+        },
+      },
+      {
+        $set: {
+          status: CampaignStatus.EXPIRED,
+        },
+      },
+    );
+
+    // -------------------------------------------------------
+    // 2. Activate approved campaigns whose scheduled
+    // window has started and has not ended.
+    // -------------------------------------------------------
+    await this.campaignModel.updateMany(
+      {
+        status: CampaignStatus.APPROVED,
+        startDate: {
+          $lte: now,
+        },
+        endDate: {
+          $gte: now,
+        },
+      },
+      {
+        $set: {
+          status: CampaignStatus.ACTIVE,
+        },
+      },
+    );
+  }
 
   // =========================================================
   // Phase 14A.8 — Pre-upload Campaign Validation
@@ -606,7 +666,7 @@ if (
   // Vendor — My Campaigns
   // =========================================================
 
-  async getMyCampaigns(
+    async getMyCampaigns(
     vendorId: string,
   ): Promise<VendorCampaign[]> {
     if (!Types.ObjectId.isValid(vendorId)) {
@@ -614,6 +674,8 @@ if (
         'Invalid vendorId',
       );
     }
+
+    await this.syncCampaignLifecycle();
 
     return this.campaignModel
       .find({
@@ -854,7 +916,9 @@ if (
   // Only campaigns that are live right now are publicly served.
   // =========================================================
 
-  async getActiveSponsoredCampaigns() {
+    async getActiveSponsoredCampaigns() {
+    await this.syncCampaignLifecycle();
+
     const now = new Date();
 
     const campaigns = await this.campaignModel
