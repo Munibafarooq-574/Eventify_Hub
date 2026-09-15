@@ -19,7 +19,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
+import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
 import { createVendorCampaign } from "@/services/vendorCampaignApi";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 
@@ -117,15 +117,14 @@ export default function CreateVendorCampaignIndex() {
   const [campaignImage, setCampaignImage] =
     useState<CampaignImage | null>(null);
 
-  const [startDate, setStartDate] =
-    useState<Date | null>(null);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+const [endDate, setEndDate] = useState<Date | null>(null);
 
-  const [endDate, setEndDate] =
-    useState<Date | null>(null);
+const [subscriptionEndDate, setSubscriptionEndDate] =
+  useState<Date | null>(null);
 
-  const [datePickerMode, setDatePickerMode] = useState<
-    "start" | "end" | null
-  >(null);
+  const [datePickerMode, setDatePickerMode] =
+    useState<"start" | null>(null);
 
   const [calendarMonth, setCalendarMonth] =
     useState(new Date());
@@ -136,6 +135,80 @@ export default function CreateVendorCampaignIndex() {
     loadPackages();
   }, [vendorId]);
 
+  useEffect(() => {
+    if (!vendorId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadSubscriptionExpiry = async () => {
+      try {
+        const access =
+          await getSubscriptionAccessState(vendorId);
+
+        const rawEndDate =
+          access?.subscription?.endDate;
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!rawEndDate) {
+          setSubscriptionEndDate(null);
+          return;
+        }
+
+        const parsedEndDate =
+          new Date(rawEndDate);
+
+        if (
+          Number.isNaN(
+            parsedEndDate.getTime(),
+          )
+        ) {
+          setSubscriptionEndDate(null);
+          return;
+        }
+
+        setSubscriptionEndDate(
+          parsedEndDate,
+        );
+      } catch (error) {
+        if (__DEV__) {
+          console.log(
+            "Unable to load subscription expiry:",
+            error,
+          );
+        }
+
+        if (isMounted) {
+          setSubscriptionEndDate(null);
+        }
+      }
+    };
+
+    loadSubscriptionExpiry();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [vendorId]);
+
+  useEffect(() => {
+    if (!startDate) {
+      return;
+    }
+
+    const automaticEnd =
+      calculateAutomaticEndDate(
+        startDate,
+      );
+
+    setEndDate(automaticEnd);
+  }, [subscriptionEndDate]);
+
+  
   const loadPackages = async () => {
     if (!vendorId) {
       setLoadingPackages(false);
@@ -243,13 +316,9 @@ export default function CreateVendorCampaignIndex() {
     }
   };
 
-  const openDatePicker = (
-    mode: "start" | "end",
-  ) => {
+  const openDatePicker = () => {
     const initialDate =
-      mode === "start"
-        ? startDate || new Date()
-        : endDate || startDate || new Date();
+      startDate || new Date();
 
     setCalendarMonth(
       new Date(
@@ -259,7 +328,53 @@ export default function CreateVendorCampaignIndex() {
       ),
     );
 
-    setDatePickerMode(mode);
+    setDatePickerMode("start");
+  };
+
+  const calculateAutomaticEndDate = (
+    selectedStartDate: Date,
+  ) => {
+    const maximumCampaignEnd =
+      new Date(selectedStartDate);
+
+    // Start date = Day 1.
+    // +29 days gives a maximum
+    // 30-calendar-day campaign.
+    maximumCampaignEnd.setDate(
+      maximumCampaignEnd.getDate() + 29,
+    );
+
+    maximumCampaignEnd.setHours(
+      23,
+      59,
+      59,
+      999,
+    );
+
+    // If subscription expiry is not available,
+    // use the normal 30-day campaign limit.
+    if (!subscriptionEndDate) {
+      return maximumCampaignEnd;
+    }
+
+    const subscriptionLastDay =
+      new Date(subscriptionEndDate);
+
+    // Campaigns work with calendar dates.
+    subscriptionLastDay.setHours(
+      23,
+      59,
+      59,
+      999,
+    );
+
+    // Whichever comes first:
+    // 1. Campaign 30-day maximum
+    // 2. Subscription expiry
+    return subscriptionLastDay.getTime() <
+      maximumCampaignEnd.getTime()
+      ? subscriptionLastDay
+      : maximumCampaignEnd;
   };
 
   const selectedPackageId = useMemo(
@@ -399,10 +514,12 @@ export default function CreateVendorCampaignIndex() {
         ],
       );
     } catch (error: any) {
-      console.error(
-        "Campaign creation error:",
-        error,
-      );
+      if (__DEV__) {
+  console.log(
+    "Campaign creation error:",
+    error,
+  );
+}
 
       Alert.alert(
         "Campaign Not Created",
@@ -754,9 +871,8 @@ export default function CreateVendorCampaignIndex() {
                 value={formatDate(startDate)}
                 selected={Boolean(startDate)}
                 icon="calendar-outline"
-                onPress={() =>
-                  openDatePicker("start")
-                }
+                onPress={openDatePicker}
+                
               />
 
               <View style={styles.dateArrow}>
@@ -769,12 +885,14 @@ export default function CreateVendorCampaignIndex() {
 
               <DateCard
                 label="End Date"
-                value={formatDate(endDate)}
+                value={
+                  endDate
+                    ? formatDate(endDate)
+                    : "Auto"
+                }
                 selected={Boolean(endDate)}
                 icon="flag-outline"
-                onPress={() =>
-                  openDatePicker("end")
-                }
+                disabled
               />
             </View>
 
@@ -870,30 +988,30 @@ export default function CreateVendorCampaignIndex() {
         visible={datePickerMode !== null}
         mode={datePickerMode}
         month={calendarMonth}
-        selectedDate={
-          datePickerMode === "start"
-            ? startDate
-            : endDate
-        }
-        minimumDate={
-          datePickerMode === "end"
-            ? startDate || new Date()
-            : new Date()
-        }
+        selectedDate={startDate}
+        minimumDate={new Date()}
         onMonthChange={setCalendarMonth}
         onClose={() => setDatePickerMode(null)}
         onSelect={(date) => {
           if (datePickerMode === "start") {
-            setStartDate(date);
+            const selectedStart =
+              new Date(date);
 
-            if (
-              endDate &&
-              endDate.getTime() <= date.getTime()
-            ) {
-              setEndDate(null);
-            }
-          } else {
-            setEndDate(date);
+            selectedStart.setHours(
+              0,
+              0,
+              0,
+              0,
+            );
+
+            setStartDate(selectedStart);
+
+            const automaticEnd =
+              calculateAutomaticEndDate(
+                selectedStart,
+              );
+
+            setEndDate(automaticEnd);
           }
 
           setDatePickerMode(null);
@@ -967,17 +1085,25 @@ function DateCard({
   selected,
   icon,
   onPress,
+  disabled = false,
 }: {
   label: string;
   value: string;
   selected: boolean;
   icon: keyof typeof Ionicons.glyphMap;
-  onPress: () => void;
+  onPress?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={styles.dateCard}
-      activeOpacity={0.8}
+      style={[
+        styles.dateCard,
+        disabled && styles.dateCardDisabled,
+      ]}
+      activeOpacity={
+        disabled ? 1 : 0.8
+      }
+      disabled={disabled}
       onPress={onPress}
     >
       <View style={styles.dateCardIcon}>
@@ -1003,6 +1129,12 @@ function DateCard({
       >
         {value}
       </Text>
+
+      {disabled ? (
+        <Text style={styles.autoDateHint}>
+          Auto calculated
+        </Text>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -1175,7 +1307,7 @@ function CalendarModal({
   onSelect,
 }: {
   visible: boolean;
-  mode: "start" | "end" | null;
+  mode: "start" | null;
   month: Date;
   selectedDate: Date | null;
   minimumDate: Date;
@@ -1261,14 +1393,12 @@ function CalendarModal({
           <View style={styles.calendarTop}>
             <View>
               <Text style={styles.calendarTitle}>
-                {mode === "start"
-                  ? "Campaign Start Date"
-                  : "Campaign End Date"}
+                Campaign Start Date
               </Text>
 
               <Text style={styles.calendarSubtitle}>
-                Select a campaign date
-              </Text>
+  End date will be calculated automatically
+</Text>
             </View>
 
             <TouchableOpacity
@@ -1731,6 +1861,17 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     backgroundColor: "#FFFFFF",
     padding: 13,
+  },
+
+  dateCardDisabled: {
+    backgroundColor: "#FCF8FC",
+  },
+
+  autoDateHint: {
+    color: PRIMARY,
+    fontSize: 8.5,
+    fontWeight: "600",
+    marginTop: 4,
   },
 
   dateArrow: {

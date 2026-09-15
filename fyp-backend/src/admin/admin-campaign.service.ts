@@ -191,16 +191,46 @@ export class AdminCampaignService {
 
     const now = new Date();
 
-    /*
-     * Do not approve an already-ended campaign.
-     */
-    if (
-      new Date(campaign.endDate) <= now
-    ) {
-      throw new BadRequestException(
-        'Campaign has already ended and cannot be approved.',
-      );
-    }
+   /*
+ * Campaign approval lifecycle:
+ *
+ * Approval before start:
+ *   PENDING -> APPROVED
+ *
+ * Approval between start and end:
+ *   PENDING -> ACTIVE
+ *
+ * Approval after end:
+ *   PENDING -> EXPIRED
+ *
+ * Campaign end date is never extended because of late review.
+ */
+
+const campaignStart =
+  new Date(campaign.startDate);
+
+const campaignEnd =
+  new Date(campaign.endDate);
+
+if (now > campaignEnd) {
+  campaign.status =
+    CampaignStatus.EXPIRED;
+
+  campaign.reviewedBy =
+    new Types.ObjectId(adminId);
+
+  campaign.reviewedAt = now;
+
+  campaign.rejectionReason = null;
+
+  await campaign.save();
+
+  return {
+    message:
+      'Campaign has already ended and was marked as expired.',
+    campaign,
+  };
+}
 
     campaign.reviewedBy =
       new Types.ObjectId(adminId);
@@ -209,21 +239,13 @@ export class AdminCampaignService {
 
     campaign.rejectionReason = null;
 
-    /*
-     * If its start time/date has already arrived,
-     * it becomes ACTIVE immediately.
-     *
-     * Otherwise it stays APPROVED until its start date.
-     */
-    if (
-      new Date(campaign.startDate) <= now
-    ) {
-      campaign.status =
-        CampaignStatus.ACTIVE;
-    } else {
-      campaign.status =
-        CampaignStatus.APPROVED;
-    }
+    if (now >= campaignStart) {
+  campaign.status =
+    CampaignStatus.ACTIVE;
+} else {
+  campaign.status =
+    CampaignStatus.APPROVED;
+}
 
     await campaign.save();
 

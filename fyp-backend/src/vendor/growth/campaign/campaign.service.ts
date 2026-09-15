@@ -193,26 +193,33 @@ if (campaignDurationMs > maxCampaignDurationMs) {
      * startDate >= exact current time.
      */
 
-    const todayStart = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0,
-        0,
-        0,
-        0,
-      ),
-    );
+    /*
+ * Campaign scheduling is date-based, not time-based.
+ *
+ * Same calendar date is allowed:
+ * Today = 15 Sep
+ * Start = 15 Sep -> VALID
+ *
+ * Only an earlier calendar date is rejected.
+ */
 
-    if (
-      startDate.getTime() <
-      todayStart.getTime()
-    ) {
-      throw new BadRequestException(
-        'Campaign start date cannot be in the past',
-      );
-    }
+const startDay = Date.UTC(
+  startDate.getUTCFullYear(),
+  startDate.getUTCMonth(),
+  startDate.getUTCDate(),
+);
+
+const todayDay = Date.UTC(
+  now.getUTCFullYear(),
+  now.getUTCMonth(),
+  now.getUTCDate(),
+);
+
+if (startDay < todayDay) {
+  throw new BadRequestException(
+    'Campaign start date cannot be in the past',
+  );
+}
 
     // -------------------------------------------------------
     // Campaign cannot run beyond subscription expiry
