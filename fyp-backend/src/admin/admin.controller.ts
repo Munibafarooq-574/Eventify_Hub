@@ -19,6 +19,8 @@ import {
 } from '@nestjs/platform-express';
 
 import { AdminService } from './admin.service';
+import { AdminCampaignService } from './admin-campaign.service';
+import { CampaignStatus } from '../schemas/vendor-campaign.schema';
 import {
   VendorApprovalStatus,
 } from '../schemas/user.schema';
@@ -50,9 +52,10 @@ import { AdminRoleGuard } from '../auth/admin-role.guard';
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminRoleGuard)
 export class AdminController {
-  constructor(
+    constructor(
     private readonly adminService: AdminService,
     private readonly categoryService: CategoryService,
+    private readonly adminCampaignService: AdminCampaignService,
   ) {}
 
   // ============================================================
@@ -212,7 +215,7 @@ reviewVendorProfile(
   // GET /admin/bookings/:id
   // ============================================================
 
-  @Get('bookings/:id')
+    @Get('bookings/:id')
   getBookingDetail(
     @Param('id') vendorOrderId: string,
   ) {
@@ -222,6 +225,98 @@ reviewVendorProfile(
   }
 
   // ============================================================
+  // ADMIN CAMPAIGNS
+  // GET /admin/campaigns
+  //
+  // Optional:
+  // ?status=pending
+  // ?limit=20
+  // ?skip=0
+  // ============================================================
+
+  @Get('campaigns')
+  getCampaigns(
+    @Query('status')
+    status?: CampaignStatus,
+
+    @Query('limit')
+    limit = 20,
+
+    @Query('skip')
+    skip = 0,
+  ) {
+    return this.adminCampaignService.getCampaigns(
+      status,
+      limit,
+      skip,
+    );
+  }
+
+  // ============================================================
+  // ADMIN CAMPAIGN DETAIL
+  // GET /admin/campaigns/:id
+  // ============================================================
+
+  @Get('campaigns/:id')
+  getCampaignDetail(
+    @Param('id')
+    campaignId: string,
+  ) {
+    return this.adminCampaignService.getCampaignDetail(
+      campaignId,
+    );
+  }
+
+  // ============================================================
+  // ADMIN APPROVE CAMPAIGN
+  // PATCH /admin/campaigns/:id/approve
+  // ============================================================
+
+  @Patch('campaigns/:id/approve')
+  approveCampaign(
+    @Param('id')
+    campaignId: string,
+
+    @Request()
+    req: any,
+  ) {
+    return this.adminCampaignService.approveCampaign(
+      campaignId,
+      req.user?.id,
+    );
+  }
+
+  // ============================================================
+  // ADMIN REJECT CAMPAIGN
+  // PATCH /admin/campaigns/:id/reject
+  //
+  // Body:
+  // {
+  //   "reason": "Campaign image does not meet requirements."
+  // }
+  // ============================================================
+
+  @Patch('campaigns/:id/reject')
+  rejectCampaign(
+    @Param('id')
+    campaignId: string,
+
+    @Body()
+    body: {
+      reason: string;
+    },
+
+    @Request()
+    req: any,
+  ) {
+    return this.adminCampaignService.rejectCampaign(
+      campaignId,
+      req.user?.id,
+      body.reason,
+    );
+  }
+
+  // ============================================================ 
   // ADMIN CREATE CATEGORY
   // POST /admin/categories
   //

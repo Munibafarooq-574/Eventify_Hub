@@ -49,6 +49,15 @@ import {
 } from 'src/schemas/user.schema';
 
 import {
+  VendorCampaign,
+  VendorCampaignSchema,
+} from 'src/schemas/vendor-campaign.schema';
+
+import {
+  AdminCampaignService,
+} from './admin-campaign.service';
+
+import {
   AdminService,
 } from './admin.service';
 
@@ -176,11 +185,19 @@ import {
           DisputeSchema,
       },
 
-      {
+            {
         name:
           User.name,
         schema:
           UserSchema,
+      },
+
+      // Phase 14A.9 — Admin Campaign Moderation
+      {
+        name:
+          VendorCampaign.name,
+        schema:
+          VendorCampaignSchema,
       },
     ]),
   ],
@@ -199,6 +216,7 @@ import {
     AdminFinanceService,
     AdminDisputeService,
     AdminAnalyticsService,
+    AdminCampaignService,
   ],
 })
 export class AdminModule {}

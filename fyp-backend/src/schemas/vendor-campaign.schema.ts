@@ -9,6 +9,7 @@ import {
 import {
   Document,
   Schema as MongooseSchema,
+  Types,
 } from 'mongoose';
 
 export enum CampaignStatus {
@@ -18,6 +19,7 @@ export enum CampaignStatus {
   ACTIVE = 'active',
   REJECTED = 'rejected',
   EXPIRED = 'expired',
+  CANCELLED = 'cancelled',
 }
 
 @Schema({ timestamps: true })
@@ -97,11 +99,35 @@ export class VendorCampaign extends Document {
   })
   status: CampaignStatus;
 
-  @Prop({
+    @Prop({
     type: String,
     default: null,
   })
   rejectionReason: string | null;
+
+  // Admin who reviewed this campaign.
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  })
+  reviewedBy: Types.ObjectId | null;
+
+  // Date/time when admin approved or rejected it.
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  reviewedAt: Date | null;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  cancelledAt: Date | null;
+
+@Prop({ type: String, default: null })
+cancelledReason: string | null;
 
   // Phase 14A.12 analytics counters.
   // Keeping them here now avoids changing the

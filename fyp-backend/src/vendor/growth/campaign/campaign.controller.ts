@@ -6,6 +6,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -135,6 +136,25 @@ export class CampaignController {
       imageUrl,
     );
   }
+
+    // =========================================================
+  // Phase 14A.8 — Vendor Stop / Cancel Campaign
+  // =========================================================
+
+  @Patch(':vendorId/:campaignId/cancel')
+  async cancelCampaign(
+    @Param('vendorId')
+    vendorId: string,
+
+    @Param('campaignId')
+    campaignId: string,
+  ) {
+    return this.campaignService.cancelCampaign(
+      vendorId,
+      campaignId,
+    );
+  }
+
 
   // =========================================================
   // Vendor — My Campaigns
