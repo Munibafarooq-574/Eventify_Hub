@@ -50,10 +50,15 @@ export class AnalyticsService {
   // profile or package (not wired into any screen yet, see README).
   // ---------------------------------------------------------------
 
-  async trackView(vendorId: string, packageId?: string): Promise<void> {
+    async trackView(
+    vendorId: string,
+    packageId?: string,
+    source: 'organic' | 'sponsored' = 'organic',
+  ): Promise<void> {
     await this.viewEventModel.create({
       vendorId: new Types.ObjectId(vendorId),
       packageId: packageId ?? null,
+      source,
     });
   }
 

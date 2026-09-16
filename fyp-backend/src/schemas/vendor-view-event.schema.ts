@@ -23,12 +23,19 @@ export class VendorViewEvent extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   vendorId: MongooseSchema.Types.ObjectId;
 
-  // null = a view of the vendor's profile itself. Set = a view of one
-  // specific package (matches the package subdocument's _id on User.packages).
-  @Prop({ type: String, default: null, index: true })
+    @Prop({ type: String, default: null, index: true })
   packageId: string | null;
 
-  viewedAt: Date; // populated by the timestamps option above
+  // Traffic source: existing records without this field remain valid.
+  @Prop({
+    type: String,
+    enum: ['organic', 'sponsored'],
+    default: 'organic',
+    index: true,
+  })
+  source: 'organic' | 'sponsored';
+
+  viewedAt: Date;
 }
 
 export const VendorViewEventSchema = SchemaFactory.createForClass(VendorViewEvent);

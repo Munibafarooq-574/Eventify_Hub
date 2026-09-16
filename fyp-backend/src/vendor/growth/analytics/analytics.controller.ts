@@ -31,7 +31,11 @@ export class AnalyticsController {
   // Not called from any screen yet — see PHASE_8_README.md.
   @Post('track-view')
   async trackView(@Body() dto: TrackViewDto) {
-    await this.analyticsService.trackView(dto.vendorId, dto.packageId);
+    await this.analyticsService.trackView(
+    dto.vendorId,
+    dto.packageId,
+    dto.source,
+  );
     return { tracked: true };
   }
 }
