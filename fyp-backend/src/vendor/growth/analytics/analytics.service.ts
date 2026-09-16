@@ -20,6 +20,7 @@ import { DiscountEntryType } from '../discount/discount.types';
 import { VendorPromotion } from '../../../schemas/vendor-promotion.schema';
 import { PromotionType } from '../promotion/promotion.types';
 import { VendorViewEvent } from '../../../schemas/vendor-view-event.schema';
+import { VendorCampaign } from '../../../schemas/vendor-campaign.schema';
 import { FeatureAccessService } from '../feature-access.service';
 import { FeatureKey } from '../subscription/subscription.types';
 
@@ -41,6 +42,7 @@ export class AnalyticsService {
     @InjectModel(VendorDiscount.name) private readonly discountModel: Model<VendorDiscount>,
     @InjectModel(VendorPromotion.name) private readonly promotionModel: Model<VendorPromotion>,
     @InjectModel(VendorViewEvent.name) private readonly viewEventModel: Model<VendorViewEvent>,
+    @InjectModel(VendorCampaign.name) private readonly campaignModel: Model<VendorCampaign>,
     private readonly vendorAnalyticsService: VendorAnalyticsService,
     private readonly featureAccessService: FeatureAccessService,
   ) {}
@@ -171,12 +173,14 @@ export class AnalyticsService {
   private async computeGrowthAnalytics(vendorId: string): Promise<GrowthAnalytics> {
     const vendorObjId = new Types.ObjectId(vendorId);
 
-    const [baseAnalytics, orderCounts, packages, promoStats] = await Promise.all([
-      this.vendorAnalyticsService.getVendorAnalytics(vendorId),
-      this.computeOrderCounts(vendorObjId),
-      this.computeGrowthPackageStats(vendorObjId),
-      this.computePromotionStats(vendorId),
-    ]);
+   const [baseAnalytics, orderCounts, packages, promoStats, views, campaigns] = await Promise.all([
+  this.vendorAnalyticsService.getVendorAnalytics(vendorId),
+  this.computeOrderCounts(vendorObjId),
+  this.computeGrowthPackageStats(vendorObjId),
+  this.computePromotionStats(vendorId),
+  this.computeSourceViews(vendorObjId),
+  this.computeCampaignAnalytics(vendorObjId),
+]);
 
     const averageOrderValue =
       orderCounts.completed > 0 ? Math.round(baseAnalytics.totalRevenue / orderCounts.completed) : null;
@@ -202,7 +206,87 @@ export class AnalyticsService {
         highestRevenuePackage: packages.highestRevenuePackage,
         mostViewedPackage: packages.mostViewedPackage,
       },
-      promotions: promoStats,
+            promotions: promoStats,
+      views,
+      campaigns,
+    };
+  }
+
+    private async computeSourceViews(vendorObjId: Types.ObjectId) {
+    const counts = await this.viewEventModel.aggregate([
+      { $match: { vendorId: vendorObjId } },
+      {
+        $group: {
+          _id: {
+            source: '$source',
+            packageId: { $eq: ['$packageId', null] },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const getCount = (
+      source: string | null,
+      isProfile: boolean,
+    ) =>
+      counts.find(
+        (item) =>
+          (item._id.source ?? null) === source &&
+          item._id.packageId === isProfile,
+      )?.count ?? 0;
+
+    const hasSourceTracking = counts.some(
+      (item) =>
+        item._id.source === 'organic' ||
+        item._id.source === 'sponsored',
+    );
+
+    return {
+      organicProfileViews: {
+        tracked: hasSourceTracking,
+        value: getCount('organic', true),
+      },
+      sponsoredProfileViews: {
+        tracked: hasSourceTracking,
+        value: getCount('sponsored', true),
+      },
+      organicPackageViews: {
+        tracked: hasSourceTracking,
+        value: getCount('organic', false),
+      },
+      sponsoredPackageViews: {
+        tracked: hasSourceTracking,
+        value: getCount('sponsored', false),
+      },
+      unattributedProfileViews: getCount(null, true),
+      unattributedPackageViews: getCount(null, false),
+    };
+  }
+
+    private async computeCampaignAnalytics(vendorObjId: Types.ObjectId) {
+    const result = await this.campaignModel.aggregate([
+      {
+        $match: {
+          vendorId: vendorObjId,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCampaigns: { $sum: 1 },
+          impressions: { $sum: { $ifNull: ['$impressions', 0] } },
+          clicks: { $sum: { $ifNull: ['$clicks', 0] } },
+          packageVisits: { $sum: { $ifNull: ['$packageVisits', 0] } },
+        },
+      },
+    ]);
+
+    return {
+      totalCampaigns: result[0]?.totalCampaigns ?? 0,
+      impressions: result[0]?.impressions ?? 0,
+      clicks: result[0]?.clicks ?? 0,
+      packageVisits: result[0]?.packageVisits ?? 0,
     };
   }
 

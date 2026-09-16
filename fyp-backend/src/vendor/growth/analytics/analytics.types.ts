@@ -43,11 +43,30 @@ export interface GrowthPromotions {
   discountCodeRedemptions: number;
 }
 
+export interface SourceViewAnalytics {
+  organicProfileViews: TrackedMetric;
+  sponsoredProfileViews: TrackedMetric;
+  organicPackageViews: TrackedMetric;
+  sponsoredPackageViews: TrackedMetric;
+  unattributedProfileViews: number;
+  unattributedPackageViews: number;
+}
+
+export interface CampaignAnalytics {
+  totalCampaigns: number;
+  impressions: number;
+  clicks: number;
+  packageVisits: number;
+}
+
+
 export interface GrowthAnalytics {
   sales: GrowthSales;
   customers: GrowthCustomers;
   packages: GrowthPackages;
   promotions: GrowthPromotions;
+  views: SourceViewAnalytics;
+  campaigns: CampaignAnalytics;
 }
 
 export interface MonthlyPoint {
