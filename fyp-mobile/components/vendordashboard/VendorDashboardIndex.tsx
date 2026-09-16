@@ -17,7 +17,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import * as SecureStore from "expo-secure-store";
 import {
     ActivityIndicator,
     Alert,
@@ -98,6 +99,9 @@ const [subscriptionLoading, setSubscriptionLoading] =
 
 const [subscriptionError, setSubscriptionError] =
     useState<boolean>(false);
+
+    // Prevent duplicate alerts while focus/refresh requests are running.
+    const renewalAlertInProgress = useRef(false);
 
     const maxPackages =
     subscriptionAccess?.limits?.maxPackages ?? 0;
@@ -380,6 +384,82 @@ useFocusEffect(
     loadAllData,
   ]),
 );
+
+    // Show a reminder once per vendor per local calendar day. Real API data only.
+    useEffect(() => {
+        if (
+            initialLoading ||
+            checkingApproval ||
+            subscriptionLoading ||
+            subscriptionError ||
+            !subscriptionAccess ||
+            !vendorId ||
+            renewalAlertInProgress.current
+        ) {
+            return;
+        }
+
+        const subscription = subscriptionAccess.subscription;
+        const isExpired = subscription?.status === SubscriptionStatus.EXPIRED;
+        const isExpiringSoon =
+            subscription?.status === SubscriptionStatus.ACTIVE &&
+            subscriptionAccess.isPaidPlan === true &&
+            subscriptionAccess.daysRemaining >= 1 &&
+            subscriptionAccess.daysRemaining <= 7 &&
+            !subscriptionAccess.hasPendingPayment;
+
+        if (!isExpired && !isExpiringSoon) return;
+
+        renewalAlertInProgress.current = true;
+        let cancelled = false;
+
+        const showReminder = async () => {
+            const today = new Date();
+            const localDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+            const reminderType = isExpired ? "expired" : "expiring";
+            const key = `subscription-reminder-${vendorId}-${reminderType}`;
+
+            try {
+                const lastShownDay = await SecureStore.getItemAsync(key);
+                if (cancelled || lastShownDay === localDay) return;
+
+                // Mark as shown before displaying to avoid repeat alerts on refocus.
+                await SecureStore.setItemAsync(key, localDay);
+                if (cancelled) return;
+
+                Alert.alert(
+                    isExpired ? "Subscription Expired" : "Subscription Expiring Soon",
+                    isExpired
+                        ? "Your subscription has expired. View plans to restore subscription benefits."
+                        : `Your subscription expires in ${subscriptionAccess.daysRemaining} day${subscriptionAccess.daysRemaining === 1 ? "" : "s"}. Review your plan to continue your access.`,
+                    [
+                        { text: "Not Now", style: "cancel" },
+                        {
+                            text: isExpired ? "View Plans" : "Renew Plan",
+                            onPress: () => router.push({
+                                pathname: "/subscriptionscreen",
+                                params: { vendorId },
+                            }),
+                        },
+                    ],
+                );
+            } catch (error) {
+                console.warn("Unable to display subscription reminder:", error);
+            } finally {
+                renewalAlertInProgress.current = false;
+            }
+        };
+
+        void showReminder();
+        return () => { cancelled = true; };
+    }, [
+        initialLoading,
+        checkingApproval,
+        subscriptionLoading,
+        subscriptionError,
+        subscriptionAccess,
+        vendorId,
+    ]);
 
    const fetchUsername = async () => {
     try {
