@@ -5,6 +5,11 @@ import { growthApi } from "./growthApiClient";
 export async function recordCampaignImpression(
   campaignId: string,
 ): Promise<void> {
+  console.log(
+    "[Campaign Analytics] Impression API:",
+    campaignId,
+  );
+
   await growthApi.post(
     `/vendor/growth/campaign/public/${campaignId}/impression`,
     {},
