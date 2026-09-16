@@ -217,8 +217,10 @@ export default function GrowthAnalyticsScreen() {
     );
   }
 
-  const data: GrowthAnalytics | null = premium ?? growth;
+    const data: GrowthAnalytics | null = premium ?? growth;
   if (!data) return null;
+
+  const hasNewAnalytics = Boolean(data.views && data.campaigns);
 
   return (
     <View style={styles.root}>
@@ -276,6 +278,79 @@ export default function GrowthAnalyticsScreen() {
           />
         </View>
 
+           {hasNewAnalytics && (
+  <>
+       {/* Organic and Sponsored Views */}
+<View style={styles.card}>
+  <View style={styles.sectionLabelRow}>
+    <Eye size={13} color={COLORS.muted} strokeWidth={2.25} />
+    <Text style={styles.sectionLabel}>Profile & Package Views</Text>
+  </View>
+
+  <InfoRow
+    label="Profile Views From Search"
+    value={metricText(data.views.organicProfileViews)}
+  />
+  <InfoRow
+    label="Profile Views From Campaign"
+    value={metricText(data.views.sponsoredProfileViews)}
+  />
+  <InfoRow
+    label="Package Views From Search"
+    value={metricText(data.views.organicPackageViews)}
+  />
+  <InfoRow
+    label="Package Views From Campaign"
+    value={metricText(data.views.sponsoredPackageViews)}
+  />
+
+  {(
+    data.views.unattributedProfileViews +
+    data.views.unattributedPackageViews
+  ) > 0 && (
+    <InfoRow
+      label="Older Views (Source Not Tracked)"
+      value={fmt(
+        data.views.unattributedProfileViews +
+        data.views.unattributedPackageViews
+      )}
+    />
+  )}
+
+</View>
+
+        {/* Sponsored Campaign Analytics */}
+        <View style={styles.card}>
+          <View style={styles.sectionLabelRow}>
+            <BarChart3 size={13} color={COLORS.muted} strokeWidth={2.25} />
+            <Text style={styles.sectionLabel}>Sponsored Campaigns</Text>
+          </View>
+
+          <InfoRow
+            label="Total Campaigns"
+            value={fmt(data.campaigns.totalCampaigns)}
+          />
+          <InfoRow
+            label="Impressions"
+            value={fmt(data.campaigns.impressions)}
+          />
+          <InfoRow
+            label="Clicks"
+            value={fmt(data.campaigns.clicks)}
+          />
+          <InfoRow
+            label="Package Visits"
+            value={fmt(data.campaigns.packageVisits)}
+          />
+
+          <Text style={styles.analyticsNote}>
+            Totals include current and historical campaigns.
+            These counters are separate from profile and package views.
+          </Text>
+        </View>
+
+           </>
+)}
         {/* Promotions */}
         <View style={styles.card}>
           <View style={styles.sectionLabelRow}>
@@ -477,6 +552,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
   statChange: { fontSize: 10.5, fontWeight: '700', marginTop: 2 },
 
+  analyticsNote: { fontSize: 11, color: COLORS.muted, lineHeight: 16, marginTop: 12, },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.background },
   infoLabel: { fontSize: 13, color: COLORS.muted, flex: 1 },
   infoValue: { fontSize: 13, fontWeight: '600', color: COLORS.text, textAlign: 'right', flex: 1 },
