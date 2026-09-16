@@ -1009,9 +1009,7 @@ export default function VendorCampaignsIndex() {
 
               <TouchableOpacity
                 activeOpacity={0.85}
-                disabled={
-                  !canCreateCampaign
-                }
+                disabled={false}
                 onPress={
                   handleCreateCampaign
                 }

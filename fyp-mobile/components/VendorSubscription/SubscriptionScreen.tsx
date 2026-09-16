@@ -811,6 +811,20 @@ export default function SubscriptionScreen() {
                 days remaining
               </Text>
 
+               {accessState.daysRemaining > 0 &&
+                accessState.daysRemaining <= 7 &&
+                !hasPendingPayment && (
+                  <Text style={styles.statusSecondary}>
+                    Your subscription expires in{' '}
+                    {accessState.daysRemaining}{' '}
+                    {accessState.daysRemaining === 1
+                      ? 'day'
+                      : 'days'}.
+                    {' '}Review your subscription plans below
+                    to continue your access.
+                  </Text>
+                )}
+
               {currentSubscription?.endDate && (
                 <Text
                   style={

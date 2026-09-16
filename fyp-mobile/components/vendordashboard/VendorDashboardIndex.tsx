@@ -646,6 +646,117 @@ useFocusEffect(
                     </TouchableOpacity>
                 ) : null}
             </View>
+
+            {/* ---------- Marketing & Campaigns ---------- */}
+<View style={styles.marketingSection}>
+    <TouchableOpacity
+        activeOpacity={0.86}
+        onPress={() => {
+            if (!vendorId) {
+                Alert.alert(
+                    "Error",
+                    "Vendor ID not found.",
+                );
+                return;
+            }
+
+            router.push({
+                pathname: "/vendorcampaigns",
+                params: { vendorId },
+            });
+        }}
+    >
+        <LinearGradient
+            colors={["#7D0C72", "#640080"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.marketingCard}
+        >
+            {/* Decorative background */}
+            <View style={styles.marketingGlowOne} />
+            <View style={styles.marketingGlowTwo} />
+
+            <View style={styles.marketingCardTop}>
+                <View style={styles.marketingIconContainer}>
+                    <Ionicons
+                        name="megaphone-outline"
+                        size={24}
+                        color="#7D0C72"
+                    />
+                </View>
+
+                <View style={styles.marketingBadge}>
+                    <Ionicons
+                        name="sparkles"
+                        size={11}
+                        color="#7D0C72"
+                    />
+
+                    <Text style={styles.marketingBadgeText}>
+                        PROMOTE
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.marketingContent}>
+                <Text style={styles.marketingEyebrow}>
+                    MARKETING
+                </Text>
+
+                <Text style={styles.marketingTitle}>
+                    Marketing & Campaigns
+                </Text>
+
+                <Text style={styles.marketingDescription}>
+                    Promote your packages, manage sponsored campaigns
+                    and track their performance.
+                </Text>
+            </View>
+
+            <View style={styles.marketingFooter}>
+                <View style={styles.marketingFeatureRow}>
+                    <View style={styles.marketingFeature}>
+                        <Ionicons
+                            name="cube-outline"
+                            size={14}
+                            color="#FFFFFF"
+                        />
+
+                        <Text style={styles.marketingFeatureText}>
+                            Packages
+                        </Text>
+                    </View>
+
+                    <View style={styles.marketingFeatureDivider} />
+
+                    <View style={styles.marketingFeature}>
+                        <Ionicons
+                            name="stats-chart-outline"
+                            size={14}
+                            color="#FFFFFF"
+                        />
+
+                        <Text style={styles.marketingFeatureText}>
+                            Analytics
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.marketingOpenButton}>
+                    <Text style={styles.marketingOpenButtonText}>
+                        Open
+                    </Text>
+
+                    <Ionicons
+                        name="arrow-forward"
+                        size={15}
+                        color="#7D0C72"
+                    />
+                </View>
+            </View>
+        </LinearGradient>
+    </TouchableOpacity>
+</View>
                 {/* ---------- Analytics error banner ---------- */}
                 {analyticsError && (
                     <View style={styles.errorBanner}>
@@ -1027,14 +1138,29 @@ useFocusEffect(
                                 styles.addPackageButtonDisabled,
                         ]}
                         activeOpacity={0.8}
-                        disabled={
-                            packageLimitReached ||
-                            subscriptionLoading
-                        }
+                    disabled={subscriptionLoading}
                         onPress={() => {
                             if (packageLimitReached) {
-                                return;
-                            }
+                            Alert.alert(
+                                "Package Limit Reached",
+                                `Your current subscription allows up to ${maxPackages} packages.`,
+                                [
+                                    { text: "Not Now", style: "cancel" },
+                                    {
+                                        text: "View Plans",
+                                        onPress: () => {
+                                            if (!vendorId) return;
+
+                                            router.push({
+                                                pathname: "/subscriptionscreen",
+                                                params: { vendorId },
+                                            });
+                                        },
+                                    },
+                                ]
+                            );
+                            return;
+                        }
 
                             router.push({
                                 pathname: "/vpdaddnewpackage",
@@ -1684,6 +1810,149 @@ subscriptionLoadErrorText: {
     color: "#7D0C72",
     fontSize: 12,
     fontWeight: "600",
+},
+
+// Marketing & Campaigns
+marketingSection: {
+    paddingHorizontal: 20,
+    marginTop: 16,
+},
+
+marketingCard: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 22,
+    padding: 18,
+    minHeight: 205,
+    ...cardShadow(0.16),
+},
+
+marketingGlowOne: {
+    position: "absolute",
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -65,
+    right: -35,
+},
+
+marketingGlowTwo: {
+    position: "absolute",
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    bottom: -55,
+    left: -25,
+},
+
+marketingCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+},
+
+marketingIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
+marketingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#F8EAF8",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+},
+
+marketingBadgeText: {
+    color: "#7D0C72",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+},
+
+marketingContent: {
+    marginTop: 16,
+    paddingRight: 6,
+},
+
+marketingEyebrow: {
+    color: "#EFCBF0",
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+},
+
+marketingTitle: {
+    color: "#FFFFFF",
+    fontSize: screenWidth < 360 ? 18 : 20,
+    fontWeight: "800",
+    marginTop: 3,
+},
+
+marketingDescription: {
+    color: "rgba(255,255,255,0.76)",
+    fontSize: screenWidth < 360 ? 11 : 12,
+    lineHeight: 18,
+    marginTop: 6,
+    maxWidth: 390,
+},
+
+marketingFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 18,
+},
+
+marketingFeatureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+},
+
+marketingFeature: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+},
+
+marketingFeatureText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: screenWidth < 360 ? 9 : 10,
+    fontWeight: "600",
+},
+
+marketingFeatureDivider: {
+    width: 1,
+    height: 15,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    marginHorizontal: screenWidth < 360 ? 7 : 10,
+},
+
+marketingOpenButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: screenWidth < 360 ? 10 : 13,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginLeft: 8,
+},
+
+marketingOpenButtonText: {
+    color: "#7D0C72",
+    fontSize: 11,
+    fontWeight: "800",
 },
     // Sections
     sectionContainer: { paddingHorizontal: 20, marginTop: 24 },

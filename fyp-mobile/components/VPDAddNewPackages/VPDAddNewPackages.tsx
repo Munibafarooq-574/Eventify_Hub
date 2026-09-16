@@ -12,6 +12,7 @@ import updatePackage from "@/services/updatePackage";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
 import type { SubscriptionAccessState } from "@/types/subscription.types";
+import * as ImageManipulator from "expo-image-manipulator";
 import {
   getSecureData,
   getUserData,
@@ -483,7 +484,21 @@ if (maxImagesPerPackage <= 0) {
 if (remainingPackageImageSlots <= 0) {
   Alert.alert(
     "Image Limit Reached",
-    `Your current subscription allows up to ${maxImagesPerPackage} images per package.`
+    `Your current subscription allows up to ${maxImagesPerPackage} images per package.`,
+    [
+      { text: "Not Now", style: "cancel" },
+      {
+        text: "View Plans",
+        onPress: () => {
+          if (!vendorId) return;
+
+          router.push({
+            pathname: "/subscriptionscreen",
+            params: { vendorId },
+          });
+        },
+      },
+    ]
   );
   return;
 }
@@ -513,20 +528,43 @@ const result =
       return;
     }
 
-    const selectedImages: PackageImageAsset[] =
-      result.assets.map((asset, index) => ({
-        uri: asset.uri,
-        name:
-          asset.fileName ||
-          `package-${Date.now()}-${index}.jpg`,
-        type:
-          asset.mimeType ||
-          "image/jpeg",
-      }));
+        const compressedImages: PackageImageAsset[] = [];
+
+    for (let index = 0; index < result.assets.length; index++) {
+      const asset = result.assets[index];
+
+      try {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1280 } }], // width se zyada bara nahi hoga
+          {
+            compress: 0.6, // 0 = zyada compress, 1 = original quality
+            format: ImageManipulator.SaveFormat.JPEG,
+          }
+        );
+
+        compressedImages.push({
+          uri: manipulated.uri,
+          name:
+            asset.fileName ||
+            `package-${Date.now()}-${index}.jpg`,
+          type: "image/jpeg",
+        });
+      } catch (compressError) {
+        console.error("Image compression failed:", compressError);
+        compressedImages.push({
+          uri: asset.uri,
+          name:
+            asset.fileName ||
+            `package-${Date.now()}-${index}.jpg`,
+          type: asset.mimeType || "image/jpeg",
+        });
+      }
+    }
 
     setImageAssets((prev) => [
       ...prev,
-      ...selectedImages,
+      ...compressedImages,
     ]);
   } catch (error) {
     console.error(
@@ -592,6 +630,32 @@ const removeImageAsset = (index: number) => {
     customDurationRate,
   ]);
 
+    // ---------------------------------------------------------
+  // Upload images with 1 automatic retry on transient server errors
+  // ---------------------------------------------------------
+
+  const uploadImagesWithRetry = async (
+    targetId: string,
+    assets: PackageImageAsset[],
+    onProgress: (progress: number) => void,
+    retriesLeft = 1
+  ): Promise<void> => {
+    try {
+      await uploadPackageImages(targetId, assets, onProgress);
+    } catch (error: any) {
+      const status = error?.response?.status || error?.status;
+      const isRetryable = status === 520 || status === 502 || status === 503;
+
+      if (isRetryable && retriesLeft > 0) {
+        console.warn(`Upload failed (status ${status}), retrying in 5s...`);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        return uploadImagesWithRetry(targetId, assets, onProgress, retriesLeft - 1);
+      }
+
+      throw error;
+    }
+  };
+
   // ---------------------------------------------------------
   // Save package
   // ---------------------------------------------------------
@@ -624,7 +688,21 @@ if (subscriptionLoadError || !subscriptionAccess) {
 if (!isEditMode && packageLimitReached) {
   Alert.alert(
     "Package Limit Reached",
-    `Your current subscription allows up to ${maxPackages} packages.`
+    `Your current subscription allows up to ${maxPackages} packages.`,
+    [
+      { text: "Not Now", style: "cancel" },
+      {
+        text: "View Plans",
+        onPress: () => {
+          if (!vendorId) return;
+
+          router.push({
+            pathname: "/subscriptionscreen",
+            params: { vendorId },
+          });
+        },
+      },
+    ]
   );
   return;
 }
@@ -707,19 +785,21 @@ if (!userId) {
     // EDIT PACKAGE
     // =====================================================
 
-    if (isEditMode) {
+        if (isEditMode) {
       await updatePackage(
         packageId as string,
         payload
       );
 
       // Upload newly selected images
+      let editImageUploadFailed = false;
+
       if (imageAssets.length > 0) {
         try {
           setUploadingImages(true);
           setUploadProgress(0);
 
-          await uploadPackageImages(
+            await uploadImagesWithRetry(
             packageId as string,
             imageAssets,
             (progress) => {
@@ -728,14 +808,19 @@ if (!userId) {
           );
 
           setUploadProgress(100);
+        } catch (imgErr) {
+          console.error("Image upload failed:", imgErr);
+          editImageUploadFailed = true;
         } finally {
           setUploadingImages(false);
         }
       }
 
       Alert.alert(
-        "Success",
-        "Package updated successfully.",
+        editImageUploadFailed ? "Package Saved" : "Success",
+        editImageUploadFailed
+          ? "Your changes were saved, but the images couldn't be uploaded (server error). Please try adding images again."
+          : "Package updated successfully.",
         [
           {
             text: "OK",
@@ -789,16 +874,18 @@ if (!userId) {
       );
     }
 
-    // =====================================================
+        // =====================================================
     // Upload package images
     // =====================================================
+
+    let imageUploadFailed = false;
 
     if (imageAssets.length > 0) {
       try {
         setUploadingImages(true);
         setUploadProgress(0);
 
-        await uploadPackageImages(
+        await uploadImagesWithRetry(
           createdPackageId,
           imageAssets,
           (progress) => {
@@ -807,14 +894,19 @@ if (!userId) {
         );
 
         setUploadProgress(100);
+      } catch (imgErr) {
+        console.error("Image upload failed:", imgErr);
+        imageUploadFailed = true;
       } finally {
         setUploadingImages(false);
       }
     }
 
     Alert.alert(
-      "Success",
-      "Package created successfully.",
+      imageUploadFailed ? "Package Saved" : "Success",
+      imageUploadFailed
+        ? "Your package was saved, but the images couldn't be uploaded (server error). You can edit this package to add images again."
+        : "Package created successfully.",
       [
         {
           text: "OK",
@@ -1484,27 +1576,24 @@ if (!userId) {
             <TouchableOpacity
           style={[
             styles.addDurationButton,
-            (loading ||
+             (loading ||
               uploadingImages ||
-              loadingSubscription ||
-              packageImageLimitReached) &&
+              loadingSubscription) &&
               styles.addDurationButtonDisabled,
           ]}
           onPress={pickPackageImages}
           disabled={
-            loading ||
-            uploadingImages ||
-            loadingSubscription ||
-            packageImageLimitReached
-          }
+          loading ||
+          uploadingImages ||
+          loadingSubscription
+        }
           activeOpacity={0.8}
         >
           <Text
             style={[
               styles.addDurationText,
-              (loadingSubscription ||
-                packageImageLimitReached) &&
-                styles.addDurationTextDisabled,
+               loadingSubscription &&
+              styles.addDurationTextDisabled,
             ]}
           >
             {packageImageLimitReached
@@ -1926,21 +2015,19 @@ if (!userId) {
         ------------------------------------------------- */}
 
         <TouchableOpacity
-          style={[
+              style={[
             styles.saveButton,
             (!isFormValid ||
-            loading ||
-            loadingSubscription ||
-            packageLimitReached) &&
-            styles.saveButtonDisabled
+              loading ||
+              loadingSubscription) &&
+              styles.saveButtonDisabled,
           ]}
           onPress={handleSave}
           disabled={
-          loading ||
-          loadingSubscription ||
-          !isFormValid ||
-          packageLimitReached
-        }
+            loading ||
+            loadingSubscription ||
+            !isFormValid
+          }
           activeOpacity={0.85}
         >
           {loading ? (
