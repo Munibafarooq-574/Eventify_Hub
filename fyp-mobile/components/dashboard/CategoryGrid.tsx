@@ -67,8 +67,14 @@ const CategoryGrid: React.FC = () => {
   }, []);
   const getCategories = async () => {
     const response = await getAllCategories();
-    await saveSecureData("categories", JSON.stringify(response));
-    setCategories(response);
+
+    // Show categories alphabetically (A → Z) by name.
+    const sortedResponse = [...response].sort((a: ICategory, b: ICategory) =>
+      a.name.localeCompare(b.name)
+    );
+
+    await saveSecureData("categories", JSON.stringify(sortedResponse));
+    setCategories(sortedResponse);
   }
   return (
     <View style={styles.container}>
@@ -87,11 +93,11 @@ const CategoryGrid: React.FC = () => {
       </View>
       <FlatList
         data={categories}
-        renderItem={({ item, index }) => <CategoryItem key={item._id} item={item} />}
+        renderItem={({ item }) => <CategoryItem key={item._id} item={item} />}
         keyExtractor={(item) => item._id}
-        numColumns={4}
-        columnWrapperStyle={styles.row}
-        scrollEnabled={false}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
       />
     </View>
   );
@@ -106,6 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 18,
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 18,
@@ -130,12 +137,12 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   row: {
-    justifyContent: 'space-between',
-    marginBottom: 18,
+    paddingHorizontal: 16,
   },
   categoryItem: {
     alignItems: 'center',
-    width: '23%',
+    width: 78,
+    marginRight: 14,
   },
   categoryTouchable: {
     alignItems: 'center',
