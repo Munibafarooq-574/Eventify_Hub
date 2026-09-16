@@ -560,13 +560,32 @@ const pickPackageImages = async () => {
         "Image Upload Unavailable",
         "Your current subscription does not allow new package images.",
       );
-      return;
+            return;
     }
 
     if (remainingPackageImageSlots <= 0) {
       Alert.alert(
         "Image Limit Reached",
         `Your current plan allows up to ${maxImagesPerPackage} images per package.`,
+        [
+          { text: "Not Now", style: "cancel" },
+          {
+            text: "View Plans",
+            onPress: async () => {
+              const user = await readUser();
+
+              if (!user?._id) {
+                Alert.alert("Error", "Vendor ID not found.");
+                return;
+              }
+
+              router.push({
+                pathname: "/subscriptionscreen",
+                params: { vendorId: user._id },
+              });
+            },
+          },
+        ],
       );
       return;
     }
@@ -1964,8 +1983,7 @@ const removeExistingImage = (index: number) => {
         loadingSubscription ||
         subscriptionLoadError ||
         !subscriptionAccess ||
-        maxImagesPerPackage <= 0 ||
-        packageImageLimitReached
+        maxImagesPerPackage <= 0
       }
       activeOpacity={0.8}
     >
