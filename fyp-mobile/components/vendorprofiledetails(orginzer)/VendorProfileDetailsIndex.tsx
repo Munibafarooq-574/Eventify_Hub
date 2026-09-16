@@ -27,6 +27,7 @@ import getVendorAvailability, {
 } from '@/services/getVendorAvailability';
 import checkVendorsAvailability from '@/services/checkVendorsAvailability';
 import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
+import { trackVendorView } from '@/services/trackVendorView';
 import {
   ActivityIndicator,
   Image,
@@ -413,6 +414,10 @@ const VendorDetailsScreen: React.FC =
     const sponsoredVisitRecordedRef =
       useRef<string | null>(null);
 
+    const profileViewRecordedRef = useRef<string | null>(null);
+
+    const packageViewsRecordedRef = useRef<Set<string>>(new Set());
+
     const [selectedMedia, setSelectedMedia] =
       useState<ReviewMedia[]>([]);
 
@@ -712,14 +717,75 @@ const todayAvailabilitySummary =
       return vendorData.packages[0] || null;
     };
 
-    const handlePackageSelect = (
+        const handlePackageSelect = (
       selectedPackageId: string,
     ) => {
-      setActivePackage(
-        String(selectedPackageId),
-      );
+      const selectedId = String(selectedPackageId);
+      setActivePackage(selectedId);
     };
 
+    useEffect(() => {
+      if (
+        !vendorData?._id ||
+        activeTab !== 'Packages' ||
+        !activePackage
+      ) {
+        return;
+      }
+
+      const packageExists = vendorData.packages?.some(
+        (pkg: any) => String(pkg._id) === String(activePackage),
+      );
+
+      if (!packageExists) return;
+
+      const vendorId = String(vendorData._id);
+      const selectedId = String(activePackage);
+      const viewKey = `${vendorId}:${selectedId}`;
+
+      if (packageViewsRecordedRef.current.has(viewKey)) return;
+
+      const viewSource =
+        (Array.isArray(source) ? source[0] : source) === 'sponsored'
+          ? 'sponsored'
+          : 'organic';
+
+      packageViewsRecordedRef.current.add(viewKey);
+
+      trackVendorView(vendorId, selectedId, viewSource).catch((error) => {
+        console.warn('Package view tracking failed:', error);
+      });
+    }, [vendorData, activeTab, activePackage, source]);
+
+        useEffect(() => {
+      if (
+        !vendorData?._id ||
+        activeTab !== 'Details'
+      ) {
+        return;
+      }
+
+      const vendorId = String(vendorData._id);
+
+      if (profileViewRecordedRef.current === vendorId) {
+        return;
+      }
+
+      const viewSource =
+        (Array.isArray(source) ? source[0] : source) === 'sponsored'
+          ? 'sponsored'
+          : 'organic';
+
+      profileViewRecordedRef.current = vendorId;
+
+      trackVendorView(
+        vendorId,
+        undefined,
+        viewSource,
+      ).catch((error) => {
+        console.warn('Profile view tracking failed:', error);
+      });
+    }, [vendorData?._id, activeTab, source]);
     // ---------------------------------------------------------
     // Reviews
      // ---------------------------------------------------------
@@ -1477,6 +1543,42 @@ const todayAvailabilitySummary =
           setVendorData(
             vendor,
           );
+
+                    // Record one profile view after the vendor loads successfully.
+          // Do not count refreshes or package changes as new profile visits.
+          const loadedVendorId = String(vendor?._id || '');
+          const viewSource =
+            (Array.isArray(source) ? source[0] : source) === 'sponsored'
+              ? 'sponsored'
+              : 'organic';
+
+          const directCampaignPackageVisit =
+  viewSource === 'sponsored' &&
+  Boolean(Array.isArray(campaignId) ? campaignId[0] : campaignId) &&
+  Boolean(
+    (Array.isArray(packageId) ? packageId[0] : packageId) &&
+      vendor?.packages?.some(
+        (pkg: any) =>
+          String(pkg._id) ===
+          String(Array.isArray(packageId) ? packageId[0] : packageId),
+      ),
+  );
+
+if (
+  loadedVendorId &&
+  !directCampaignPackageVisit &&
+  profileViewRecordedRef.current !== loadedVendorId
+) {
+            profileViewRecordedRef.current = loadedVendorId;
+
+            trackVendorView(
+              loadedVendorId,
+              undefined,
+              viewSource,
+            ).catch((error) => {
+              console.warn('Profile view tracking failed:', error);
+            });
+          }
 
           const routePackageId =
             typeof packageId ===

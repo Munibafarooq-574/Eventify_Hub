@@ -14,9 +14,16 @@
 //     top-only SafeAreaView (react-native-safe-area-context, already a
 //     peer dependency of expo-router).
 //     npm install lucide-react-native react-native-svg
+//
+// UPDATE — Pull-to-refresh added:
+//   - ScrollView now uses RefreshControl (native pull-down gesture) wired
+//     to loadData(), so users can refresh the screen without navigating
+//     away. A separate `refreshing` state is used (instead of reusing the
+//     initial `loading` state) so the pull-to-refresh spinner and the
+//     full-screen initial loading spinner don't fight each other.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -95,43 +102,59 @@ export default function GrowthAnalyticsScreen() {
   const [premium, setPremium] = useState<PremiumAnalytics | null>(null);
   const [insights, setInsights] = useState<BusinessInsight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    if (!vendorIdValue) {
-      setError('Missing vendorId');
-      setLoading(false);
-      return;
-    }
-    try {
-      setError(null);
-      const subscription = await getVendorSubscription(vendorIdValue);
-      setPlan(subscription.plan);
-
-      if (subscription.plan === SubscriptionPlan.FREE) {
+  // isRefresh=true is used by pull-to-refresh: it skips the full-screen
+  // spinner (and the "loading" state) and instead just flips the small
+  // `refreshing` flag that RefreshControl watches.
+  const loadData = useCallback(
+    async (isRefresh = false) => {
+      if (!vendorIdValue) {
+        setError('Missing vendorId');
         setLoading(false);
+        setRefreshing(false);
         return;
       }
+      try {
+        setError(null);
+        const subscription = await getVendorSubscription(vendorIdValue);
+        setPlan(subscription.plan);
 
-      if (subscription.plan === SubscriptionPlan.PREMIUM) {
-        const [premiumData, insightData] = await Promise.all([
-          getPremiumAnalytics(vendorIdValue),
-          getBusinessInsights(vendorIdValue),
-        ]);
-        setPremium(premiumData);
-        setInsights(insightData);
-      } else {
-        setGrowth(await getGrowthAnalytics(vendorIdValue));
+        if (subscription.plan === SubscriptionPlan.FREE) {
+          return;
+        }
+
+        if (subscription.plan === SubscriptionPlan.PREMIUM) {
+          const [premiumData, insightData] = await Promise.all([
+            getPremiumAnalytics(vendorIdValue),
+            getBusinessInsights(vendorIdValue),
+          ]);
+          setPremium(premiumData);
+          setInsights(insightData);
+        } else {
+          setGrowth(await getGrowthAnalytics(vendorIdValue));
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load analytics');
+      } finally {
+        if (isRefresh) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
       }
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load analytics');
-    } finally {
-      setLoading(false);
-    }
-  }, [vendorIdValue]);
+    },
+    [vendorIdValue]
+  );
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData(true);
   }, [loadData]);
 
   // Standard screen header: back button (left) — title + subtitle (center)
@@ -179,12 +202,17 @@ export default function GrowthAnalyticsScreen() {
       <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
         <Header />
-        <View style={styles.centered}>
+        <ScrollView
+          contentContainerStyle={styles.centered}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
+          }
+        >
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -194,7 +222,12 @@ export default function GrowthAnalyticsScreen() {
       <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
         <Header />
-        <View style={styles.centered}>
+        <ScrollView
+          contentContainerStyle={styles.centered}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
+          }
+        >
           <View style={styles.upsellIconBadge}>
             <BarChart3 size={30} color={COLORS.primary} strokeWidth={2} />
           </View>
@@ -212,12 +245,12 @@ export default function GrowthAnalyticsScreen() {
           >
             <Text style={styles.upsellButtonText}>View Plans</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     );
   }
 
-    const data: GrowthAnalytics | null = premium ?? growth;
+  const data: GrowthAnalytics | null = premium ?? growth;
   if (!data) return null;
 
   const hasNewAnalytics = Boolean(data.views && data.campaigns);
@@ -227,7 +260,14 @@ export default function GrowthAnalyticsScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Header />
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
+        }
+      >
         {/* Business Insights — Premium only */}
         {insights.length > 0 && (
           <View style={[styles.card, styles.insightsCard]}>
@@ -278,79 +318,48 @@ export default function GrowthAnalyticsScreen() {
           />
         </View>
 
-           {hasNewAnalytics && (
-  <>
-       {/* Organic and Sponsored Views */}
-<View style={styles.card}>
-  <View style={styles.sectionLabelRow}>
-    <Eye size={13} color={COLORS.muted} strokeWidth={2.25} />
-    <Text style={styles.sectionLabel}>Profile & Package Views</Text>
-  </View>
+        {hasNewAnalytics && (
+          <>
+            {/* Organic and Sponsored Views */}
+            <View style={styles.card}>
+              <View style={styles.sectionLabelRow}>
+                <Eye size={13} color={COLORS.muted} strokeWidth={2.25} />
+                <Text style={styles.sectionLabel}>Profile & Package Views</Text>
+              </View>
 
-  <InfoRow
-    label="Profile Views From Search"
-    value={metricText(data.views.organicProfileViews)}
-  />
-  <InfoRow
-    label="Profile Views From Campaign"
-    value={metricText(data.views.sponsoredProfileViews)}
-  />
-  <InfoRow
-    label="Package Views From Search"
-    value={metricText(data.views.organicPackageViews)}
-  />
-  <InfoRow
-    label="Package Views From Campaign"
-    value={metricText(data.views.sponsoredPackageViews)}
-  />
+              <InfoRow label="Profile Views From Search" value={metricText(data.views.organicProfileViews)} />
+              <InfoRow label="Profile Views From Campaign" value={metricText(data.views.sponsoredProfileViews)} />
+              <InfoRow label="Package Views From Search" value={metricText(data.views.organicPackageViews)} />
+              <InfoRow label="Package Views From Campaign" value={metricText(data.views.sponsoredPackageViews)} />
 
-  {(
-    data.views.unattributedProfileViews +
-    data.views.unattributedPackageViews
-  ) > 0 && (
-    <InfoRow
-      label="Older Views (Source Not Tracked)"
-      value={fmt(
-        data.views.unattributedProfileViews +
-        data.views.unattributedPackageViews
-      )}
-    />
-  )}
+              {(data.views.unattributedProfileViews + data.views.unattributedPackageViews) > 0 && (
+                <InfoRow
+                  label="Older Views (Source Not Tracked)"
+                  value={fmt(data.views.unattributedProfileViews + data.views.unattributedPackageViews)}
+                />
+              )}
+            </View>
 
-</View>
+            {/* Sponsored Campaign Analytics */}
+            <View style={styles.card}>
+              <View style={styles.sectionLabelRow}>
+                <BarChart3 size={13} color={COLORS.muted} strokeWidth={2.25} />
+                <Text style={styles.sectionLabel}>Sponsored Campaigns</Text>
+              </View>
 
-        {/* Sponsored Campaign Analytics */}
-        <View style={styles.card}>
-          <View style={styles.sectionLabelRow}>
-            <BarChart3 size={13} color={COLORS.muted} strokeWidth={2.25} />
-            <Text style={styles.sectionLabel}>Sponsored Campaigns</Text>
-          </View>
+              <InfoRow label="Total Campaigns" value={fmt(data.campaigns.totalCampaigns)} />
+              <InfoRow label="Impressions" value={fmt(data.campaigns.impressions)} />
+              <InfoRow label="Clicks" value={fmt(data.campaigns.clicks)} />
+              <InfoRow label="Package Visits" value={fmt(data.campaigns.packageVisits)} />
 
-          <InfoRow
-            label="Total Campaigns"
-            value={fmt(data.campaigns.totalCampaigns)}
-          />
-          <InfoRow
-            label="Impressions"
-            value={fmt(data.campaigns.impressions)}
-          />
-          <InfoRow
-            label="Clicks"
-            value={fmt(data.campaigns.clicks)}
-          />
-          <InfoRow
-            label="Package Visits"
-            value={fmt(data.campaigns.packageVisits)}
-          />
+              <Text style={styles.analyticsNote}>
+                Totals include current and historical campaigns.
+                These counters are separate from profile and package views.
+              </Text>
+            </View>
+          </>
+        )}
 
-          <Text style={styles.analyticsNote}>
-            Totals include current and historical campaigns.
-            These counters are separate from profile and package views.
-          </Text>
-        </View>
-
-           </>
-)}
         {/* Promotions */}
         <View style={styles.card}>
           <View style={styles.sectionLabelRow}>
@@ -500,7 +509,7 @@ const styles = StyleSheet.create({
 
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 32 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, padding: 24 },
+  centered: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background, padding: 24 },
   errorText: { color: COLORS.muted, marginBottom: 12 },
   retryButton: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryButtonText: { color: '#fff', fontWeight: '600' },
@@ -552,7 +561,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: COLORS.muted, marginTop: 2 },
   statChange: { fontSize: 10.5, fontWeight: '700', marginTop: 2 },
 
-  analyticsNote: { fontSize: 11, color: COLORS.muted, lineHeight: 16, marginTop: 12, },
+  analyticsNote: { fontSize: 11, color: COLORS.muted, lineHeight: 16, marginTop: 12 },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.background },
   infoLabel: { fontSize: 13, color: COLORS.muted, flex: 1 },
   infoValue: { fontSize: 13, fontWeight: '600', color: COLORS.text, textAlign: 'right', flex: 1 },
