@@ -385,7 +385,8 @@ useFocusEffect(
   ]),
 );
 
-    // Show a reminder once per vendor per local calendar day. Real API data only.
+    // Expired: show once whenever the dashboard is opened/focused.
+// Expiring soon: keep the existing once-per-day reminder.
     useEffect(() => {
         if (
             initialLoading ||
@@ -414,23 +415,30 @@ useFocusEffect(
         let cancelled = false;
 
         const showReminder = async () => {
-            const today = new Date();
-            const localDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-            const reminderType = isExpired ? "expired" : "expiring";
-            const key = `subscription-reminder-${vendorId}-${reminderType}`;
+                        try {
+                if (isExpiringSoon) {
+                    const today = new Date();
+                    const localDay = `${today.getFullYear()}-${String(
+                        today.getMonth() + 1,
+                    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-            try {
-                const lastShownDay = await SecureStore.getItemAsync(key);
-                if (cancelled || lastShownDay === localDay) return;
+                    const key = `subscription-reminder-${vendorId}-expiring`;
 
-                // Mark as shown before displaying to avoid repeat alerts on refocus.
-                await SecureStore.setItemAsync(key, localDay);
+                    const lastShownDay = await SecureStore.getItemAsync(key);
+
+                    if (cancelled || lastShownDay === localDay) {
+                        return;
+                    }
+
+                    await SecureStore.setItemAsync(key, localDay);
+                }
+
                 if (cancelled) return;
 
                 Alert.alert(
                     isExpired ? "Subscription Expired" : "Subscription Expiring Soon",
                     isExpired
-                        ? "Your subscription has expired. View plans to restore subscription benefits."
+                        ? "Your subscription has expired. Your profile is hidden from new clients and you cannot receive new bookings. You can still manage your existing bookings. Subscribe to a plan to become visible again."
                         : `Your subscription expires in ${subscriptionAccess.daysRemaining} day${subscriptionAccess.daysRemaining === 1 ? "" : "s"}. Review your plan to continue your access.`,
                     [
                         { text: "Not Now", style: "cancel" },
@@ -1470,7 +1478,7 @@ const getSubscriptionBannerConfig = (
         return {
             title: "Subscription Expired",
             message:
-                "Choose a plan to restore subscription benefits, visibility and growth features.",
+                "Your profile is hidden from new clients. You can still manage existing bookings, but subscribe to a plan to become visible and receive new bookings again.",
             buttonLabel: "Renew Subscription",
             icon: "alert-circle-outline",
             background: ["#FDE8EC", "#F8D4DC"],

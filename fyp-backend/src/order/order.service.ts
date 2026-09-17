@@ -16,6 +16,7 @@ import { Notification } from 'src/schemas/notification.schema';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 import { PayoutService } from 'src/payout/payout.service';
 import { CommissionConfig } from 'src/schemas/commission-config.schema';
+import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -43,7 +44,8 @@ export class OrderService {
     private readonly connection: Connection,
 
     private readonly availabilityService: VendorAvailabilityService,
-    private readonly payoutService: PayoutService,
+private readonly payoutService: PayoutService,
+private readonly featureAccessService: FeatureAccessService,
 ) { }
 
             // Create a new order
@@ -79,6 +81,37 @@ try {
     let savedOrder: Order;
 
     await session.withTransaction(async () => {
+
+        // New-business subscription guard.
+        // A vendor must have usable subscription access when a NEW booking
+        // is created. Existing bookings are not affected by this check.
+        const uniqueVendorIds = [
+            ...new Set(
+                services.map((service) =>
+                    service.vendorId.toString(),
+                ),
+            ),
+        ];
+
+        const vendorAccessResults = await Promise.all(
+            uniqueVendorIds.map(async (vendorId) => ({
+                vendorId,
+                hasAccess:
+                    await this.featureAccessService.hasActiveSubscription(
+                        vendorId,
+                    ),
+            })),
+        );
+
+        const restrictedVendor = vendorAccessResults.find(
+            (result) => !result.hasAccess,
+        );
+
+        if (restrictedVendor) {
+            throw new ConflictException(
+                'This vendor is currently unavailable for new bookings.',
+            );
+        }
 
         // Check every selected vendor before creating anything
         const results = await this.availabilityService.checkMany(

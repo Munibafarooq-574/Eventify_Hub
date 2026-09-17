@@ -1019,6 +1019,17 @@ export class SubscriptionService {
       subscription.status ===
       SubscriptionStatus.EXPIRED;
 
+      const accessAllowed =
+  subscription.status === SubscriptionStatus.TRIAL ||
+  subscription.status === SubscriptionStatus.ACTIVE ||
+  (
+    subscription.status === SubscriptionStatus.CANCELLED &&
+    Boolean(
+      subscription.endDate &&
+      new Date(subscription.endDate).getTime() > Date.now()
+    )
+  );
+
     /**
      * Trial is now lifecycle status,
      * not SubscriptionPlan.TRIAL.
@@ -1125,7 +1136,7 @@ limits:
   entitlementLimits,
 
 isPaidPlan,
-
+       accessAllowed,
       subscriptionRequired:
         expired,
 

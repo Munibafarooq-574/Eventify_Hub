@@ -27,10 +27,12 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { AdminRoleGuard } from './admin-role.guard';
 
 import { FileUploadService } from '../file-upload/file-upload.service';
+import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
 
 @Module({
   imports: [
     PassportModule,
+    VendorGrowthModule,
 
     JwtModule.registerAsync({
       imports: [ConfigModule],

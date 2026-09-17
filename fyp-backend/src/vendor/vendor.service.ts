@@ -143,11 +143,29 @@ export class VendorService {
                 }
             }
         ];
+            // Execute the existing aggregation pipeline first.
+const vendors = await this.userModel.aggregate(pipeline).exec();
 
-        // Execute the aggregation pipeline
-        const vendors = await this.userModel.aggregate(pipeline).exec();
+// Marketplace visibility rule:
+// Only vendors with usable subscription access can be shown to new clients.
+// Active 7-day Basic trial and active paid plans are allowed.
+// Expired, pending-payment-only, rejected, or otherwise unusable
+// subscriptions remain hidden from new client discovery.
+//
+// This does NOT affect existing bookings, orders, chats, or vendor login.
+const vendorAccessResults = await Promise.all(
+    vendors.map(async (vendor: any) => ({
+        vendor,
+        hasAccess:
+            await this.featureAccessService.hasActiveSubscription(
+                vendor._id.toString(),
+            ),
+    })),
+);
 
-        return vendors as User[];
+return vendorAccessResults
+    .filter(({ hasAccess }) => hasAccess)
+    .map(({ vendor }) => vendor) as User[];
     }
 
     async findVendorById(id: string) {
@@ -961,13 +979,29 @@ async assertCanUploadPackageImages(
         const vendors = await this.userModel.aggregate(pipeline).exec();
 
         // Filter by guest capacity
-        const filteredVendors = vendors.filter(v => {
-            const maxCapacity = v.BusinessDetails?.maximumPeopleCapacity ?? Infinity;
-            return guests <= maxCapacity;
-        });
+const filteredVendors = vendors.filter(v => {
+    const maxCapacity = v.BusinessDetails?.maximumPeopleCapacity ?? Infinity;
+    return guests <= maxCapacity;
+});
 
-        // Flatten all packages with vendor info
-        const packages = filteredVendors.flatMap(vendor =>
+// New-client package discovery must only include vendors
+// with currently usable subscription access.
+const vendorAccessResults = await Promise.all(
+    filteredVendors.map(async (vendor: any) => ({
+        vendor,
+        hasAccess:
+            await this.featureAccessService.hasActiveSubscription(
+                vendor._id.toString(),
+            ),
+    })),
+);
+
+const visibleVendors = vendorAccessResults
+    .filter(({ hasAccess }) => hasAccess)
+    .map(({ vendor }) => vendor);
+
+// Flatten all packages with vendor info
+const packages = visibleVendors.flatMap(vendor =>
     vendor.packages.map((pkg: any) => ({
         packageId: pkg._id.toString(),
         vendorId: vendor._id.toString(),

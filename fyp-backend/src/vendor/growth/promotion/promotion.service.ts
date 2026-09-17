@@ -511,7 +511,28 @@ return this.promotionModel.create({
   ];
   const packageIds = activePromotions.map((p) => p.packageId);
 
-  const vendors = await this.userModel
+// A featured-package promotion can outlive the subscription
+// that created it. Re-check current entitlement at serving time
+// so expired/downgraded vendors are not publicly featured.
+const eligibilityChecks = await Promise.all(
+  vendorIds.map(async (idStr) => {
+    const allowed =
+      await this.featureAccessService.canUseFeature(
+        idStr,
+        FeatureKey.FEATURED_PACKAGE,
+      );
+
+    return [idStr, allowed] as const;
+  }),
+);
+
+const eligibleVendorIds = new Set(
+  eligibilityChecks
+    .filter(([, allowed]) => allowed)
+    .map(([idStr]) => idStr),
+);
+
+const vendors = await this.userModel
     .find({ _id: { $in: vendorIds.map((id) => new Types.ObjectId(id)) } })
      .select('name coverImage packages contactDetails')
     .lean();
@@ -545,9 +566,15 @@ return this.promotionModel.create({
   );
 
   return activePromotions
-    .map((promo: any) => {
-      const vendor = vendorById.get(promo.vendorId.toString());
-      if (!vendor) return null;
+  .map((promo: any) => {
+    const vendorId = promo.vendorId.toString();
+
+    if (!eligibleVendorIds.has(vendorId)) {
+      return null;
+    }
+
+    const vendor = vendorById.get(vendorId);
+    if (!vendor) return null;
 
       const pkg = (vendor.packages || []).find(
         (p: any) => p?._id && p._id.toString() === promo.packageId,
@@ -646,16 +673,32 @@ return this.promotionModel.create({
       status: PromotionStatus.ACTIVE,
       endDate: { $gt: now },
     })
-      .select('packageId')
-      .lean();
+.select('vendorId packageId')
+.lean();
 
-    return new Set(
-      promotions
-        .map((promotion: any) =>
-          promotion.packageId?.toString(),
-        )
-        .filter(Boolean),
-    );
+const eligibilityChecks = await Promise.all(
+  promotions.map(async (promotion: any) => {
+    const allowed =
+      await this.featureAccessService.canUseFeature(
+        promotion.vendorId.toString(),
+        FeatureKey.FEATURED_PACKAGE,
+      );
+
+    return {
+      packageId: promotion.packageId?.toString(),
+      allowed,
+    };
+  }),
+);
+
+return new Set(
+  eligibilityChecks
+    .filter(
+      ({ allowed, packageId }) =>
+        allowed && Boolean(packageId),
+    )
+    .map(({ packageId }) => packageId as string),
+);
   }
 
   // ---------------------------------------------------------------

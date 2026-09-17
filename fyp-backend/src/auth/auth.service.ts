@@ -23,6 +23,7 @@ import { UpdatePushTokenDto } from './dto/update-push-token.dto';
 import { SearchVendorsDto } from './dto/search-vendors.dto';
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
+import { SubscriptionService } from '../vendor/growth/subscription/subscription.service';
 
 /**
  * =============================================================
@@ -95,7 +96,9 @@ export class AuthService {
     private jwtService: JwtService,
 
     private fileUploadService: FileUploadService,
-  ) {}
+
+private readonly subscriptionService: SubscriptionService,
+) {}
 
   // =========================================================
   // REGISTER
@@ -337,15 +340,35 @@ export class AuthService {
     // =====================================================
 
     const token =
-      this.jwtService.sign({
-        id: user._id,
-        role: user.role,
-      });
+  this.jwtService.sign({
+    id: user._id,
+    role: user.role,
+  });
 
-    return {
-      token,
-      user,
-    };
+// =====================================================
+// VENDOR SUBSCRIPTION ACCESS
+// =====================================================
+
+if (
+  String(user.role).toLowerCase() ===
+  'vendor'
+) {
+  const subscriptionAccess =
+    await this.subscriptionService.getSubscriptionAccessState(
+      user._id.toString(),
+    );
+
+  return {
+    token,
+    user,
+    subscriptionAccess,
+  };
+}
+
+return {
+  token,
+  user,
+};
   }
 
   // =========================================================
@@ -533,32 +556,54 @@ export class AuthService {
   // SEARCH USERS
   // =========================================================
 
-  async searchUsers(
-    keyword: string,
-  ): Promise<User[]> {
-    return this.userModel
-      .find({
-        role: 'Vendor',
+async searchUsers(
+  keyword: string,
+): Promise<User[]> {
+  const vendors = await this.userModel
+    .find({
+      role: 'Vendor',
 
-        $or: [
-          {
-            name: {
-              $regex: keyword,
-              $options: 'i',
-            },
+      $or: [
+        {
+          name: {
+            $regex: keyword,
+            $options: 'i',
           },
+        },
 
-          {
-            'contactDetails.brandName':
-              {
-                $regex: keyword,
-                $options: 'i',
-              },
+        {
+          'contactDetails.brandName': {
+            $regex: keyword,
+            $options: 'i',
           },
-        ],
-      })
-      .exec();
-  }
+        },
+      ],
+    })
+    .exec();
+
+  // Public/new-client vendor search must only expose vendors
+  // that currently have usable subscription access.
+  //
+  // This does not affect vendor login, existing bookings,
+  // existing chats, or historical booking relationships.
+  const accessResults = await Promise.all(
+    vendors.map(async (vendor) => {
+      const access =
+        await this.subscriptionService.getSubscriptionAccessState(
+          vendor._id.toString(),
+        );
+
+      return {
+        vendor,
+        visible: access.accessAllowed === true,
+      };
+    }),
+  );
+
+  return accessResults
+    .filter(({ visible }) => visible)
+    .map(({ vendor }) => vendor);
+}
 
   // =========================================================
   // SEARCH ORGANIZERS
@@ -659,9 +704,14 @@ export class AuthService {
 
           .lean();
 
-      return allVendors.map(
-        this.attachBusinessDetails,
-      );
+      const visibleVendors =
+  await this.filterVendorsWithActiveSubscription(
+    allVendors,
+  );
+
+return visibleVendors.map(
+  this.attachBusinessDetails,
+);
     }
 
     const query: any = {
@@ -943,10 +993,52 @@ export class AuthService {
     // UNIFIED BUSINESS DETAILS
     // =====================================================
 
-    return filteredUsers.map(
-      this.attachBusinessDetails,
-    );
+    const visibleVendors =
+  await this.filterVendorsWithActiveSubscription(
+    filteredUsers,
+  );
+
+return visibleVendors.map(
+  this.attachBusinessDetails,
+);
   }
+
+  // =========================================================
+// MARKETPLACE SUBSCRIPTION VISIBILITY
+// =========================================================
+
+private async filterVendorsWithActiveSubscription(
+  vendors: any[],
+): Promise<any[]> {
+  const accessResults =
+    await Promise.all(
+      vendors.map(
+        async (vendor) => {
+          const access =
+            await this.subscriptionService.getSubscriptionAccessState(
+              vendor._id.toString(),
+            );
+
+          return {
+            vendor,
+            visible:
+              access.accessAllowed ===
+              true,
+          };
+        },
+      ),
+    );
+
+  return accessResults
+    .filter(
+      ({ visible }) =>
+        visible,
+    )
+    .map(
+      ({ vendor }) =>
+        vendor,
+    );
+}
 
   // =========================================================
   // UNIFIED BUSINESS DETAILS

@@ -52,7 +52,7 @@ status:
 
     @Prop({
         type: String,
-        enum: ['organizer', 'vendor', 'admin'],
+        enum: ['organizer', 'vendor', 'admin', null],
         default: null,
     })
     cancelledBy?: string | null;
@@ -79,11 +79,11 @@ status:
     // when the vendor accepts the booking.
     // Backend-calculated only — never trust frontend amounts.
     @Prop({
-        type: String,
-        enum: ['PERCENTAGE', 'FIXED'],
-        default: null,
-    })
-    downPaymentType?: string | null;
+    type: String,
+    enum: ['PERCENTAGE', 'FIXED', null],
+    default: null,
+})
+downPaymentType?: string | null;
 
     // Used only when downPaymentType === 'PERCENTAGE'
     @Prop({ type: Number, default: null })

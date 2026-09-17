@@ -9,6 +9,7 @@ import { Notification, NotificationSchema } from "src/schemas/notification.schem
 import { VendorAvailabilityModule } from "../vendor-availability/vendor-availability.module";
 import { PayoutModule } from "../payout/payout.module";
 import { CommissionConfig, CommissionConfigSchema } from "src/schemas/commission-config.schema";
+import { VendorGrowthModule } from "../vendor/growth/vendor-growth.module";
 
 @Module({
     imports: [
@@ -23,6 +24,7 @@ import { CommissionConfig, CommissionConfigSchema } from "src/schemas/commission
         ]),
         VendorAvailabilityModule,
         PayoutModule,
+        VendorGrowthModule,
     ],
     controllers: [OrderController],
     providers: [OrderService],

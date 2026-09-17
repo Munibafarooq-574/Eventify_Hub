@@ -39,7 +39,7 @@ import { AuthModule } from '../auth/auth.module';
             { name: Conversation.name, schema: ConversationSchema },
         ]),
                 forwardRef(() => VendorGrowthModule),
-                AuthModule,
+                forwardRef(() => AuthModule),
     ],
 
     controllers: [VendorController],

@@ -11,7 +11,24 @@ export default async function Login(email: string, password: string) {
             url,
         };
 
-        const response = await axios<{ token: string, user: any }>(config);
+        const response = await axios<{
+    token: string;
+    user: any;
+    subscriptionAccess?: {
+        isTrial: boolean;
+        effectivePlan: string;
+        accessAllowed: boolean;
+        subscriptionRequired: boolean;
+        hasPendingPayment: boolean;
+        trialDaysRemaining: number;
+        daysRemaining: number;
+        limits: {
+            maxPackages: number;
+            maxPortfolioImages: number;
+            maxImagesPerPackage: number;
+        };
+    };
+}>(config);
         return response.data;
     } catch (error: any) {
         if (error.response && error.response.data && error.response.data.message) {
