@@ -1,4 +1,5 @@
 import postPhotographyBusinessDetails from "@/services/postPhotographyBusinessDetails";
+import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -272,12 +273,14 @@ if (edit === "true") {
 
   await postPhotographyBusinessDetails(user._id, dto);
 
+  await submitVendorProfileForReview(user._id);
+
   Alert.alert(
     "Success",
     "Business Details Saved Successfully."
   );
 
-  router.replace("/vendordashboard");
+  router.replace("/vendorprofilepending");
 }
 
     } catch (error) {

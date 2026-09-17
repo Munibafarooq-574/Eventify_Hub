@@ -1,4 +1,5 @@
 import postVenueBusinessDetails from "@/services/postVenueBusinessDetails";
+import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { useLocalSearchParams , router } from "expo-router";
 import React, { useEffect , useState } from "react";
@@ -173,12 +174,14 @@ console.log("USER ID PARAM:", userId);
 
     await postVenueBusinessDetails(user._id, dto);
 
+    await submitVendorProfileForReview(user._id);
+
     Alert.alert(
         "Success",
         "Business details saved successfully!"
     );
 
-    router.replace("/vendordashboard");
+    router.replace("/vendorprofilepending");
 }
 
 } catch (error) {

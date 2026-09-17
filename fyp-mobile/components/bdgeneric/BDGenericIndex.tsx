@@ -1,6 +1,6 @@
 // fyp-mobile/components/bdgeneric/BDGenericIndex.tsx
-
 import { CreateGenericBusinessDetailsDto } from "@/dto/CreateGenericBusinessDetails.dto";
+import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import postGenericBusinessDetails from "@/services/postGenericBusinessDetails";
 import { getSecureData } from "@/store";
@@ -366,16 +366,18 @@ const BDGenericIndex = () => {
             }
 
             await postGenericBusinessDetails(
-                user._id,
-                dto
-            );
+    user._id,
+    dto
+);
 
-            Alert.alert(
-                "Success",
-                "Business details saved successfully!"
-            );
+await submitVendorProfileForReview(user._id);
 
-            router.push("/packages");
+Alert.alert(
+    "Success",
+    "Business details saved successfully!"
+);
+
+router.replace("/vendorprofilepending");
         } catch (error: any) {
             console.error(
                 "Generic Business Details Error:",

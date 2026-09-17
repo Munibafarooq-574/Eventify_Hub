@@ -1,6 +1,7 @@
 // fyp-mobile/components/vendorcontactdetails/VendorContactDetailsIndex.tsx
 
 import postContactDetails from "@/services/postContactDetails";
+import getCategoryById from "@/services/getCategoryByID";
 import { getSecureData } from "@/store";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -329,18 +330,45 @@ const ContactDetailsScreen = () => {
 
       await postContactDetails(user._id, formData);
 
-      Alert.alert(
-  "Profile Submitted",
-  "Your profile has been submitted for admin review. We’ll notify you by email once it is approved or rejected.",
-  [
-    {
-      text: "OK",
-      onPress: () => {
-        router.replace("/vendorprofilepending");
-      },
-    },
-  ]
-);
+      const categoryId =
+  typeof user?.buisnessCategory === "object"
+    ? user?.buisnessCategory?._id
+    : user?.buisnessCategory || user?.categoryId;
+
+if (!categoryId) {
+  throw new Error("Vendor category not found.");
+}
+
+const category = await getCategoryById(categoryId);
+
+if (!category) {
+  throw new Error("Vendor category details not found.");
+}
+
+const businessDetailsRoutes: Record<string, string> = {
+  PHOTOGRAPHY: "/bdphotographer",
+  MAKEUP: "/bdsalon",
+  VENUE: "/bdvenue",
+  CATERING: "/bdcatering",
+  CAKE: "/bdcakes",
+  MEHNDI: "/bdmehndi",
+  SOUND: "/bdsounds",
+  GENERIC: "/bdgeneric",
+};
+
+const businessDetailsType =
+  category?.businessDetailsType || "GENERIC";
+
+const route = businessDetailsRoutes[businessDetailsType];
+
+if (!route) {
+  throw new Error(
+    `Business details form not found for ${businessDetailsType}.`
+  );
+}
+
+router.replace(route as any);
+
     } catch (error: any) {
       console.log(
         "Contact details submit error:",

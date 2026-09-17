@@ -193,22 +193,6 @@ async createContactDetails(
       '',
   };
 
-  // First profile submission always goes to Admin review
-  user.vendorApprovalStatus =
-    VendorApprovalStatus.PENDING_REVIEW;
-
-  user.vendorApprovalSubmittedAt =
-    new Date();
-
-  user.vendorApprovalReviewedAt =
-    null;
-
-  user.vendorApprovalReviewedBy =
-    null;
-
-  user.vendorApprovalRejectionReason =
-    null;
-
   user.markModified('contactDetails');
 
   return await user.save();
@@ -289,6 +273,76 @@ async updateContactDetails(
     user.vendorApprovalRejectionReason =
       null;
   }
+
+  return await user.save();
+}
+
+async submitVendorProfileForReview(
+  userId: string,
+): Promise<User> {
+  const user = await this.userModel
+    .findById(userId)
+    .populate('buisnessCategory')
+    .exec();
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  if (user.role?.toLowerCase() !== 'vendor') {
+    throw new BadRequestException(
+      'Only Vendor accounts can submit a vendor profile for review.',
+    );
+  }
+
+  if (!user.contactDetails) {
+    throw new BadRequestException(
+      'Contact details are required before submitting for review.',
+    );
+  }
+
+  const category = user.buisnessCategory as Category;
+
+  if (!category) {
+    throw new BadRequestException(
+      'Vendor category is required before submitting for review.',
+    );
+  }
+
+  const businessDetailsType =
+    category.businessDetailsType ??
+    BusinessDetailsType.GENERIC;
+
+  const hasBusinessDetails =
+    businessDetailsType === BusinessDetailsType.PHOTOGRAPHY
+      ? !!user.photographerBusinessDetails
+      : businessDetailsType === BusinessDetailsType.MAKEUP
+        ? !!user.salonBusinessDetails
+        : businessDetailsType === BusinessDetailsType.VENUE
+          ? !!user.venueBusinessDetails
+          : businessDetailsType === BusinessDetailsType.CATERING
+            ? !!user.cateringBusinessDetails
+            : businessDetailsType === BusinessDetailsType.CAKE
+              ? !!user.cakeBusinessDetails
+              : businessDetailsType === BusinessDetailsType.MEHNDI
+                ? !!user.mehndiBusinessDetails
+                : businessDetailsType === BusinessDetailsType.SOUND
+                  ? !!user.soundBusinessDetails
+                  : !!user.genericBusinessDetails;
+
+  if (!hasBusinessDetails) {
+    throw new BadRequestException(
+      'Business details are required before submitting for review.',
+    );
+  }
+
+  user.vendorApprovalStatus =
+    VendorApprovalStatus.PENDING_REVIEW;
+
+  user.vendorApprovalSubmittedAt = new Date();
+  user.vendorApprovalReviewedAt = null;
+  user.vendorApprovalReviewedBy = null;
+  user.vendorApprovalRejectionReason = null;
 
   return await user.save();
 }

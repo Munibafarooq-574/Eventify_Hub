@@ -1,4 +1,5 @@
 import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
+import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -229,16 +230,17 @@ if (edit === "true") {
     "Business details updated successfully!"
   );
 
-  router.back();
-} else {
+  router.back()} else {
   await postCateringBusinessDetails(user._id, dto);
+
+  await submitVendorProfileForReview(user._id);
 
   Alert.alert(
     "Success",
     "Business details saved successfully!"
   );
 
-  router.replace("/vendordashboard");
+  router.replace("/vendorprofilepending");
 }
 
     } catch (err) {

@@ -9,9 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useGlobalSearchParams, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity,Alert, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import replyToReview from '@/services/replyToReview';
+import getAllCategories from "@/services/getAllCategories";
+
 
 const PRIMARY = '#7B2869';
 const PRIMARY_LIGHT = '#9F4F8E';
@@ -85,16 +87,29 @@ const openPackageImageViewer = (image: string) => {
     const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
 
-    const getBusinessDetailsRoute = () => {
-    if (vendorData?.photographerBusinessDetails) return "/bdphotographer";
-    if (vendorData?.salonBusinessDetails) return "/bdsalon";
-    if (vendorData?.venueBusinessDetails) return "/bdvenue";
-    if (vendorData?.cateringBusinessDetails) return "/bdcatering";
-    if (vendorData?.cakeBusinessDetails) return "/bdcakes";
-    if (vendorData?.mehndiBusinessDetails) return "/bdmehndi";
-    if (vendorData?.soundBusinessDetails) return "/bdsounds";
+    const getBusinessDetailsRoute = async () => {
+  const categories = await getAllCategories();
 
-    return "/bdvenue"; // fallback
+  const categoryId =
+    typeof vendorData?.buisnessCategory === "object"
+      ? vendorData?.buisnessCategory?._id
+      : vendorData?.buisnessCategory;
+
+  const category = categories.find(
+    (item: any) => item._id === categoryId
+  );
+
+  const routes: Record<string, string> = {
+    PHOTOGRAPHY: "/bdphotographer",
+    MAKEUP: "/bdsalon",
+    VENUE: "/bdvenue",
+    CATERING: "/bdcatering",
+    CAKE: "/bdcakes",
+    MEHNDI: "/bdmehndi",
+    SOUND: "/bdsounds",
+  };
+
+  return routes[category?.businessDetailsType] ?? null;
 };
     const buildReviewFilter = (page: number): ReviewFilter => {
     const filter: ReviewFilter = {
@@ -466,15 +481,30 @@ const category =
                                 <Text style={styles.sectionTitle}>Details</Text>
                             </View>
                            <TouchableOpacity
-    onPress={() =>
+    onPress={async () => {
+    try {
+        const route = await getBusinessDetailsRoute();
+
+        if (!route) {
+            Alert.alert(
+                "Error",
+                "Business details form is not available for this category."
+            );
+            return;
+        }
+
         router.push({
-            pathname: getBusinessDetailsRoute() as any,
+            pathname: route as any,
             params: {
                 edit: "true",
                 userId: vendorData._id,
             },
-        })
+        });
+    } catch (error) {
+        console.error("Error opening business details:", error);
+        Alert.alert("Error", "Unable to open business details. Please try again.");
     }
+}}
     activeOpacity={0.7}
 >
     <View style={styles.editPill}>

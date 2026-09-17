@@ -1,4 +1,5 @@
 import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
+import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
 import { Alert , View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
@@ -142,10 +143,11 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 console.log("POST API WILL BE CALLED");
 
                 await postCakeBusinessDetails(user._id, dto);
+                await submitVendorProfileForReview(user._id);
 
                 Alert.alert("Success", "Business Details Saved");
 
-                router.replace("/vendordashboard");
+                router.replace("/vendorprofilepending");
             }
         } catch (error) {
             console.log(error);

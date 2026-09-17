@@ -168,6 +168,15 @@ async getVendorApprovalStatus(
     );
   }
 
+  @Post('submit-for-review')
+async submitVendorProfileForReview(
+  @Query('userId') userId: string,
+) {
+  return await this.vendorService.submitVendorProfileForReview(
+    userId,
+  );
+}
+
   @Post('buisnessDetails')
   async createPhotographerBuisnessDetails(
     @Query('userId') userId: string,
