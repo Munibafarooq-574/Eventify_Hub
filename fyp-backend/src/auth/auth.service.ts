@@ -506,10 +506,7 @@ export class AuthService {
           file,
         );
 
-      updateData[
-        'contactDetails.brandLogo'
-      ] =
-        uploaded?.Location || '';
+       updateData.profileImage = uploaded?.Location || null;
     }
 
     const updatedUser =

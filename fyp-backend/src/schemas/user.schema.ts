@@ -837,6 +837,10 @@ export class User extends Document {
   @Prop()
   name: string;
 
+  // Account profile photo uploaded during signup
+  @Prop({ type: String, default: null })
+  profileImage?: string | null;
+
   @Prop()
   phone_number: string;
 
