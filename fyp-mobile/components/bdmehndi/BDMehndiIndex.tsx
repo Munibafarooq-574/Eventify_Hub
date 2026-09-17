@@ -143,9 +143,11 @@ if (edit === "true") {
 } else {
   await postMehndiBusinessDetails(user._id, dto);
 
+  await submitVendorProfileForReview(user._id);
+
   Alert.alert(
     "Success",
-    "Business details saved successfully!"
+    "Business details submitted for admin review!"
   );
 
   router.replace("/vendorprofilepending");

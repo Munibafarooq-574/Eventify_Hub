@@ -1,7 +1,6 @@
 // fyp-mobile/components/vendorcontactdetails/VendorContactDetailsIndex.tsx
 
 import postContactDetails from "@/services/postContactDetails";
-import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getSecureData } from "@/store";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -328,16 +327,33 @@ const ContactDetailsScreen = () => {
         } as any
       );
 
-      await postContactDetails(user._id, formData);
+    await postContactDetails(user._id, formData);
 
-      await submitVendorProfileForReview(user._id);
+const businessDetailsType =
+  (await getSecureData("businessDetailsType")) || "GENERIC";
 
-Alert.alert(
-  "Profile Submitted",
-  "Your business profile has been submitted for admin review."
-);
+const businessDetailsRoutes: Record<string, string> = {
+  PHOTOGRAPHY: "/bdphotographer",
+  MAKEUP: "/bdsalon",
+  VENUE: "/bdvenue",
+  CATERING: "/bdcatering",
+  CAKE: "/bdcakes",
+  MEHNDI: "/bdmehndi",
+  SOUND: "/bdsounds",
+  GENERIC: "/bdgeneric",
+};
 
-router.replace("/vendorprofilepending");
+const route = businessDetailsRoutes[businessDetailsType];
+
+if (!route) {
+  Alert.alert(
+    "Error",
+    "Business details form not found for your category."
+  );
+  return;
+}
+
+router.replace(route as any);
 
     } catch (error: any) {
       console.log(

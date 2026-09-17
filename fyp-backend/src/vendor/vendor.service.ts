@@ -303,14 +303,41 @@ async submitVendorProfileForReview(
 
   const category = user.buisnessCategory as Category;
 
-  if (!category) {
-    throw new BadRequestException(
-      'Vendor category is required before submitting for review.',
-    );
-  }
+if (!category) {
+  throw new BadRequestException(
+    'Vendor category is required before submitting for review.',
+  );
+}
 
-  user.vendorApprovalStatus =
-    VendorApprovalStatus.PENDING_REVIEW;
+const businessDetailsType =
+  category.businessDetailsType ??
+  BusinessDetailsType.GENERIC;
+
+const hasBusinessDetails =
+  businessDetailsType === BusinessDetailsType.PHOTOGRAPHY
+    ? !!user.photographerBusinessDetails
+    : businessDetailsType === BusinessDetailsType.MAKEUP
+      ? !!user.salonBusinessDetails
+      : businessDetailsType === BusinessDetailsType.VENUE
+        ? !!user.venueBusinessDetails
+        : businessDetailsType === BusinessDetailsType.CATERING
+          ? !!user.cateringBusinessDetails
+          : businessDetailsType === BusinessDetailsType.CAKE
+            ? !!user.cakeBusinessDetails
+            : businessDetailsType === BusinessDetailsType.MEHNDI
+              ? !!user.mehndiBusinessDetails
+              : businessDetailsType === BusinessDetailsType.SOUND
+                ? !!user.soundBusinessDetails
+                : !!user.genericBusinessDetails;
+
+if (!hasBusinessDetails) {
+  throw new BadRequestException(
+    'Business details are required before submitting for review.',
+  );
+}
+
+user.vendorApprovalStatus =
+  VendorApprovalStatus.PENDING_REVIEW;
 
   user.vendorApprovalSubmittedAt = new Date();
   user.vendorApprovalReviewedAt = null;
