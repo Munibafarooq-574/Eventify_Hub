@@ -19,8 +19,22 @@ async function request<T>(
 ): Promise<T> {
   const token = await getSecureData('token');
 
+  //const headers = new Headers(options.headers);
+  //headers.set('Content-Type', 'application/json');
+
   const headers = new Headers(options.headers);
+
+const isFormData =
+  typeof FormData !== 'undefined' &&
+  options.body instanceof FormData;
+
+// JSON requests keep the existing behaviour.
+// For FormData, do NOT manually set Content-Type.
+// fetch will automatically add:
+// multipart/form-data; boundary=...
+if (!isFormData) {
   headers.set('Content-Type', 'application/json');
+}
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -96,11 +110,21 @@ export const growthApi = {
       method: 'GET',
     }),
 
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }),
+  post: <T>(path: string, body?: unknown) => {
+  const isFormData =
+    typeof FormData !== 'undefined' &&
+    body instanceof FormData;
+
+  return request<T>(path, {
+    method: 'POST',
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? body
+          : JSON.stringify(body),
+  });
+},
 
     patch: <T>(path: string, body?: unknown) =>
     request<T>(path, {

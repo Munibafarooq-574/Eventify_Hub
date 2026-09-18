@@ -385,9 +385,22 @@ export default function SubscriptionScreen() {
     accessState?.isPaidPlan ===
     true;
 
-  const selectPlan = (
+    const selectPlan = (
     plan: PlanDefinition,
   ) => {
+    if (accessState?.scheduledSubscription) {
+      Alert.alert(
+        'Plan Change Locked',
+        `Your ${getPlanName(
+          accessState.scheduledSubscription.plan,
+        )} plan is already approved and scheduled for ${formatDate(
+          accessState.scheduledSubscription.scheduledActivationDate,
+        )}. You can change your subscription after it activates.`,
+      );
+
+      return;
+    }
+
     if (hasPendingPayment) {
       Alert.alert(
         'Payment Under Review',
@@ -492,8 +505,7 @@ export default function SubscriptionScreen() {
                       paymentReference:
                         reference,
 
-                      activationType:
-                        activationType,
+                      activationType: activationType.toLowerCase() as 'immediate' | 'scheduled',
                     },
                   );
 
@@ -922,6 +934,39 @@ export default function SubscriptionScreen() {
             </View>
           )}
 
+                     {accessState.scheduledSubscription && (
+            <View style={[styles.statusCard, styles.infoCard]}>
+              <Clock3 size={20} color={COLORS.info} />
+
+              <View style={styles.statusTextWrap}>
+                <Text style={styles.statusTitle}>
+                  {accessState.scheduledSubscription.planChangeType === 'upgrade'
+                    ? 'Your Upgrade is Scheduled'
+                    : accessState.scheduledSubscription.planChangeType === 'downgrade'
+                      ? 'Your Downgrade is Scheduled'
+                      : 'Your Next Subscription is Scheduled'}
+                </Text>
+
+                <Text style={styles.statusDescription}>
+                  Your {getPlanName(accessState.effectivePlan)} plan remains
+                  active until{' '}
+                  {formatDate(currentSubscription?.endDate)}.
+                </Text>
+
+                <Text style={styles.statusSecondary}>
+                  {getPlanName(accessState.scheduledSubscription.plan)} plan
+                  starts on{' '}
+                  {formatDate(
+                    accessState.scheduledSubscription.scheduledActivationDate,
+                  )}.
+                </Text>
+
+                <Text style={styles.statusSecondary}>
+                  Payment approved · Activation scheduled
+                </Text>
+              </View>
+            </View>
+          )}
           {isCancellationScheduled && (
             <View
               style={[
@@ -1395,11 +1440,13 @@ export default function SubscriptionScreen() {
                       style={[
                         styles.primaryButton,
 
-                        hasPendingPayment &&
+                                                (hasPendingPayment ||
+                          !!accessState.scheduledSubscription) &&
                           styles.disabledButton,
                       ]}
                       disabled={
-                        hasPendingPayment
+                        hasPendingPayment ||
+                        !!accessState.scheduledSubscription
                       }
                       onPress={() =>
                         selectPlan(
@@ -1425,6 +1472,26 @@ export default function SubscriptionScreen() {
             },
           )}
 
+          {accessState.scheduledSubscription && (
+            <View style={[styles.statusCard, styles.infoCard]}>
+              <Clock3 size={20} color={COLORS.info} />
+
+              <View style={styles.statusTextWrap}>
+                <Text style={styles.statusTitle}>
+                  Plan Changes Locked
+                </Text>
+
+                <Text style={styles.statusDescription}>
+                  Your {getPlanName(accessState.scheduledSubscription.plan)}
+                  {' '}plan is already approved and scheduled.
+                  You can change your subscription after it activates on{' '}
+                  {formatDate(
+                    accessState.scheduledSubscription.scheduledActivationDate,
+                  )}.
+                </Text>
+              </View>
+            </View>
+          )}
           {/* ================================================= */}
           {/* PAYMENT */}
           {/* ================================================= */}
@@ -1569,6 +1636,34 @@ export default function SubscriptionScreen() {
                           );
                         },
                       )}
+                    </View>
+                  )}
+
+                                 {isActivePaid &&
+                  currentSubscription?.plan === SubscriptionPlan.GROWTH &&
+                  selectedPlan.key === SubscriptionPlan.BASIC && (
+                    <View
+                      style={[
+                        styles.statusCard,
+                        styles.infoCard,
+                        { marginTop: 18 },
+                      ]}
+                    >
+                      <Clock3 size={20} color={COLORS.info} />
+
+                      <View style={styles.statusTextWrap}>
+                        <Text style={styles.statusTitle}>
+                          Scheduled Downgrade
+                        </Text>
+
+                        <Text style={styles.statusDescription}>
+                          Your Growth benefits remain active until{' '}
+                          {formatDate(currentSubscription.endDate)}.
+                          {' '}Your Basic plan will start after your
+                          Growth plan expires, subject to Admin
+                          payment verification.
+                        </Text>
+                      </View>
                     </View>
                   )}
 

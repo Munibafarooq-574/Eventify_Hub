@@ -240,6 +240,13 @@ const response =
       );
     };
 
+  const handleGoToLogin =
+    () => {
+      router.replace(
+        "/login",
+      );
+    };
+
   if (loading) {
     return (
       <View
@@ -655,6 +662,32 @@ const response =
             </Text>
           </TouchableOpacity>
         )}
+
+        {!isApproved && (
+          <TouchableOpacity
+            style={
+              styles.loginButton
+            }
+            activeOpacity={0.8}
+            onPress={
+              handleGoToLogin
+            }
+          >
+            <Ionicons
+              name="log-in-outline"
+              size={18}
+              color="#7D0C72"
+            />
+
+            <Text
+              style={
+                styles.loginButtonText
+              }
+            >
+              Login
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );
@@ -883,6 +916,28 @@ const styles =
     },
 
     refreshButtonText: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: "#7D0C72",
+    },
+
+    loginButton: {
+      minHeight: 50,
+      marginTop: 14,
+      borderRadius: 15,
+      borderWidth: 1.5,
+      borderColor: "#7D0C72",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent:
+        "center",
+      gap: 8,
+      paddingHorizontal: 18,
+      backgroundColor:
+        "#F8F7FB",
+    },
+
+    loginButtonText: {
       fontSize: 14,
       fontWeight: "800",
       color: "#7D0C72",

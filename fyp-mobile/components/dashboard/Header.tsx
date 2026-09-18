@@ -100,7 +100,7 @@ const Header: React.FC = () => {
       }
 
       setUsername(user?.name || user?.username || 'Guest');
-      setAvatar(user?.contactDetails?.brandLogo || '');
+      setAvatar(user?.profileImage || '');
     } catch (error) {
       console.error('fetchUsername error:', error);
       setUsername('Guest');

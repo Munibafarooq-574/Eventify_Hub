@@ -1,6 +1,6 @@
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
 import deletePackage from "@/services/deletePackage";
-
+import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import {
   getSecureData,
   saveSecureData,
@@ -134,46 +134,39 @@ const PackageScreen = () => {
   // ---------------------------------------------------------
 
   const fetchPackageDetails = async (id: string) => {
-    setLoading(true);
+  setLoading(true);
+  setPackageDetails(null);
 
-    try {
-      const user = await readUser();
+  try {
+    const user = await readUser();
 
-      if (!user) {
-        console.error("User not found in any storage");
-        setPackageDetails(null);
-        return;
-      }
+    const vendorId = user?._id || user?.id;
 
-      if (!user.packages || !Array.isArray(user.packages)) {
-        console.error("User has no packages array");
-        setPackageDetails(null);
-        return;
-      }
-
-      const packageObj = user.packages.find(
-        (x: any) => x._id === id
-      );
-
-      if (!packageObj) {
-        console.error(
-          "Package not found for id:",
-          id
-        );
-      }
-
-      setPackageDetails(packageObj || null);
-    } catch (error) {
-      console.error(
-        "Error fetching package details:",
-        error
-      );
-
-      setPackageDetails(null);
-    } finally {
-      setLoading(false);
+    if (!vendorId) {
+      throw new Error("Vendor ID not found");
     }
-  };
+
+    // Always fetch the latest packages from the backend.
+    const packages = await getVendorPackagesList(String(vendorId));
+
+    const packageObj = packages.find(
+      (pkg) => String(pkg._id) === String(id)
+    );
+
+    if (!packageObj) {
+      console.warn("Package not found on server:", id);
+      setPackageDetails(null);
+      return;
+    }
+
+    setPackageDetails(packageObj);
+  } catch (error) {
+    console.error("Error fetching package details:", error);
+    setPackageDetails(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     console.log(

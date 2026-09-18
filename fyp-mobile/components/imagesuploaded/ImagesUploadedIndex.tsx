@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "expo-router/react-navigation";
 import React, { useEffect, useState } from "react";
 import {
@@ -35,6 +35,10 @@ const PRIMARY = "#780C60";
 
 const ImageUploadScreen: React.FC = () => {
   const navigation = useNavigation();
+
+  const { vendorId: routeVendorId } = useLocalSearchParams<{
+    vendorId?: string;
+  }>();
 
   const [selectedImage, setSelectedImage] =
     useState<string | null>(null);
@@ -125,14 +129,21 @@ const ImageUploadScreen: React.FC = () => {
 
           return;
         }
-
         const userData =
-          JSON.parse(userRaw);
+  JSON.parse(userRaw);
 
-        const id: string | undefined =
-          userData?._id;
+const id: string | undefined =
+  typeof routeVendorId === "string" && routeVendorId
+    ? routeVendorId
+    : userData?._id;
 
-        if (!id) {
+console.log("[PORTFOLIO] Vendor ID source:", {
+  routeVendorId,
+  storedUserId: userData?._id,
+  selectedVendorId: id,
+});
+
+if (!id) {
           setVendorId(null);
           setSubscriptionAccess(null);
           setSubscriptionLoadError(true);
@@ -188,7 +199,7 @@ const ImageUploadScreen: React.FC = () => {
     };
 
     loadScreenData();
-  }, []);
+  }, [routeVendorId]);
 
   /* =====================================================
      Retry Subscription + Portfolio Data

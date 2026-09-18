@@ -735,6 +735,82 @@ useFocusEffect(
                 ) : null}
             </View>
 
+            {subscriptionAccess?.scheduledSubscription && (
+                <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() =>
+                        router.push({
+                            pathname: "/subscriptionscreen",
+                            params: { vendorId },
+                        })
+                    }
+                    style={{
+                        marginHorizontal: 20,
+                        marginTop: 10,
+                        marginBottom: 6,
+                        padding: 15,
+                        borderRadius: 16,
+                        backgroundColor: "#E6F4FF",
+                        borderWidth: 1,
+                        borderColor: "#B8DCFF",
+                        flexDirection: "row",
+                        alignItems: "center",
+                    }}
+                >
+                    <Ionicons
+                        name="calendar-outline"
+                        size={22}
+                        color="#2563A6"
+                    />
+
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                fontWeight: "700",
+                                color: "#174A78",
+                            }}
+                        >
+                            {subscriptionAccess.scheduledSubscription.planChangeType === "upgrade"
+                                ? "Upgrade Scheduled"
+                                : subscriptionAccess.scheduledSubscription.planChangeType === "downgrade"
+                                  ? "Downgrade Scheduled"
+                                  : "Next Plan Scheduled"}
+                        </Text>
+
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                color: "#2563A6",
+                                marginTop: 4,
+                            }}
+                        >
+                            {subscriptionAccess.scheduledSubscription.plan.charAt(0).toUpperCase() +
+                                subscriptionAccess.scheduledSubscription.plan.slice(1)}
+                            {" plan starts "}
+                            {formatSubscriptionDate(
+                                subscriptionAccess.scheduledSubscription.scheduledActivationDate,
+                            ) ?? "on the scheduled activation date"}
+                        </Text>
+
+                        <Text
+                            style={{
+                                fontSize: 11,
+                                color: "#39739B",
+                                marginTop: 4,
+                            }}
+                        >
+                            Payment approved · Current plan remains active until the scheduled change.
+                        </Text>
+                    </View>
+
+                    <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color="#2563A6"
+                    />
+                </TouchableOpacity>
+            )}
             {/* ---------- Marketing & Campaigns ---------- */}
 <View style={styles.marketingSection}>
     <TouchableOpacity

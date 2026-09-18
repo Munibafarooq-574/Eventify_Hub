@@ -948,6 +948,14 @@ export class AdminService {
             data.email?.trim?.() ||
             'N/A',
 
+        accountPhoneNumber:
+            data.phone_number?.trim?.() ||
+            'N/A',
+
+        accountProfileImage:
+            data.profileImage ||
+             null,
+
         bookingEmail:
             data.contactDetails?.bookingEmail?.trim?.() ||
             data.email?.trim?.() ||

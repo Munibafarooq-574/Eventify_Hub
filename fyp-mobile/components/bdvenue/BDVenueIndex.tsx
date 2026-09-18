@@ -30,6 +30,7 @@ const CATERING_OPTIONS = [
 ];
 
 const STAFF_GENDERS = [
+  { label: "MALE", icon: "male" },
   { label: "FEMALE", icon: "female" },
 ];
 

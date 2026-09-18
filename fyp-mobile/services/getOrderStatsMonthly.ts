@@ -15,7 +15,7 @@ export default async function getOrderStatsMonthly(userId: string) {
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error("Error fetching conversation list:", error);
+        console.error("Error fetching monthly order stats:", error);
         throw error; // Handle errors properly
     }
 }

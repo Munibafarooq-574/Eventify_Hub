@@ -48,7 +48,7 @@ const OrganizerEditProfileScreen: React.FC = () => {
       setPhoneNumber(user.phone_number || user.phoneNumber || '');
       setAddress(user.address || user?.contactDetails?.address || '');
       // Same shared field Vendor uses for its DP.
-      setAvatar(user?.contactDetails?.brandLogo || '');
+      setAvatar(user?.profileImage || '');
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     }

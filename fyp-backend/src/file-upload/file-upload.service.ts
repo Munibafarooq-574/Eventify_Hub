@@ -58,11 +58,12 @@ async uploadFile(file: {
         };
 
         try {
-            let s3Response = await this.s3.upload(params).promise();
+            const s3Response = await this.s3.upload(params).promise();
             return s3Response;
-        } catch (e) {
-            console.log(e);
-        }
+            } catch (error) {
+            console.error("S3 upload failed:", error);
+            throw error;
+            }
     }
 
     async uploadMultipleFiles(files: Express.Multer.File[]) {

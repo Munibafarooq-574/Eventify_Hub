@@ -34,6 +34,8 @@ type VendorDetail = {
   name: string;
   brandName: string;
   accountEmail: string;
+  accountPhoneNumber: string;
+accountProfileImage: string | null;
   bookingEmail: string;
   phoneNumber: string;
   city: string;
@@ -154,6 +156,23 @@ function displayValue(
   }
 
   return String(value);
+}
+
+/** Accept both an object and a JSON-encoded string from older API records. */
+function readCustomFields(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") {
+    try {
+      return readCustomFields(JSON.parse(value) as unknown);
+    } catch {
+      return {};
+    }
+  }
+
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
 }
 
 function humanizeKey(
@@ -299,15 +318,24 @@ export default async function VendorDetailPage({
     vendor.approvalStatus ??
     "INCOMPLETE";
 
-  const businessEntries =
-    vendor.businessDetails
-      ? Object.entries(
-          vendor.businessDetails,
-        ).filter(
-          ([key]) =>
-            key !== "_id",
-        )
-      : [];
+  const businessDetails = vendor.businessDetails;
+  const rawCustomFields = businessDetails?.customFields;
+  const customFields = readCustomFields(rawCustomFields);
+
+  const businessEntries: [string, unknown][] = businessDetails
+    ? [
+        ...Object.entries(businessDetails).filter(
+          ([key]) => key !== "_id" && key !== "customFields",
+        ),
+        ...Object.entries(customFields),
+        // Do not silently hide an unparseable legacy value.
+        ...(typeof rawCustomFields === "string" &&
+        Object.keys(customFields).length === 0 &&
+        rawCustomFields.trim()
+          ? [["customFields", rawCustomFields] as [string, unknown]]
+          : []),
+      ]
+    : [];
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
@@ -541,14 +569,23 @@ export default async function VendorDetailPage({
                     vendor.name
                   }
                 />
-
+                {vendor.accountProfileImage && (
+                <img
+                  src={vendor.accountProfileImage}
+                  alt="Vendor account profile"
+                  className="mb-5 h-20 w-20 rounded-full border border-slate-200 object-cover"
+                />
+              )}
                 <InfoRow
                   label="Account Email"
                   value={
                     vendor.accountEmail
                   }
                 />
-
+                 <InfoRow
+                  label="Account Phone"
+                  value={vendor.accountPhoneNumber}
+                />
                 <InfoRow
                   label="Registered"
                   value={formatDateTime(
@@ -578,7 +615,13 @@ export default async function VendorDetailPage({
                     vendor.brandName
                   }
                 />
-
+                  {vendor.brandLogo && (
+                    <img
+                      src={vendor.brandLogo}
+                      alt={`${vendor.brandName} logo`}
+                      className="mb-5 h-20 w-20 rounded-full border border-slate-200 object-cover"
+                    />
+                  )}
                 <InfoRow
                   label="Booking Email"
                   value={
@@ -771,9 +814,11 @@ export default async function VendorDetailPage({
                         className="border-b border-slate-100 pb-4"
                       >
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          {humanizeKey(
-                            key,
-                          )}
+                          {key === "teamGenders"
+                            ? "Team Genders"
+                            : key === "yearsExperience"
+                              ? "Years of Experience"
+                              : humanizeKey(key)}
                         </p>
 
                         <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">

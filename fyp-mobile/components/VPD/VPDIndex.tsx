@@ -420,23 +420,52 @@ const category =
                 </View>
             )}
         </View>
+         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+    {vendorData.images.length > 0 && (
+        <TouchableOpacity
+            testID="see-all-photos"
+            onPress={() =>
+                router.push({
+                    pathname: "/vendorprofileimages",
+                    params: { vendorId: vendorData._id },
+                })
+            }
+            activeOpacity={0.7}
+            style={styles.seeAllButton}
+        >
+            <Text style={styles.seeAllLink}>See All</Text>
+            <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={PRIMARY}
+            />
+        </TouchableOpacity>
+    )}
 
-        {vendorData.images.length > 0 && (
-            <TouchableOpacity
-                testID="see-all-photos"
-                onPress={() =>
-                    router.push({
-                        pathname: '/vendorprofileimages',
-                        params: { vendorId: vendorData._id },
-                    })
-                }
-                activeOpacity={0.7}
-                style={styles.seeAllButton}
-            >
-                <Text style={styles.seeAllLink}>See All</Text>
-                <Ionicons name="chevron-forward" size={14} color={PRIMARY} />
-            </TouchableOpacity>
-        )}
+    <TouchableOpacity
+    testID="add-portfolio-photos"
+    onPress={() =>
+    router.push({
+        pathname: "/imagesuploaded",
+        params: {
+            vendorId: vendorData._id,
+        },
+    })
+}
+    activeOpacity={0.8}
+    style={styles.managePortfolioButton}
+>
+    <Ionicons
+        name="images-outline"
+        size={15}
+        color="#FFFFFF"
+    />
+
+    <Text style={styles.managePortfolioButtonText}>
+        Manage Portfolio
+    </Text>
+</TouchableOpacity>
+</View>
     </View>
 
     {vendorData.images.length > 0 ? (
@@ -3100,6 +3129,23 @@ photoCountText: {
 seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
+},
+managePortfolioButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    minHeight: 36,
+},
+
+managePortfolioButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
 },
 photoContainerContent: {
     paddingVertical: 4,

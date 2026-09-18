@@ -39,8 +39,8 @@ const EDITING_SERVICES = [
   { label: "ALBUM DESIGN", icon: "book" },
   { label: "REELS", icon: "play-circle" },
 ];
-
 const STAFF_GENDERS = [
+  { label: "MALE", icon: "male" },
   { label: "FEMALE", icon: "female" },
 ];
 

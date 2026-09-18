@@ -27,6 +27,7 @@ const EXPERTISE_TYPES = [
 
 
 const STAFF_GENDERS = [
+  { label: "MALE", icon: "male" },
   { label: "FEMALE", icon: "female" },
 ];
 const SERVICES = [

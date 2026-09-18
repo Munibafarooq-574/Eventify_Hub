@@ -66,7 +66,9 @@ describe('FileUploadService', () => {
             };
 
             // Override `s3_upload` temporarily
-            jest.spyOn(service, 's3_upload').mockResolvedValueOnce(undefined);
+            jest
+    .spyOn(service, 's3_upload')
+    .mockResolvedValueOnce(undefined as any);
 
             await expect(service.uploadMultipleFiles([mockFail] as any)).rejects.toThrow(
                 'Upload failed for fail.jpg',

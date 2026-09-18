@@ -12,7 +12,8 @@ export enum SubscriptionPlan {
 
 export enum SubscriptionStatus {
   TRIAL = 'trial',
-  ACTIVE = 'active',
+    ACTIVE = 'active',
+  SCHEDULED = 'scheduled',
   PENDING_PAYMENT = 'pending_payment',
   EXPIRED = 'expired',
   CANCELLED = 'cancelled',
@@ -92,7 +93,11 @@ export interface VendorSubscription {
 
   rejectionReason: string | null;
 
-  isCurrent: boolean;
+    isCurrent: boolean;
+
+  activationType?: 'immediate' | 'scheduled' | null;
+  planChangeType?: 'upgrade' | 'downgrade' | 'renewal' | null;
+  scheduledActivationDate?: string | null;
 
   cancelledReason: string | null;
 
@@ -136,7 +141,8 @@ export interface PendingSubscriptionPayment {
 }
 
 export interface SubscriptionAccessState {
-  subscription: VendorSubscription;
+    subscription: VendorSubscription;
+  scheduledSubscription: ScheduledSubscription | null;
 
   isTrial: boolean;
 
@@ -156,6 +162,17 @@ export interface SubscriptionAccessState {
   daysRemaining: number;
 
   trialEndDate: string | null;
+}
+
+export interface ScheduledSubscription {
+  subscriptionId: string;
+  plan: SubscriptionPlan;
+  activationType: 'immediate' | 'scheduled' | null;
+  planChangeType: 'upgrade' | 'downgrade' | 'renewal' | null;
+  scheduledActivationDate: string | null;
+  startDate: string;
+  endDate: string | null;
+  paymentStatus: PaymentStatus;
 }
 
 export interface SubscriptionPaymentInstructions {

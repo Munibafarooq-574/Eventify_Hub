@@ -49,9 +49,7 @@ const AccountScreen: React.FC = () => {
       }
       setUsername(user?.name || "Guest");
       setEmail(user?.email || "");
-      // Same field the Vendor side uses — it lives on the shared User
-      // schema (contactDetails.brandLogo), so it works for Organizer too.
-      setAvatar(user?.contactDetails?.brandLogo || "");
+      setAvatar(user?.profileImage || "");
       setRole(user?.role || "");
     } catch (error) {
       console.error("Error fetching user details:", error);

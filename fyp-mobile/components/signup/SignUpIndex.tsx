@@ -268,7 +268,7 @@ const handleRegister = async () => {
 
     // Optional DP selected during signup — upload it now via the existing
     // profile-update flow.
-    if (avatar) {
+    if (role !== "Vendor" && avatar) {
       try {
         const userId =
           response.user._id || response.user.userId;
@@ -314,8 +314,6 @@ const handleRegister = async () => {
       JSON.stringify(finalUser)
     );
     await saveUserData(finalUser);
-
-    setIsLoading(false);
 
     setIsLoading(false);
 
@@ -398,7 +396,8 @@ return (
         </Text>
             </Animated.View>
 
-      {/* Profile Picture (optional) */}
+      {/* Optional profile picture for Client only */}
+      {role !== "Vendor" && (
       <TouchableOpacity
         style={styles.avatarPicker}
         onPress={pickAvatar}
@@ -410,11 +409,9 @@ return (
           />
         ) : (
           <View style={styles.avatarPlaceholder}>
-            <Ionicons
-              name="camera-outline"
-              size={26}
-              color="#780C60"
-            />
+            <Text style={styles.avatarInitial}>
+              {name.trim().charAt(0).toUpperCase() || "?"}
+            </Text>
           </View>
         )}
 
@@ -424,6 +421,7 @@ return (
             : "Add Profile Photo (optional)"}
         </Text>
       </TouchableOpacity>
+      )}
 
       {/* Name */}
 
@@ -701,6 +699,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: "#E0C6D8",
+  },
+
+  avatarInitial: {
+    fontSize: 34,
+    fontWeight: "700",
+    color: "#780C60",
   },
 
   avatarPickerText: {

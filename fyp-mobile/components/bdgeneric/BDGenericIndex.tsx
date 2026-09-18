@@ -38,6 +38,8 @@ type CancellationPolicy =
     | "PARTIALLY REFUNDABLE"
     | null;
 
+const TEAM_GENDERS = ["MALE", "FEMALE"] as const;
+
 const DOWN_PAYMENT_TYPES = [
     {
         label: "PERCENTAGE",
@@ -111,6 +113,10 @@ const BDGenericIndex = () => {
     const [travelsToClientHome, setTravelsToClientHome] =
         useState<YesNo>(null);
 
+    const [businessType, setBusinessType] = useState("");
+    const [teamGenders, setTeamGenders] = useState<string[]>([]);
+    const [yearsExperience, setYearsExperience] = useState("");
+
     const [cityCovered, setCityCovered] =
         useState("");
 
@@ -180,6 +186,11 @@ const BDGenericIndex = () => {
                         return;
                     }
 
+                    const fields = data.customFields || {};
+                    setBusinessType(fields.businessType || "");
+                    setTeamGenders(Array.isArray(fields.teamGenders) ? fields.teamGenders : []);
+                    setYearsExperience(fields.yearsExperience?.toString() || "");
+
                     setDescription(
                         data.description || ""
                     );
@@ -234,6 +245,9 @@ const BDGenericIndex = () => {
 
     const submit = async () => {
         if (
+            !businessType.trim() ||
+            teamGenders.length === 0 ||
+            !yearsExperience.trim() ||
             !description.trim() ||
             !cityCovered.trim() ||
             !minimumPrice ||
@@ -247,6 +261,12 @@ const BDGenericIndex = () => {
                 "Please fill all required fields."
             );
 
+            return;
+        }
+
+        const parsedYearsExperience = Number(yearsExperience);
+        if (!Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 0 || parsedYearsExperience > 100) {
+            Alert.alert("Invalid Experience", "Enter experience in whole years (0–100).");
             return;
         }
 
@@ -346,7 +366,11 @@ const BDGenericIndex = () => {
 
                     cancellationPolicy,
 
-                    customFields: {},
+                     customFields: {
+                         businessType: businessType.trim(),
+                         teamGenders,
+                         yearsExperience: parsedYearsExperience,
+                     },
                 };
 
             if (edit === "true") {
@@ -477,6 +501,71 @@ router.replace("/vendorprofilepending");
                         )
                     )}
                 </View>
+            </View>
+
+            {/* Business type: free text for any category */}
+            <View style={styles.card}>
+                <SectionTitle icon="briefcase" title="Business Type / Services Offered" required />
+                <Text style={styles.hint}>
+                    Write the services you offer, e.g. wedding photography, pre-wedding shoots, or event decoration.
+                </Text>
+                <TextInput
+                    style={[styles.input, styles.textAreaSmall]}
+                    multiline
+                    textAlignVertical="top"
+                    placeholder="e.g. Wedding photography, pre-wedding shoots, birthday shoots"
+                    placeholderTextColor="#B99DAF"
+                    value={businessType}
+                    onChangeText={setBusinessType}
+                    maxLength={500}
+                />
+            </View>
+
+            {/* Team availability: multi-select */}
+            <View style={styles.card}>
+                <SectionTitle icon="users" title="Available Staff Gender" required />
+                <Text style={styles.hint}>Select all staff options available for client bookings.</Text>
+                <View style={styles.chipContainer}>
+                    {TEAM_GENDERS.map((gender) => {
+                        const selected = teamGenders.includes(gender);
+                        return (
+                            <TouchableOpacity
+                                key={gender}
+                                activeOpacity={0.85}
+                                style={[styles.chip, selected && styles.chipSelected]}
+                                onPress={() => setTeamGenders((previous) =>
+                                    selected
+                                        ? previous.filter((item) => item !== gender)
+                                        : [...previous, gender]
+                                )}
+                            >
+                                <FontAwesome5
+                                    name={gender === "MALE" ? "male" : "female"}
+                                    size={15}
+                                    style={[styles.chipIcon, selected && styles.chipIconSelected]}
+                                />
+                                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                                    {gender}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </View>
+
+            {/* Experience for admin review */}
+            <View style={styles.card}>
+                <SectionTitle icon="award" title="Years of Experience" required />
+                <Text style={styles.hint}>Enter how many years your business has been providing these services.</Text>
+                <TextInput
+                    style={styles.input}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 3"
+                    placeholderTextColor="#B99DAF"
+                    value={yearsExperience}
+                    onChangeText={(value) => setYearsExperience(value.replace(/[^0-9]/g, ""))}
+                    maxLength={3}
+                />
             </View>
 
             {/* Description */}
