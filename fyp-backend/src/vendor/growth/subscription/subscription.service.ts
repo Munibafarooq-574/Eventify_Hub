@@ -6,9 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import { InjectModel } from '@nestjs/mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 
 import {
+  Connection,
   HydratedDocument,
   Model,
   Types,
@@ -25,9 +26,11 @@ import {
 import {
   DEMO_SUBSCRIPTION_DURATION_DAYS,
   PaymentProvider,
-  PaymentStatus,
+    PaymentStatus,
+    SubscriptionActivationType,
   SUBSCRIPTION_DURATION_DAYS,
   SubscriptionPlan,
+  SubscriptionPlanChangeType,
   SubscriptionStatus,
   VENDOR_TRIAL_DURATION_DAYS,
 } from './subscription.types';
@@ -50,11 +53,14 @@ export class SubscriptionService {
   constructor(
     @InjectModel(VendorSubscription.name)
     private readonly subscriptionModel:
-      Model<VendorSubscription>,
+    Model<VendorSubscription>,
 
     @InjectModel(User.name)
     private readonly userModel:
-      Model<User>,
+    Model<User>,
+
+    @InjectConnection()
+    private readonly connection: Connection,
   ) {}
 
   // =========================================================
@@ -93,8 +99,12 @@ export class SubscriptionService {
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
-    const vendorObjectId =
+        const vendorObjectId =
       new Types.ObjectId(vendorId);
+
+    await this.activateScheduledSubscription(
+      vendorObjectId,
+    );
 
     let current:
       | VendorSubscriptionDocument
@@ -135,6 +145,63 @@ export class SubscriptionService {
     );
   }
 
+    // =========================================================
+  // AUTOMATIC SCHEDULED ACTIVATION
+  // =========================================================
+
+  private async activateScheduledSubscription(
+    vendorObjectId: Types.ObjectId,
+  ): Promise<void> {
+    const due = await this.subscriptionModel.exists({
+      vendorId: vendorObjectId,
+      status: SubscriptionStatus.SCHEDULED,
+      paymentStatus: PaymentStatus.PAID,
+      isCurrent: false,
+      scheduledActivationDate: { $lte: new Date() },
+    });
+    if (!due) return;
+
+    await this.connection.transaction(async (session) => {
+      const lock = await this.userModel.updateOne(
+        { _id: vendorObjectId },
+        { $currentDate: { updatedAt: true } },
+        { session },
+      );
+      if (!lock.matchedCount) {
+        throw new NotFoundException('Vendor not found.');
+      }
+
+      const duePlans = await this.subscriptionModel.find({
+        vendorId: vendorObjectId,
+        status: SubscriptionStatus.SCHEDULED,
+        paymentStatus: PaymentStatus.PAID,
+        isCurrent: false,
+        scheduledActivationDate: { $lte: new Date() },
+      }).sort({ scheduledActivationDate: 1 }).session(session);
+
+      if (!duePlans.length) return;
+      if (duePlans.length > 1) {
+        throw new BadRequestException(
+          'Multiple scheduled subscriptions need administrator review.',
+        );
+      }
+
+      const activation = duePlans[0];
+      await this.subscriptionModel.updateMany(
+        { vendorId: vendorObjectId, isCurrent: true },
+        { $set: { isCurrent: false } },
+        { session },
+      );
+      activation.status = activation.endDate &&
+        new Date(activation.endDate).getTime() <= Date.now()
+        ? SubscriptionStatus.EXPIRED
+        : SubscriptionStatus.ACTIVE;
+      activation.isCurrent = true;
+      activation.scheduledActivationDate = null;
+      await activation.save({ session });
+    });
+  }
+
   // =========================================================
   // HISTORY
   // =========================================================
@@ -163,7 +230,8 @@ export class SubscriptionService {
     vendorId: string,
     plan: SubscriptionPlan,
     paymentProvider: PaymentProvider,
-    paymentReference: string,
+     paymentReference: string,
+    activationType: SubscriptionActivationType,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
@@ -173,19 +241,69 @@ export class SubscriptionService {
       paymentProvider,
     );
 
-    /**
-     * Verify Vendor and normalize current
-     * subscription lifecycle first.
-     *
-     * Existing trial/paid subscription remains
-     * current while payment waits for Admin review.
-     */
-    await this.getCurrentSubscription(
+        const current = await this.getCurrentSubscription(
       vendorId,
     );
 
+    const planRank: Record<string, number> = {
+      [SubscriptionPlan.BASIC]: 1,
+      [SubscriptionPlan.GROWTH]: 2,
+      [SubscriptionPlan.PREMIUM]: 3,
+    };
+
+    const hasValidCurrentAccess =
+      current.endDate !== null &&
+      new Date(current.endDate).getTime() > Date.now() &&
+      [
+        SubscriptionStatus.TRIAL,
+        SubscriptionStatus.ACTIVE,
+        SubscriptionStatus.CANCELLED,
+      ].includes(current.status);
+
+    let planChangeType: SubscriptionPlanChangeType;
+    let effectiveActivationType: SubscriptionActivationType;
+
+    if (current.status === SubscriptionStatus.TRIAL) {
+      planChangeType = SubscriptionPlanChangeType.NEW_PURCHASE;
+      effectiveActivationType = SubscriptionActivationType.IMMEDIATE;
+    } else if (!hasValidCurrentAccess) {
+      planChangeType = SubscriptionPlanChangeType.NEW_PURCHASE;
+      effectiveActivationType = SubscriptionActivationType.IMMEDIATE;
+    } else if (current.plan === plan) {
+      planChangeType = SubscriptionPlanChangeType.RENEWAL;
+      effectiveActivationType = SubscriptionActivationType.SCHEDULED;
+        } else if (planRank[plan] > planRank[current.plan]) {
+      if (
+        activationType !== SubscriptionActivationType.IMMEDIATE &&
+        activationType !== SubscriptionActivationType.SCHEDULED
+      ) {
+        throw new BadRequestException(
+          'Choose immediate or scheduled activation for your upgrade.',
+        );
+      }
+
+      planChangeType = SubscriptionPlanChangeType.UPGRADE;
+      effectiveActivationType = activationType;
+    } else {
+      planChangeType = SubscriptionPlanChangeType.DOWNGRADE;
+      effectiveActivationType = SubscriptionActivationType.SCHEDULED;
+    }
+
     const vendorObjectId =
       new Types.ObjectId(vendorId);
+
+          const existingScheduled =
+      await this.subscriptionModel.findOne({
+        vendorId: vendorObjectId,
+        status: SubscriptionStatus.SCHEDULED,
+        paymentStatus: PaymentStatus.PAID,
+      });
+
+    if (existingScheduled) {
+      throw new BadRequestException(
+        'You already have an approved scheduled subscription. Wait until it activates before purchasing another plan.',
+      );
+    }
 
     const amountDue =
       getConfiguredPlanPrice(plan);
@@ -283,7 +401,13 @@ export class SubscriptionService {
       vendorId:
         vendorObjectId,
 
-      plan,
+        plan,
+
+      planChangeType,
+
+      activationType: effectiveActivationType,
+
+      scheduledActivationDate: null,
 
       status:
         SubscriptionStatus.PENDING_PAYMENT,
@@ -514,6 +638,14 @@ export class SubscriptionService {
             subscriptionStatus:
               subscription.status,
 
+             activationType:
+        subscription.activationType ?? null,
+
+      planChangeType:
+        subscription.planChangeType ?? null,
+
+      scheduledActivationDate:
+        subscription.scheduledActivationDate ?? null,
             paymentStatus:
               subscription.paymentStatus,
 
@@ -601,196 +733,143 @@ export class SubscriptionService {
     adminId: string,
     reason?: string,
   ): Promise<VendorSubscriptionDocument> {
-    if (
-      !Types.ObjectId.isValid(
-        subscriptionId,
-      )
-    ) {
-      throw new BadRequestException(
-        'Invalid subscriptionId.',
-      );
+    if (!Types.ObjectId.isValid(subscriptionId)) {
+      throw new BadRequestException('Invalid subscriptionId.');
+    }
+    if (!Types.ObjectId.isValid(adminId)) {
+      throw new BadRequestException('Invalid Admin account.');
     }
 
-    if (
-      !Types.ObjectId.isValid(
-        adminId,
-      )
-    ) {
-      throw new BadRequestException(
-        'Invalid Admin account.',
-      );
+    const normalizedDecision = decision?.toUpperCase();
+    if (normalizedDecision !== 'PAID' && normalizedDecision !== 'FAILED') {
+      throw new BadRequestException('Decision must be PAID or FAILED.');
+    }
+    const rejectionReason = reason?.trim();
+    if (normalizedDecision === 'FAILED' && !rejectionReason) {
+      throw new BadRequestException('A rejection reason is required.');
     }
 
-    const paymentRequest =
-      await this.subscriptionModel.findById(
-        subscriptionId,
-      );
+    // All payment and entitlement writes commit or roll back together.
+    // This Mongoose version returns void from connection.transaction().
+    let reviewedSubscription: VendorSubscriptionDocument | null = null;
 
-    if (!paymentRequest) {
-      throw new NotFoundException(
-        'Subscription payment request not found.',
-      );
-    }
+    await this.connection.transaction(
+      async (session): Promise<void> => {
+        const paymentRequest = await this.subscriptionModel
+          .findById(subscriptionId)
+          .session(session);
+        if (!paymentRequest) {
+          throw new NotFoundException('Subscription payment request not found.');
+        }
 
-    if (
-      paymentRequest.paymentStatus !==
-        PaymentStatus.PENDING ||
-      paymentRequest.status !==
-        SubscriptionStatus.PENDING_PAYMENT
-    ) {
-      throw new BadRequestException(
-        'This subscription payment has already been reviewed.',
-      );
-    }
-
-    const normalizedDecision =
-      decision.toUpperCase();
-
-    // -------------------------------------------------------
-    // FAILED / REJECTED
-    // -------------------------------------------------------
-
-    if (
-      normalizedDecision ===
-      'FAILED'
-    ) {
-      const rejectionReason =
-        reason?.trim();
-
-      if (!rejectionReason) {
-        throw new BadRequestException(
-          'A rejection reason is required.',
+        // A write to the same vendor serializes concurrent reviews/activations.
+        const lock = await this.userModel.updateOne(
+          { _id: paymentRequest.vendorId },
+          { $currentDate: { updatedAt: true } },
+          { session },
         );
-      }
+        if (!lock.matchedCount) {
+          throw new NotFoundException('Vendor not found.');
+        }
 
-      paymentRequest.paymentStatus =
-        PaymentStatus.FAILED;
+        if (
+          paymentRequest.paymentStatus !== PaymentStatus.PENDING ||
+          paymentRequest.status !== SubscriptionStatus.PENDING_PAYMENT
+        ) {
+          throw new BadRequestException(
+            'This subscription payment has already been reviewed.',
+          );
+        }
 
-      paymentRequest.status =
-        SubscriptionStatus.REJECTED;
+        const now = new Date();
+        paymentRequest.verifiedAt = now;
+        paymentRequest.verifiedBy = new Types.ObjectId(adminId);
+        paymentRequest.isCurrent = false;
 
-      paymentRequest.amountPaid =
-        0;
+        if (normalizedDecision === 'FAILED') {
+          paymentRequest.paymentStatus = PaymentStatus.FAILED;
+          paymentRequest.status = SubscriptionStatus.REJECTED;
+          paymentRequest.amountPaid = 0;
+          paymentRequest.rejectionReason = rejectionReason || null;
+          await paymentRequest.save({ session });
+          reviewedSubscription = paymentRequest;
+          return;
+        }
 
-      paymentRequest.verifiedAt =
-        new Date();
+        const price = Number(paymentRequest.amountDue ?? 0);
+        if (!Number.isFinite(price) || price <= 0) {
+          throw new BadRequestException(
+            'This payment request does not contain a valid backend price snapshot.',
+          );
+        }
 
-      paymentRequest.verifiedBy =
-        new Types.ObjectId(
-          adminId,
-        );
+        const existingScheduled = await this.subscriptionModel.exists({
+          vendorId: paymentRequest.vendorId,
+          _id: { $ne: paymentRequest._id },
+          status: SubscriptionStatus.SCHEDULED,
+          paymentStatus: PaymentStatus.PAID,
+        }).session(session);
+        if (existingScheduled) {
+          throw new BadRequestException(
+            'An approved scheduled subscription already exists for this vendor.',
+          );
+        }
 
-      paymentRequest.rejectionReason =
-        rejectionReason;
+        const currentSubscriptions = await this.subscriptionModel.find({
+          vendorId: paymentRequest.vendorId,
+          isCurrent: true,
+        }).session(session);
+        if (currentSubscriptions.length > 1) {
+          throw new BadRequestException(
+            'Duplicate current subscriptions require administrator cleanup before approval.',
+          );
+        }
+        const current = currentSubscriptions[0] || null;
+        const currentEndDate = current?.endDate
+          ? new Date(current.endDate)
+          : null;
+        const shouldSchedule =
+          paymentRequest.activationType === SubscriptionActivationType.SCHEDULED &&
+          currentEndDate !== null &&
+          currentEndDate.getTime() > now.getTime() &&
+          current?.status !== SubscriptionStatus.TRIAL;
 
-      paymentRequest.isCurrent =
-        false;
+        const startDate = shouldSchedule && currentEndDate
+          ? currentEndDate
+          : now;
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + SUBSCRIPTION_DURATION_DAYS);
 
-      await paymentRequest.save();
+        if (!shouldSchedule) {
+          await this.subscriptionModel.updateMany(
+            { vendorId: paymentRequest.vendorId, isCurrent: true },
+            { $set: { isCurrent: false } },
+            { session },
+          );
+        }
 
-      return paymentRequest;
-    }
-
-    // -------------------------------------------------------
-    // PAID / APPROVED
-    // -------------------------------------------------------
-
-    if (
-      normalizedDecision !==
-      'PAID'
-    ) {
-      throw new BadRequestException(
-        'Decision must be PAID or FAILED.',
-      );
-    }
-
-    if (
-      Number(
-        paymentRequest.amountDue ??
-        0,
-      ) <= 0
-    ) {
-      throw new BadRequestException(
-        'This payment request does not contain a valid backend price snapshot.',
-      );
-    }
-
-    const now =
-      new Date();
-
-    const endDate =
-      new Date(now);
-
-    endDate.setDate(
-      endDate.getDate() +
-        SUBSCRIPTION_DURATION_DAYS,
-    );
-
-    /**
-     * Any approved Basic/Growth/Premium plan
-     * replaces the current entitlement.
-     *
-     * Only one current entitlement is allowed.
-     */
-    await this.subscriptionModel.updateMany(
-      {
-        vendorId:
-          paymentRequest.vendorId,
-
-        isCurrent:
-          true,
-      },
-      {
-        $set: {
-          isCurrent:
-            false,
-        },
+        paymentRequest.status = shouldSchedule
+          ? SubscriptionStatus.SCHEDULED
+          : SubscriptionStatus.ACTIVE;
+        paymentRequest.scheduledActivationDate = shouldSchedule ? startDate : null;
+        paymentRequest.paymentStatus = PaymentStatus.PAID;
+        paymentRequest.amountPaid = price;
+        paymentRequest.startDate = startDate;
+        paymentRequest.endDate = endDate;
+        paymentRequest.rejectionReason = null;
+        paymentRequest.cancelledReason = null;
+        paymentRequest.isCurrent = !shouldSchedule;
+        await paymentRequest.save({ session });
+        reviewedSubscription = paymentRequest;
+        return;
       },
     );
 
-    paymentRequest.status =
-      SubscriptionStatus.ACTIVE;
+    if (!reviewedSubscription) {
+      throw new Error('Subscription review did not complete.');
+    }
 
-    paymentRequest.paymentStatus =
-      PaymentStatus.PAID;
-
-    /**
-     * Admin cannot manually choose amount.
-     *
-     * The backend snapshot created during
-     * payment request becomes amountPaid.
-     */
-    paymentRequest.amountPaid =
-      Number(
-        paymentRequest.amountDue,
-      );
-
-    paymentRequest.startDate =
-      now;
-
-    paymentRequest.endDate =
-      endDate;
-
-    paymentRequest.verifiedAt =
-      now;
-
-    paymentRequest.verifiedBy =
-      new Types.ObjectId(
-        adminId,
-      );
-
-    paymentRequest.rejectionReason =
-      null;
-
-    paymentRequest.cancelledReason =
-      null;
-
-    paymentRequest.isCurrent =
-      true;
-
-    await paymentRequest.save();
-
-    return paymentRequest;
+    return reviewedSubscription;
   }
 
   // =========================================================
@@ -1047,8 +1126,8 @@ export class SubscriptionService {
      * paymentStatus = PAID
      */
     const isPaidPlan =
-      subscription.status ===
-        SubscriptionStatus.ACTIVE &&
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        (subscription.status === SubscriptionStatus.CANCELLED && accessAllowed)) &&
       subscription.paymentStatus ===
         PaymentStatus.PAID &&
       [
@@ -1082,6 +1161,17 @@ export class SubscriptionService {
           createdAt: -1,
         })
         .lean();
+
+        const scheduledSubscription =
+  await this.subscriptionModel
+    .findOne({
+      vendorId: new Types.ObjectId(vendorId),
+      status: SubscriptionStatus.SCHEDULED,
+      paymentStatus: PaymentStatus.PAID,
+      isCurrent: false,
+    })
+    .sort({ scheduledActivationDate: 1 })
+    .lean();
 
     const planDefinition =
   getPlanDefinition(
@@ -1123,6 +1213,20 @@ const entitlementLimits =
 
         return {
       subscription,
+
+      scheduledSubscription: scheduledSubscription
+  ? {
+      subscriptionId: String(scheduledSubscription._id),
+      plan: scheduledSubscription.plan,
+      activationType: scheduledSubscription.activationType,
+      planChangeType: scheduledSubscription.planChangeType,
+      scheduledActivationDate:
+        scheduledSubscription.scheduledActivationDate,
+      startDate: scheduledSubscription.startDate,
+      endDate: scheduledSubscription.endDate,
+      paymentStatus: scheduledSubscription.paymentStatus,
+    }
+  : null,
 
       isTrial,
      
@@ -1206,132 +1310,94 @@ isPaidPlan,
   // =========================================================
 
   private async createInitialTrial(
-    vendorObjectId: Types.ObjectId,
-  ): Promise<VendorSubscriptionDocument> {
-    const vendor =
-      await this.userModel
-        .findById(
-          vendorObjectId,
-        )
-        .select(
-          '_id role createdAt',
-        )
-        .lean();
+  vendorObjectId: Types.ObjectId,
+): Promise<VendorSubscriptionDocument> {
+  const existing = await this.subscriptionModel.findOne({
+    vendorId: vendorObjectId,
+    isCurrent: true,
+  });
+
+  if (existing) return existing;
+
+  await this.connection.transaction(async (session): Promise<void> => {
+    const vendor = await this.userModel
+      .findOneAndUpdate(
+        { _id: vendorObjectId },
+        { $currentDate: { updatedAt: true } },
+        { new: true, session },
+      )
+      .select('_id role created_at');
 
     if (!vendor) {
-      throw new NotFoundException(
-        'Vendor not found.',
-      );
+      throw new NotFoundException('Vendor not found.');
     }
 
-    if (
-      String(
-        vendor.role,
-      ).toLowerCase() !==
-      'vendor'
-    ) {
+    if (String(vendor.role).toLowerCase() !== 'vendor') {
       throw new BadRequestException(
         'Subscription is available only for Vendor accounts.',
       );
     }
 
-    /**
-     * IMPORTANT:
-     *
-     * Trial starts from original Vendor account
-     * creation date, not from the first time the
-     * subscription endpoint is opened.
-     *
-     * This prevents an old Vendor from receiving
-     * a fresh 7-day trial later.
-     */
-    const vendorCreatedAt =
-      (vendor as any).createdAt
-        ? new Date(
-            (vendor as any)
-              .createdAt,
-          )
-        : new Date();
+    const current = await this.subscriptionModel
+      .findOne({
+        vendorId: vendorObjectId,
+        isCurrent: true,
+      })
+      .session(session);
 
-    const trialEndDate =
-      new Date(
-        vendorCreatedAt,
-      );
+    if (current) return;
+
+    const vendorCreatedAt = vendor.created_at
+  ? new Date(vendor.created_at)
+  : new Date();
+
+    const trialEndDate = new Date(vendorCreatedAt);
 
     trialEndDate.setDate(
-      trialEndDate.getDate() +
-        VENDOR_TRIAL_DURATION_DAYS,
+      trialEndDate.getDate() + VENDOR_TRIAL_DURATION_DAYS,
     );
 
     const alreadyExpired =
-      trialEndDate.getTime() <=
-      Date.now();
+      trialEndDate.getTime() <= Date.now();
 
-    /**
-     * Final Phase 14A rule:
-     *
-     * Trial is BASIC plan entitlement.
-     *
-     * ACTIVE trial:
-     * plan   = BASIC
-     * status = TRIAL
-     *
-     * Expired trial:
-     * plan   = BASIC
-     * status = EXPIRED
-     */
-    return this.subscriptionModel.create({
-      vendorId:
-        vendorObjectId,
+    await this.subscriptionModel.create(
+      [
+        {
+          vendorId: vendorObjectId,
+          plan: SubscriptionPlan.BASIC,
+          status: alreadyExpired
+            ? SubscriptionStatus.EXPIRED
+            : SubscriptionStatus.TRIAL,
+          startDate: vendorCreatedAt,
+          endDate: trialEndDate,
+          paymentStatus: PaymentStatus.NONE,
+          paymentProvider: PaymentProvider.NONE,
+          paymentReference: null,
+          amountDue: 0,
+          amountPaid: 0,
+          paymentSubmittedAt: null,
+          verifiedAt: null,
+          verifiedBy: null,
+          rejectionReason: null,
+          isCurrent: true,
+          cancelledReason: null,
+        },
+      ],
+      { session },
+    );
+  });
 
-      plan:
-        SubscriptionPlan.BASIC,
+  const subscription = await this.subscriptionModel.findOne({
+    vendorId: vendorObjectId,
+    isCurrent: true,
+  });
 
-      status:
-        alreadyExpired
-          ? SubscriptionStatus.EXPIRED
-          : SubscriptionStatus.TRIAL,
-
-      startDate:
-        vendorCreatedAt,
-
-      endDate:
-        trialEndDate,
-
-      paymentStatus:
-        PaymentStatus.NONE,
-
-      paymentProvider:
-        PaymentProvider.NONE,
-
-      paymentReference:
-        null,
-
-      amountDue:
-        0,
-
-      amountPaid:
-        0,
-
-      paymentSubmittedAt:
-        null,
-
-      verifiedAt:
-        null,
-
-      verifiedBy:
-        null,
-
-      rejectionReason:
-        null,
-
-      isCurrent:
-        true,
-
-      cancelledReason:
-        null,
-    });
+  if (!subscription) {
+    throw new Error('Initial subscription could not be created.');
   }
+
+  return subscription;
+}
 
   // =========================================================
   // LEGACY FREE → BASIC TRIAL MIGRATION

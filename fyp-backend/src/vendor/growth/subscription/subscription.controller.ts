@@ -28,6 +28,7 @@ import {
 
 import {
   PaymentProvider,
+  SubscriptionActivationType,
   SubscriptionPlan,
 } from './subscription.types';
 
@@ -63,6 +64,12 @@ class RequestSubscriptionPaymentDto {
   @IsString()
   @Length(2, 120)
   paymentReference!: string;
+
+  @IsIn([
+    SubscriptionActivationType.IMMEDIATE,
+    SubscriptionActivationType.SCHEDULED,
+  ])
+  activationType!: SubscriptionActivationType;
 }
 
 @Controller(
@@ -165,6 +172,7 @@ getPaymentInstructions() {
         dto.plan,
         dto.paymentProvider,
         dto.paymentReference,
+        dto.activationType,
       );
   }
 

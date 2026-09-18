@@ -29,7 +29,11 @@ type SubscriptionPaymentRow = {
 
   vendor: SubscriptionVendor | null;
 
-  plan: string;
+    plan: string;
+
+  activationType?: string | null;
+  planChangeType?: string | null;
+  scheduledActivationDate?: string | null;
 
   subscriptionStatus: string;
 
@@ -682,7 +686,7 @@ export default async function SubscriptionsPage({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1550px] w-full text-left">
+                  <table className="min-w-[1700px] w-full text-left">
                     <thead className="bg-slate-50">
                       <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <th className="px-5 py-3">
@@ -691,6 +695,10 @@ export default async function SubscriptionsPage({
 
                         <th className="px-5 py-3">
                           Plan
+                        </th>
+
+                        <th className="px-5 py-3">
+                          Activation
                         </th>
 
                         <th className="px-5 py-3">
@@ -796,6 +804,41 @@ export default async function SubscriptionsPage({
                                   item.plan,
                                 )}
                               </span>
+                            </td>
+
+                                                        <td className="px-5 py-4">
+                              {item.planChangeType?.toUpperCase() === "UPGRADE" &&
+                              item.activationType ? (
+                                <>
+                                  <span
+                                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                                      item.activationType.toUpperCase() === "IMMEDIATE"
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : "border-blue-200 bg-blue-50 text-blue-700"
+                                    }`}
+                                  >
+                                    {prettyText(item.activationType)}
+                                  </span>
+
+                                  <p className="mt-2 text-xs text-slate-500">
+                                    Upgrade
+                                  </p>
+
+                                  {item.scheduledActivationDate ? (
+                                    <p className="mt-1 text-xs text-blue-700">
+                                      Starts: {formatDate(item.scheduledActivationDate)}
+                                    </p>
+                                  ) : null}
+                                </>
+                              ) : item.planChangeType?.toUpperCase() === "UPGRADE" ? (
+                                <span className="text-xs text-red-600">
+                                  Choice not recorded
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  {prettyText(item.planChangeType)}
+                                </span>
+                              )}
                             </td>
 
                             <td className="px-5 py-4">

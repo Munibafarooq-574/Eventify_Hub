@@ -17,6 +17,7 @@ interface RequestSubscriptionPaymentInput {
   paymentProvider: PaymentProvider.EASYPAISA;
 
   paymentReference: string;
+  activationType?: 'IMMEDIATE' | 'SCHEDULED';
 }
 
 export async function requestSubscriptionPayment(

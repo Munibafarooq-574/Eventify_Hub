@@ -4,12 +4,15 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -224,6 +227,9 @@ export default function SubscriptionScreen() {
   ] =
     useState('');
 
+    const [activationType, setActivationType] =
+    useState<'IMMEDIATE' | 'SCHEDULED'>('IMMEDIATE');
+
   const [loading, setLoading] =
     useState(true);
 
@@ -243,6 +249,39 @@ export default function SubscriptionScreen() {
     useState<string | null>(
       null,
     );
+
+  // ---- NEW: refs for auto-scroll-to-payment-card ----
+  const scrollViewRef =
+    useRef<ScrollView>(null);
+
+  const paymentCardOffsetY =
+    useRef(0);
+
+  const scrollToPaymentCard =
+    useCallback(() => {
+      // small delay lets the card finish laying out
+      // before we try to scroll to its position
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(
+            paymentCardOffsetY.current -
+              16,
+            0,
+          ),
+          animated: true,
+        });
+      });
+    }, []);
+
+  const handlePaymentCardLayout = (
+    event: any,
+  ) => {
+    paymentCardOffsetY.current =
+      event.nativeEvent.layout.y;
+
+    scrollToPaymentCard();
+  };
+  // -----------------------------------------------------
 
   const loadData =
     useCallback(async () => {
@@ -376,9 +415,17 @@ export default function SubscriptionScreen() {
       plan,
     );
 
-    setPaymentReference(
+        setPaymentReference(
       '',
     );
+
+    setActivationType('IMMEDIATE');
+
+    // NEW: if the payment card is already mounted (user is
+    // switching plans), scroll to it immediately as well.
+    // If it isn't mounted yet, handlePaymentCardLayout will
+    // fire once it renders and will scroll then.
+    scrollToPaymentCard();
   };
 
   const submitPayment =
@@ -406,7 +453,15 @@ export default function SubscriptionScreen() {
 
       Alert.alert(
         'Submit Payment?',
-        `Confirm that you have sent ${selectedPlan.priceLabel} through Easypaisa.\n\nReference: ${reference}`,
+       `Confirm that you have sent ${selectedPlan.priceLabel} through Easypaisa.\n\nActivation: ${
+      isActivePaid &&
+    currentSubscription?.plan === SubscriptionPlan.GROWTH &&
+    selectedPlan.key === SubscriptionPlan.PREMIUM
+    ? activationType === 'IMMEDIATE'
+      ? 'Immediate — after Admin approval'
+      : 'Scheduled — after current plan expires'
+    : 'After Admin approval'
+}\nReference: ${reference}`,
         [
           {
             text: 'Cancel',
@@ -436,6 +491,9 @@ export default function SubscriptionScreen() {
 
                       paymentReference:
                         reference,
+
+                      activationType:
+                        activationType,
                     },
                   );
 
@@ -689,252 +747,189 @@ export default function SubscriptionScreen() {
 
       <Header />
 
-      <ScrollView
+      {/* NEW: KeyboardAvoidingView wraps the scrollable content
+          so the reference TextInput is never hidden behind the
+          keyboard on either iOS or Android. */}
+      <KeyboardAvoidingView
         style={
           styles.container
         }
-        contentContainerStyle={
-          styles.content
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : 'height'
         }
-        showsVerticalScrollIndicator={
-          false
+        keyboardVerticalOffset={
+          Platform.OS === 'ios'
+            ? insets.top + 10
+            : 0
         }
       >
-        {/* ================================================= */}
-        {/* CURRENT STATUS */}
-        {/* ================================================= */}
+        <ScrollView
+          ref={
+            scrollViewRef
+          }
+          style={
+            styles.container
+          }
+          contentContainerStyle={
+            styles.content
+          }
+          showsVerticalScrollIndicator={
+            false
+          }
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {/* ================================================= */}
+          {/* CURRENT STATUS */}
+          {/* ================================================= */}
 
-        {isTrial && (
-          <View
-            style={[
-              styles.statusCard,
-              styles.infoCard,
-            ]}
-          >
-            <Clock3
-              size={20}
-              color={
-                COLORS.info
-              }
-            />
-
+          {isTrial && (
             <View
-              style={
-                styles.statusTextWrap
-              }
+              style={[
+                styles.statusCard,
+                styles.infoCard,
+              ]}
             >
-              <Text
-                style={
-                  styles.statusTitle
+              <Clock3
+                size={20}
+                color={
+                  COLORS.info
                 }
-              >
-                Free Basic Trial
-              </Text>
+              />
 
-              <Text
+              <View
                 style={
-                  styles.statusDescription
+                  styles.statusTextWrap
                 }
               >
-                You have{' '}
                 <Text
                   style={
-                    styles.statusBold
+                    styles.statusTitle
+                  }
+                >
+                  Free Basic Trial
+                </Text>
+
+                <Text
+                  style={
+                    styles.statusDescription
+                  }
+                >
+                  You have{' '}
+                  <Text
+                    style={
+                      styles.statusBold
+                    }
+                  >
+                    {
+                      accessState.trialDaysRemaining
+                    }{' '}
+                    day
+                    {accessState.trialDaysRemaining ===
+                    1
+                      ? ''
+                      : 's'}
+                  </Text>{' '}
+                  remaining.
+                </Text>
+
+                {accessState.trialEndDate && (
+                  <Text
+                    style={
+                      styles.statusSecondary
+                    }
+                  >
+                    Trial ends{' '}
+                    {formatDate(
+                      accessState.trialEndDate,
+                    )}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {isActivePaid && (
+            <View
+              style={[
+                styles.statusCard,
+                styles.successCard,
+              ]}
+            >
+              <Check
+                size={20}
+                color={
+                  COLORS.success
+                }
+              />
+
+              <View
+                style={
+                  styles.statusTextWrap
+                }
+              >
+                <Text
+                  style={
+                    styles.statusTitle
+                  }
+                >
+                  {getPlanName(
+                    accessState.effectivePlan,
+                  )}{' '}
+                  Plan Active
+                </Text>
+
+                <Text
+                  style={
+                    styles.statusDescription
                   }
                 >
                   {
-                    accessState.trialDaysRemaining
+                    accessState.daysRemaining
                   }{' '}
-                  day
-                  {accessState.trialDaysRemaining ===
-                  1
-                    ? ''
-                    : 's'}
-                </Text>{' '}
-                remaining.
-              </Text>
-
-              {accessState.trialEndDate && (
-                <Text
-                  style={
-                    styles.statusSecondary
-                  }
-                >
-                  Trial ends{' '}
-                  {formatDate(
-                    accessState.trialEndDate,
-                  )}
+                  days remaining
                 </Text>
-              )}
-            </View>
-          </View>
-        )}
 
-        {isActivePaid && (
-          <View
-            style={[
-              styles.statusCard,
-              styles.successCard,
-            ]}
-          >
-            <Check
-              size={20}
-              color={
-                COLORS.success
-              }
-            />
+                 {accessState.daysRemaining > 0 &&
+                  accessState.daysRemaining <= 7 &&
+                  !hasPendingPayment && (
+                    <Text style={styles.statusSecondary}>
+                      Your subscription expires in{' '}
+                      {accessState.daysRemaining}{' '}
+                      {accessState.daysRemaining === 1
+                        ? 'day'
+                        : 'days'}.
+                      {' '}Review your subscription plans below
+                      to continue your access.
+                    </Text>
+                  )}
 
-            <View
-              style={
-                styles.statusTextWrap
-              }
-            >
-              <Text
-                style={
-                  styles.statusTitle
-                }
-              >
-                {getPlanName(
-                  accessState.effectivePlan,
-                )}{' '}
-                Plan Active
-              </Text>
-
-              <Text
-                style={
-                  styles.statusDescription
-                }
-              >
-                {
-                  accessState.daysRemaining
-                }{' '}
-                days remaining
-              </Text>
-
-               {accessState.daysRemaining > 0 &&
-                accessState.daysRemaining <= 7 &&
-                !hasPendingPayment && (
-                  <Text style={styles.statusSecondary}>
-                    Your subscription expires in{' '}
-                    {accessState.daysRemaining}{' '}
-                    {accessState.daysRemaining === 1
-                      ? 'day'
-                      : 'days'}.
-                    {' '}Review your subscription plans below
-                    to continue your access.
+                {currentSubscription?.endDate && (
+                  <Text
+                    style={
+                      styles.statusSecondary
+                    }
+                  >
+                    Valid until{' '}
+                    {formatDate(
+                      currentSubscription.endDate,
+                    )}
                   </Text>
                 )}
-
-              {currentSubscription?.endDate && (
-                <Text
-                  style={
-                    styles.statusSecondary
-                  }
-                >
-                  Valid until{' '}
-                  {formatDate(
-                    currentSubscription.endDate,
-                  )}
-                </Text>
-              )}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {isCancellationScheduled && (
-          <View
-            style={[
-              styles.statusCard,
-              styles.warningCard,
-            ]}
-          >
-            <Clock3
-              size={20}
-              color={
-                COLORS.warning
-              }
-            />
-
-            <View
-              style={
-                styles.statusTextWrap
-              }
-            >
-              <Text
-                style={
-                  styles.statusTitle
-                }
-              >
-                Renewal Cancelled
-              </Text>
-
-              <Text
-                style={
-                  styles.statusDescription
-                }
-              >
-                Your current access
-                remains available until{' '}
-                {formatDate(
-                  currentSubscription?.endDate,
-                )}
-                .
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {isExpired && (
-          <View
-            style={[
-              styles.statusCard,
-              styles.dangerCard,
-            ]}
-          >
-            <Clock3
-              size={20}
-              color={
-                COLORS.danger
-              }
-            />
-
-            <View
-              style={
-                styles.statusTextWrap
-              }
-            >
-              <Text
-                style={
-                  styles.statusTitle
-                }
-              >
-                Subscription Required
-              </Text>
-
-              <Text
-                style={
-                  styles.statusDescription
-                }
-              >
-                Your trial or paid
-                subscription has
-                expired. Choose a plan
-                below to continue using
-                subscription features.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {hasPendingPayment &&
-          accessState.pendingPayment && (
+          {isCancellationScheduled && (
             <View
               style={[
                 styles.statusCard,
                 styles.warningCard,
               ]}
             >
-              <WalletCards
+              <Clock3
                 size={20}
                 color={
                   COLORS.warning
@@ -951,7 +946,7 @@ export default function SubscriptionScreen() {
                     styles.statusTitle
                   }
                 >
-                  Payment Under Review
+                  Renewal Cancelled
                 </Text>
 
                 <Text
@@ -959,40 +954,25 @@ export default function SubscriptionScreen() {
                     styles.statusDescription
                   }
                 >
-                  Your{' '}
-                  {getPlanName(
-                    accessState
-                      .pendingPayment
-                      .plan,
-                  )}{' '}
-                  payment is waiting
-                  for Admin verification.
-                </Text>
-
-                <Text
-                  style={
-                    styles.statusSecondary
-                  }
-                >
-                  Reference:{' '}
-                  {accessState
-                    .pendingPayment
-                    .paymentReference ||
-                    '—'}
+                  Your current access
+                  remains available until{' '}
+                  {formatDate(
+                    currentSubscription?.endDate,
+                  )}
+                  .
                 </Text>
               </View>
             </View>
           )}
 
-        {!hasPendingPayment &&
-          latestRejectedPayment && (
+          {isExpired && (
             <View
               style={[
                 styles.statusCard,
                 styles.dangerCard,
               ]}
             >
-              <WalletCards
+              <Clock3
                 size={20}
                 color={
                   COLORS.danger
@@ -1009,8 +989,7 @@ export default function SubscriptionScreen() {
                     styles.statusTitle
                   }
                 >
-                  Previous Payment
-                  Rejected
+                  Subscription Required
                 </Text>
 
                 <Text
@@ -1018,37 +997,204 @@ export default function SubscriptionScreen() {
                     styles.statusDescription
                   }
                 >
-                  {getPlanName(
-                    latestRejectedPayment.plan,
-                  )}{' '}
-                  payment was not
-                  approved.
+                  Your trial or paid
+                  subscription has
+                  expired. Choose a plan
+                  below to continue using
+                  subscription features.
                 </Text>
+              </View>
+            </View>
+          )}
 
-                {latestRejectedPayment.rejectionReason ? (
+          {hasPendingPayment &&
+            accessState.pendingPayment && (
+              <View
+                style={[
+                  styles.statusCard,
+                  styles.warningCard,
+                ]}
+              >
+                <WalletCards
+                  size={20}
+                  color={
+                    COLORS.warning
+                  }
+                />
+
+                <View
+                  style={
+                    styles.statusTextWrap
+                  }
+                >
+                  <Text
+                    style={
+                      styles.statusTitle
+                    }
+                  >
+                    Payment Under Review
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.statusDescription
+                    }
+                  >
+                    Your{' '}
+                    {getPlanName(
+                      accessState
+                        .pendingPayment
+                        .plan,
+                    )}{' '}
+                    payment is waiting
+                    for Admin verification.
+                  </Text>
+
                   <Text
                     style={
                       styles.statusSecondary
                     }
                   >
-                    Reason:{' '}
-                    {
-                      latestRejectedPayment.rejectionReason
-                    }
+                    Reference:{' '}
+                    {accessState
+                      .pendingPayment
+                      .paymentReference ||
+                      '—'}
                   </Text>
-                ) : null}
+                </View>
               </View>
+            )}
+
+          {!hasPendingPayment &&
+            latestRejectedPayment && (
+              <View
+                style={[
+                  styles.statusCard,
+                  styles.dangerCard,
+                ]}
+              >
+                <WalletCards
+                  size={20}
+                  color={
+                    COLORS.danger
+                  }
+                />
+
+                <View
+                  style={
+                    styles.statusTextWrap
+                  }
+                >
+                  <Text
+                    style={
+                      styles.statusTitle
+                    }
+                  >
+                    Previous Payment
+                    Rejected
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.statusDescription
+                    }
+                  >
+                    {getPlanName(
+                      latestRejectedPayment.plan,
+                    )}{' '}
+                    payment was not
+                    approved.
+                  </Text>
+
+                  {latestRejectedPayment.rejectionReason ? (
+                    <Text
+                      style={
+                        styles.statusSecondary
+                      }
+                    >
+                      Reason:{' '}
+                      {
+                        latestRejectedPayment.rejectionReason
+                      }
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            )}
+
+          {/* ================================================= */}
+          {/* BASIC TRIAL ENTITLEMENTS */}
+          {/* ================================================= */}
+
+          {isTrial && (
+            <View
+              style={
+                styles.trialInfoCard
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Your Trial Includes
+              </Text>
+
+              <Text
+                style={
+                  styles.trialLimitText
+                }
+              >
+                {
+                  accessState
+                    .limits
+                    .maxPackages
+                }{' '}
+                packages
+              </Text>
+
+              <Text
+                style={
+                  styles.trialLimitText
+                }
+              >
+                {
+                  accessState
+                    .limits
+                    .maxPortfolioImages
+                }{' '}
+                portfolio images
+              </Text>
+
+              <Text
+                style={
+                  styles.trialLimitText
+                }
+              >
+                {
+                  accessState
+                    .limits
+                    .maxImagesPerPackage
+                }{' '}
+                images per package
+              </Text>
+
+              <Text
+                style={
+                  styles.trialNotice
+                }
+              >
+                Trial provides Basic-level
+                access only. Growth and
+                Premium promotional
+                features are not included.
+              </Text>
             </View>
           )}
 
-        {/* ================================================= */}
-        {/* BASIC TRIAL ENTITLEMENTS */}
-        {/* ================================================= */}
-
-        {isTrial && (
           <View
             style={
-              styles.trialInfoCard
+              styles.sectionHeader
             }
           >
             <Text
@@ -1056,163 +1202,254 @@ export default function SubscriptionScreen() {
                 styles.sectionTitle
               }
             >
-              Your Trial Includes
+              Choose Your Plan
             </Text>
 
             <Text
               style={
-                styles.trialLimitText
+                styles.sectionSubtitle
               }
             >
-              {
-                accessState
-                  .limits
-                  .maxPackages
-              }{' '}
-              packages
-            </Text>
-
-            <Text
-              style={
-                styles.trialLimitText
-              }
-            >
-              {
-                accessState
-                  .limits
-                  .maxPortfolioImages
-              }{' '}
-              portfolio images
-            </Text>
-
-            <Text
-              style={
-                styles.trialLimitText
-              }
-            >
-              {
-                accessState
-                  .limits
-                  .maxImagesPerPackage
-              }{' '}
-              images per package
-            </Text>
-
-            <Text
-              style={
-                styles.trialNotice
-              }
-            >
-              Trial provides Basic-level
-              access only. Growth and
-              Premium promotional
-              features are not included.
+              Monthly subscription ·
+              manual Easypaisa payment
             </Text>
           </View>
-        )}
 
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            Choose Your Plan
-          </Text>
+          {/* ================================================= */}
+          {/* PLANS */}
+          {/* ================================================= */}
 
-          <Text
-            style={
-              styles.sectionSubtitle
-            }
-          >
-            Monthly subscription ·
-            manual Easypaisa payment
-          </Text>
-        </View>
+          {plans.map(
+            (plan) => {
+              const isCurrentPaidPlan =
+                isActivePaid &&
+                currentSubscription?.plan ===
+                  plan.key;
 
-        {/* ================================================= */}
-        {/* PLANS */}
-        {/* ================================================= */}
-
-        {plans.map(
-          (plan) => {
-            const isCurrentPaidPlan =
-              isActivePaid &&
-              currentSubscription?.plan ===
-                plan.key;
-
-            const highlights =
-              PLAN_HIGHLIGHTS[
-                plan.key
-              ] || [];
-
-            const PlanIcon =
-              plan.key ===
-              SubscriptionPlan.PREMIUM
-                ? Crown
-                : plan.key ===
-                    SubscriptionPlan.GROWTH
-                  ? Star
-                  : null;
-
-            return (
-              <View
-                key={
+              const highlights =
+                PLAN_HIGHLIGHTS[
                   plan.key
-                }
-                style={[
-                  styles.planCard,
+                ] || [];
 
-                  plan.isMostPopular &&
-                    styles.popularPlanCard,
+              const PlanIcon =
+                plan.key ===
+                SubscriptionPlan.PREMIUM
+                  ? Crown
+                  : plan.key ===
+                      SubscriptionPlan.GROWTH
+                    ? Star
+                    : null;
 
-                  selectedPlan?.key ===
-                    plan.key &&
-                    styles.selectedPlanCard,
-                ]}
-              >
-                {plan.isMostPopular && (
-                  <View
-                    style={
-                      styles.popularBadge
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.popularBadgeText
-                      }
-                    >
-                      MOST POPULAR
-                    </Text>
-                  </View>
-                )}
-
+              return (
                 <View
-                  style={
-                    styles.planHeader
+                  key={
+                    plan.key
                   }
+                  style={[
+                    styles.planCard,
+
+                    plan.isMostPopular &&
+                      styles.popularPlanCard,
+
+                    selectedPlan?.key ===
+                      plan.key &&
+                      styles.selectedPlanCard,
+                  ]}
                 >
-                  {PlanIcon && (
+                  {plan.isMostPopular && (
                     <View
                       style={
-                        styles.planIcon
+                        styles.popularBadge
                       }
                     >
-                      <PlanIcon
-                        size={18}
-                        color={
-                          plan.key ===
-                          SubscriptionPlan.PREMIUM
-                            ? COLORS.gold
-                            : COLORS.primary
+                      <Text
+                        style={
+                          styles.popularBadgeText
                         }
-                      />
+                      >
+                        MOST POPULAR
+                      </Text>
                     </View>
                   )}
+
+                  <View
+                    style={
+                      styles.planHeader
+                    }
+                  >
+                    {PlanIcon && (
+                      <View
+                        style={
+                          styles.planIcon
+                        }
+                      >
+                        <PlanIcon
+                          size={18}
+                          color={
+                            plan.key ===
+                            SubscriptionPlan.PREMIUM
+                              ? COLORS.gold
+                              : COLORS.primary
+                          }
+                        />
+                      </View>
+                    )}
+
+                    <View
+                      style={{
+                        flex: 1,
+                      }}
+                    >
+                      <Text
+                        style={
+                          styles.planName
+                        }
+                      >
+                        {plan.name}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.planPrice
+                        }
+                      >
+                        {
+                          plan.priceLabel
+                        }
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text
+                    style={
+                      styles.planDescription
+                    }
+                  >
+                    {plan.description}
+                  </Text>
+
+                  <View
+                    style={
+                      styles.highlights
+                    }
+                  >
+                    {highlights.map(
+                      (
+                        highlight,
+                      ) => (
+                        <View
+                          key={
+                            highlight
+                          }
+                          style={
+                            styles.highlightRow
+                          }
+                        >
+                          <View
+                            style={
+                              styles.checkCircle
+                            }
+                          >
+                            <Check
+                              size={11}
+                              color={
+                                COLORS.primary
+                              }
+                              strokeWidth={
+                                3
+                              }
+                            />
+                          </View>
+
+                          <Text
+                            style={
+                              styles.highlightText
+                            }
+                          >
+                            {
+                              highlight
+                            }
+                          </Text>
+                        </View>
+                      ),
+                    )}
+                  </View>
+
+                  {isCurrentPaidPlan &&
+                  !isCancellationScheduled ? (
+                    <View
+                      style={
+                        styles.currentPlanButton
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.currentPlanButtonText
+                        }
+                      >
+                        Current Plan
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.primaryButton,
+
+                        hasPendingPayment &&
+                          styles.disabledButton,
+                      ]}
+                      disabled={
+                        hasPendingPayment
+                      }
+                      onPress={() =>
+                        selectPlan(
+                          plan,
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.primaryButtonText
+                        }
+                      >
+                        {isTrial &&
+                        plan.key ===
+                          SubscriptionPlan.BASIC
+                          ? 'Subscribe to Basic'
+                          : `Choose ${plan.name}`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            },
+          )}
+
+          {/* ================================================= */}
+          {/* PAYMENT */}
+          {/* ================================================= */}
+
+          {selectedPlan &&
+            !hasPendingPayment && (
+              <View
+                style={
+                  styles.paymentCard
+                }
+                onLayout={
+                  handlePaymentCardLayout
+                }
+              >
+                <View
+                  style={
+                    styles.paymentTitleRow
+                  }
+                >
+                  <WalletCards
+                    size={22}
+                    color={
+                      COLORS.primary
+                    }
+                  />
 
                   <View
                     style={{
@@ -1221,408 +1458,322 @@ export default function SubscriptionScreen() {
                   >
                     <Text
                       style={
-                        styles.planName
+                        styles.paymentTitle
                       }
                     >
-                      {plan.name}
+                      Pay with
+                      Easypaisa
                     </Text>
 
                     <Text
                       style={
-                        styles.planPrice
+                        styles.paymentSubtitle
                       }
                     >
-                      {
-                        plan.priceLabel
-                      }
+                      Manual payment ·
+                      Admin verification
                     </Text>
                   </View>
                 </View>
 
-                <Text
+                <View
                   style={
-                    styles.planDescription
+                    styles.selectedPlanSummary
                   }
                 >
-                  {plan.description}
+                  <Text
+                    style={
+                      styles.summaryLabel
+                    }
+                  >
+                    Selected Plan
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.summaryValue
+                    }
+                  >
+                    {
+                      selectedPlan.name
+                    }
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.summaryPrice
+                    }
+                  >
+                    {
+                      selectedPlan.priceLabel
+                    }
+                  </Text>
+                                </View>
+
+                {isActivePaid &&
+  currentSubscription?.plan === SubscriptionPlan.GROWTH &&
+  selectedPlan.key === SubscriptionPlan.PREMIUM && (
+                    <View style={{ marginTop: 18 }}>
+                      <Text style={styles.referenceLabel}>
+                        When should your new plan start?
+                      </Text>
+
+                      {(['IMMEDIATE', 'SCHEDULED'] as const).map(
+                        (option) => {
+                          const selected = activationType === option;
+
+                          return (
+                            <TouchableOpacity
+                              key={option}
+                              activeOpacity={0.8}
+                              onPress={() => setActivationType(option)}
+                              style={{
+                                marginTop: 10,
+                                padding: 14,
+                                borderRadius: 12,
+                                borderWidth: selected ? 2 : 1,
+                                borderColor: selected
+                                  ? COLORS.primary
+                                  : COLORS.border,
+                                backgroundColor: selected
+                                  ? COLORS.primaryLight
+                                  : COLORS.card,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: COLORS.text,
+                                  fontWeight: '800',
+                                }}
+                              >
+                                {selected ? '◉ ' : '○ '}
+                                {option === 'IMMEDIATE'
+                                  ? 'Immediate Upgrade'
+                                  : 'Scheduled Upgrade'}
+                              </Text>
+
+                              <Text
+                                style={{
+                                  color: COLORS.muted,
+                                  marginTop: 5,
+                                  fontSize: 12,
+                                }}
+                              >
+                                {option === 'IMMEDIATE'
+                                  ? 'Your new plan starts after Admin approval. Your current plan will be replaced.'
+                                  : `Your current plan stays active until ${formatDate(
+                                      currentSubscription?.endDate,
+                                    )}. The new plan starts after that.`}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        },
+                      )}
+                    </View>
+                  )}
+
+                <Text
+                  style={
+                    styles.instructionText
+                  }
+                >
+                  Send the exact amount
+                  shown above to the
+                  Easypaisa account below.
                 </Text>
 
                 <View
                   style={
-                    styles.highlights
+                    styles.accountDetails
                   }
                 >
-                  {highlights.map(
-                    (
-                      highlight,
-                    ) => (
-                      <View
-                        key={
-                          highlight
-                        }
-                        style={
-                          styles.highlightRow
-                        }
-                      >
-                        <View
-                          style={
-                            styles.checkCircle
-                          }
-                        >
-                          <Check
-                            size={11}
-                            color={
-                              COLORS.primary
-                            }
-                            strokeWidth={
-                              3
-                            }
-                          />
-                        </View>
+                  <Text
+                    style={
+                      styles.accountLabel
+                    }
+                  >
+                    Account Title
+                  </Text>
 
-                        <Text
-                          style={
-                            styles.highlightText
-                          }
-                        >
-                          {
-                            highlight
-                          }
-                        </Text>
-                      </View>
-                    ),
-                  )}
-                </View>
+                  <Text
+                    style={
+                      styles.accountValue
+                    }
+                  >
+                    {paymentInstructions
+                      ?.accountTitle ||
+                      'Not configured'}
+                  </Text>
 
-                {isCurrentPaidPlan &&
-                !isCancellationScheduled ? (
                   <View
                     style={
-                      styles.currentPlanButton
+                      styles.accountDivider
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.accountLabel
                     }
                   >
-                    <Text
-                      style={
-                        styles.currentPlanButtonText
-                      }
-                    >
-                      Current Plan
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.primaryButton,
+                    Easypaisa Number
+                  </Text>
 
-                      hasPendingPayment &&
-                        styles.disabledButton,
-                    ]}
-                    disabled={
-                      hasPendingPayment
-                    }
-                    onPress={() =>
-                      selectPlan(
-                        plan,
-                      )
+                  <Text
+                    style={
+                      styles.accountValue
                     }
                   >
-                    <Text
-                      style={
-                        styles.primaryButtonText
-                      }
-                    >
-                      {isTrial &&
-                      plan.key ===
-                        SubscriptionPlan.BASIC
-                        ? 'Subscribe to Basic'
-                        : `Choose ${plan.name}`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            );
-          },
-        )}
+                    {paymentInstructions
+                      ?.mobileNumber ||
+                      'Not configured'}
+                  </Text>
+                </View>
 
-        {/* ================================================= */}
-        {/* PAYMENT */}
-        {/* ================================================= */}
+                <Text
+                  style={
+                    styles.referenceLabel
+                  }
+                >
+                  Transaction / Reference
+                  ID
+                </Text>
 
-        {selectedPlan &&
-          !hasPendingPayment && (
-            <View
-              style={
-                styles.paymentCard
-              }
-            >
-              <View
-                style={
-                  styles.paymentTitleRow
-                }
-              >
-                <WalletCards
-                  size={22}
-                  color={
-                    COLORS.primary
+                <TextInput
+                  style={
+                    styles.referenceInput
+                  }
+                  value={
+                    paymentReference
+                  }
+                  onChangeText={
+                    setPaymentReference
+                  }
+                  placeholder="Enter Easypaisa transaction ID"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="characters"
+                  autoCorrect={
+                    false
+                  }
+                  maxLength={120}
+                  returnKeyType="done"
+                  onFocus={
+                    scrollToPaymentCard
                   }
                 />
 
-                <View
-                  style={{
-                    flex: 1,
+                <Text
+                  style={
+                    styles.referenceHelp
+                  }
+                >
+                  Enter the transaction
+                  reference shown in your
+                  Easypaisa payment
+                  confirmation.
+                </Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+
+                    submitting &&
+                      styles.disabledButton,
+                  ]}
+                  disabled={
+                    submitting
+                  }
+                  onPress={
+                    submitPayment
+                  }
+                >
+                  {submitting ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#FFFFFF"
+                    />
+                  ) : (
+                    <Text
+                      style={
+                        styles.submitButtonText
+                      }
+                    >
+                      Submit Payment for
+                      Verification
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={
+                    styles.changePlanButton
+                  }
+                  disabled={
+                    submitting
+                  }
+                  onPress={() => {
+                    setSelectedPlan(
+                      null,
+                    );
+
+                    setPaymentReference(
+                      '',
+                    );
                   }}
                 >
                   <Text
                     style={
-                      styles.paymentTitle
+                      styles.changePlanText
                     }
                   >
-                    Pay with
-                    Easypaisa
+                    Choose another plan
                   </Text>
-
-                  <Text
-                    style={
-                      styles.paymentSubtitle
-                    }
-                  >
-                    Manual payment ·
-                    Admin verification
-                  </Text>
-                </View>
+                </TouchableOpacity>
               </View>
+            )}
 
-              <View
-                style={
-                  styles.selectedPlanSummary
-                }
-              >
-                <Text
-                  style={
-                    styles.summaryLabel
-                  }
-                >
-                  Selected Plan
-                </Text>
+          {/* ================================================= */}
+          {/* CANCEL */}
+          {/* ================================================= */}
 
-                <Text
-                  style={
-                    styles.summaryValue
-                  }
-                >
-                  {
-                    selectedPlan.name
-                  }
-                </Text>
-
-                <Text
-                  style={
-                    styles.summaryPrice
-                  }
-                >
-                  {
-                    selectedPlan.priceLabel
-                  }
-                </Text>
-              </View>
-
-              <Text
-                style={
-                  styles.instructionText
-                }
-              >
-                Send the exact amount
-                shown above to the
-                Easypaisa account below.
-              </Text>
-
-              <View
-                style={
-                  styles.accountDetails
-                }
-              >
-                <Text
-                  style={
-                    styles.accountLabel
-                  }
-                >
-                  Account Title
-                </Text>
-
-                <Text
-                  style={
-                    styles.accountValue
-                  }
-                >
-                  {paymentInstructions
-                    ?.accountTitle ||
-                    'Not configured'}
-                </Text>
-
-                <View
-                  style={
-                    styles.accountDivider
-                  }
-                />
-
-                <Text
-                  style={
-                    styles.accountLabel
-                  }
-                >
-                  Easypaisa Number
-                </Text>
-
-                <Text
-                  style={
-                    styles.accountValue
-                  }
-                >
-                  {paymentInstructions
-                    ?.mobileNumber ||
-                    'Not configured'}
-                </Text>
-              </View>
-
-              <Text
-                style={
-                  styles.referenceLabel
-                }
-              >
-                Transaction / Reference
-                ID
-              </Text>
-
-              <TextInput
-                style={
-                  styles.referenceInput
-                }
-                value={
-                  paymentReference
-                }
-                onChangeText={
-                  setPaymentReference
-                }
-                placeholder="Enter Easypaisa transaction ID"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="characters"
-                autoCorrect={
-                  false
-                }
-                maxLength={120}
-              />
-
-              <Text
-                style={
-                  styles.referenceHelp
-                }
-              >
-                Enter the transaction
-                reference shown in your
-                Easypaisa payment
-                confirmation.
-              </Text>
-
+          {isActivePaid &&
+            !isCancellationScheduled && (
               <TouchableOpacity
-                style={[
-                  styles.submitButton,
-
-                  submitting &&
-                    styles.disabledButton,
-                ]}
+                style={
+                  styles.cancelButton
+                }
                 disabled={
-                  submitting
+                  cancelling
                 }
                 onPress={
-                  submitPayment
+                  handleCancel
                 }
-              >
-                {submitting ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#FFFFFF"
-                  />
-                ) : (
-                  <Text
-                    style={
-                      styles.submitButtonText
-                    }
-                  >
-                    Submit Payment for
-                    Verification
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={
-                  styles.changePlanButton
-                }
-                disabled={
-                  submitting
-                }
-                onPress={() => {
-                  setSelectedPlan(
-                    null,
-                  );
-
-                  setPaymentReference(
-                    '',
-                  );
-                }}
               >
                 <Text
                   style={
-                    styles.changePlanText
+                    styles.cancelButtonText
                   }
                 >
-                  Choose another plan
+                  {cancelling
+                    ? 'Cancelling…'
+                    : 'Cancel subscription renewal'}
                 </Text>
               </TouchableOpacity>
-            </View>
-          )}
+            )}
 
-        {/* ================================================= */}
-        {/* CANCEL */}
-        {/* ================================================= */}
-
-        {isActivePaid &&
-          !isCancellationScheduled && (
-            <TouchableOpacity
-              style={
-                styles.cancelButton
-              }
-              disabled={
-                cancelling
-              }
-              onPress={
-                handleCancel
-              }
-            >
-              <Text
-                style={
-                  styles.cancelButtonText
-                }
-              >
-                {cancelling
-                  ? 'Cancelling…'
-                  : 'Cancel subscription renewal'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-        <Text
-          style={
-            styles.footerText
-          }
-        >
-          Subscription payments are
-          manually verified by Eventify
-          Hub. Your current access will
-          not change until a submitted
-          payment is approved.
-        </Text>
-      </ScrollView>
+          <Text
+            style={
+              styles.footerText
+            }
+          >
+            Subscription payments are
+            manually verified by Eventify
+            Hub. Your current access will
+            not change until a submitted
+            payment is approved.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -1712,7 +1863,7 @@ const styles =
 
     content: {
       paddingHorizontal: 16,
-      paddingBottom: 40,
+      paddingBottom: 60,
     },
 
     centered: {

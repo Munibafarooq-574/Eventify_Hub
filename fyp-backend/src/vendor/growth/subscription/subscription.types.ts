@@ -21,6 +21,8 @@ export enum SubscriptionStatus {
 
   PENDING_PAYMENT = 'pending_payment',
 
+  SCHEDULED = 'scheduled',
+
   EXPIRED = 'expired',
 
 
@@ -105,3 +107,15 @@ export const SUBSCRIPTION_DURATION_DAYS = 30;
 
 export const DEMO_SUBSCRIPTION_DURATION_DAYS =
   SUBSCRIPTION_DURATION_DAYS;
+
+  export enum SubscriptionActivationType {
+  IMMEDIATE = 'immediate',
+  SCHEDULED = 'scheduled',
+}
+
+export enum SubscriptionPlanChangeType {
+  RENEWAL = 'renewal',
+  UPGRADE = 'upgrade',
+  DOWNGRADE = 'downgrade',
+  NEW_PURCHASE = 'new_purchase',
+}

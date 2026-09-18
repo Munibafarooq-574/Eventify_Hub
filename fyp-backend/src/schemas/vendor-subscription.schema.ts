@@ -15,7 +15,9 @@ import {
 import {
   PaymentProvider,
   PaymentStatus,
+  SubscriptionActivationType,
   SubscriptionPlan,
+  SubscriptionPlanChangeType,
   SubscriptionStatus,
 } from '../vendor/growth/subscription/subscription.types';
 
@@ -23,6 +25,26 @@ import {
   timestamps: true,
 })
 export class VendorSubscription extends Document {
+
+    @Prop({
+    type: String,
+    enum: SubscriptionActivationType,
+    default: SubscriptionActivationType.IMMEDIATE,
+  })
+  activationType: SubscriptionActivationType;
+
+  @Prop({
+    type: String,
+    enum: SubscriptionPlanChangeType,
+    default: SubscriptionPlanChangeType.NEW_PURCHASE,
+  })
+  planChangeType: SubscriptionPlanChangeType;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  scheduledActivationDate: Date | null;
   
   @Prop({
     type:
@@ -299,5 +321,17 @@ VendorSubscriptionSchema.index(
       paymentStatus:
         PaymentStatus.PENDING,
     },
+  },
+);
+
+// Allow only one current subscription per vendor.
+VendorSubscriptionSchema.index(
+  { vendorId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      isCurrent: true,
+    },
+    name: 'unique_current_subscription_per_vendor',
   },
 );
