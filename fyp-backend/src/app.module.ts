@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
@@ -22,7 +23,10 @@ import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
+
     ConfigModule.forRoot({ isGlobal: true }),
+
+    ScheduleModule.forRoot(),
     MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost/auth-db'),
     AuthModule,
     CategoryModule,

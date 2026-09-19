@@ -1,11 +1,12 @@
 // fyp-backend/src/vendor-availability/vendor-availability.service.ts
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { User } from 'src/schemas/user.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
+import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 
 import { SetAvailabilityDto } from './dto/set-availability.dto';
 
@@ -33,6 +34,7 @@ export class VendorAvailabilityService {
 
     @InjectModel(VendorOrder.name)
     private readonly vendorOrderModel: Model<VendorOrder>,
+    private readonly featureAccessService: FeatureAccessService,
   ) {}
 
   async getAvailability(vendorId: string) {
@@ -58,6 +60,13 @@ export class VendorAvailabilityService {
       throw new NotFoundException('Vendor not found');
     }
 
+    const hasAccess = await this.featureAccessService.hasActiveSubscription(vendorId);
+
+if (!hasAccess) {
+  throw new ForbiddenException(
+    'Subscription expired. Renew your plan to edit availability.',
+  );
+}
     const current =
       (user.availabilitySettings as any)?.toObject?.() ??
       user.availabilitySettings ??

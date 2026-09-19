@@ -5,14 +5,16 @@ import { User, UserSchema } from 'src/schemas/user.schema';
 import { VendorOrder, VendorOrderSchema } from 'src/schemas/vendor-order.schema';
 import { VendorAvailabilityService } from './vendor-availability.service';
 import { VendorAvailabilityController } from './vendor-availability.controller';
+import { VendorGrowthModule } from 'src/vendor/growth/vendor-growth.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: User.name, schema: UserSchema },
-      { name: VendorOrder.name, schema: VendorOrderSchema },
-    ]),
-  ],
+  VendorGrowthModule,
+  MongooseModule.forFeature([
+    { name: User.name, schema: UserSchema },
+    { name: VendorOrder.name, schema: VendorOrderSchema },
+  ]),
+],
   controllers: [VendorAvailabilityController],
   providers: [VendorAvailabilityService],
   exports: [VendorAvailabilityService],

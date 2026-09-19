@@ -1326,7 +1326,7 @@ isPaidPlan,
         { $currentDate: { updatedAt: true } },
         { new: true, session },
       )
-      .select('_id role created_at');
+      .select('_id role createdAt created_at');
 
     if (!vendor) {
       throw new NotFoundException('Vendor not found.');
@@ -1347,9 +1347,17 @@ isPaidPlan,
 
     if (current) return;
 
-    const vendorCreatedAt = vendor.created_at
-  ? new Date(vendor.created_at)
-  : new Date();
+    const vendorCreatedAt = (vendor as any).createdAt
+  ? new Date((vendor as any).createdAt)
+  : vendor.created_at
+    ? new Date(vendor.created_at)
+    : null;
+
+if (!vendorCreatedAt || !Number.isFinite(vendorCreatedAt.getTime())) {
+  throw new BadRequestException(
+    'Vendor creation date is missing or invalid. Trial cannot be initialized.',
+  );
+}
 
     const trialEndDate = new Date(vendorCreatedAt);
 

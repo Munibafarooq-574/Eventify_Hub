@@ -1,8 +1,20 @@
 //fyp-backend/src/vendor-availability/vendor-availability.controller.ts 
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
 import { VendorAvailabilityService } from './vendor-availability.service';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
 import { CheckAvailabilityDto } from './dto/check-availability.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 function buildRange(eventDate: string, startTime: string, durationMinutes: number) {
   const [h, m] = startTime.split(':').map(Number);
@@ -22,12 +34,23 @@ export class VendorAvailabilityController {
   }
 
   @Patch(':vendorId')
-  setAvailability(
-    @Param('vendorId') vendorId: string,
-    @Body() dto: SetAvailabilityDto,
+@UseGuards(JwtAuthGuard)
+setAvailability(
+  @Param('vendorId') vendorId: string,
+  @Body() dto: SetAvailabilityDto,
+  @Req() req: any,
+) {
+  if (
+    req.user?.role?.toLowerCase() !== 'vendor' ||
+    String(req.user?.id) !== String(vendorId)
   ) {
-    return this.service.setAvailability(vendorId, dto);
+    throw new ForbiddenException(
+      'You can only edit your own availability.',
+    );
   }
+
+  return this.service.setAvailability(vendorId, dto);
+}
 
   @Post('check')
   async check(@Body() dto: CheckAvailabilityDto) {
