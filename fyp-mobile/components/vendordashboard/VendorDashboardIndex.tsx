@@ -401,7 +401,7 @@ useFocusEffect(
         }
 
         const subscription = subscriptionAccess.subscription;
-        const isExpired = subscription?.status === SubscriptionStatus.EXPIRED;
+        const isExpired = false;
         const isExpiringSoon =
             subscription?.status === SubscriptionStatus.ACTIVE &&
             subscriptionAccess.isPaidPlan === true &&
@@ -551,6 +551,146 @@ useFocusEffect(
         );
     }
 
+    // Subscription access guard — before normal dashboard render.
+const subscriptionEndTime = subscriptionAccess?.subscription?.endDate
+    ? new Date(subscriptionAccess.subscription.endDate).getTime()
+    : NaN;
+
+const hasValidSubscription =
+    subscriptionAccess?.accessAllowed === true &&
+    subscriptionAccess.subscriptionRequired === false &&
+    Number.isFinite(subscriptionEndTime) &&
+    subscriptionEndTime > Date.now();
+
+if (!hasValidSubscription) {
+    return (
+        <View
+            style={[
+                styles.container,
+                {
+                    flex: 1,
+                    justifyContent: "center",
+                    padding: 24,
+                    backgroundColor: "#FFFFFF",
+                },
+            ]}
+        >
+            <StatusBar barStyle="dark-content" />
+
+            <Ionicons
+                name="lock-closed-outline"
+                size={56}
+                color="#7D0C72"
+                style={{ alignSelf: "center", marginBottom: 18 }}
+            />
+
+            <Text
+                style={{
+                    fontSize: 24,
+                    fontWeight: "700",
+                    color: "#25003F",
+                    textAlign: "center",
+                    marginBottom: 12,
+                }}
+            >
+                {subscriptionError
+                    ? "Subscription Verification Failed"
+                    : "Subscription Required"}
+            </Text>
+
+            <Text
+                style={{
+                    fontSize: 15,
+                    color: "#687076",
+                    textAlign: "center",
+                    marginBottom: 28,
+                }}
+            >
+                {subscriptionError
+                    ? "We could not verify your subscription. Please retry."
+                    : "Your subscription is inactive. Renew your plan to restore your dashboard and become visible to new clients. You can still manage existing bookings and chats."}
+            </Text>
+
+            <TouchableOpacity
+                onPress={() => {
+                    if (subscriptionError) {
+                        void fetchSubscriptionAccess();
+                    } else {
+                        router.push({
+                        pathname: "/subscriptionscreen",
+                        params: { vendorId: String(vendorId) },
+                        });
+                    }
+                }}
+                style={{
+                    backgroundColor: "#7D0C72",
+                    padding: 16,
+                    borderRadius: 12,
+                    marginBottom: 12,
+                }}
+            >
+                <Text
+                    style={{
+                        color: "#FFFFFF",
+                        textAlign: "center",
+                        fontWeight: "700",
+                    }}
+                >
+                    {subscriptionError ? "Retry" : "Choose / Renew Plan"}
+                </Text>
+            </TouchableOpacity>
+
+                    <TouchableOpacity
+                onPress={() => router.push("/vendorordersummary")}
+                style={{
+                    padding: 15,
+                    borderWidth: 1,
+                    borderColor: "#7D0C72",
+                    borderRadius: 12,
+                    marginBottom: 12,
+                }}
+            >
+                <Text
+                    style={{
+                        color: "#7D0C72",
+                        textAlign: "center",
+                        fontWeight: "600",
+                    }}
+                >
+                    My Orders
+                </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+                onPress={() => router.push("/vendormyevents")}
+                style={{
+                    padding: 15,
+                    borderWidth: 1,
+                    borderColor: "#7D0C72",
+                    borderRadius: 12,
+                    marginBottom: 12,
+                }}
+            >
+                <Text style={{ color: "#7D0C72", textAlign: "center" }}>
+                    My Events
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                onPress={() => router.push("/vendormessages")}
+                style={{
+                    padding: 15,
+                    borderWidth: 1,
+                    borderColor: "#7D0C72",
+                    borderRadius: 12,
+                }}
+            >
+                <Text style={{ color: "#7D0C72", textAlign: "center" }}>
+                    Existing Client Chats
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />

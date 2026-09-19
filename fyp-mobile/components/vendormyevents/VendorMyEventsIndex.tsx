@@ -1,6 +1,7 @@
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 import getVendorOrders from "@/services/getVendorOrders";
+import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
 import getVendorAvailability from "@/services/getVendorAvailability";
 import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -143,6 +144,41 @@ const MyEventsScreen = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  useEffect(() => {
+  let mounted = true;
+
+  setCanEditAvailability(false);
+
+  if (!vendorId) return;
+
+  const checkAccess = async () => {
+    try {
+      const access = await getSubscriptionAccessState(vendorId);
+
+      const endTime = access.subscription?.endDate
+        ? new Date(access.subscription.endDate).getTime()
+        : NaN;
+
+      if (mounted) {
+        setCanEditAvailability(
+          access.accessAllowed === true &&
+          access.subscriptionRequired === false &&
+          Number.isFinite(endTime) &&
+          endTime > Date.now()
+        );
+      }
+    } catch {
+      if (mounted) setCanEditAvailability(false);
+    }
+  };
+
+  void checkAccess();
+
+  return () => {
+    mounted = false;
+  };
+}, [vendorId]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchData();
@@ -212,6 +248,8 @@ const events = useMemo(() => {
 const isBlockedDate = useCallback((date: string) => {
   return availability?.blockedDates?.some((blockedDate) => toKey(blockedDate) === date) || false;
 }, [availability]);
+
+const [canEditAvailability, setCanEditAvailability] = useState(false);
 
 const getDaySlotConfig = useCallback((date: string) => {
   const dayCode = getDayCode(date);
@@ -470,10 +508,16 @@ return (
           {availabilityState}
         </Text>
       </View>
-      <TouchableOpacity style={styles.editAvailabilityButton} onPress={() => setAvailabilityEditorVisible(true)} activeOpacity={0.8}>
-        <Ionicons name="create-outline" size={15} color="#FFFFFF" />
-        <Text style={styles.editAvailabilityText}>Edit</Text>
-      </TouchableOpacity>
+     {canEditAvailability && (
+  <TouchableOpacity
+    style={styles.editAvailabilityButton}
+    onPress={() => setAvailabilityEditorVisible(true)}
+    activeOpacity={0.8}
+  >
+    <Ionicons name="create-outline" size={15} color="#FFFFFF" />
+    <Text style={styles.editAvailabilityText}>Edit</Text>
+  </TouchableOpacity>
+)}
     </View>
   </View>
 
@@ -758,7 +802,7 @@ ListEmptyComponent={
       <BottomNavigationFinal />
 
       <VendorAvailabilityEditor
-  visible={availabilityEditorVisible}
+  visible={availabilityEditorVisible && canEditAvailability}
   vendorId={vendorId}
   availability={availability}
   selectedDate={selectedDate}

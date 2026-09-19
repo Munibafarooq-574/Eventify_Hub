@@ -152,7 +152,7 @@ export interface SubscriptionAccessState {
   limits: SubscriptionLimits;
 
   isPaidPlan: boolean;
-
+   accessAllowed: boolean;
   subscriptionRequired: boolean;
 
   hasPendingPayment: boolean;

@@ -1,4 +1,5 @@
 import Login from '@/services/login';
+import { getSubscriptionAccessState } from '@/services/getSubscriptionAccessState';
 import { saveSecureData, saveUserData } from '@/store';
 import { connectSocket, registerUser } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
@@ -85,10 +86,43 @@ export default function LoginScreen() {
       await approvalResponse.json();
 
     switch (approvalData?.status) {
-      case "APPROVED":
-        router.replace("/vendordashboard");
-        break;
+      case "APPROVED": {
+  try {
+    const access = await getSubscriptionAccessState(
+      String(response.user._id),
+    );
 
+    const endDate = access.subscription?.endDate;
+    const isWithinSubscriptionPeriod =
+      Boolean(endDate) &&
+      new Date(endDate!).getTime() > Date.now();
+
+    if (
+      access.accessAllowed &&
+      !access.subscriptionRequired &&
+      isWithinSubscriptionPeriod
+    ) {
+      router.replace("/vendordashboard");
+    } else {
+  router.replace("/vendordashboard");
+}
+  } catch (subscriptionError) {
+    console.error(
+      "Subscription check after login failed:",
+      subscriptionError,
+    );
+
+    Toast.show({
+      type: "error",
+      text1: "Subscription verification failed",
+      text2: "Please try logging in again.",
+    });
+
+    // Do not open the dashboard when verification fails.
+  }
+
+  break;
+}
       case "INCOMPLETE":
         router.replace("/vendorcontactdetails");
         break;
