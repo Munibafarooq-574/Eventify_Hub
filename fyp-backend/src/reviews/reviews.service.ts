@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types, FilterQuery } from 'mongoose';
-
+import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewQueryDto, ReviewSortOption } from './dto/review-query.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
@@ -16,10 +16,11 @@ import { Review } from 'src/schemas/review.schema';
 
 @Injectable()
 export class ReviewsService {
-    constructor(
-        @InjectModel(Review.name)
-        private reviewModel: Model<Review>,
-    ) {}
+   constructor(
+    @InjectModel(Review.name)
+    private reviewModel: Model<Review>,
+    private readonly featureAccessService: FeatureAccessService,
+) {}
 
     async createReview(
         userId: string,
@@ -118,9 +119,7 @@ export class ReviewsService {
                     totalReviews: -1,
                 },
             },
-            {
-                $limit: limit,
-            },
+
             {
                 $lookup: {
                     from: 'users',
@@ -162,7 +161,21 @@ export class ReviewsService {
             },
         ];
 
-        return await this.reviewModel.aggregate(pipeline).exec();
+        const rankedVendors = await this.reviewModel.aggregate(pipeline).exec();
+
+const accessResults = await Promise.all(
+    rankedVendors.map(async (item) => ({
+        item,
+        eligible: await this.featureAccessService.hasActiveSubscription(
+            item.vendorId.toString(),
+        ),
+    })),
+);
+
+return accessResults
+    .filter(({ eligible }) => eligible)
+    .slice(0, limit)
+    .map(({ item }) => item);
     }
 
     async getVendorReviewSummary(vendorId: string) {
