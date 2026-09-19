@@ -61,6 +61,37 @@ const impressedCampaignIds = new Set<string>();
  */
 const CLICK_DEBOUNCE_MS = 1500;
 
+/*
+ * ---- Auto-scroll / carousel geometry ----
+ *
+ * CARD_WIDTH must match styles.card.width below.
+ * CARD_MARGIN must match styles.card.marginRight below.
+ * ITEM_SIZE is the horizontal distance from one card's start
+ * to the next card's start.
+ */
+const CARD_WIDTH = 300;
+const CARD_MARGIN = 12;
+const ITEM_SIZE = CARD_WIDTH + CARD_MARGIN;
+
+/*
+ * How long (ms) each ad stays centered on screen before the
+ * carousel auto-advances to the next one.
+ */
+const AUTO_SCROLL_INTERVAL_MS = 2000;
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+/*
+ * Horizontal padding on both sides of the list so that a
+ * CARD_WIDTH-wide card lands exactly in the horizontal center
+ * of the screen when it is scrolled to. Falls back to a sane
+ * minimum on very wide screens/tablets.
+ */
+const SIDE_SPACING = Math.max(
+  (SCREEN_WIDTH - CARD_WIDTH) / 2,
+  16,
+);
+
 const SponsoredForYou: React.FC = () => {
   const [campaigns, setCampaigns] = useState<
     SponsoredCampaign[]
@@ -68,6 +99,28 @@ const SponsoredForYou: React.FC = () => {
 
   const [loading, setLoading] =
     useState<boolean>(true);
+
+  const flatListRef =
+    useRef<FlatList<SponsoredCampaign> | null>(
+      null,
+    );
+
+  /*
+   * Tracks which card is currently considered "active"
+   * (centered) for the auto-scroll carousel. Kept in a ref
+   * (not state) so the interval callback always reads the
+   * latest value without needing to be recreated every tick.
+   */
+  const currentIndexRef = useRef<number>(0);
+
+  /*
+   * Holds the running auto-scroll timer so it can be cleared
+   * and restarted (e.g. when the user manually scrolls).
+   */
+  const autoScrollTimerRef =
+    useRef<ReturnType<typeof setInterval> | null>(
+      null,
+    );
 
   /*
    * Keep refs for every rendered campaign card.
@@ -390,20 +443,124 @@ const SponsoredForYou: React.FC = () => {
     checkAllCampaignVisibility,
   ]);
 
+  /*
+   * ---- Auto-scroll carousel ----
+   *
+   * Advances to the next card every AUTO_SCROLL_INTERVAL_MS,
+   * scrolling it to the horizontal center of the screen.
+   * Loops back to the first card after the last one.
+   */
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
+    }
+  }, []);
+
+  const startAutoScroll = useCallback(() => {
+    stopAutoScroll();
+
+    if (campaigns.length <= 1) {
+      // Nothing to rotate between.
+      return;
+    }
+
+    autoScrollTimerRef.current = setInterval(
+      () => {
+        const nextIndex =
+          (currentIndexRef.current + 1) %
+          campaigns.length;
+
+        currentIndexRef.current = nextIndex;
+
+        flatListRef.current?.scrollToOffset({
+          offset: nextIndex * ITEM_SIZE,
+          animated: true,
+        });
+
+        // Re-check visibility so impressions still fire
+        // correctly for the newly-centered card.
+        setTimeout(() => {
+          checkAllCampaignVisibility();
+        }, 350);
+      },
+      AUTO_SCROLL_INTERVAL_MS,
+    );
+  }, [
+    campaigns.length,
+    stopAutoScroll,
+    checkAllCampaignVisibility,
+  ]);
+
+  // (Re)start the auto-scroll loop whenever the campaign list
+  // changes, and always clean up on unmount.
+  useEffect(() => {
+    if (loading || campaigns.length === 0) {
+      return;
+    }
+
+    currentIndexRef.current = 0;
+    startAutoScroll();
+
+    return () => {
+      stopAutoScroll();
+    };
+  }, [
+    campaigns,
+    loading,
+    startAutoScroll,
+    stopAutoScroll,
+  ]);
+
+  /*
+   * User has touched the list — pause auto-scroll so it
+   * doesn't fight with their manual swipe.
+   */
+  const handleScrollBeginDrag =
+    useCallback(() => {
+      stopAutoScroll();
+    }, [stopAutoScroll]);
+
+  /*
+   * List has settled after a manual scroll (drag release or
+   * momentum finish). Sync currentIndexRef to wherever the
+   * user actually landed, re-check visibility, then resume
+   * the auto-scroll loop from that position.
+   */
   const handleListScrollEnd = useCallback(
     (
-      _event:
+      event:
         NativeSyntheticEvent<NativeScrollEvent>,
     ) => {
-      /*
-       * Wait until the horizontal list settles before
-       * checking which campaign is actually visible.
-       */
+      const offsetX =
+        event.nativeEvent.contentOffset.x;
+
+      const nearestIndex = Math.round(
+        offsetX / ITEM_SIZE,
+      );
+
+      const clampedIndex = Math.max(
+        0,
+        Math.min(
+          nearestIndex,
+          Math.max(campaigns.length - 1, 0),
+        ),
+      );
+
+      currentIndexRef.current = clampedIndex;
+
       setTimeout(() => {
         checkAllCampaignVisibility();
       }, 100);
+
+      // Resume auto-rotation from the card the user left on.
+      startAutoScroll();
     },
-    [checkAllCampaignVisibility],
+    [
+      campaigns.length,
+      checkAllCampaignVisibility,
+      startAutoScroll,
+    ],
   );
 
   /*
@@ -459,6 +616,9 @@ const SponsoredForYou: React.FC = () => {
         campaign._id,
       ).catch(() => {});
     }
+
+    // Pause the carousel once the user is navigating away.
+    stopAutoScroll();
 
     router.push({
       pathname: "/vendorprofiledetails",
@@ -663,6 +823,7 @@ const SponsoredForYou: React.FC = () => {
   return (
     <View style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={campaigns}
         horizontal
         keyExtractor={(item) =>
@@ -672,8 +833,20 @@ const SponsoredForYou: React.FC = () => {
         showsHorizontalScrollIndicator={
           false
         }
-        contentContainerStyle={
-          styles.list
+        contentContainerStyle={[
+          styles.list,
+          { paddingHorizontal: SIDE_SPACING },
+        ]}
+        snapToInterval={ITEM_SIZE}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        getItemLayout={(_, index) => ({
+          length: ITEM_SIZE,
+          offset: ITEM_SIZE * index,
+          index,
+        })}
+        onScrollBeginDrag={
+          handleScrollBeginDrag
         }
         onMomentumScrollEnd={
           handleListScrollEnd
@@ -701,13 +874,14 @@ const styles = StyleSheet.create({
   },
 
   list: {
-    paddingHorizontal: 16,
+    // paddingHorizontal is applied dynamically above
+    // (SIDE_SPACING) so each card centers on screen.
   },
 
   card: {
-    width: 300,
+    width: CARD_WIDTH,
     height: 200,
-    marginRight: 12,
+    marginRight: CARD_MARGIN,
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: COLORS.soft,

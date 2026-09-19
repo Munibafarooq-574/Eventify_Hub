@@ -112,7 +112,7 @@ const PLAN_HIGHLIGHTS: Partial<
   [SubscriptionPlan.BASIC]: [
     'Up to 5 packages',
     'Up to 10 portfolio images',
-    'Up to 3 images per package',
+    'Up to 5 images per package',
     'Standard marketplace listing',
     'Bookings, messages & availability',
     'Reviews and basic business stats',

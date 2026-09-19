@@ -4,7 +4,7 @@
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import getVendorReviewSummary from '@/services/getVendorReviewSummary';
 import postVendorReview from '@/services/postVendorReview';
-import { uploadMultipleImages } from '@/services/uploadMultipleImages';
+import { uploadReviewMedia } from '@/services/uploadReviewMedia';
 import {
   getUserData,
   saveSecureData,
@@ -915,16 +915,23 @@ const todayAvailabilitySummary =
               },
             );
 
-          const uploadedUrls =
-            await uploadMultipleImages(
-              userId,
-              uploadAssets,
-              (progress) => {
-                setUploadProgress(
-                  progress,
-                );
-              },
-            );
+          // Get existing JWT token
+const token = await getSecureData('token');
+
+if (!token) {
+  throw new Error(
+    'Your session has expired. Please log in again.',
+  );
+}
+
+// Upload review media using dedicated API
+const uploadedUrls = await uploadReviewMedia(
+  uploadAssets,
+  token,
+  (progress) => {
+    setUploadProgress(progress);
+  },
+);
 
           const uploadedMedia:
             ReviewMedia[] =
@@ -966,11 +973,23 @@ const todayAvailabilitySummary =
               error,
           );
 
-          alert(
-            error?.response
-              ?.data?.message ||
-              'Failed to upload media. Please try again.',
-          );
+          const serverMessage =
+  error?.response?.data?.message;
+
+const errorMessage =
+  typeof serverMessage === 'string'
+    ? serverMessage
+    : typeof serverMessage?.message === 'string'
+      ? serverMessage.message
+      : typeof error?.message === 'string'
+        ? error.message
+        : 'Failed to upload media. Please try again.';
+
+Toast.show({
+  type: 'error',
+  text1: 'Media Upload Failed',
+  text2: errorMessage,
+});
         } finally {
           setUploadingMedia(
             false,

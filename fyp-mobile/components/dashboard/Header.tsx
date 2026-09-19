@@ -8,6 +8,7 @@ import { useFocusEffect } from "expo-router/react-navigation";
 import React, { useCallback, useState } from 'react';
 import {
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -192,44 +193,58 @@ const Header: React.FC = () => {
         </View>
 
         {/* Dropdown */}
-        {showDropdown && results.length > 0 && (
+        {showDropdown && (
           <View style={styles.dropdownContainer}>
-            {results.map((item: any) => (
-              <TouchableOpacity
-                key={item._id}
-                style={styles.dropdownItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setSearchQuery(item.name);
-                  setShowDropdown(false);
-                  router.push(`/vendorprofiledetails?id=${item._id}`)
-                }}
+            {results.length > 0 ? (
+              <ScrollView
+                style={{ maxHeight: 240 }}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
               >
-                <View style={styles.dropdownAvatar}>
-                  <Text style={styles.dropdownAvatarText}>
-                    {item.name ? item.name.charAt(0).toUpperCase() : '?'}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.dropdownNameRow}>
-                    <Text style={styles.dropdownName}>{item.name}</Text>
+                {results.map((item: any) => (
+                  <TouchableOpacity
+                    key={item._id}
+                    style={styles.dropdownItem}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSearchQuery(item.name);
+                      setShowDropdown(false);
+                      router.push(`/vendorprofiledetails?id=${item._id}`)
+                    }}
+                  >
+                    <View style={styles.dropdownAvatar}>
+                      <Text style={styles.dropdownAvatarText}>
+                        {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.dropdownNameRow}>
+                        <Text style={styles.dropdownName}>{item.name}</Text>
 
-                    {badgeMap[item._id]?.hasBadges && (
-                      <View style={styles.badgeDot}>
-                        <Text style={styles.badgeIcon}>🏅</Text>
+                        {badgeMap[item._id]?.hasBadges && (
+                          <View style={styles.badgeDot}>
+                            <Text style={styles.badgeIcon}>🏅</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
 
-                  {!!item.contactDetails?.brandName && (
-                    <Text style={styles.dropdownBrand}>
-                      {item.contactDetails?.brandName}
-                    </Text>
-                  )}
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            ))}
+                      {!!item.contactDetails?.brandName && (
+                        <Text style={styles.dropdownBrand}>
+                          {item.contactDetails?.brandName}
+                        </Text>
+                      )}
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.noResultContainer}>
+                <Ionicons name="alert-circle-outline" size={18} color={COLORS.textMuted} />
+                <Text style={styles.noResultText}>No vendor found</Text>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -330,6 +345,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 1,
+  },
+  noResultContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+  },
+  noResultText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+    marginLeft: 6,
   },
   container: {
     padding: 16,
