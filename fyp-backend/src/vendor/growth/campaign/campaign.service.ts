@@ -989,8 +989,7 @@ if (
 
       if (
         !campaignAccessEndDate ||
-        campaignAccessEndDate.getTime() <
-          now.getTime()
+        campaignAccessEndDate.getTime() <= now.getTime()
       ) {
         continue;
       }
