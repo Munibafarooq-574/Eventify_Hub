@@ -65,7 +65,7 @@ async uploadReviewMedia(
 ) {
   const role = String(req.user?.role || '').toLowerCase();
 
-  if (role !== 'client') {
+  if (role !== 'client' && role !== 'organizer') {
     throw new BadRequestException(
       'Only Client accounts can upload review media.',
     );
