@@ -830,6 +830,32 @@ if (
     return campaign;
   }
 
+  async cancelCampaignsForDeletedPackage(
+  vendorId: string,
+  packageId: string,
+): Promise<void> {
+  await this.campaignModel.updateMany(
+    {
+      vendorId: new Types.ObjectId(vendorId),
+      packageId,
+      status: {
+        $in: [
+          CampaignStatus.DRAFT,
+          CampaignStatus.PENDING,
+          CampaignStatus.APPROVED,
+          CampaignStatus.ACTIVE,
+        ],
+      },
+    },
+    {
+      $set: {
+        status: CampaignStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledReason: 'Linked package deleted',
+      },
+    },
+  );
+}
   // =========================================================
   // Vendor — Monthly Campaign Usage
   // =========================================================
@@ -1115,7 +1141,16 @@ if (
         'Campaign is no longer eligible for sponsored placement',
       );
     }
+const linkedPackageExists = await this.userModel.exists({
+  _id: campaign.vendorId,
+  'packages._id': campaign.packageId,
+});
 
+if (!linkedPackageExists) {
+  throw new ForbiddenException(
+    'Campaign linked package is no longer available',
+  );
+}
     return campaign;
   }
 

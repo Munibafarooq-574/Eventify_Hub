@@ -13,6 +13,7 @@ import {
   GenericBusinessDetails,
   VendorApprovalStatus,
 } from '../schemas/user.schema';
+import { CampaignService } from './growth/campaign/campaign.service';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
@@ -55,6 +56,7 @@ export class VendorService {
     @InjectModel(Category.name) private categoryModel: Model<Category>,
     private fileUploadService: FileUploadService,
     private readonly featureAccessService: FeatureAccessService,
+    private readonly campaignService: CampaignService,
 ) { }
 
     async getAllVendorsByCategoryId(categoryId: string): Promise<User[]> {
@@ -1196,16 +1198,29 @@ async updatePackage(
     );
 }
     async deletePackage(packageId: string) {
-        const result = await this.userModel.updateOne(
-            { 'packages._id': packageId },
-            { $pull: { packages: { _id: packageId } } }
-        );
+  const vendor = await this.userModel.findOne({
+    'packages._id': packageId,
+  });
 
-        if (result.modifiedCount === 0) {
-            throw new NotFoundException('Package not found');
-        }
+  if (!vendor) {
+    throw new NotFoundException('Package not found');
+  }
 
-        return { message: 'Package deleted successfully' };
-    }
+  const result = await this.userModel.updateOne(
+    { _id: vendor._id, 'packages._id': packageId },
+    { $pull: { packages: { _id: packageId } } },
+  );
+
+  if (result.modifiedCount === 0) {
+    throw new NotFoundException('Package not found');
+  }
+
+  await this.campaignService.cancelCampaignsForDeletedPackage(
+    vendor._id.toString(),
+    packageId,
+  );
+
+  return { message: 'Package deleted successfully' };
+}
 
 }
