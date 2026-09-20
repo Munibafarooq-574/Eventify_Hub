@@ -1,6 +1,7 @@
 // fyp-backend/src/admin/admin-finance.service.ts
 
 import {
+  BadRequestException,
   Injectable,
 } from '@nestjs/common';
 
@@ -28,6 +29,12 @@ import {
   SubscriptionService,
 } from '../vendor/growth/subscription/subscription.service';
 
+import {
+  VendorSubscription,
+} from 'src/schemas/vendor-subscription.schema';
+
+import { VendorOrder } from 'src/schemas/vendor-order.schema';
+
 @Injectable()
 export class AdminFinanceService {
   constructor(
@@ -43,16 +50,631 @@ export class AdminFinanceService {
     private readonly payoutModel:
       Model<Payout>,
 
+      @InjectModel(VendorSubscription.name)
+    private readonly subscriptionModel:
+      Model<VendorSubscription>,
+          @InjectModel(VendorOrder.name)
+    private readonly vendorOrderModel: Model<VendorOrder>,
     // Reuse the existing centralized subscription service.
     // Do NOT duplicate subscription activation logic here.
     private readonly subscriptionService:
       SubscriptionService,
   ) {}
 
+    private getFinanceDateRange(
+    from?: string,
+    to?: string,
+  ): { start: Date; end: Date } | null {
+    if (!from && !to) {
+      return null;
+    }
+
+    if (!from || !to) {
+      throw new BadRequestException(
+        'Both from and to dates are required.',
+      );
+    }
+
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (
+      !datePattern.test(from) ||
+      !datePattern.test(to)
+    ) {
+      throw new BadRequestException(
+        'Dates must use YYYY-MM-DD format.',
+      );
+    }
+
+    const start = new Date(`${from}T00:00:00.000Z`);
+    const end = new Date(`${to}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      start.toISOString().slice(0, 10) !== from ||
+      end.toISOString().slice(0, 10) !== to
+    ) {
+      throw new BadRequestException(
+        'Invalid calendar date.',
+      );
+    }
+
+    if (start > end) {
+      throw new BadRequestException(
+        'From date cannot be after to date.',
+      );
+    }
+
+    // Exclusive upper boundary: includes the entire selected final day.
+    end.setUTCDate(end.getUTCDate() + 1);
+
+    return { start, end };
+  }
   // =========================================================
   // BOOKING PAYMENTS
   // =========================================================
 
+  private async getDailyFinanceChart(
+  range: { start: Date; end: Date } | null,
+) {
+  const dateFilter = (field: string) =>
+    range
+      ? {
+          [field]: {
+            $gte: range.start,
+            $lt: range.end,
+          },
+        }
+      : {};
+
+  const [bookings, subscriptions, refunds] = await Promise.all([
+    this.paymentModel.aggregate([
+      {
+        $match: {
+          status: 'SUCCESS',
+          paidAt: { $type: 'date', ...dateFilter('paidAt').paidAt },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$paidAt',
+              timezone: 'UTC',
+            },
+          },
+          amount: { $sum: '$amount' },
+        },
+      },
+    ]),
+
+    this.subscriptionModel.aggregate([
+      {
+        $match: {
+          paymentStatus: 'paid',
+          paymentProvider: {
+            $in: ['bank_transfer', 'jazzcash', 'easypaisa'],
+          },
+          verifiedAt: {
+            $type: 'date',
+            ...dateFilter('verifiedAt').verifiedAt,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$verifiedAt',
+              timezone: 'UTC',
+            },
+          },
+          amount: { $sum: '$amountPaid' },
+        },
+      },
+    ]),
+
+    this.refundModel.aggregate([
+      {
+        $match: {
+          status: 'REFUNDED',
+          refundedAt: {
+            $type: 'date',
+            ...dateFilter('refundedAt').refundedAt,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$refundedAt',
+              timezone: 'UTC',
+            },
+          },
+          amount: { $sum: '$refundAmount' },
+        },
+      },
+    ]),
+  ]);
+
+  const daily = new Map<
+    string,
+    {
+      date: string;
+      bookingCollections: number;
+      subscriptionRevenue: number;
+      completedRefunds: number;
+    }
+  >();
+
+  const addAmounts = (
+    records: Array<{ _id: string; amount: number }>,
+    field:
+      | 'bookingCollections'
+      | 'subscriptionRevenue'
+      | 'completedRefunds',
+  ) => {
+    for (const record of records) {
+      const existing = daily.get(record._id) ?? {
+        date: record._id,
+        bookingCollections: 0,
+        subscriptionRevenue: 0,
+        completedRefunds: 0,
+      };
+
+      existing[field] = Number(record.amount ?? 0);
+      daily.set(record._id, existing);
+    }
+  };
+
+  addAmounts(bookings, 'bookingCollections');
+  addAmounts(subscriptions, 'subscriptionRevenue');
+  addAmounts(refunds, 'completedRefunds');
+
+  const sortedDates = Array.from(daily.keys()).sort();
+
+if (!range && sortedDates.length === 0) {
+  return [];
+}
+
+const start = range
+  ? new Date(range.start)
+  : new Date(`${sortedDates[0]}T00:00:00.000Z`);
+
+const end = range
+  ? new Date(range.end.getTime() - 1)
+  : new Date(`${sortedDates[sortedDates.length - 1]}T00:00:00.000Z`);
+
+const result = [];
+
+for (
+  const current = new Date(start);
+  current <= end;
+  current.setUTCDate(current.getUTCDate() + 1)
+) {
+  const date = current.toISOString().slice(0, 10);
+
+  result.push(
+    daily.get(date) ?? {
+      date,
+      bookingCollections: 0,
+      subscriptionRevenue: 0,
+      completedRefunds: 0,
+    },
+  );
+}
+
+return result;
+}
+
+  private async getCollectedCommission(
+    range: { start: Date; end: Date } | null,
+  ): Promise<number> {
+    const results = await this.paymentModel.aggregate([
+      {
+        $match: {
+          status: 'SUCCESS',
+          ...(range
+            ? {
+                paidAt: {
+                  $gte: range.start,
+                  $lt: range.end,
+                },
+              }
+            : {}),
+        },
+      },
+      {
+        $group: {
+          _id: '$vendorOrderId',
+          collectedAmount: {
+            $sum: '$amount',
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: this.vendorOrderModel.collection.name,
+          localField: '_id',
+          foreignField: '_id',
+          as: 'vendorOrder',
+        },
+      },
+      {
+        $unwind: '$vendorOrder',
+      },
+      {
+        $project: {
+          commission: {
+            $cond: [
+              {
+                $gt: ['$vendorOrder.price', 0],
+              },
+              {
+                $multiply: [
+                  {
+                    $min: [
+                      {
+                        $divide: [
+                          '$collectedAmount',
+                          '$vendorOrder.price',
+                        ],
+                      },
+                      1,
+                    ],
+                  },
+                  {
+                    $ifNull: [
+                      '$vendorOrder.commissionAmount',
+                      0,
+                    ],
+                  },
+                ],
+              },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: {
+            $sum: '$commission',
+          },
+        },
+      },
+    ]);
+
+    return Number(results[0]?.total ?? 0);
+  }
+
+    async getFinanceOverview(from?: string, to?: string) {
+    const range = this.getFinanceDateRange(from, to);
+
+  const bookingDateMatch = range
+  ? {
+      $or: [
+        {
+          status: 'SUCCESS',
+          paidAt: {
+            $gte: range.start,
+            $lt: range.end,
+          },
+        },
+        {
+          status: { $ne: 'SUCCESS' },
+          createdAt: {
+            $gte: range.start,
+            $lt: range.end,
+          },
+        },
+      ],
+    }
+  : {};
+      const [
+  bookingPayments,
+  subscriptionPayments,
+  refunds,
+  collectedCommission,
+  dailyChart,
+  subscriptionRevenueByPlan,
+] = await Promise.all([
+        this.paymentModel.aggregate([
+      {
+        $match: bookingDateMatch,
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          amount: { $sum: '$amount' },
+        },
+      },
+    ]),
+
+        this.subscriptionModel.aggregate([
+            {
+        $match: range
+          ? {
+              $or: [
+                {
+                  paymentStatus: 'paid',
+                  verifiedAt: {
+                    $gte: range.start,
+                    $lt: range.end,
+                  },
+                },
+                {
+                  paymentStatus: { $ne: 'paid' },
+                  createdAt: {
+                    $gte: range.start,
+                    $lt: range.end,
+                  },
+                },
+              ],
+            }
+          : {},
+      },
+  {
+    $group: {
+      _id: '$paymentStatus',
+      count: {
+        $sum: {
+          $cond: [
+            {
+              $or: [
+                { $ne: ['$paymentStatus', 'paid'] },
+                {
+                  $and: [
+                    { $ne: ['$verifiedAt', null] },
+                    {
+                      $in: [
+                        '$paymentProvider',
+                        ['bank_transfer', 'jazzcash', 'easypaisa'],
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            1,
+            0,
+          ],
+        },
+      },
+      amount: {
+        $sum: {
+          $cond: [
+            {
+              $and: [
+                { $eq: ['$paymentStatus', 'paid'] },
+                { $ne: ['$verifiedAt', null] },
+                {
+                  $in: [
+                    '$paymentProvider',
+                    ['bank_transfer', 'jazzcash', 'easypaisa'],
+                  ],
+                },
+              ],
+            },
+            '$amountPaid',
+            {
+              $cond: [
+                { $eq: ['$paymentStatus', 'paid'] },
+                0,
+                '$amountDue',
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+]),
+
+          this.refundModel.aggregate([
+  {
+    $match: range
+      ? {
+          $or: [
+            {
+              status: 'REFUNDED',
+              refundedAt: {
+                $gte: range.start,
+                $lt: range.end,
+              },
+            },
+            {
+              status: { $ne: 'REFUNDED' },
+              createdAt: {
+                $gte: range.start,
+                $lt: range.end,
+              },
+            },
+          ],
+        }
+      : {},
+  },
+  {
+    $group: {
+      _id: '$status',
+            count: { $sum: 1 },
+            amount: { $sum: '$refundAmount' },
+          },
+        },
+      ]),
+
+   this.getCollectedCommission(range),
+this.getDailyFinanceChart(range),
+
+this.subscriptionModel.aggregate([
+  {
+    $match: {
+      paymentStatus: 'paid',
+      paymentProvider: {
+        $in: ['bank_transfer', 'jazzcash', 'easypaisa'],
+      },
+      verifiedAt: {
+        $type: 'date',
+        ...(range
+          ? {
+              $gte: range.start,
+              $lt: range.end,
+            }
+          : {}),
+      },
+      plan: {
+        $in: ['basic', 'growth', 'premium'],
+      },
+    },
+  },
+  {
+    $group: {
+      _id: '$plan',
+      paidTransactions: { $sum: 1 },
+      revenue: { $sum: '$amountPaid' },
+    },
+  },
+]),
+]);
+
+  const getStats = (
+    records: Array<{
+      _id: string;
+      count: number;
+      amount: number;
+    }>,
+    status: string,
+  ) => {
+    const record = records.find(
+      (item) => item._id === status,
+    );
+
+    return {
+      count: record?.count ?? 0,
+      amount: record?.amount ?? 0,
+    };
+  };
+
+  const bookingSuccessful = getStats(
+    bookingPayments,
+    'SUCCESS',
+  );
+
+  const bookingPending = getStats(
+    bookingPayments,
+    'PENDING',
+  );
+
+  const bookingFailed = getStats(
+    bookingPayments,
+    'FAILED',
+  );
+
+  const subscriptionPaid = getStats(
+    subscriptionPayments,
+    'paid',
+  );
+
+  const subscriptionPending = getStats(
+    subscriptionPayments,
+    'pending',
+  );
+
+  const subscriptionFailed = getStats(
+    subscriptionPayments,
+    'failed',
+  );
+
+  const completedRefunds = getStats(
+    refunds,
+    'REFUNDED',
+  );
+
+  const pendingRefunds = getStats(
+    refunds,
+    'PENDING',
+  );
+
+  const processingRefunds = getStats(
+    refunds,
+    'PROCESSING',
+  );
+
+  const grossTransactions =
+    bookingSuccessful.amount +
+    subscriptionPaid.amount;
+
+  const netTransactions =
+    grossTransactions -
+    completedRefunds.amount;
+
+  const getPlanRevenue = (plan: string) => {
+  const record = subscriptionRevenueByPlan.find(
+    (item) => item._id === plan,
+  );
+
+  return {
+    paidTransactions: record?.paidTransactions ?? 0,
+    revenue: record?.revenue ?? 0,
+  };
+};
+
+return {
+  currency: 'PKR',
+
+  dailyChart,
+
+  subscriptionRevenueByPlan: {
+    basic: getPlanRevenue('basic'),
+    growth: getPlanRevenue('growth'),
+    premium: getPlanRevenue('premium'),
+  },
+
+  bookingPayments: {
+      successful: bookingSuccessful,
+      pending: bookingPending,
+      failed: bookingFailed,
+    },
+
+    subscriptionPayments: {
+      paid: subscriptionPaid,
+      pending: subscriptionPending,
+      failed: subscriptionFailed,
+    },
+
+    refunds: {
+      completed: completedRefunds,
+      pending: pendingRefunds,
+      processing: processingRefunds,
+    },
+
+    summary: {
+      bookingPaymentsCollected:
+        bookingSuccessful.amount,
+
+      subscriptionRevenue:
+        subscriptionPaid.amount,
+
+      grossTransactions,
+
+      completedRefunds:
+        completedRefunds.amount,
+
+      netTransactions,
+
+      platformRevenue:
+      subscriptionPaid.amount,
+      collectedCommission,
+    },
+  };
+}
   async getPayments(
     status?: string,
     limit = 20,

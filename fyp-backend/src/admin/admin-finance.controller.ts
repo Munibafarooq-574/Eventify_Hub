@@ -76,6 +76,14 @@ export class AdminFinanceController {
   // BOOKING PAYMENTS
   // =========================================================
 
+   @Get('overview')
+getFinanceOverview(
+  @Query('from') from?: string,
+  @Query('to') to?: string,
+) {
+  return this.service.getFinanceOverview(from, to);
+}
+
   @Get('payments')
   getPayments(
     @Query('status')

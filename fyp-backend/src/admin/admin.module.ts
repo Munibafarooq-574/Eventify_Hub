@@ -105,6 +105,11 @@ import {
   CategoryModule,
 } from '../category/category.module';
 
+import {
+  VendorSubscription,
+  VendorSubscriptionSchema,
+} from 'src/schemas/vendor-subscription.schema';
+
 // Reuse the existing Vendor Growth / Subscription module.
 // SubscriptionService is already exported by this module.
 import {
@@ -163,6 +168,11 @@ import {
         schema:
           PayoutSchema,
       },
+       
+      {
+      name: VendorSubscription.name,
+      schema: VendorSubscriptionSchema,
+    },
 
       {
         name:
