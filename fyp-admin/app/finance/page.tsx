@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import LogoutButton from "@/components/LogoutButton";
 import FinanceRevenueChart from "@/components/FinanceRevenueChart";
+import RecentFinancialTransactions from "@/components/RecentFinancialTransactions";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
 
@@ -613,6 +614,10 @@ const thisYearUrl =
                 />
               </div>
             </section>
+
+            {/* RECENT FINANCIAL TRANSACTIONS */}
+
+          <RecentFinancialTransactions from={from} to={to} />
 
             {/* TRANSACTION SUMMARY */}
 

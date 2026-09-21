@@ -84,6 +84,27 @@ getFinanceOverview(
   return this.service.getFinanceOverview(from, to);
 }
 
+@Get('transactions')
+getRecentTransactions(
+  @Query('from') from?: string,
+  @Query('to') to?: string,
+  @Query('status') status?: string,
+  @Query('type') type?: string,
+  @Query('search') search?: string,
+  @Query('page') page?: string,
+  @Query('limit') limit?: string,
+) {
+  return this.service.getRecentTransactions({
+    from,
+    to,
+    status,
+    type,
+    search,
+    page,
+    limit,
+  });
+}
+
   @Get('payments')
   getPayments(
     @Query('status')

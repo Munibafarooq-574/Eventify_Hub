@@ -675,6 +675,317 @@ return {
     },
   };
 }
+async getRecentTransactions(filters: {
+  from?: string;
+  to?: string;
+  status?: string;
+  type?: string;
+  search?: string;
+  page?: string;
+  limit?: string;
+}) {
+  const range = this.getFinanceDateRange(
+    filters.from,
+    filters.to,
+  );
+
+  const page = Number(filters.page ?? 1);
+  const limit = Number(filters.limit ?? 20);
+
+  if (
+    !Number.isInteger(page) ||
+    page < 1 ||
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 100
+  ) {
+    throw new BadRequestException(
+      'Page must be >= 1 and limit must be between 1 and 100.',
+    );
+  }
+
+  const type = (filters.type || 'ALL').toUpperCase();
+  const status = (filters.status || 'ALL').toUpperCase();
+  const search = (filters.search || '').trim();
+
+  if (
+    !['ALL', 'BOOKING_PAYMENT', 'SUBSCRIPTION_PAYMENT'].includes(type)
+  ) {
+    throw new BadRequestException('Invalid transaction type.');
+  }
+
+  if (
+    !['ALL', 'PENDING', 'SUCCESS', 'PAID', 'FAILED'].includes(status)
+  ) {
+    throw new BadRequestException('Invalid payment status.');
+  }
+
+  if (search.length > 100) {
+    throw new BadRequestException('Search is too long.');
+  }
+
+  const { Types } = await import('mongoose');
+
+  const searchId = /^[a-fA-F0-9]{24}$/.test(search)
+  ? new Types.ObjectId(search)
+  : null;
+
+  const bookingMatch: Record<string, any> = {};
+  const subscriptionMatch: Record<string, any> = {
+    paymentStatus: {
+      $in: ['pending', 'paid', 'failed'],
+    },
+    paymentProvider: {
+      $in: ['bank_transfer', 'jazzcash', 'easypaisa'],
+    },
+  };
+
+  if (range) {
+  const dateCondition = {
+    $gte: range.start,
+    $lt: range.end,
+  };
+
+  bookingMatch.$expr = {
+    $and: [
+      {
+        $gte: [
+          { $ifNull: ['$paidAt', '$createdAt'] },
+          range.start,
+        ],
+      },
+      {
+        $lt: [
+          { $ifNull: ['$paidAt', '$createdAt'] },
+          range.end,
+        ],
+      },
+    ],
+  };
+
+  subscriptionMatch.$expr = {
+    $and: [
+      {
+        $gte: [
+          { $ifNull: ['$verifiedAt', '$createdAt'] },
+          range.start,
+        ],
+      },
+      {
+        $lt: [
+          { $ifNull: ['$verifiedAt', '$createdAt'] },
+          range.end,
+        ],
+      },
+    ],
+  };
+}
+if (status !== 'ALL') {
+  bookingMatch.status =
+    status === 'PAID' || status === 'SUCCESS'
+      ? 'SUCCESS'
+      : status;
+
+  subscriptionMatch.paymentStatus =
+    status === 'PAID' || status === 'SUCCESS'
+      ? 'paid'
+      : status.toLowerCase();
+}
+
+  if (search) {
+    bookingMatch.$or = [
+      ...(searchId
+        ? [
+            { _id: searchId },
+            { orderId: searchId },
+            { vendorOrderId: searchId },
+            { vendorId: searchId },
+            { organizerId: searchId },
+          ]
+        : []),
+      { transactionRef: search },
+    ];
+
+    subscriptionMatch.$or = [
+      ...(searchId
+        ? [
+            { _id: searchId },
+            { vendorId: searchId },
+          ]
+        : []),
+      { paymentReference: search },
+    ];
+  }
+
+  const bookingPipeline: any[] = [
+    { $match: bookingMatch },
+    {
+      $project: {
+        _id: 1,
+        transactionId: { $toString: '$_id' },
+        transactionDate: {
+          $ifNull: ['$paidAt', '$createdAt'],
+        },
+        vendorId: 1,
+        clientId: '$organizerId',
+        transactionType: {
+          $literal: 'BOOKING_PAYMENT',
+        },
+        paymentMethod: '$method',
+        amount: '$amount',
+        status: 1,
+        reference: '$transactionRef',
+        orderId: 1,
+      },
+    },
+  ];
+
+  const subscriptionPipeline: any[] = [
+    { $match: subscriptionMatch },
+    {
+      $project: {
+        _id: 1,
+        transactionId: { $toString: '$_id' },
+        transactionDate: {
+          $ifNull: ['$verifiedAt', '$createdAt'],
+        },
+        vendorId: 1,
+        clientId: { $literal: null },
+        transactionType: {
+          $literal: 'SUBSCRIPTION_PAYMENT',
+        },
+        paymentMethod: '$paymentProvider',
+        amount: {
+          $cond: [
+            { $eq: ['$paymentStatus', 'paid'] },
+            '$amountPaid',
+            '$amountDue',
+          ],
+        },
+        status: {
+          $toUpper: '$paymentStatus',
+        },
+        reference: '$paymentReference',
+        orderId: { $literal: null },
+      },
+    },
+  ];
+
+  const includeBookings = type !== 'SUBSCRIPTION_PAYMENT';
+  const includeSubscriptions = type !== 'BOOKING_PAYMENT';
+
+  const pipeline: any[] = includeBookings
+  ? [...bookingPipeline]
+  : [
+      { $match: { _id: { $exists: false } } },
+      {
+        $unionWith: {
+          coll: this.subscriptionModel.collection.name,
+          pipeline: subscriptionPipeline,
+        },
+      },
+    ];
+
+  if (includeBookings && includeSubscriptions) {
+    pipeline.push({
+      $unionWith: {
+        coll: this.subscriptionModel.collection.name,
+        pipeline: subscriptionPipeline,
+      },
+    });
+  }
+
+  pipeline.push(
+    {
+      $sort: {
+        transactionDate: -1,
+        _id: -1,
+      },
+    },
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'vendorId',
+              foreignField: '_id',
+              as: 'vendor',
+              pipeline: [
+                {
+                  $project: {
+                    name: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'clientId',
+              foreignField: '_id',
+              as: 'client',
+              pipeline: [
+                {
+                  $project: {
+                    name: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              transactionId: 1,
+              transactionDate: 1,
+              transactionType: 1,
+              paymentMethod: 1,
+              amount: 1,
+              status: 1,
+              reference: 1,
+              orderId: 1,
+              vendorId: {
+                $toString: '$vendorId',
+              },
+              clientId: {
+                $cond: [
+                  { $ne: ['$clientId', null] },
+                  { $toString: '$clientId' },
+                  null,
+                ],
+              },
+              vendorName: {
+                $arrayElemAt: ['$vendor.name', 0],
+              },
+              clientName: {
+                $arrayElemAt: ['$client.name', 0],
+              },
+            },
+          },
+        ],
+      },
+    },
+  );
+
+  const [result] = await this.paymentModel.aggregate(pipeline);
+
+  const total = result?.metadata?.[0]?.total ?? 0;
+
+  return {
+    data: result?.data ?? [],
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
   async getPayments(
     status?: string,
     limit = 20,
