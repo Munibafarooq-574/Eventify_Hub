@@ -10,7 +10,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 import { User, UserSchema } from '../schemas/user.schema';
-import { Reviews, ReviewsSchema } from '../schemas/reviews.schema';
+
 import { Category, CategorySchema } from '../schemas/category.schema';
 import { Message, MessageSchema } from '../schemas/message.schema';
 import { Review, ReviewSchema } from '../schemas/review.schema';
@@ -67,10 +67,7 @@ import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
         name: User.name,
         schema: UserSchema,
       },
-      {
-        name: Reviews.name,
-        schema: ReviewsSchema,
-      },
+  
       {
         name: Category.name,
         schema: CategorySchema,
