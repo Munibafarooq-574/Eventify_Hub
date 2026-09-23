@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import AdminSidebar from "@/components/AdminSidebar";
 import ClientsAutoRefresh from "@/components/ClientsAutoRefresh";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
@@ -224,56 +225,10 @@ export default async function ClientsPage({
       {/* Automatically refresh server data every 10 seconds. */}
       <ClientsAutoRefresh />
 
-      <div className="mx-auto flex min-h-screen max-w-[1600px]">
-        <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white px-5 py-6 lg:block">
-          <div className="mb-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Eventify Hub
-            </p>
-
-            <h1 className="mt-2 text-2xl font-bold">
-              Admin Panel
-            </h1>
-          </div>
-
-          <nav className="space-y-2">
-            <Link
-              href="/dashboard"
-              className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-            >
-              Dashboard
-            </Link>
-
-            <Link
-              href="/bookings"
-              className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-            >
-              Bookings
-            </Link>
-
-            <Link
-              href="/vendors"
-              className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-            >
-              Vendors
-            </Link>
-
-            <Link
-              href="/clients"
-              className="block rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white"
-            >
-              Clients
-            </Link>
-
-            <div className="rounded-xl px-4 py-3 text-sm font-medium text-slate-300">
-              Categories
-            </div>
-
-            <div className="rounded-xl px-4 py-3 text-sm font-medium text-slate-300">
-              Finance
-            </div>
-          </nav>
-        </aside>
+      <div className="flex min-h-screen flex-col lg:flex-row">       
+          <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+          <AdminSidebar />
+        </div>
 
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">

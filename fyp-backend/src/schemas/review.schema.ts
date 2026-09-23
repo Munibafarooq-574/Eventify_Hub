@@ -32,6 +32,13 @@ export enum ReviewMediaType {
   VIDEO = 'video',
 }
 
+export enum ReviewModerationStatus {
+  VISIBLE = 'visible',
+  PENDING = 'pending',
+  HIDDEN = 'hidden',
+  REJECTED = 'rejected',
+}
+
 @Schema({ _id: false })
 export class ReviewMedia {
   @Prop({ required: true, enum: ReviewMediaType })
@@ -56,6 +63,43 @@ export class VendorReply {
 }
 
 export const VendorReplySchema = SchemaFactory.createForClass(VendorReply);
+
+@Schema({ _id: false })
+export class ReviewModerationHistory {
+  @Prop({
+    required: true,
+    enum: ReviewModerationStatus,
+  })
+  fromStatus: ReviewModerationStatus;
+
+  @Prop({
+    required: true,
+    enum: ReviewModerationStatus,
+  })
+  toStatus: ReviewModerationStatus;
+
+  @Prop({
+    trim: true,
+    maxlength: 500,
+  })
+  reason?: string;
+
+  @Prop({
+    required: true,
+    type: Types.ObjectId,
+    ref: 'User',
+  })
+  moderatedBy: Types.ObjectId;
+
+  @Prop({
+    required: true,
+    default: () => new Date(),
+  })
+  moderatedAt: Date;
+}
+
+export const ReviewModerationHistorySchema =
+  SchemaFactory.createForClass(ReviewModerationHistory);
 
 @Schema({ timestamps: true })
 export class Review extends Document {
@@ -103,6 +147,37 @@ export class Review extends Document {
     required: false,
   })
   vendorReply?: VendorReply;
+
+    @Prop({
+    required: true,
+    enum: ReviewModerationStatus,
+    default: ReviewModerationStatus.VISIBLE,
+    index: true,
+  })
+  status: ReviewModerationStatus;
+
+  @Prop({
+    trim: true,
+    maxlength: 500,
+  })
+  moderationReason?: string;
+
+  @Prop({
+    type: Date,
+  })
+  moderatedAt?: Date;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'User',
+  })
+  moderatedBy?: Types.ObjectId;
+
+  @Prop({
+    type: [ReviewModerationHistorySchema],
+    default: [],
+  })
+  moderationHistory: ReviewModerationHistory[];
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
@@ -110,3 +185,4 @@ export const ReviewSchema = SchemaFactory.createForClass(Review);
 // Indexes for vendor review filtering, sorting and pagination
 ReviewSchema.index({ vendorId: 1, createdAt: -1 });
 ReviewSchema.index({ vendorId: 1, rating: -1 });
+ReviewSchema.index({ status: 1, createdAt: -1 });

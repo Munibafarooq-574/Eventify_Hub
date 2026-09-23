@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import LogoutButton from "@/components/LogoutButton";
+import AdminSidebar from "@/components/AdminSidebar";
 import SubscriptionPaymentActions from "@/components/SubscriptionPaymentActions";
 
 import { getAdminToken } from "@/lib/auth";
@@ -385,91 +386,11 @@ export default async function SubscriptionsPage({
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex min-h-screen">
+        <div className="flex min-h-screen flex-col lg:flex-row">
+           <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+          <AdminSidebar />
+        </div>
 
-        {/* ================= SIDEBAR ================= */}
-
-        <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-          <div className="border-b border-slate-200 px-6 py-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Eventify Hub
-            </p>
-
-            <h1 className="mt-2 text-xl font-bold text-slate-900">
-              Admin Console
-            </h1>
-          </div>
-
-          <nav className="flex-1 space-y-1 px-4 py-5">
-            <Link
-              href="/dashboard"
-              className={sidebarItemClass()}
-            >
-              Dashboard
-            </Link>
-
-            <Link
-              href="/bookings"
-              className={sidebarItemClass()}
-            >
-              Bookings
-            </Link>
-
-            <Link
-              href="/vendors"
-              className={sidebarItemClass()}
-            >
-              Vendors
-            </Link>
-
-            <Link
-              href="/clients"
-              className={sidebarItemClass()}
-            >
-              Clients
-            </Link>
-
-            <Link
-              href="/categories"
-              className={sidebarItemClass()}
-            >
-              Categories
-            </Link>
-
-            <div className="px-4 pb-1 pt-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Finance
-              </p>
-            </div>
-
-            <Link
-              href="/payments"
-              className={sidebarItemClass()}
-            >
-              Booking Payments
-            </Link>
-
-            <Link
-              href="/refunds"
-              className={sidebarItemClass()}
-            >
-              Refunds
-            </Link>
-
-            <Link
-              href="/subscriptions"
-              className={sidebarItemClass(
-                true,
-              )}
-            >
-              Subscription Payments
-            </Link>
-          </nav>
-
-          <div className="border-t border-slate-200 p-4">
-            <LogoutButton />
-          </div>
-        </aside>
 
         {/* ================= CONTENT ================= */}
 

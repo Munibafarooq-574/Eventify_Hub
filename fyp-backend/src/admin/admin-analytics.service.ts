@@ -1,4 +1,4 @@
-// fyp-backend/src/admin/admin-analytics.service.ts
+﻿// fyp-backend/src/admin/admin-analytics.service.ts
 
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -7,6 +7,8 @@ import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { Payment } from 'src/schemas/payment.schema';
 import { Payout } from 'src/schemas/payout.schema';
 import { User } from 'src/schemas/user.schema';
+import { Order } from 'src/schemas/order.schema';
+import { VendorSubscription } from 'src/schemas/vendor-subscription.schema';
 
 @Injectable()
 export class AdminAnalyticsService {
@@ -22,6 +24,12 @@ export class AdminAnalyticsService {
 
         @InjectModel(User.name)
         private readonly userModel: Model<User>,
+
+        @InjectModel(Order.name)
+        private readonly orderModel: Model<Order>,
+
+        @InjectModel(VendorSubscription.name)
+        private readonly subscriptionModel: Model<VendorSubscription>,
     ) {}
 
     async getMonthlyRevenue(months = 6) {
@@ -409,5 +417,451 @@ export class AdminAnalyticsService {
         );
 
         return insights.slice(0, 20);
+    }
+
+    // =========================================================
+    // PHASE 6 - STEP 3: PLATFORM ANALYTICS
+    // Revenue remains in existing Finance/Revenue analytics.
+    // =========================================================
+    async getPlatformAnalytics(months = 6) {
+        const safeMonths =
+            Number.isInteger(months) &&
+            months >= 1 &&
+            months <= 24
+                ? months
+                : 6;
+
+        const now = new Date();
+
+        const trendStart = new Date(
+            now.getFullYear(),
+            now.getMonth() - (safeMonths - 1),
+            1,
+        );
+
+        const [
+            totalClients,
+            totalVendors,
+            totalBookings,
+            completedBookings,
+            cancelledBookings,
+            currentSubscriptions,
+            bookingTrendRaw,
+            subscriptionTrendRaw,
+            categoryPerformance,
+        ] = await Promise.all([
+            this.userModel.countDocuments({
+                role: {
+                    $in: [
+                        /^Organizer$/i,
+                        /^Client$/i,
+                    ],
+                },
+            }),
+
+            this.userModel.countDocuments({
+                role: /^Vendor$/i,
+            }),
+
+            this.orderModel.countDocuments(),
+
+            this.orderModel.countDocuments({
+                status: 'completed',
+            }),
+
+            this.orderModel.countDocuments({
+                status: 'cancelled',
+            }),
+
+            this.subscriptionModel
+                .find({
+                    isCurrent: true,
+                })
+                .select(
+                    'plan status startDate endDate isCurrent createdAt',
+                )
+                .lean(),
+
+            this.orderModel.aggregate([
+                {
+                    $match: {
+                        createdAt: {
+                            $gte: trendStart,
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: {
+                            year: {
+                                $year: '$createdAt',
+                            },
+                            month: {
+                                $month: '$createdAt',
+                            },
+                        },
+
+                        total: {
+                            $sum: 1,
+                        },
+
+                        completed: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$status',
+                                            'completed',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        cancelled: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$status',
+                                            'cancelled',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $sort: {
+                        '_id.year': 1,
+                        '_id.month': 1,
+                    },
+                },
+            ]),
+
+            this.subscriptionModel.aggregate([
+                {
+                    $match: {
+                        createdAt: {
+                            $gte: trendStart,
+                        },
+
+                        plan: {
+                            $in: [
+                                'basic',
+                                'growth',
+                                'premium',
+                            ],
+                        },
+
+                        status: {
+                            $in: [
+                                'trial',
+                                'active',
+                                'expired',
+                                'cancelled',
+                            ],
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: {
+                            year: {
+                                $year: '$createdAt',
+                            },
+                            month: {
+                                $month: '$createdAt',
+                            },
+                        },
+
+                        total: {
+                            $sum: 1,
+                        },
+
+                        basic: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$plan',
+                                            'basic',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        growth: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$plan',
+                                            'growth',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        premium: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$plan',
+                                            'premium',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $sort: {
+                        '_id.year': 1,
+                        '_id.month': 1,
+                    },
+                },
+            ]),
+
+            this.vendorOrderModel.aggregate([
+                {
+                    $match: {
+                        status: {
+                            $nin: [
+                                'rejected',
+                                'expired',
+                            ],
+                        },
+                    },
+                },
+                {
+                    $group: {
+                        _id: '$serviceName',
+
+                        totalBookings: {
+                            $sum: 1,
+                        },
+
+                        completed: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $eq: [
+                                            '$status',
+                                            'completed',
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+
+                        cancelled: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $in: [
+                                            '$status',
+                                            [
+                                                'cancelled',
+                                                'cancelled_by_vendor',
+                                            ],
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $sort: {
+                        totalBookings: -1,
+                    },
+                },
+                {
+                    $limit: 20,
+                },
+            ]),
+        ]);
+
+        const planDistribution = {
+            basic: 0,
+            growth: 0,
+            premium: 0,
+        };
+
+        const statusDistribution = {
+            trial: 0,
+            active: 0,
+            expired: 0,
+            cancelled: 0,
+        };
+
+        for (
+            const record
+            of currentSubscriptions as any[]
+        ) {
+            const plan =
+                String(
+                    record.plan || '',
+                ).toLowerCase();
+
+            if (
+                plan === 'basic' ||
+                plan === 'growth' ||
+                plan === 'premium'
+            ) {
+                planDistribution[plan] += 1;
+            }
+
+            const endDate =
+                record.endDate
+                    ? new Date(record.endDate)
+                    : null;
+
+            const effectiveStatus =
+                endDate &&
+                endDate.getTime() <=
+                    now.getTime()
+                    ? 'expired'
+                    : String(
+                          record.status || '',
+                      ).toLowerCase();
+
+            if (
+                effectiveStatus === 'trial' ||
+                effectiveStatus === 'active' ||
+                effectiveStatus === 'expired' ||
+                effectiveStatus === 'cancelled'
+            ) {
+                statusDistribution[
+                    effectiveStatus
+                ] += 1;
+            }
+        }
+
+        const bookingTrend = [];
+        const subscriptionTrend = [];
+
+        for (
+            let index = 0;
+            index < safeMonths;
+            index++
+        ) {
+            const date = new Date(
+                now.getFullYear(),
+                now.getMonth() -
+                    (safeMonths - 1) +
+                    index,
+                1,
+            );
+
+            const year =
+                date.getFullYear();
+
+            const month =
+                date.getMonth() + 1;
+
+            const bookingRecord =
+                bookingTrendRaw.find(
+                    (item: any) =>
+                        item._id.year === year &&
+                        item._id.month === month,
+                );
+
+            const subscriptionRecord =
+                subscriptionTrendRaw.find(
+                    (item: any) =>
+                        item._id.year === year &&
+                        item._id.month === month,
+                );
+
+            bookingTrend.push({
+                year,
+                month,
+                total:
+                    bookingRecord?.total || 0,
+                completed:
+                    bookingRecord?.completed || 0,
+                cancelled:
+                    bookingRecord?.cancelled || 0,
+            });
+
+            subscriptionTrend.push({
+                year,
+                month,
+                total:
+                    subscriptionRecord?.total || 0,
+                basic:
+                    subscriptionRecord?.basic || 0,
+                growth:
+                    subscriptionRecord?.growth || 0,
+                premium:
+                    subscriptionRecord?.premium || 0,
+            });
+        }
+
+        return {
+            users: {
+                totalClients,
+                totalVendors,
+            },
+
+            bookings: {
+                total: totalBookings,
+                completed: completedBookings,
+                cancelled: cancelledBookings,
+            },
+
+            subscriptions: {
+                totalCurrent:
+                    currentSubscriptions.length,
+
+                planDistribution,
+                statusDistribution,
+            },
+
+            categoryPerformance:
+                categoryPerformance.map(
+                    (item: any) => ({
+                        category:
+                            item._id || 'Unknown',
+
+                        totalBookings:
+                            item.totalBookings || 0,
+
+                        completed:
+                            item.completed || 0,
+
+                        cancelled:
+                            item.cancelled || 0,
+                    }),
+                ),
+
+            trends: {
+                months: safeMonths,
+                bookings: bookingTrend,
+                subscriptions:
+                    subscriptionTrend,
+            },
+        };
     }
 }

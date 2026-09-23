@@ -170,11 +170,25 @@ export default function RecentFinancialTransactions({
         </form>
       </div>
 
-      {loading ? (
-        <p role="status" className="mt-6 text-sm text-slate-500">
-          Loading transactions...
-        </p>
-      ) : error ? (
+       {loading ? (
+  <div
+    role="status"
+    aria-label="Loading transactions"
+    className="mt-6 animate-pulse space-y-3"
+  >
+    <span className="sr-only">Loading transactions...</span>
+
+    <div className="h-10 rounded-lg bg-slate-200" />
+
+    {[1, 2, 3, 4, 5].map((item) => (
+      <div
+        key={item}
+        className="h-12 rounded-lg bg-slate-100"
+      />
+    ))}
+  </div>
+) : error ? (
+    
         <div role="alert" className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">
           {error}
            <button

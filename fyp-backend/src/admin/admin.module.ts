@@ -1,4 +1,4 @@
-// fyp-backend/src/admin/admin.module.ts
+﻿// fyp-backend/src/admin/admin.module.ts
 
 import {
   Module,
@@ -116,30 +116,33 @@ import {
   VendorGrowthModule,
 } from '../vendor/growth/vendor-growth.module';
 
+import {
+  Review,
+  ReviewSchema,
+} from 'src/schemas/review.schema';
+
+import {
+  AdminReviewService,
+} from './admin-review.service';
+
+import {
+  AdminReviewController,
+} from './admin-review.controller';
+
+import {
+  AdminVendorSubscriptionService,
+} from './admin-vendor-subscription.service';
+
+import {
+  AdminVendorSubscriptionController,
+} from './admin-vendor-subscription.controller';
+
 @Module({
   imports: [
-    // =====================================================
-    // AUTH
-    // =====================================================
 
     AuthModule,
-
-    // =====================================================
-    // CATEGORY
-    // =====================================================
-
     CategoryModule,
-
-    // =====================================================
-    // EXISTING SUBSCRIPTION SYSTEM
-    // =====================================================
-
     VendorGrowthModule,
-
-    // =====================================================
-    // ADMIN DATABASE MODELS
-    // =====================================================
-
     MongooseModule.forFeature([
       {
         name:
@@ -202,12 +205,15 @@ import {
           UserSchema,
       },
 
-      // Phase 14A.9 — Admin Campaign Moderation
       {
         name:
           VendorCampaign.name,
         schema:
           VendorCampaignSchema,
+      },
+      {
+        name: Review.name,
+        schema: ReviewSchema,
       },
     ]),
   ],
@@ -218,6 +224,8 @@ import {
     AdminFinanceController,
     AdminDisputeController,
     AdminAnalyticsController,
+    AdminReviewController,
+    AdminVendorSubscriptionController,
   ],
 
   providers: [
@@ -227,6 +235,8 @@ import {
     AdminDisputeService,
     AdminAnalyticsService,
     AdminCampaignService,
+    AdminReviewService,
+    AdminVendorSubscriptionService,
   ],
 })
 export class AdminModule {}

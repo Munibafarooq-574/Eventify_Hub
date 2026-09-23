@@ -1,4 +1,4 @@
-// fyp-backend/src/admin/admin-analytics.controller.ts
+﻿// fyp-backend/src/admin/admin-analytics.controller.ts
 
 import {
   Controller,
@@ -41,5 +41,14 @@ export class AdminAnalyticsController {
   @Get('demand-insights')
   getDemandInsights() {
     return this.service.getDemandInsights();
+  }
+
+  @Get('platform')
+  getPlatformAnalytics(
+    @Query('months') months = 6,
+  ) {
+    return this.service.getPlatformAnalytics(
+      Number(months),
+    );
   }
 }

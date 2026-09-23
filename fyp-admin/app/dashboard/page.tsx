@@ -4,6 +4,7 @@ import LogoutButton from "@/components/LogoutButton";
 import RevenueChart from "@/components/RevenueChart";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+import AdminSidebar from "@/components/AdminSidebar";
 
 type DashboardSummary = {
   totalBookings?: number;
@@ -260,58 +261,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <div className="flex min-h-screen">
-        {/* ------------------------------------------------ */}
-        {/* Sidebar */}
-        {/* ------------------------------------------------ */}
+        <div className="flex min-h-screen flex-col lg:flex-row">
+           <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+          <AdminSidebar />
+        </div>
 
-        <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-          <div className="border-b border-slate-200 px-6 py-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Eventify Hub
-            </p>
-
-            <h1 className="mt-2 text-xl font-bold text-slate-950">
-              Admin Panel
-            </h1>
-          </div>
-
-          <nav className="flex-1 px-4 py-6">
-            <a
-              href="/dashboard"
-              className="flex items-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white"
-            >
-              Dashboard
-            </a>
-
-            <div className="mt-2 space-y-1">
-              {[
-                "Bookings",
-                "Vendors",
-                "Clients",
-                "Categories",
-                "Payments",
-                "Payouts",
-                "Refunds",
-                "Disputes",
-                "Analytics",
-              ].map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  disabled
-                  className="flex w-full cursor-not-allowed items-center rounded-xl px-4 py-3 text-left text-sm font-medium text-slate-400"
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          <div className="border-t border-slate-200 p-4">
-            <LogoutButton />
-          </div>
-        </aside>
 
         {/* ------------------------------------------------ */}
         {/* Main */}

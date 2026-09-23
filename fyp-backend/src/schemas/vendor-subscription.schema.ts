@@ -335,3 +335,20 @@ VendorSubscriptionSchema.index(
     name: 'unique_current_subscription_per_vendor',
   },
 );
+
+// Prevent the same transaction reference from being used
+// by multiple pending or paid subscription requests.
+VendorSubscriptionSchema.index(
+  {
+    paymentProvider: 1,
+    paymentReference: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      paymentStatus: PaymentStatus.PENDING,
+      paymentReference: { $type: 'string' },
+    },
+    name: 'unique_pending_subscription_payment_reference',
+  },
+);

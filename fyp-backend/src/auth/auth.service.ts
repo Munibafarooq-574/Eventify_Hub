@@ -132,9 +132,15 @@ private readonly subscriptionService: SubscriptionService,
     // the public Client/Vendor registration endpoint.
     // =====================================================
 
-    if (normalizedRole === 'admin') {
+    const isAdministrativeRole =
+      normalizedRole === 'admin' ||
+      normalizedRole === 'superadmin' ||
+      normalizedRole === 'super admin' ||
+      normalizedRole === 'super_admin';
+
+    if (isAdministrativeRole) {
       throw new UnauthorizedException(
-        'Admin accounts cannot be created through public registration',
+        'Administrative accounts cannot be created through public registration',
       );
     }
 
@@ -290,13 +296,29 @@ private readonly subscriptionService: SubscriptionService,
 
     return {
       token,
-      user,
+      user: this.sanitizeAuthUser(user),
     };
   }
 
   // =========================================================
   // LOGIN
   // =========================================================
+
+  private sanitizeAuthUser(user: any) {
+    const rawUser =
+      typeof user?.toObject === 'function'
+        ? user.toObject()
+        : { ...user };
+
+    const {
+      password,
+      providerId,
+      pushToken,
+      ...safeUser
+    } = rawUser;
+
+    return safeUser;
+  }
 
   async login(
     loginDto: LoginDto,
@@ -360,14 +382,14 @@ if (
 
   return {
     token,
-    user,
+    user: this.sanitizeAuthUser(user),
     subscriptionAccess,
   };
 }
 
 return {
   token,
-  user,
+  user: this.sanitizeAuthUser(user),
 };
   }
 

@@ -1,7 +1,12 @@
 // fyp-backend/src/admin/admin-dispute.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import { Dispute } from 'src/schemas/dispute.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
@@ -16,6 +21,7 @@ export class AdminDisputeService {
         @InjectModel(Order.name) private readonly orderModel: Model<Order>,
         @InjectModel(Payment.name) private readonly paymentModel: Model<Payment>,
         @InjectModel(Refund.name) private readonly refundModel: Model<Refund>,
+        @InjectConnection() private readonly connection: Connection,
     ) {}
 
     // Organizer or vendor raises a dispute
@@ -43,19 +49,39 @@ export class AdminDisputeService {
             status: 'OPEN',
         });
     }
+        // The other party responds with their side
+    async addCounterStatement(
+        disputeId: string,
+        from: 'organizer' | 'vendor',
+        statement: string,
+    ) {
+        const updated = await this.disputeModel.findOneAndUpdate(
+            {
+                _id: disputeId,
+                status: { $in: ['OPEN', 'UNDER_REVIEW'] },
+            },
+            {
+                $set: {
+                    ...(from === 'organizer'
+                        ? { organizerStatement: statement }
+                        : { vendorStatement: statement }),
+                    status: 'UNDER_REVIEW',
+                },
+            },
+            { new: true },
+        );
 
-    // The other party responds with their side
-    async addCounterStatement(disputeId: string, from: 'organizer' | 'vendor', statement: string) {
-        const dispute = await this.disputeModel.findById(disputeId);
-        if (!dispute) throw new NotFoundException('Dispute not found');
-
-        if (from === 'organizer') {
-            dispute.organizerStatement = statement;
-        } else {
-            dispute.vendorStatement = statement;
+        if (updated) {
+            return updated;
         }
-        dispute.status = 'UNDER_REVIEW';
-        return dispute.save();
+
+        const exists = await this.disputeModel.exists({ _id: disputeId });
+
+        if (!exists) {
+            throw new NotFoundException('Dispute not found');
+        }
+
+        throw new ConflictException('Cannot update a resolved dispute');
     }
 
     // Full context for admin to review
@@ -85,73 +111,157 @@ export class AdminDisputeService {
         };
     }
 
-    async getDisputes(status?: string, limit = 20, skip = 0) {
-        const query: any = status ? { status } : {};
-        return this.disputeModel
-            .find(query)
-            .populate('organizerId', 'name')
-            .populate('vendorId', 'name contactDetails')
-            .sort({ createdAt: -1 })
-            .skip(Number(skip))
-            .limit(Number(limit))
-            .lean();
+        async getDisputes(status?: string, limit = 20, skip = 0) {
+        const query = status ? { status } : {};
+
+        const [disputes, total] = await Promise.all([
+            this.disputeModel
+                .find(query)
+                .populate('organizerId', 'name')
+                .populate('vendorId', 'name contactDetails')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+
+            this.disputeModel.countDocuments(query),
+        ]);
+
+        return {
+            disputes,
+            total,
+            limit,
+            skip,
+        };
     }
 
-    // Admin resolution
+        // Admin resolution
     async resolveDispute(
         disputeId: string,
         resolution: 'RESOLVED_ORGANIZER' | 'RESOLVED_VENDOR' | 'RESOLVED_PARTIAL',
         notes?: string,
         partialRefundAmount?: number,
     ) {
-        const dispute = await this.disputeModel.findById(disputeId);
-        if (!dispute) throw new NotFoundException('Dispute not found');
+        const session = await this.connection.startSession();
 
-        dispute.status = resolution;
-        dispute.resolutionNotes = notes || null;
-        dispute.resolvedAt = new Date();
+        try {
+            let resolvedDispute: Dispute | null = null;
 
-        if (resolution === 'RESOLVED_PARTIAL') {
-            dispute.partialRefundAmount = partialRefundAmount ?? 0;
-        }
+            await session.withTransaction(async () => {
+                const dispute = await this.disputeModel
+                    .findById(disputeId)
+                    .session(session);
 
-        await dispute.save();
+                if (!dispute) {
+                    throw new NotFoundException('Dispute not found');
+                }
 
-        // If resolution favors the organizer (full or partial), create a
-        // Refund record so it flows through the existing Refund ledger.
-        if (resolution === 'RESOLVED_ORGANIZER' || resolution === 'RESOLVED_PARTIAL') {
-            const paidPayments = await this.paymentModel.find({
-                vendorOrderId: dispute.vendorOrderId,
-                status: 'SUCCESS',
+                if (
+                    dispute.status === 'RESOLVED_ORGANIZER' ||
+                    dispute.status === 'RESOLVED_VENDOR' ||
+                    dispute.status === 'RESOLVED_PARTIAL'
+                ) {
+                    throw new ConflictException('Dispute is already resolved');
+                }
+
+                const needsRefund =
+                    resolution === 'RESOLVED_ORGANIZER' ||
+                    resolution === 'RESOLVED_PARTIAL';
+
+                let amountPaid = 0;
+
+                if (needsRefund) {
+                    const paidPayments = await this.paymentModel
+                        .find({
+                            vendorOrderId: dispute.vendorOrderId,
+                            status: 'SUCCESS',
+                        })
+                        .session(session);
+
+                    amountPaid = paidPayments.reduce(
+                        (sum, payment) => sum + payment.amount,
+                        0,
+                    );
+                }
+
+                if (resolution === 'RESOLVED_PARTIAL') {
+                    if (
+                        partialRefundAmount === undefined ||
+                        !Number.isFinite(partialRefundAmount) ||
+                        partialRefundAmount <= 0 ||
+                        partialRefundAmount > amountPaid
+                    ) {
+                        throw new BadRequestException(
+                            'Partial refund must be greater than zero and cannot exceed the paid amount',
+                        );
+                    }
+                }
+
+                const updated = await this.disputeModel.findOneAndUpdate(
+                    {
+                        _id: disputeId,
+                        status: { $in: ['OPEN', 'UNDER_REVIEW'] },
+                    },
+                    {
+                        $set: {
+                            status: resolution,
+                            resolutionNotes: notes || null,
+                            resolvedAt: new Date(),
+                            ...(resolution === 'RESOLVED_PARTIAL'
+                                ? { partialRefundAmount }
+                                : {}),
+                        },
+                    },
+                    {
+                        new: true,
+                        session,
+                    },
+                );
+
+                if (!updated) {
+                    throw new ConflictException('Dispute is already resolved');
+                }
+
+                if (needsRefund) {
+                    const refundAmount =
+                        resolution === 'RESOLVED_PARTIAL'
+                            ? partialRefundAmount!
+                            : amountPaid;
+
+                    const existingRefund = await this.refundModel
+                        .findOne({
+                            vendorOrderId: dispute.vendorOrderId,
+                        })
+                        .session(session);
+
+                    if (!existingRefund) {
+                        await this.refundModel.create(
+                            [
+                                {
+                                    vendorOrderId: dispute.vendorOrderId,
+                                    orderId: dispute.orderId,
+                                    organizerId: dispute.organizerId,
+                                    vendorId: dispute.vendorId,
+                                    amountPaid,
+                                    refundAmount,
+                                    withheldAmount: amountPaid - refundAmount,
+                                    initiatedBy: 'ORGANIZER_CANCELLED',
+                                    daysBeforeEvent: 0,
+                                    cancellationPolicyApplied: 'DISPUTE_RESOLUTION',
+                                    status: 'PENDING',
+                                },
+                            ],
+                            { session },
+                        );
+                    }
+                }
+
+                resolvedDispute = updated;
             });
-            const amountPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
 
-            const refundAmount =
-                resolution === 'RESOLVED_PARTIAL'
-                    ? (partialRefundAmount ?? 0)
-                    : amountPaid;
-
-            const existingRefund = await this.refundModel.findOne({
-                vendorOrderId: dispute.vendorOrderId,
-            });
-
-            if (!existingRefund) {
-                await this.refundModel.create({
-                    vendorOrderId: dispute.vendorOrderId,
-                    orderId: dispute.orderId,
-                    organizerId: dispute.organizerId,
-                    vendorId: dispute.vendorId,
-                    amountPaid,
-                    refundAmount,
-                    withheldAmount: amountPaid - refundAmount,
-                    initiatedBy: 'ORGANIZER_CANCELLED', // reuse enum; dispute-driven refund
-                    daysBeforeEvent: 0,
-                    cancellationPolicyApplied: 'DISPUTE_RESOLUTION',
-                    status: 'PENDING',
-                });
-            }
+            return resolvedDispute;
+        } finally {
+            await session.endSession();
         }
-
-        return dispute;
     }
 }

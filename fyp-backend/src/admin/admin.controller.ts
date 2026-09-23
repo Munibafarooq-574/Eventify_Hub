@@ -1,6 +1,7 @@
 // fyp-backend/src/admin/admin.controller.ts
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -58,6 +59,17 @@ export class AdminController {
     private readonly adminCampaignService: AdminCampaignService,
   ) {}
 
+  private validateObjectId(
+    id: string,
+    label: string,
+  ): void {
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+      throw new BadRequestException(
+        `Invalid ${label} ID.` ,
+      );
+    }
+  }
+
   // ============================================================
   // ADMIN DASHBOARD
   // GET /admin/dashboard
@@ -109,6 +121,8 @@ getVendors(
   getVendorDetail(
     @Param('id') vendorId: string,
   ) {
+    this.validateObjectId(vendorId, 'vendor');
+
     return this.adminService.getVendorDetail(
       vendorId,
     );
@@ -145,6 +159,8 @@ reviewVendorProfile(
   @Request()
   req: any,
 ) {
+  this.validateObjectId(vendorId, 'vendor');
+
   return this.adminService.reviewVendorProfile(
     vendorId,
     body.status,
@@ -187,6 +203,8 @@ reviewVendorProfile(
   getClientDetail(
     @Param('id') clientId: string,
   ) {
+    this.validateObjectId(clientId, 'client');
+
     return this.adminService.getClientDetail(
       clientId,
     );
@@ -219,6 +237,8 @@ reviewVendorProfile(
   getBookingDetail(
     @Param('id') vendorOrderId: string,
   ) {
+    this.validateObjectId(vendorOrderId, 'booking');
+
     return this.adminService.getBookingDetail(
       vendorOrderId,
     );
@@ -257,7 +277,19 @@ reviewVendorProfile(
   // GET /admin/campaigns/:id
   // ============================================================
 
-  @Get('campaigns/:id')
+  
+  // =============================================================
+  // PHASE 6 STEP 4 - CAMPAIGN ANALYTICS
+  // GET /admin/campaigns/analytics/summary
+  // Existing campaign counters only.
+  // =============================================================
+
+  @Get('campaigns/analytics/summary')
+  getCampaignAnalytics() {
+    return this.adminCampaignService
+      .getCampaignAnalytics();
+  }
+@Get('campaigns/:id')
   getCampaignDetail(
     @Param('id')
     campaignId: string,
@@ -494,3 +526,4 @@ createCategory(
     );
   }
 }
+

@@ -12,7 +12,10 @@ import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewQueryDto, ReviewSortOption } from './dto/review-query.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
-import { Review } from 'src/schemas/review.schema';
+import {
+    Review,
+    ReviewModerationStatus,
+} from 'src/schemas/review.schema';
 
 @Injectable()
 export class ReviewsService {
@@ -23,18 +26,85 @@ export class ReviewsService {
 ) {}
 
     async createReview(
-        userId: string,
-        dto: CreateReviewDto,
-    ): Promise<Review> {
-        const vendorId = new Types.ObjectId(dto.vendorId);
-        const userIdLocal = new Types.ObjectId(userId);
-
-        return this.reviewModel.create({
-            ...dto,
-            userId: userIdLocal,
-            vendorId,
-        });
+    userId: string,
+    dto: CreateReviewDto,
+): Promise<Review> {
+    if (!Types.ObjectId.isValid(userId)) {
+        throw new BadRequestException('Invalid userId');
     }
+
+    if (!Types.ObjectId.isValid(dto.vendorId)) {
+        throw new BadRequestException('Invalid vendorId');
+    }
+
+    const vendorId = new Types.ObjectId(dto.vendorId);
+    const userIdLocal = new Types.ObjectId(userId);
+
+    const reasons: string[] = [];
+
+    const previousReviewCount =
+        await this.reviewModel.countDocuments({
+            userId: userIdLocal,
+        });
+
+    if (previousReviewCount === 0) {
+        reasons.push('FIRST_REVIEW');
+    }
+
+    if (dto.rating === 1) {
+        reasons.push('LOW_RATING');
+    }
+
+    const text = dto.reviewText.trim();
+
+    if (text.length < 10) {
+        reasons.push('VERY_SHORT_TEXT');
+    }
+
+    const linkPattern =
+        /(https?:\/\/|www\.)\S+/i;
+
+    if (linkPattern.test(text)) {
+        reasons.push('LINK_DETECTED');
+    }
+
+    const phonePattern =
+        /(?:\+92|0092|0)?3\d{2}[\s-]?\d{7}/;
+
+    if (phonePattern.test(text)) {
+        reasons.push('PHONE_NUMBER_DETECTED');
+    }
+
+    const recentWindow = new Date(
+        Date.now() - 10 * 60 * 1000,
+    );
+
+    const recentReviewCount =
+        await this.reviewModel.countDocuments({
+            userId: userIdLocal,
+            createdAt: { $gte: recentWindow },
+        });
+
+    if (recentReviewCount >= 3) {
+        reasons.push('MULTIPLE_REVIEWS_SHORT_TIME');
+    }
+
+    const status =
+        reasons.length > 0
+            ? ReviewModerationStatus.PENDING
+            : ReviewModerationStatus.VISIBLE;
+
+    return this.reviewModel.create({
+        ...dto,
+        userId: userIdLocal,
+        vendorId,
+        status,
+        moderationReason:
+            reasons.length > 0
+                ? reasons.join(', ')
+                : undefined,
+    });
+}
 
     async getVendorReviews(query: ReviewQueryDto) {
         const {
@@ -47,8 +117,12 @@ export class ReviewsService {
         } = query;
 
         const filter: FilterQuery<Review> = {
-            vendorId: new Types.ObjectId(vendorId),
-        };
+    vendorId: new Types.ObjectId(vendorId),
+    $or: [
+        { status: ReviewModerationStatus.VISIBLE },
+        { status: { $exists: false } },
+    ],
+};
 
         if (rating) {
             filter.rating = rating;
@@ -106,6 +180,14 @@ export class ReviewsService {
 
     async getTopVendorsByRating(limit = 5) {
         const pipeline: PipelineStage[] = [
+            {
+    $match: {
+        $or: [
+            { status: ReviewModerationStatus.VISIBLE },
+            { status: { $exists: false } },
+        ],
+    },
+},
             {
                 $group: {
                     _id: '$vendorId',
@@ -187,10 +269,14 @@ return accessResults
 
         const pipeline: PipelineStage[] = [
             {
-                $match: {
-                    vendorId: vendorObjectId,
-                },
-            },
+    $match: {
+        vendorId: vendorObjectId,
+        $or: [
+            { status: ReviewModerationStatus.VISIBLE },
+            { status: { $exists: false } },
+        ],
+    },
+},
             {
                 $group: {
                     _id: '$vendorId',

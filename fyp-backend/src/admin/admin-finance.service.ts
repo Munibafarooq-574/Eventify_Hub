@@ -432,7 +432,7 @@ return result;
                 { $ne: ['$paymentStatus', 'paid'] },
                 {
                   $and: [
-                    { $ne: ['$verifiedAt', null] },
+                    { $eq: [{ $type: '$verifiedAt' }, 'date'] },
                     {
                       $in: [
                         '$paymentProvider',

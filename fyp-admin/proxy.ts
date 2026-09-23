@@ -7,19 +7,15 @@ export function proxy(request: NextRequest) {
   const token =
     request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
 
-  const isDashboardRoute =
-    pathname === "/dashboard" ||
-    pathname.startsWith("/dashboard/");
-
   const isLoginRoute = pathname === "/login";
 
-  if (isDashboardRoute && !token) {
+  if (!token && !isLoginRoute) {
     return NextResponse.redirect(
       new URL("/login", request.url),
     );
   }
 
-  if (isLoginRoute && token) {
+  if (token && isLoginRoute) {
     return NextResponse.redirect(
       new URL("/dashboard", request.url),
     );
@@ -29,5 +25,22 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login", "/dashboard/:path*"],
+  matcher: [
+    "/",
+    "/dashboard/:path*",
+    "/analytics/:path*",
+    "/bookings/:path*",
+    "/campaigns/:path*",
+    "/categories/:path*",
+    "/clients/:path*",
+    "/disputes/:path*",
+    "/finance/:path*",
+    "/payments/:path*",
+    "/refunds/:path*",
+    "/reviews/:path*",
+    "/subscriptions/:path*",
+    "/vendors/:path*",
+    "/vendor-subscriptions/:path*",
+    "/login",
+  ],
 };

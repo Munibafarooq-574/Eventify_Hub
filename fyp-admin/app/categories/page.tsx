@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import AdminSidebar from "@/components/AdminSidebar";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
 
@@ -278,63 +279,10 @@ const [categoryResponse, requestResponse] = await Promise.all([
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-64 border-r border-slate-200 bg-white lg:block">
-          <div className="sticky top-0 flex h-screen flex-col">
-            <div className="border-b border-slate-200 px-6 py-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                Eventify Hub
-              </p>
-
-              <h1 className="mt-1 text-xl font-bold text-slate-900">
-                Admin Panel
-              </h1>
-            </div>
-
-            <nav className="flex-1 space-y-1 px-3 py-5">
-              <Link
-                href="/dashboard"
-                className="block rounded-lg px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Dashboard
-              </Link>
-
-              <Link
-                href="/bookings"
-                className="block rounded-lg px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Bookings
-              </Link>
-
-              <Link
-                href="/vendors"
-                className="block rounded-lg px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Vendors
-              </Link>
-
-              <Link
-                href="/clients"
-                className="block rounded-lg px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-              >
-                Clients
-              </Link>
-
-              <Link
-                href="/categories"
-                className="block rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
-              >
-                Categories
-              </Link>
-            </nav>
-
-            <div className="border-t border-slate-200 px-6 py-5">
-              <p className="text-xs text-slate-400">
-                Category Management
-              </p>
-            </div>
-          </div>
-        </aside>
+            <div className="flex min-h-screen flex-col lg:flex-row">
+           <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+          <AdminSidebar />
+        </div>
 
         <section className="min-w-0 flex-1">
           <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">

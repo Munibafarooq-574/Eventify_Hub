@@ -1,4 +1,4 @@
-// fyp-backend/src/admin/admin-campaign.service.ts
+﻿// fyp-backend/src/admin/admin-campaign.service.ts
 
 import {
   BadRequestException,
@@ -21,7 +21,7 @@ export class AdminCampaignService {
   ) {}
 
   // ============================================================
-  // ADMIN — LIST CAMPAIGNS
+  // ADMIN â€” LIST CAMPAIGNS
   // GET /admin/campaigns
   //
   // Optional:
@@ -84,7 +84,7 @@ export class AdminCampaignService {
   }
 
   // ============================================================
-  // ADMIN — CAMPAIGN DETAIL
+  // ADMIN â€” CAMPAIGN DETAIL
   // GET /admin/campaigns/:id
   // ============================================================
 
@@ -158,7 +158,7 @@ export class AdminCampaignService {
   }
 
   // ============================================================
-  // ADMIN — APPROVE CAMPAIGN
+  // ADMIN â€” APPROVE CAMPAIGN
   // PATCH /admin/campaigns/:id/approve
   // ============================================================
 
@@ -260,7 +260,7 @@ if (now > campaignEnd) {
   }
 
   // ============================================================
-  // ADMIN — REJECT CAMPAIGN
+  // ADMIN â€” REJECT CAMPAIGN
   // PATCH /admin/campaigns/:id/reject
   //
   // reason is mandatory.
@@ -363,5 +363,438 @@ if (now > campaignEnd) {
         'Invalid admin ID.',
       );
     }
+  }
+
+  // ============================================================
+  // PHASE 6 - STEP 4
+  // ADMIN CAMPAIGN ANALYTICS
+  //
+  // Read-only aggregation over the existing VendorCampaign
+  // counters. Tracking remains owned by CampaignService.
+  // ============================================================
+  async getCampaignAnalytics() {
+    const now = new Date();
+
+    const [
+      totalsResult,
+      campaignPerformance,
+      vendorPerformance,
+    ] = await Promise.all([
+      this.campaignModel.aggregate([
+        {
+          $group: {
+            _id: null,
+
+            totalCampaigns: {
+              $sum: 1,
+            },
+
+            activeCampaigns: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      {
+                        $eq: [
+                          '$status',
+                          CampaignStatus.ACTIVE,
+                        ],
+                      },
+                      {
+                        $lte: [
+                          '$startDate',
+                          now,
+                        ],
+                      },
+                      {
+                        $gte: [
+                          '$endDate',
+                          now,
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            impressions: {
+              $sum: {
+                $ifNull: [
+                  '$impressions',
+                  0,
+                ],
+              },
+            },
+
+            clicks: {
+              $sum: {
+                $ifNull: [
+                  '$clicks',
+                  0,
+                ],
+              },
+            },
+
+            packageVisits: {
+              $sum: {
+                $ifNull: [
+                  '$packageVisits',
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
+
+      this.campaignModel.aggregate([
+        {
+          $addFields: {
+            safeImpressions: {
+              $ifNull: [
+                '$impressions',
+                0,
+              ],
+            },
+
+            safeClicks: {
+              $ifNull: [
+                '$clicks',
+                0,
+              ],
+            },
+
+            safePackageVisits: {
+              $ifNull: [
+                '$packageVisits',
+                0,
+              ],
+            },
+          },
+        },
+
+        {
+          $addFields: {
+            ctr: {
+              $cond: [
+                {
+                  $gt: [
+                    '$safeImpressions',
+                    0,
+                  ],
+                },
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        '$safeClicks',
+                        '$safeImpressions',
+                      ],
+                    },
+                    100,
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+
+        {
+          $sort: {
+            safeImpressions: -1,
+            safeClicks: -1,
+            safePackageVisits: -1,
+            createdAt: -1,
+          },
+        },
+
+        {
+          $limit: 20,
+        },
+
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'vendorId',
+            foreignField: '_id',
+            as: 'vendor',
+          },
+        },
+
+        {
+          $unwind: {
+            path: '$vendor',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+
+        {
+          $project: {
+            _id: 1,
+            title: 1,
+            status: 1,
+            vendorId: 1,
+            packageId: 1,
+            startDate: 1,
+            endDate: 1,
+
+            impressions:
+              '$safeImpressions',
+
+            clicks:
+              '$safeClicks',
+
+            packageVisits:
+              '$safePackageVisits',
+
+            ctr: {
+              $round: [
+                '$ctr',
+                2,
+              ],
+            },
+
+            vendorName: {
+              $ifNull: [
+                '$vendor.name',
+                'Unknown Vendor',
+              ],
+            },
+
+            brandName: {
+              $ifNull: [
+                '$vendor.businessName',
+                {
+                  $ifNull: [
+                    '$vendor.brandName',
+                    '',
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ]),
+
+      this.campaignModel.aggregate([
+        {
+          $group: {
+            _id: '$vendorId',
+
+            totalCampaigns: {
+              $sum: 1,
+            },
+
+            activeCampaigns: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      {
+                        $eq: [
+                          '$status',
+                          CampaignStatus.ACTIVE,
+                        ],
+                      },
+                      {
+                        $lte: [
+                          '$startDate',
+                          now,
+                        ],
+                      },
+                      {
+                        $gte: [
+                          '$endDate',
+                          now,
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+
+            impressions: {
+              $sum: {
+                $ifNull: [
+                  '$impressions',
+                  0,
+                ],
+              },
+            },
+
+            clicks: {
+              $sum: {
+                $ifNull: [
+                  '$clicks',
+                  0,
+                ],
+              },
+            },
+
+            packageVisits: {
+              $sum: {
+                $ifNull: [
+                  '$packageVisits',
+                  0,
+                ],
+              },
+            },
+          },
+        },
+
+        {
+          $addFields: {
+            ctr: {
+              $cond: [
+                {
+                  $gt: [
+                    '$impressions',
+                    0,
+                  ],
+                },
+                {
+                  $multiply: [
+                    {
+                      $divide: [
+                        '$clicks',
+                        '$impressions',
+                      ],
+                    },
+                    100,
+                  ],
+                },
+                0,
+              ],
+            },
+          },
+        },
+
+        {
+          $sort: {
+            impressions: -1,
+            clicks: -1,
+            packageVisits: -1,
+          },
+        },
+
+        {
+          $limit: 20,
+        },
+
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'vendor',
+          },
+        },
+
+        {
+          $unwind: {
+            path: '$vendor',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+
+        {
+          $project: {
+            _id: 0,
+
+            vendorId: {
+              $toString: '$_id',
+            },
+
+            vendorName: {
+              $ifNull: [
+                '$vendor.name',
+                'Unknown Vendor',
+              ],
+            },
+
+            brandName: {
+              $ifNull: [
+                '$vendor.businessName',
+                {
+                  $ifNull: [
+                    '$vendor.brandName',
+                    '',
+                  ],
+                },
+              ],
+            },
+
+            totalCampaigns: 1,
+            activeCampaigns: 1,
+            impressions: 1,
+            clicks: 1,
+            packageVisits: 1,
+
+            ctr: {
+              $round: [
+                '$ctr',
+                2,
+              ],
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const totals =
+      totalsResult[0] || {
+        totalCampaigns: 0,
+        activeCampaigns: 0,
+        impressions: 0,
+        clicks: 0,
+        packageVisits: 0,
+      };
+
+    const ctr =
+      totals.impressions > 0
+        ? Number(
+            (
+              (
+                totals.clicks /
+                totals.impressions
+              ) * 100
+            ).toFixed(2),
+          )
+        : 0;
+
+    return {
+      summary: {
+        totalCampaigns:
+          totals.totalCampaigns || 0,
+
+        activeCampaigns:
+          totals.activeCampaigns || 0,
+
+        impressions:
+          totals.impressions || 0,
+
+        views:
+          totals.impressions || 0,
+
+        clicks:
+          totals.clicks || 0,
+
+        packageVisits:
+          totals.packageVisits || 0,
+
+        ctr,
+      },
+
+      campaignPerformance,
+
+      vendorPerformance,
+    };
   }
 }
