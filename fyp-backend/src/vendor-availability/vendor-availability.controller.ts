@@ -52,10 +52,20 @@ setAvailability(
   return this.service.setAvailability(vendorId, dto);
 }
 
-  @Post('check')
+    @Post('check')
   async check(@Body() dto: CheckAvailabilityDto) {
-    const { start, end } = buildRange(dto.eventDate, dto.startTime, dto.durationMinutes);
-    return this.service.checkMany(dto.vendorIds, start, end);
+    const { start, end } = buildRange(
+      dto.eventDate,
+      dto.startTime,
+      dto.durationMinutes,
+    );
+
+    return this.service.checkMany(
+      dto.vendorIds,
+      start,
+      end,
+      dto.packageId,
+    );
   }
 
   @Get(':vendorId/slots')

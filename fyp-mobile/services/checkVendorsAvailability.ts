@@ -7,11 +7,14 @@ export interface AvailabilityCheckResult {
   reason?: string;
 }
 
-export default function checkVendorsAvailability(payload: {
+export default function checkVendorsAvailability(
+ payload: {
   vendorIds: string[];
-  eventDate: string; // "2026-09-10"
-  startTime: string; // "17:00"
+  eventDate: string;
+  startTime: string;
   durationMinutes: number;
-}) {
+  packageId?: string;
+}
+) {
   return growthApi.post<AvailabilityCheckResult[]>('/vendor-availability/check', payload);
 }

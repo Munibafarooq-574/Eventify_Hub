@@ -1,5 +1,13 @@
 //fyp-backend/src/vendor-availability/dto/check-availability.dto.ts
-import { IsArray, IsDateString, IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CheckAvailabilityDto {
   @IsArray()
@@ -12,7 +20,11 @@ export class CheckAvailabilityDto {
   @IsString()
   startTime: string; // "HH:mm", 24h
 
-  @IsInt()
+    @IsInt()
   @Min(1)
   durationMinutes: number;
+
+  @IsOptional()
+  @IsString()
+  packageId?: string;
 }

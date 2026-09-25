@@ -99,14 +99,15 @@ if (!hasAccess) {
    *
    * Also enforces the vendor's maximum event duration.
    */
-  async checkVendorAvailability(
+    async checkVendorAvailability(
     vendorId: string,
     startDateTime: Date,
     endDateTime: Date,
+    packageId?: string,
   ): Promise<AvailabilityResult> {
-    const vendor = await this.userModel
+        const vendor = await this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role')
+      .select('availabilitySettings role packages')
       .lean();
 
     if (!vendor || vendor.role !== 'Vendor') {
@@ -115,6 +116,111 @@ if (!hasAccess) {
         available: false,
         reason: 'Vendor not found',
       };
+    }
+
+
+
+        // ---------------------------------------------------------
+    // Phase 3 Step 2:
+    // Resolve the availability range from the existing
+    // Phase 2 package booking configuration.
+    //
+    // No packageId = keep existing vendor-level behavior.
+    // ---------------------------------------------------------
+
+    if (packageId) {
+      const packages: any[] = (vendor as any).packages ?? [];
+
+      const selectedPackage = packages.find(
+        (pkg: any) =>
+          String(pkg._id) === String(packageId),
+      );
+
+      if (!selectedPackage) {
+        return {
+          vendorId,
+          available: false,
+          reason: 'Package not found for this vendor',
+        };
+      }
+
+      const bookingType = selectedPackage.bookingType;
+
+      switch (bookingType) {
+        case 'DURATION_BASED':
+          // Existing requested start/end range remains the source
+          // for duration-based packages.
+          break;
+
+        case 'TIME_SLOT_BASED': {
+          const requiredDuration =
+            selectedPackage.requiredServiceDurationMinutes;
+
+          if (
+            typeof requiredDuration !== 'number' ||
+            !Number.isFinite(requiredDuration) ||
+            requiredDuration <= 0
+          ) {
+            return {
+              vendorId,
+              available: false,
+              reason:
+                'Package does not have a valid required service duration',
+            };
+          }
+
+          endDateTime = new Date(
+            startDateTime.getTime() +
+              requiredDuration * 60000,
+          );
+
+          break;
+        }
+
+        case 'DELIVERY_BASED':
+        case 'SETUP_BASED':
+        case 'CUSTOM': {
+          const startOffset =
+            selectedPackage.serviceWindowStartOffsetMinutes;
+
+          const endOffset =
+            selectedPackage.serviceWindowEndOffsetMinutes;
+
+          if (
+            typeof startOffset !== 'number' ||
+            !Number.isFinite(startOffset) ||
+            typeof endOffset !== 'number' ||
+            !Number.isFinite(endOffset) ||
+            startOffset > endOffset
+          ) {
+            return {
+              vendorId,
+              available: false,
+              reason:
+                'Package does not have a valid service window',
+            };
+          }
+
+          const eventStart = new Date(startDateTime);
+
+          startDateTime = new Date(
+            eventStart.getTime() +
+              startOffset * 60000,
+          );
+
+          endDateTime = new Date(
+            eventStart.getTime() +
+              endOffset * 60000,
+          );
+
+          break;
+        }
+
+        default:
+          // Backward compatibility for old packages that do not
+          // yet have bookingType.
+          break;
+      }
     }
 
     const settings: any = vendor.availabilitySettings ?? {};
@@ -395,10 +501,11 @@ if (!hasAccess) {
     };
   }
 
-  async checkMany(
+    async checkMany(
     vendorIds: string[],
     startDateTime: Date,
     endDateTime: Date,
+    packageId?: string,
   ): Promise<AvailabilityResult[]> {
     return Promise.all(
       vendorIds.map((id) =>
@@ -406,6 +513,7 @@ if (!hasAccess) {
           id,
           startDateTime,
           endDateTime,
+          packageId,
         ),
       ),
     );
