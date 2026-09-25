@@ -754,6 +754,14 @@ export const PackageDurationOptionSchema =
   SchemaFactory.createForClass(PackageDurationOption);
 
 
+  export enum PackageBookingType {
+  DURATION_BASED = 'DURATION_BASED',
+  TIME_SLOT_BASED = 'TIME_SLOT_BASED',
+  DELIVERY_BASED = 'DELIVERY_BASED',
+  SETUP_BASED = 'SETUP_BASED',
+  CUSTOM = 'CUSTOM',
+}
+
 // ==========================================
 // Vendor Package
 // ==========================================
@@ -770,8 +778,29 @@ export class Package {
   @Prop({ required: false, min: 0 })
   price?: number;
 
-  @Prop({ required: true })
+     @Prop({ required: true })
   services: string;
+
+  // Defines how this package consumes vendor availability.
+  // Optional for backward compatibility with existing packages.
+  @Prop({
+    enum: PackageBookingType,
+    required: false,
+  })
+  bookingType?: PackageBookingType;
+
+  // Fixed amount of vendor time required where applicable.
+  // Existing DURATION_BASED packages continue using durations[].
+  @Prop({ required: false, min: 1 })
+  requiredServiceDurationMinutes?: number;
+
+  // Optional service window relative to the event start.
+  // Negative = before event, positive = after event.
+  @Prop({ required: false })
+  serviceWindowStartOffsetMinutes?: number;
+
+  @Prop({ required: false })
+  serviceWindowEndOffsetMinutes?: number;
 
   // Fixed duration options
   @Prop({

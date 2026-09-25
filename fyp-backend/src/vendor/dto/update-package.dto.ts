@@ -11,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PackageBookingType } from '../../schemas/user.schema';
 
 export class UpdatePackageDurationOptionDto {
   @IsNumber()
@@ -44,6 +45,23 @@ export class UpdatePackageDto {
   @IsString()
   services?: string;
 
+   @IsOptional()
+  @IsEnum(PackageBookingType)
+  bookingType?: PackageBookingType;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  requiredServiceDurationMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  serviceWindowStartOffsetMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  serviceWindowEndOffsetMinutes?: number;
+  
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

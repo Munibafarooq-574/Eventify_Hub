@@ -635,7 +635,14 @@ async addPackages(
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
-        services: pkg.services,
+                services: pkg.services,
+        bookingType: pkg.bookingType,
+        requiredServiceDurationMinutes:
+            pkg.requiredServiceDurationMinutes,
+        serviceWindowStartOffsetMinutes:
+            pkg.serviceWindowStartOffsetMinutes,
+        serviceWindowEndOffsetMinutes:
+            pkg.serviceWindowEndOffsetMinutes,
         durations: pkg.durations ?? [],
         allowCustomDuration: pkg.allowCustomDuration ?? false,
         customDurationUnit: pkg.customDurationUnit,
@@ -1144,9 +1151,29 @@ async updatePackage(
             updateDto.price;
     }
 
-    if (updateDto.services !== undefined) {
+        if (updateDto.services !== undefined) {
         updatePayload['packages.$.services'] =
             updateDto.services;
+    }
+
+    if (updateDto.bookingType !== undefined) {
+        updatePayload['packages.$.bookingType'] =
+            updateDto.bookingType;
+    }
+
+    if (updateDto.requiredServiceDurationMinutes !== undefined) {
+        updatePayload['packages.$.requiredServiceDurationMinutes'] =
+            updateDto.requiredServiceDurationMinutes;
+    }
+
+    if (updateDto.serviceWindowStartOffsetMinutes !== undefined) {
+        updatePayload['packages.$.serviceWindowStartOffsetMinutes'] =
+            updateDto.serviceWindowStartOffsetMinutes;
+    }
+
+    if (updateDto.serviceWindowEndOffsetMinutes !== undefined) {
+        updatePayload['packages.$.serviceWindowEndOffsetMinutes'] =
+            updateDto.serviceWindowEndOffsetMinutes;
     }
 
     if (updateDto.durations !== undefined) {
