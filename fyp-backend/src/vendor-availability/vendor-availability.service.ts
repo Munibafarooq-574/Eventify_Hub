@@ -1,6 +1,11 @@
 // fyp-backend/src/vendor-availability/vendor-availability.service.ts
 
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -67,6 +72,167 @@ if (!hasAccess) {
     'Subscription expired. Renew your plan to edit availability.',
   );
 }
+
+    // ---------------------------------------------------------
+    // Phase 3 Step 3:
+    // Backend final-authority validation for availability CRUD.
+    // ---------------------------------------------------------
+
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+    const validateTime = (value: string, fieldName: string) => {
+      if (!timePattern.test(value)) {
+        throw new BadRequestException(
+          `${fieldName} must use HH:mm format`,
+        );
+      }
+    };
+
+    // Validate default working hours.
+    if (dto.workingHoursStart !== undefined) {
+      validateTime(dto.workingHoursStart, 'Working hours start');
+    }
+
+    if (dto.workingHoursEnd !== undefined) {
+      validateTime(dto.workingHoursEnd, 'Working hours end');
+    }
+
+    if (
+      dto.workingHoursStart !== undefined ||
+      dto.workingHoursEnd !== undefined
+    ) {
+      const currentSettings: any =
+        (user.availabilitySettings as any)?.toObject?.() ??
+        user.availabilitySettings ??
+        {};
+
+      const start =
+        dto.workingHoursStart ??
+        currentSettings.workingHoursStart ??
+        '09:00';
+
+      const end =
+        dto.workingHoursEnd ??
+        currentSettings.workingHoursEnd ??
+        '18:00';
+
+      validateTime(start, 'Working hours start');
+      validateTime(end, 'Working hours end');
+
+      if (start >= end) {
+        throw new BadRequestException(
+          'Working hours start must be before working hours end',
+        );
+      }
+    }
+
+    // Validate every per-day custom slot.
+    if (dto.daySlots !== undefined) {
+      for (const dayConfig of dto.daySlots) {
+        for (const slot of dayConfig.slots ?? []) {
+          validateTime(slot.start, `${dayConfig.day} slot start`);
+          validateTime(slot.end, `${dayConfig.day} slot end`);
+
+          if (slot.start >= slot.end) {
+            throw new BadRequestException(
+              `${dayConfig.day}: slot start must be before slot end`,
+            );
+          }
+        }
+
+                // Reject duplicate or overlapping availability slots
+        // configured for the same day.
+        const sortedSlots = [...(dayConfig.slots ?? [])].sort(
+          (a, b) => a.start.localeCompare(b.start),
+        );
+
+        for (let i = 1; i < sortedSlots.length; i++) {
+          const previousSlot = sortedSlots[i - 1];
+          const currentSlot = sortedSlots[i];
+
+          if (currentSlot.start < previousSlot.end) {
+            throw new BadRequestException(
+              `${dayConfig.day}: availability slots cannot overlap`,
+            );
+          }
+        }
+
+        const advanceOptions =
+          dayConfig.advanceNoticeOptionsMinutes ?? [];
+
+        for (const minutes of advanceOptions) {
+          if (
+            !Number.isInteger(minutes) ||
+            minutes < 0
+          ) {
+            throw new BadRequestException(
+              `${dayConfig.day}: advance notice must be zero or a positive whole number`,
+            );
+          }
+        }
+      }
+    }
+
+    // Validate global advance-notice options.
+    if (dto.advanceNoticeOptionsMinutes !== undefined) {
+      for (const minutes of dto.advanceNoticeOptionsMinutes) {
+        if (
+          !Number.isInteger(minutes) ||
+          minutes < 0
+        ) {
+          throw new BadRequestException(
+            'Advance notice must be zero or a positive whole number',
+          );
+        }
+      }
+    }
+
+    if (
+      dto.minimumAdvanceMinutes !== undefined &&
+      (
+        !Number.isInteger(dto.minimumAdvanceMinutes) ||
+        dto.minimumAdvanceMinutes < 0
+      )
+    ) {
+      throw new BadRequestException(
+        'Minimum advance notice must be zero or a positive whole number',
+      );
+    }
+
+    // Validate blocked dates and reject past dates.
+    if (dto.blockedDates !== undefined) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+      for (const date of dto.blockedDates) {
+        if (
+          typeof date !== 'string' ||
+          !datePattern.test(date)
+        ) {
+          throw new BadRequestException(
+            'Blocked dates must use YYYY-MM-DD format',
+          );
+        }
+
+        const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+        if (
+          Number.isNaN(parsedDate.getTime()) ||
+          parsedDate.toISOString().slice(0, 10) !== date
+        ) {
+          throw new BadRequestException(
+            `Invalid blocked date: ${date}`,
+          );
+        }
+
+        if (date < todayKey) {
+          throw new BadRequestException(
+            `Blocked date cannot be in the past: ${date}`,
+          );
+        }
+      }
+    }
+
     const current =
       (user.availabilitySettings as any)?.toObject?.() ??
       user.availabilitySettings ??
@@ -104,8 +270,47 @@ if (!hasAccess) {
     startDateTime: Date,
     endDateTime: Date,
     packageId?: string,
-  ): Promise<AvailabilityResult> {
-        const vendor = await this.userModel
+   ): Promise<AvailabilityResult> {
+    // ---------------------------------------------------------
+    // Phase 3 Step 4:
+    // Validate the requested availability range first.
+    // This remains the single backend availability authority.
+    // ---------------------------------------------------------
+
+    const requestedStart = new Date(startDateTime);
+    const requestedEnd = new Date(endDateTime);
+
+    if (
+      Number.isNaN(requestedStart.getTime()) ||
+      Number.isNaN(requestedEnd.getTime())
+    ) {
+      return {
+        vendorId,
+        available: false,
+        reason: 'Invalid booking date/time',
+      };
+    }
+
+    if (requestedStart >= requestedEnd) {
+      return {
+        vendorId,
+        available: false,
+        reason: 'Booking start time must be before end time',
+      };
+    }
+
+    if (requestedStart.getTime() < Date.now()) {
+      return {
+        vendorId,
+        available: false,
+        reason: 'Booking date/time cannot be in the past',
+      };
+    }
+
+    startDateTime = requestedStart;
+    endDateTime = requestedEnd;
+
+    const vendor = await this.userModel
       .findById(vendorId)
       .select('availabilitySettings role packages')
       .lean();
@@ -147,10 +352,103 @@ if (!hasAccess) {
       const bookingType = selectedPackage.bookingType;
 
       switch (bookingType) {
-        case 'DURATION_BASED':
-          // Existing requested start/end range remains the source
-          // for duration-based packages.
+                case 'DURATION_BASED': {
+          const requestedDurationMinutes =
+            (endDateTime.getTime() - startDateTime.getTime()) /
+            60000;
+
+          const durations: any[] =
+            Array.isArray(selectedPackage.durations)
+              ? selectedPackage.durations
+              : [];
+
+          const matchesFixedDuration = durations.some(
+            (duration: any) => {
+              const value = Number(duration.value);
+
+              if (!Number.isFinite(value) || value <= 0) {
+                return false;
+              }
+
+              const durationMinutes =
+                duration.unit === 'DAYS'
+                  ? value * 24 * 60
+                  : duration.unit === 'HOURS'
+                    ? value * 60
+                    : null;
+
+              return durationMinutes === requestedDurationMinutes;
+            },
+          );
+
+          if (
+            durations.length > 0 &&
+            !matchesFixedDuration &&
+            !selectedPackage.allowCustomDuration
+          ) {
+            return {
+              vendorId,
+              available: false,
+              reason:
+                'Requested duration is not supported by this package',
+            };
+          }
+
+          if (
+            durations.length === 0 &&
+            !selectedPackage.allowCustomDuration
+          ) {
+            // Backward compatibility:
+            // legacy duration-based packages may not have duration
+            // options configured yet, so keep their existing behavior.
+            break;
+          }
+
+          if (
+            !matchesFixedDuration &&
+            selectedPackage.allowCustomDuration
+          ) {
+            const customUnit =
+              selectedPackage.customDurationUnit;
+
+            const customRate =
+              selectedPackage.customDurationRate;
+
+            if (
+              (customUnit !== 'HOURS' &&
+                customUnit !== 'DAYS') ||
+              typeof customRate !== 'number' ||
+              !Number.isFinite(customRate) ||
+              customRate < 0
+            ) {
+              return {
+                vendorId,
+                available: false,
+                reason:
+                  'Package does not have valid custom duration configuration',
+              };
+            }
+
+            const unitMinutes =
+              customUnit === 'DAYS'
+                ? 24 * 60
+                : 60;
+
+            if (
+              requestedDurationMinutes <= 0 ||
+              requestedDurationMinutes % unitMinutes !== 0
+            ) {
+              return {
+                vendorId,
+                available: false,
+                reason:
+                  `Requested duration must be in whole ${customUnit.toLowerCase()}`,
+              };
+            }
+          }
+
           break;
+        }
 
         case 'TIME_SLOT_BASED': {
           const requiredDuration =
@@ -382,11 +680,6 @@ if (!hasAccess) {
         };
       }
     }
-
-    // ---------------------------------------------------------
-    // 4. Blocked dates
-    // ---------------------------------------------------------
-
     const key =
       toDateKey(startDateTime);
 
@@ -403,21 +696,17 @@ if (!hasAccess) {
       };
     }
 
-    // ---------------------------------------------------------
-    // 5. Minimum advance booking time
-    // Per-day override takes priority over vendor-wide default.
-    // ---------------------------------------------------------
-
     const advanceNoticeOptionsMinutes: number[] =
       daySlotConfig &&
       Array.isArray(daySlotConfig.advanceNoticeOptionsMinutes) &&
       daySlotConfig.advanceNoticeOptionsMinutes.length > 0
         ? daySlotConfig.advanceNoticeOptionsMinutes
-        : Array.isArray(settings.advanceNoticeOptionsMinutes)
-          ? settings.advanceNoticeOptionsMinutes
-          : settings.minimumAdvanceMinutes != null
-            ? [settings.minimumAdvanceMinutes]
-            : [];
+        : Array.isArray(settings.advanceNoticeOptionsMinutes) &&
+          settings.advanceNoticeOptionsMinutes.length > 0
+        ? settings.advanceNoticeOptionsMinutes
+        : settings.minimumAdvanceMinutes != null
+          ? [settings.minimumAdvanceMinutes]
+          : [];
 
     if (advanceNoticeOptionsMinutes.length > 0) {
   const now = new Date();
@@ -426,14 +715,6 @@ if (!hasAccess) {
     (startDateTime.getTime() - now.getTime()) /
     60000;
 
-  // Booking is allowed if at least one of the vendor's
-  // configured notice options is satisfied.
-  //
-  // Example:
-  // Vendor options: 3h, 6h, 12h
-  // Event is 5h away
-  //
-  // 3h option is satisfied → booking allowed.
   const bookingAllowed = advanceNoticeOptionsMinutes.some(
     (noticeMinutes) =>
       minutesUntilEvent >= noticeMinutes,
@@ -669,11 +950,12 @@ return {
     Array.isArray(daySlotConfig.advanceNoticeOptionsMinutes) &&
     daySlotConfig.advanceNoticeOptionsMinutes.length > 0
       ? daySlotConfig.advanceNoticeOptionsMinutes
-      : Array.isArray(settings.advanceNoticeOptionsMinutes)
-        ? settings.advanceNoticeOptionsMinutes
-        : settings.minimumAdvanceMinutes != null
-          ? [settings.minimumAdvanceMinutes]
-          : [],
+      : Array.isArray(settings.advanceNoticeOptionsMinutes) &&
+    settings.advanceNoticeOptionsMinutes.length > 0
+  ? settings.advanceNoticeOptionsMinutes
+  : settings.minimumAdvanceMinutes != null
+    ? [settings.minimumAdvanceMinutes]
+    : [],
 
   workingSlots,
 

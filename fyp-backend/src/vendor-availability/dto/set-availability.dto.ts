@@ -8,7 +8,10 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+import { Type } from 'class-transformer';
 
 export class WorkingDayDto {
   @IsIn(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
@@ -33,7 +36,9 @@ export class DaySlotConfigDto {
   @IsOptional()
   enabled?: boolean;
 
-  @IsArray()
+    @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TimeSlotDto)
   @IsOptional()
   slots?: TimeSlotDto[];
 
@@ -49,17 +54,19 @@ export class DaySlotConfigDto {
    * per-day duration restriction.
    */
     @IsArray()
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  @IsOptional()
-  advanceNoticeOptionsMinutes?: number[];
+@IsInt({ each: true })
+@Min(0, { each: true })
+@IsOptional()
+advanceNoticeOptionsMinutes?: number[];
 }
 
 export class SetAvailabilityDto {
   /**
    * Legacy working-days configuration.
    */
-  @IsArray()
+   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WorkingDayDto)
   @IsOptional()
   workingDays?: WorkingDayDto[];
 
@@ -77,7 +84,9 @@ export class SetAvailabilityDto {
   /**
    * New multi-slot per-day configuration.
    */
-  @IsArray()
+    @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DaySlotConfigDto)
   @IsOptional()
   daySlots?: DaySlotConfigDto[];
 
