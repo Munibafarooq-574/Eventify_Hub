@@ -44,6 +44,11 @@ export interface FeaturedPackagePublicEntry {
   orderCount: number;           // NEW
 }
 
+interface FeaturedVendorDiscoveryContext {
+  eventCityId?: string;
+  categoryIds?: string[];
+}
+
 @Injectable()
 export class PromotionService {
   constructor(
@@ -314,178 +319,149 @@ return this.promotionModel.create({
   // Customer-facing
   // Used by Home / Vendor Search / Package Discovery.
   // ---------------------------------------------------------------
+async getActiveFeaturedVendors(
+  limit = 10,
+  context: FeaturedVendorDiscoveryContext = {},
+): Promise<FeaturedVendorPublicEntry[]> {
+  const now = new Date();
 
-  async getActiveFeaturedVendors(
-    limit = 20,
-  ): Promise<FeaturedVendorPublicEntry[]> {
-    const now = new Date();
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 10, 1),
+    20,
+  );
 
-    const activePromotions = await this.promotionModel
-      .find({
-        type: PromotionType.FEATURED_VENDOR,
-        status: PromotionStatus.ACTIVE,
-        endDate: { $gt: now },
-      })
-      .sort({ startDate: -1 })
-      .limit(limit)
-      .lean();
+  const eventCityId =
+    context.eventCityId?.trim() || undefined;
 
-    if (!activePromotions.length) {
-      return [];
+  const categoryIds = Array.from(
+    new Set(
+      (context.categoryIds ?? [])
+        .map((id) => id.trim())
+        .filter((id) => Types.ObjectId.isValid(id)),
+    ),
+  );
+
+  if (
+    eventCityId &&
+    !Types.ObjectId.isValid(eventCityId)
+  ) {
+    return [];
+  }
+
+  // Do NOT limit here.
+  // Mandatory eligibility must happen before final limit.
+  const promotions = await this.promotionModel
+    .find({
+      type: PromotionType.FEATURED_VENDOR,
+      status: PromotionStatus.ACTIVE,
+      startDate: { $lte: now },
+      endDate: { $gt: now },
+    })
+    .sort({
+      startDate: -1,
+      _id: 1,
+    })
+    .lean();
+
+  const results: FeaturedVendorPublicEntry[] = [];
+
+  for (const promotion of promotions) {
+    const vendorId = String(promotion.vendorId);
+
+    // Existing FEATURED_VENDOR entitlement remains authoritative.
+    const stillEligible =
+      await this.featureAccessService.canUseFeature(
+        vendorId,
+        FeatureKey.FEATURED_VENDOR,
+      );
+
+    if (!stillEligible) {
+      continue;
     }
 
-    /*const vendorIds = activePromotions.map(
-      (promotion) => promotion.vendorId,
-    );
+    const vendor = await this.userModel
+      .findOne({
+        _id: new Types.ObjectId(vendorId),
+        role: 'Vendor',
 
-        const vendors = await this.userModel
-      .find({
-        _id: { $in: vendorIds },
-      })*/
-         const vendorIds = activePromotions.map(
-      (promotion) => promotion.vendorId,
-    );
+        ...(eventCityId
+          ? {
+              serviceLocationCityIds:
+                new Types.ObjectId(eventCityId),
+            }
+          : {}),
 
-    // Guard: a promotion row can outlive the subscription that created it
-    // (vendor cancels/downgrades before the 7/15/30-day campaign's endDate
-    // naturally arrives). Re-check current plan here so a vendor stops
-    // appearing as Featured the moment they drop to Free, instead of
-    // waiting for the promotion row to expire on its own.
-    const eligibilityChecks = await Promise.all(
-      vendorIds.map(async (id) => {
-        const idStr = id.toString();
-        const allowed = await this.featureAccessService.canUseFeature(
-          idStr,
-          FeatureKey.FEATURED_VENDOR,
-        );
-        return [idStr, allowed] as const;
-      }),
-    );
-    const eligibleVendorIds = new Set(
-      eligibilityChecks
-        .filter(([, allowed]) => allowed)
-        .map(([idStr]) => idStr),
-    );
-
-        const vendors = await this.userModel
-      .find({
-        _id: { $in: vendorIds },
+        ...(categoryIds.length > 0
+          ? {
+              buisnessCategory: {
+                $in: categoryIds.map(
+                  (id) => new Types.ObjectId(id),
+                ),
+              },
+            }
+          : {}),
       })
-      .select('name contactDetails city buisnessCategory')
-      .populate('buisnessCategory')
+      .select(
+        'name contactDetails city buisnessCategory serviceLocationCityIds',
+      )
+      .populate('buisnessCategory', 'name')
       .lean();
 
-    const vendorById = new Map(
-      vendors.map((vendor: any) => [
-        vendor._id.toString(),
-        vendor,
-      ]),
-    );
+    if (!vendor) {
+      continue;
+    }
 
-    // Average rating per vendor — computed from Review collection
-    const ratingAgg = await this.reviewModel.aggregate([
-      {
-        $match: {
-          vendorId: { $in: vendorIds.map((id) => new Types.ObjectId(id.toString())) },
-        },
-      },
-      {
-        $group: {
-          _id: '$vendorId',
-          averageRating: { $avg: '$rating' },
-          totalReviews: { $sum: 1 },
-        },
-      },
-    ]);
-
-        const ratingByVendor = new Map(
-      ratingAgg.map((r: any) => [r._id.toString(), r]),
-    );
-
-    // Distinct customer (organizer) count per vendor — via VendorOrder -> Order join
-    const customerAgg = await this.vendorOrderModel.aggregate([
-      {
-        $match: {
-          vendorId: { $in: vendorIds.map((id) => new Types.ObjectId(id.toString())) },
-        },
-      },
-      {
-        $lookup: {
-          from: 'orders',
-          localField: 'orderId',
-          foreignField: '_id',
-          as: 'order',
-        },
-      },
-      { $unwind: '$order' },
-      {
-        $group: {
-          _id: '$vendorId',
-          customers: { $addToSet: '$order.organizerId' },
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          customerCount: { $size: '$customers' },
-        },
-      },
-    ]);
-
-    const customerCountByVendor = new Map(
-      customerAgg.map((c: any) => [c._id.toString(), c.customerCount]),
-    );
-
-    return activePromotions
-      .map((promo: any) => {
-        const vendor = vendorById.get(
-          promo.vendorId.toString(),
-        );
-
-             /*   if (!vendor) {
-          // Vendor deleted/deactivated — skip.
-          return null;
-        }
-
-        const ratingInfo = ratingByVendor.get(vendor._id.toString());*/
-
-                        if (!vendor) {
-          // Vendor deleted/deactivated — skip.
-          return null;
-        }
-
-        if (!eligibleVendorIds.has(vendor._id.toString())) {
-          // Plan no longer includes Featured Vendor (downgraded/cancelled)
-          // even though this promotion row is still technically "active".
-          return null;
-        }
-
-        const ratingInfo = ratingByVendor.get(vendor._id.toString());
-      
-
-        return {
-          promotionId: promo._id.toString(),
-          vendorId: vendor._id.toString(),
-          vendorName: vendor.contactDetails?.brandName || vendor.name,
-          brandLogo: vendor.contactDetails?.brandLogo || null,
-          businessCategoryName:
-            vendor.buisnessCategory?.name || null,
-          city: vendor.city || null,
-          rating: ratingInfo
-            ? Math.round(ratingInfo.averageRating * 10) / 10
-            : null,
-          totalReviews: ratingInfo ? ratingInfo.totalReviews : 0,
-          customerCount: customerCountByVendor.get(vendor._id.toString()) || 0,
-          featuredUntil: promo.endDate,
-        };
+    const reviews = await this.reviewModel
+      .find({
+        vendorId: new Types.ObjectId(vendorId),
       })
-      .filter(
-        (
-          entry,
-        ): entry is FeaturedVendorPublicEntry =>
-          entry !== null,
-      );
+      .select('rating')
+      .lean();
+
+    const totalReviews = reviews.length;
+
+    const rating =
+      totalReviews > 0
+        ? reviews.reduce(
+            (sum: number, review: any) =>
+              sum + Number(review.rating || 0),
+            0,
+          ) / totalReviews
+        : null;
+
+    const customerCount =
+      await this.vendorOrderModel.countDocuments({
+        vendorId: new Types.ObjectId(vendorId),
+        status: 'completed',
+      });
+
+    results.push({
+      promotionId: String(promotion._id),
+      vendorId,
+      vendorName: vendor.name ?? 'Vendor',
+      brandLogo:
+        (vendor as any).contactDetails?.brandLogo ??
+        null,
+      businessCategoryName:
+        (vendor as any).buisnessCategory?.name ??
+        null,
+      city:
+        (vendor as any).city ??
+        null,
+      rating,
+      totalReviews,
+      customerCount,
+      featuredUntil: promotion.endDate as Date,
+    });
+
+    // Limit AFTER mandatory entitlement/city/category eligibility.
+    if (results.length >= safeLimit) {
+      break;
+    }
   }
+
+  return results;
+}
 
   async getActiveFeaturedPackages(
   limit = 20,

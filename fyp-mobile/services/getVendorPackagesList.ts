@@ -20,8 +20,22 @@ export interface VendorPackageListItem {
   // Old package price - backward compatibility
   price?: number;
 
-  // Services included in package
+    // Services included in package
   services: string;
+
+  // Booking configuration
+  bookingType?:
+    | 'DURATION_BASED'
+    | 'TIME_SLOT_BASED'
+    | 'DELIVERY_BASED'
+    | 'SETUP_BASED'
+    | 'CUSTOM';
+
+  requiredServiceDurationMinutes?: number;
+
+  serviceWindowStartOffsetMinutes?: number;
+
+  serviceWindowEndOffsetMinutes?: number;
 
   // Fixed duration options
   durations?: VendorPackageDuration[];

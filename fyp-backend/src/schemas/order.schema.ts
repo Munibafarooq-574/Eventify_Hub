@@ -16,6 +16,21 @@ export class Order extends Document {
     @Prop()
     eventType: string;
 
+    @Prop({
+  type: Types.ObjectId,
+  ref: 'City',
+  required: true,
+  index: true,
+})
+eventCityId: Types.ObjectId;
+
+@Prop({
+  type: String,
+  required: true,
+  trim: true,
+})
+eventAddress: string;
+
     @Prop({ required: true })
     guests: number;
 

@@ -1,4 +1,4 @@
-import postMehndiBusinessDetails from '@/services/Postmehndibusinessdetails';
+﻿import postMehndiBusinessDetails from '@/services/Postmehndibusinessdetails';
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -33,7 +33,6 @@ const BDMehndiIndex = () => {
     // Multi-select: vendor can offer more than one mehndi type / artist gender
     const [mehndiType, setMehndiType] = useState<string[]>([]);
     const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
-    const [cityCovered, setCityCovered] = useState<string>("");
     const [staffGender, setStaffGender] = useState<string[]>([]);
     const [minimumPrice, setMinimumPrice] = useState<string>("");
     const [description, setDescription] = useState<string>("");
@@ -60,7 +59,6 @@ if (!data) {
 
 setMehndiType(data.mehndiType || []);
       setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
-      setCityCovered(data.cityCovered || "");
       setStaffGender(data.staffGender || []);
       setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
@@ -92,7 +90,6 @@ setMehndiType(data.mehndiType || []);
         if (
             mehndiType.length === 0 ||
             travelsToClientHome === null ||
-            !cityCovered ||
             staffGender.length === 0 ||
             !minimumPrice ||
             !description ||
@@ -112,7 +109,6 @@ setMehndiType(data.mehndiType || []);
             const dto = {
   mehndiType,
   travelsToClientHome: travel,
-  cityCovered,
   staffGender,
   minimumPrice: Number(minimumPrice),
   description,
@@ -230,17 +226,6 @@ if (edit === "true") {
                 </View>
             </View>
 
-            {/* City Covered */}
-            <View style={styles.card}>
-                <SectionTitle icon="map-marker-alt" title="City Covered" required />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Select Cities"
-                    placeholderTextColor="#B99DAF"
-                    value={cityCovered}
-                    onChangeText={setCityCovered}
-                />
-            </View>
 
             {/* Staff - multi select */}
             <View style={styles.card}>
@@ -298,10 +283,10 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-            • Bridal Mehndi
-            • Arabic Mehndi
-            • Home Service Available
-            • Organic Mehndi Used`}
+            â€¢ Bridal Mehndi
+            â€¢ Arabic Mehndi
+            â€¢ Home Service Available
+            â€¢ Organic Mehndi Used`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -315,9 +300,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-        • Extra charges after 10 PM
-        • Travel charges outside city
-        • Booking required 2 days before`}
+        â€¢ Extra charges after 10 PM
+        â€¢ Travel charges outside city
+        â€¢ Booking required 2 days before`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -700,3 +685,4 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 });
+

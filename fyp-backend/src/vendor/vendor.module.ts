@@ -25,6 +25,7 @@ import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { VendorAnalyticsService } from './vendor-analytics.service';
 import { VendorGrowthModule } from './growth/vendor-growth.module';
 import { AuthModule } from '../auth/auth.module';
+import { CityModule } from '../city/city.module';
 
 @Module({
     imports: [
@@ -40,6 +41,7 @@ import { AuthModule } from '../auth/auth.module';
         ]),
                 forwardRef(() => VendorGrowthModule),
                 forwardRef(() => AuthModule),
+                CityModule,
     ],
 
     controllers: [VendorController],

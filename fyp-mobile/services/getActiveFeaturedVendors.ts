@@ -1,13 +1,57 @@
 // fyp-mobile/services/getActiveFeaturedVendors.ts
-//
-// Not wired into any customer-facing screen yet — that's Phase 9
-// (HomeScreen "Featured Vendors" section, Vendor Search ranking). Added
-// now since the backend endpoint already exists, so Phase 9 can import
-// this directly instead of writing it from scratch.
+
 import { growthApi } from './growthApiClient';
 import { FeaturedVendorPublicEntry } from '../types/promotion.types';
 
-export async function getActiveFeaturedVendors(limit?: number): Promise<FeaturedVendorPublicEntry[]> {
-  const query = limit ? `?limit=${limit}` : '';
-  return growthApi.get<FeaturedVendorPublicEntry[]>(`/vendor/growth/promotion/featured-vendor/active${query}`);
+export interface FeaturedVendorQuery {
+  limit?: number;
+  eventCityId?: string;
+  categoryIds?: string[];
+}
+
+export async function getActiveFeaturedVendors(
+  options: FeaturedVendorQuery = {},
+): Promise<FeaturedVendorPublicEntry[]> {
+  const query = new URLSearchParams();
+
+  if (
+    typeof options.limit === 'number' &&
+    Number.isFinite(options.limit) &&
+    options.limit > 0
+  ) {
+    query.append(
+      'limit',
+      String(Math.floor(options.limit)),
+    );
+  }
+
+  if (options.eventCityId?.trim()) {
+    query.append(
+      'eventCityId',
+      options.eventCityId.trim(),
+    );
+  }
+
+  const categoryIds = Array.from(
+    new Set(
+      (options.categoryIds ?? [])
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (categoryIds.length > 0) {
+    query.append(
+      'categoryIds',
+      categoryIds.join(','),
+    );
+  }
+
+  const queryString = query.toString();
+
+  return growthApi.get<FeaturedVendorPublicEntry[]>(
+    `/vendor/growth/promotion/featured-vendor/active${
+      queryString ? `?${queryString}` : ''
+    }`,
+  );
 }

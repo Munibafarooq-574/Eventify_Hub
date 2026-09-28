@@ -5,10 +5,13 @@ import { getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -53,6 +56,7 @@ type DaySlotConfig = {
   day: string;
   enabled: boolean;
   slots: TimeSlot[];
+  advanceNoticeOptionsMinutes?: number[];
 };
 
 const toKey = (d: string | Date) =>
@@ -76,8 +80,13 @@ const formatDisplayTime = (hhmm: string) => {
 
 const VendorAvailabilitySettings = () => {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [vendorId, setVendorId] = useState<string | null>(null);
+const [saving, setSaving] = useState(false);
+const [resetting, setResetting] = useState(false);
+
+const [loadError, setLoadError] = useState<string | null>(null);
+const [hasAvailability, setHasAvailability] = useState(false);
+
+const [vendorId, setVendorId] = useState<string | null>(null);
 
   const [workingDays, setWorkingDays] = useState(
     DAYS.map((d) => ({ day: d.code, enabled: true })),
@@ -88,7 +97,10 @@ const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
 const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
 
 const [blockedDates, setBlockedDates] = useState<string[]>([]);
-  const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
+ const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
+
+const [advanceNoticeOptionsMinutes, setAdvanceNoticeOptionsMinutes] =
+  useState<number[]>([]);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
 const [showEndPicker, setShowEndPicker] = useState(false);
@@ -96,57 +108,117 @@ const [showBlockCalendar, setShowBlockCalendar] = useState(false);
 
 // Multi-slot picker state
 const [activeSlotDay, setActiveSlotDay] = useState<string | null>(null);
+const [slotModalVisible, setSlotModalVisible] = useState(false);
 const [slotPickerMode, setSlotPickerMode] = useState<'start' | 'end' | null>(
   null,
 );
 const [draftSlotStart, setDraftSlotStart] = useState<Date>(timeToDate('09:00'));
 const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const user = await getUserData();
-        if (!user?._id) {
-          Alert.alert('Error', 'Could not identify vendor account.');
-          setLoading(false);
-          return;
-        }
-        setVendorId(user._id);
+  const loadAvailability = async () => {
+  setLoading(true);
+  setLoadError(null);
 
-        const data = await getVendorAvailability(user._id);
-        if (data?.workingDays?.length) setWorkingDays(data.workingDays);
-        if (data?.workingHoursStart) setWorkingHoursStart(data.workingHoursStart);
-        if (data?.workingHoursEnd) setWorkingHoursEnd(data.workingHoursEnd);
+  try {
+    const user = await getUserData();
 
-if (Array.isArray(data?.daySlots)) {
-  setDaySlots(
-    data.daySlots.map((item: any) => ({
-      day: item.day,
-      enabled: item.enabled !== false,
-      slots: Array.isArray(item.slots)
-        ? item.slots.map((slot: any) => ({
-            start: slot.start,
-            end: slot.end,
-          }))
-        : [],
-    })),
+    if (!user?._id) {
+      setVendorId(null);
+      setHasAvailability(false);
+      setLoadError('Could not identify vendor account.');
+      return;
+    }
+
+    setVendorId(user._id);
+
+    const data = await getVendorAvailability(user._id);
+
+    const hasExistingAvailability =
+  !!data &&
+  (
+    (Array.isArray(data.workingDays) &&
+      data.workingDays.some((d) => d.enabled === false)) ||
+    (data.workingHoursStart && data.workingHoursStart !== '09:00') ||
+    (data.workingHoursEnd && data.workingHoursEnd !== '18:00') ||
+    (Array.isArray(data.daySlots) && data.daySlots.length > 0) ||
+    (Array.isArray(data.blockedDates) && data.blockedDates.length > 0) ||
+    (typeof data.minimumAdvanceMinutes === 'number' &&
+      data.minimumAdvanceMinutes !== 0) ||
+    (Array.isArray(data.advanceNoticeOptionsMinutes) &&
+      data.advanceNoticeOptionsMinutes.length > 0) ||
+    (typeof data.maxConcurrentBookings === 'number' &&
+      data.maxConcurrentBookings !== 1)
   );
+
+    setHasAvailability(hasExistingAvailability);
+
+    if (data?.workingDays?.length) {
+      setWorkingDays(data.workingDays);
+    }
+
+    if (data?.workingHoursStart) {
+      setWorkingHoursStart(data.workingHoursStart);
+    }
+
+    if (data?.workingHoursEnd) {
+      setWorkingHoursEnd(data.workingHoursEnd);
+    }
+
+    if (Array.isArray(data?.daySlots)) {
+      setDaySlots(
+        data.daySlots.map((item: any) => ({
+          day: item.day,
+          enabled: item.enabled !== false,
+          slots: Array.isArray(item.slots)
+  ? item.slots.map((slot: any) => ({
+      start: slot.start,
+      end: slot.end,
+    }))
+  : [],
+advanceNoticeOptionsMinutes: Array.isArray(
+  item.advanceNoticeOptionsMinutes,
+)
+  ? item.advanceNoticeOptionsMinutes.filter(
+      (value: number) =>
+        Number.isFinite(value) && value >= 0,
+    )
+  : [],
+        })),
+      );
+    }
+
+    if (Array.isArray(data?.blockedDates)) {
+      setBlockedDates(
+        data.blockedDates.map((d: string) => toKey(d)),
+      );
+    }
+
+    if (typeof data?.minimumAdvanceMinutes === 'number') {
+  setMinimumAdvanceMinutes(data.minimumAdvanceMinutes);
 }
 
-if (data?.blockedDates) {
-          setBlockedDates(data.blockedDates.map((d: string) => toKey(d)));
-        }
-        if (typeof data?.minimumAdvanceMinutes === 'number') {
-          setMinimumAdvanceMinutes(data.minimumAdvanceMinutes);
-        }
-      } catch (error) {
-        console.error('Error loading availability settings:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
+if (Array.isArray(data?.advanceNoticeOptionsMinutes)) {
+  setAdvanceNoticeOptionsMinutes(
+    data.advanceNoticeOptionsMinutes.filter(
+      (value: number) => Number.isFinite(value) && value >= 0,
+    ),
+  );
+}
+  } catch (error) {
+    console.error('Error loading availability settings:', error);
+
+    setHasAvailability(false);
+    setLoadError(
+      'Could not load availability settings. Please try again.',
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  loadAvailability();
+}, []);
 
   const toggleDay = (code: string) => {
     setWorkingDays((prev) =>
@@ -154,14 +226,104 @@ if (data?.blockedDates) {
     );
   };
 
-  const addSlotForDay = (day: string) => {
-  const start = timeToDate('09:00');
-  const end = timeToDate('13:00');
+   const openTimePicker = (
+  which: 'start' | 'end',
+  currentValue: Date,
+  onPicked: (date: Date) => void,
+) => {
+  if (Platform.OS === 'android') {
+    DateTimePickerAndroid.open({
+      value: currentValue,
+      mode: 'time',
+      display: 'default',
+      onChange: (_, selected) => {
+        if (selected) onPicked(selected);
+      },
+    });
+  } else {
+    setSlotPickerMode(which);
+  }
+};
 
+ const addSlotForDay = (day: string) => {
   setActiveSlotDay(day);
-  setDraftSlotStart(start);
-  setDraftSlotEnd(end);
-  setSlotPickerMode('start');
+  setDraftSlotStart(timeToDate('09:00'));
+  setDraftSlotEnd(timeToDate('13:00'));
+  setSlotPickerMode(null);
+  setSlotModalVisible(true);
+};
+
+const confirmDraftSlot = () => {
+  if (!activeSlotDay) return;
+
+  if (draftSlotStart >= draftSlotEnd) {
+    Alert.alert('Invalid slot', 'End time must be after start time.');
+    return;
+  }
+
+  const newSlot: TimeSlot = {
+    start: dateToTime(draftSlotStart),
+    end: dateToTime(draftSlotEnd),
+  };
+
+  setDaySlots((prev) => {
+    const existing = prev.find((item) => item.day === activeSlotDay);
+
+    if (!existing) {
+      return [
+        ...prev,
+        { day: activeSlotDay, enabled: true, slots: [newSlot] },
+      ];
+    }
+
+    return prev.map((item) =>
+      item.day === activeSlotDay
+        ? { ...item, enabled: true, slots: [...item.slots, newSlot] }
+        : item,
+    );
+  });
+
+  setSlotModalVisible(false);
+  setActiveSlotDay(null);
+};
+
+const cancelDraftSlot = () => {
+  setSlotModalVisible(false);
+  setActiveSlotDay(null);
+  setSlotPickerMode(null);
+};
+
+const toggleDayAdvanceNotice = (day: string, value: number) => {
+  setDaySlots((prev) => {
+    const existing = prev.find((item) => item.day === day);
+
+    if (!existing) {
+      return [
+        ...prev,
+        {
+          day,
+          enabled: true,
+          slots: [],
+          advanceNoticeOptionsMinutes: [value],
+        },
+      ];
+    }
+
+    const current = existing.advanceNoticeOptionsMinutes ?? [];
+
+    const updated = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value].sort((a, b) => a - b);
+
+    return prev.map((item) =>
+      item.day === day
+        ? {
+            ...item,
+            advanceNoticeOptionsMinutes: updated,
+          }
+        : item,
+    );
+  });
 };
 
 const removeSlotForDay = (day: string, index: number) => {
@@ -175,16 +337,33 @@ const removeSlotForDay = (day: string, index: number) => {
             }
           : config,
       )
-      .filter((config) => config.slots.length > 0 || config.enabled === false),
+      .filter(
+        (config) =>
+          config.slots.length > 0 ||
+          config.enabled === false ||
+          (config.advanceNoticeOptionsMinutes?.length ?? 0) > 0,
+      ),
   );
 };
 
 
 const toggleBlockedDate = (dateStr: string) => {
-    setBlockedDates((prev) =>
-      prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr],
+  const today = toKey(new Date());
+
+  if (dateStr < today) {
+    Alert.alert(
+      'Invalid date',
+      'Past dates cannot be added as unavailable dates.',
     );
-  };
+    return;
+  }
+
+  setBlockedDates((prev) =>
+    prev.includes(dateStr)
+      ? prev.filter((d) => d !== dateStr)
+      : [...prev, dateStr],
+  );
+};
 
  const handleSave = async () => {
   if (!vendorId) return;
@@ -223,9 +402,12 @@ const toggleBlockedDate = (dateStr: string) => {
       // NEW: multiple working windows per day.
       daySlots,
 
-      blockedDates,
+            blockedDates,
       minimumAdvanceMinutes,
+      advanceNoticeOptionsMinutes,
     });
+
+    setHasAvailability(true);
 
     Alert.alert(
       'Saved',
@@ -242,6 +424,72 @@ const toggleBlockedDate = (dateStr: string) => {
   }
 };
 
+const handleResetAvailability = () => {
+  if (!vendorId || saving || resetting) return;
+
+  Alert.alert(
+    'Reset Availability',
+    'This will remove your custom slots, blocked dates, and advance-notice settings and restore the default availability. Continue?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: async () => {
+          setResetting(true);
+
+          const defaultWorkingDays = DAYS.map((d) => ({
+            day: d.code,
+            enabled: true,
+          }));
+
+          try {
+            await patchVendorAvailability(vendorId, {
+              workingDays: defaultWorkingDays,
+              workingHoursStart: '09:00',
+              workingHoursEnd: '18:00',
+              daySlots: [],
+              blockedDates: [],
+              minimumAdvanceMinutes: 0,
+              advanceNoticeOptionsMinutes: [],
+              maxConcurrentBookings: 1,
+            });
+
+            setWorkingDays(defaultWorkingDays);
+            setWorkingHoursStart('09:00');
+            setWorkingHoursEnd('18:00');
+            setDaySlots([]);
+            setBlockedDates([]);
+            setMinimumAdvanceMinutes(0);
+            setAdvanceNoticeOptionsMinutes([]);
+            setShowBlockCalendar(false);
+            setHasAvailability(false);
+
+            Alert.alert(
+              'Reset Complete',
+              'Your custom availability has been removed and default availability restored.',
+            );
+          } catch (error) {
+            console.error(
+              'Error resetting availability settings:',
+              error,
+            );
+
+            Alert.alert(
+              'Error',
+              'Could not reset availability settings. Please try again.',
+            );
+          } finally {
+            setResetting(false);
+          }
+        },
+      },
+    ],
+  );
+};
   const blockedMarks = blockedDates.reduce((acc: Record<string, any>, dateStr) => {
     acc[dateStr] = {
       customStyles: {
@@ -253,12 +501,46 @@ const toggleBlockedDate = (dateStr: string) => {
   }, {});
 
   if (loading) {
-    return (
-      <View style={styles.centerState}>
-        <ActivityIndicator size="large" color={PRIMARY} />
-      </View>
-    );
-  }
+  return (
+    <View style={styles.centerState}>
+      <ActivityIndicator size="large" color={PRIMARY} />
+      <Text style={{ marginTop: 12, color: '#666' }}>
+        Loading availability...
+      </Text>
+    </View>
+  );
+}
+
+if (loadError) {
+  return (
+    <View style={styles.centerState}>
+      <Text
+        style={{
+          color: '#B91C1C',
+          textAlign: 'center',
+          marginBottom: 16,
+          paddingHorizontal: 24,
+        }}
+      >
+        {loadError}
+      </Text>
+
+      <TouchableOpacity
+        onPress={loadAvailability}
+        style={{
+          backgroundColor: PRIMARY,
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 8,
+        }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '600' }}>
+          Retry
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
   return (
     <View style={styles.container}>
@@ -271,6 +553,38 @@ const toggleBlockedDate = (dateStr: string) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+  {!hasAvailability && (
+    <View
+      style={{
+        backgroundColor: '#F8F5F8',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 16,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 15,
+          fontWeight: '600',
+          color: PRIMARY,
+          marginBottom: 4,
+        }}
+      >
+        Default Availability
+      </Text>
+
+      <Text
+        style={{
+          fontSize: 13,
+          color: '#666',
+          lineHeight: 19,
+        }}
+      >
+        No custom availability has been set yet. Update the settings below and
+        save them to create your availability.
+      </Text>
+    </View>
+  )}
         {/* Working Days */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Working Days</Text>
@@ -377,12 +691,53 @@ const toggleBlockedDate = (dateStr: string) => {
             ))}
 
             <TouchableOpacity
-              style={styles.addSlotButton}
-              onPress={() => addSlotForDay(code)}
-            >
-              <Ionicons name="add-circle-outline" size={17} color={PRIMARY} />
-              <Text style={styles.addSlotButtonText}>Add Slot</Text>
-            </TouchableOpacity>
+  style={styles.addSlotButton}
+  onPress={() => addSlotForDay(code)}
+>
+  <Ionicons
+    name="add-circle-outline"
+    size={17}
+    color={PRIMARY}
+  />
+  <Text style={styles.addSlotButtonText}>Add Slot</Text>
+</TouchableOpacity>
+
+<View style={{ marginTop: 10 }}>
+  <Text style={styles.slotHint}>
+    Advance notice for {label}
+  </Text>
+
+  <View style={[styles.chipsWrap, { marginTop: 7 }]}>
+    {ADVANCE_OPTIONS.map((opt) => {
+      const selected =
+        config?.advanceNoticeOptionsMinutes ?? [];
+
+      const active = selected.includes(opt.value);
+
+      return (
+        <TouchableOpacity
+          key={`${code}-advance-${opt.value}`}
+          style={[
+            styles.chip,
+            active && styles.chipActive,
+          ]}
+          onPress={() =>
+            toggleDayAdvanceNotice(code, opt.value)
+          }
+        >
+          <Text
+            style={[
+              styles.chipText,
+              active && styles.chipTextActive,
+            ]}
+          >
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+</View>
           </>
         )}
       </View>
@@ -401,9 +756,13 @@ const toggleBlockedDate = (dateStr: string) => {
   </View>
 
   <View style={styles.hoursRow}>
-    <TouchableOpacity
+       <TouchableOpacity
       style={styles.timeButton}
-      onPress={() => setShowStartPicker(true)}
+      onPress={() =>
+        openTimePicker('start', timeToDate(workingHoursStart), (d) =>
+          setWorkingHoursStart(dateToTime(d)),
+        )
+      }
     >
       <Ionicons name="time-outline" size={16} color={PRIMARY} />
       <Text style={styles.timeButtonText}>
@@ -415,7 +774,11 @@ const toggleBlockedDate = (dateStr: string) => {
 
     <TouchableOpacity
       style={styles.timeButton}
-      onPress={() => setShowEndPicker(true)}
+      onPress={() =>
+        openTimePicker('end', timeToDate(workingHoursEnd), (d) =>
+          setWorkingHoursEnd(dateToTime(d)),
+        )
+      }
     >
       <Ionicons name="time-outline" size={16} color={PRIMARY} />
       <Text style={styles.timeButtonText}>
@@ -424,13 +787,13 @@ const toggleBlockedDate = (dateStr: string) => {
     </TouchableOpacity>
   </View>
 
-  {showStartPicker && (
+  {Platform.OS === 'ios' && showStartPicker && (
     <DateTimePicker
       value={timeToDate(workingHoursStart)}
       mode="time"
       display="default"
       onChange={(_, selected) => {
-        setShowStartPicker(Platform.OS === 'ios');
+        setShowStartPicker(false);
 
         if (selected) {
           setWorkingHoursStart(dateToTime(selected));
@@ -439,13 +802,13 @@ const toggleBlockedDate = (dateStr: string) => {
     />
   )}
 
-  {showEndPicker && (
+  {Platform.OS === 'ios' && showEndPicker && (
     <DateTimePicker
       value={timeToDate(workingHoursEnd)}
       mode="time"
       display="default"
       onChange={(_, selected) => {
-        setShowEndPicker(Platform.OS === 'ios');
+        setShowEndPicker(false);
 
         if (selected) {
           setWorkingHoursEnd(dateToTime(selected));
@@ -456,28 +819,51 @@ const toggleBlockedDate = (dateStr: string) => {
 </View>
 
         {/* Minimum Advance Booking */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Minimum Advance Booking Time</Text>
-          <Text style={styles.cardSubtitle}>
-            How far ahead an organizer must book you before the event starts.
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>Advance Booking Options</Text>
+
+  <Text style={styles.cardSubtitle}>
+    Select one or more advance-notice options. These are used when a day
+    does not have its own advance-notice settings.
+  </Text>
+
+  <View style={styles.chipsWrap}>
+    {ADVANCE_OPTIONS.map((opt) => {
+      const active =
+        advanceNoticeOptionsMinutes.length > 0
+          ? advanceNoticeOptionsMinutes.includes(opt.value)
+          : minimumAdvanceMinutes === opt.value;
+
+      return (
+        <TouchableOpacity
+          key={opt.value}
+          style={[styles.chip, active && styles.chipActive]}
+          onPress={() => {
+            setAdvanceNoticeOptionsMinutes((prev) => {
+              const base =
+                prev.length > 0 ? prev : [minimumAdvanceMinutes];
+
+              const updated = base.includes(opt.value)
+                ? base.filter((value) => value !== opt.value)
+                : [...base, opt.value].sort((a, b) => a - b);
+
+              return updated;
+            });
+          }}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              active && styles.chipTextActive,
+            ]}
+          >
+            {opt.label}
           </Text>
-          <View style={styles.chipsWrap}>
-            {ADVANCE_OPTIONS.map((opt) => {
-              const active = minimumAdvanceMinutes === opt.value;
-              return (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setMinimumAdvanceMinutes(opt.value)}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+</View>
 
         {/* Blocked Dates */}
         <View style={styles.card}>
@@ -532,98 +918,144 @@ const toggleBlockedDate = (dateStr: string) => {
         </View>
             </ScrollView>
 
-      {/* Multi-slot time picker */}
-      {slotPickerMode === 'start' && (
-        <DateTimePicker
-          value={draftSlotStart}
-          mode="time"
-          display="default"
-          onChange={(_, selected) => {
-            if (Platform.OS === 'android') {
-              setSlotPickerMode(null);
-            }
+            {/* Add Time Slot Modal - clear, non-chained UX */}
+      <Modal
+        visible={slotModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelDraftSlot}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Add Time Slot</Text>
+            <Text style={styles.modalSubtitle}>
+              {DAYS.find((d) => d.code === activeSlotDay)?.label}
+            </Text>
 
-            if (selected) {
-              setDraftSlotStart(selected);
-              setSlotPickerMode('end');
-            }
-          }}
+            <View style={styles.modalTimeRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalFieldLabel}>Start</Text>
+                   <TouchableOpacity
+                  style={styles.modalTimeButton}
+                  onPress={() =>
+                    openTimePicker('start', draftSlotStart, setDraftSlotStart)
+                  }
+                >
+                  <Ionicons name="time-outline" size={16} color={PRIMARY} />
+                  <Text style={styles.modalTimeButtonText}>
+                    {formatDisplayTime(dateToTime(draftSlotStart))}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Ionicons
+                name="arrow-forward"
+                size={16}
+                color="#B0B0B0"
+                style={{ marginTop: 22 }}
+              />
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalFieldLabel}>End</Text>
+                   <TouchableOpacity
+                  style={styles.modalTimeButton}
+                  onPress={() =>
+                    openTimePicker('end', draftSlotEnd, setDraftSlotEnd)
+                  }
+                >
+                  <Ionicons name="time-outline" size={16} color={PRIMARY} />
+                  <Text style={styles.modalTimeButtonText}>
+                    {formatDisplayTime(dateToTime(draftSlotEnd))}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+                        {Platform.OS === 'ios' && slotPickerMode === 'start' && (
+              <DateTimePicker
+                value={draftSlotStart}
+                mode="time"
+                display="default"
+                onChange={(_, selected) => {
+                  setSlotPickerMode(null);
+                  if (selected) setDraftSlotStart(selected);
+                }}
+              />
+            )}
+
+            {Platform.OS === 'ios' && slotPickerMode === 'end' && (
+              <DateTimePicker
+                value={draftSlotEnd}
+                mode="time"
+                display="default"
+                onChange={(_, selected) => {
+                  setSlotPickerMode(null);
+                  if (selected) setDraftSlotEnd(selected);
+                }}
+              />
+            )}
+
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={cancelDraftSlot}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={confirmDraftSlot}
+              >
+                <Text style={styles.modalConfirmButtonText}>Add Slot</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+     <View style={styles.footer}>
+  <TouchableOpacity
+    style={[
+      styles.resetButton,
+      (saving || resetting) && { opacity: 0.6 },
+    ]}
+    onPress={handleResetAvailability}
+    disabled={saving || resetting}
+  >
+    {resetting ? (
+      <ActivityIndicator size="small" color="#B91C1C" />
+    ) : (
+      <>
+        <Ionicons
+          name="refresh-outline"
+          size={17}
+          color="#B91C1C"
         />
-      )}
+        <Text style={styles.resetButtonText}>
+          Reset Availability
+        </Text>
+      </>
+    )}
+  </TouchableOpacity>
 
-      {slotPickerMode === 'end' && (
-        <DateTimePicker
-          value={draftSlotEnd}
-          mode="time"
-          display="default"
-          onChange={(_, selected) => {
-            setSlotPickerMode(null);
-
-            if (selected) {
-              setDraftSlotEnd(selected);
-
-              // Android fires the callback immediately.
-              // Confirm after receiving the selected end time.
-              if (draftSlotStart < selected) {
-                const newSlot: TimeSlot = {
-                  start: dateToTime(draftSlotStart),
-                  end: dateToTime(selected),
-                };
-
-                if (activeSlotDay) {
-                  setDaySlots((prev) => {
-                    const existing = prev.find(
-                      (item) => item.day === activeSlotDay,
-                    );
-
-                    if (!existing) {
-                      return [
-                        ...prev,
-                        {
-                          day: activeSlotDay,
-                          enabled: true,
-                          slots: [newSlot],
-                        },
-                      ];
-                    }
-
-                    return prev.map((item) =>
-                      item.day === activeSlotDay
-                        ? {
-                            ...item,
-                            enabled: true,
-                            slots: [...item.slots, newSlot],
-                          }
-                        : item,
-                    );
-                  });
-                }
-
-                setActiveSlotDay(null);
-              } else {
-                Alert.alert(
-                  'Invalid slot',
-                  'End time must be after start time.',
-                );
-              }
-            }
-          }}
-        />
-      )}
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.saveButton, saving && { opacity: 0.7 }]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Availability</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity
+    style={[
+      styles.saveButton,
+      (saving || resetting) && { opacity: 0.7 },
+    ]}
+    onPress={handleSave}
+    disabled={saving || resetting}
+  >
+    {saving ? (
+      <ActivityIndicator size="small" color="#FFFFFF" />
+    ) : (
+      <Text style={styles.saveButtonText}>
+        Save Availability
+      </Text>
+    )}
+  </TouchableOpacity>
+</View>
     </View>
   );
 };
@@ -792,6 +1224,24 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F0DDEA',
   },
+  resetButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  borderWidth: 1.5,
+  borderColor: '#B91C1C',
+  borderRadius: 14,
+  paddingVertical: 11,
+  marginBottom: 9,
+  backgroundColor: '#FFFFFF',
+},
+
+resetButtonText: {
+  color: '#B91C1C',
+  fontWeight: '800',
+  fontSize: 13,
+},
   saveButton: {
     backgroundColor: PRIMARY,
     borderRadius: 14,
@@ -799,4 +1249,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 20,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  modalSubtitle: { fontSize: 12, color: '#8A8A8A', marginTop: 2, marginBottom: 16 },
+  modalTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8A8A8A',
+    marginBottom: 6,
+  },
+  modalTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PRIMARY_LIGHT,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  modalTimeButtonText: { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 20,
+  },
+  modalCancelButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#E3D3DD',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: { fontSize: 13, fontWeight: '700', color: '#666' },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
 });

@@ -1,4 +1,4 @@
-import postSalonBusinessDetails from '@/services/postSalonBusinessDetails';
+﻿import postSalonBusinessDetails from '@/services/postSalonBusinessDetails';
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
@@ -33,7 +33,6 @@ const BusinessDetailsForm = () => {
     const [staffType, setStaffType] = useState<string | null>(null);
     const [expertise, setExpertise] = useState<string>("");
     const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
-    const [cityCovered, setCityCovered] = useState<string>("");
     // Multi-select: vendor can offer more than one staff gender
     const [staffGender, setStaffGender] = useState<string[]>([]);
     const [minimumPrice, setMinimumPrice] = useState<string>("");
@@ -60,7 +59,6 @@ const BusinessDetailsForm = () => {
       setTravelsToClientHome(
         data.travelsToClientHome ? "YES" : "NO"
       );
-      setCityCovered(data.cityCovered || "");
       setStaffGender(data.staffGender || []);
       setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
@@ -88,7 +86,6 @@ const BusinessDetailsForm = () => {
             !staffType ||
             !expertise ||
             travelsToClientHome === null ||
-            !cityCovered ||
             staffGender.length === 0 ||
             !minimumPrice ||
             !description ||
@@ -109,7 +106,6 @@ const BusinessDetailsForm = () => {
     staffType,
     expertise,
     travelsToClientHome: travel,
-    cityCovered,
     staffGender,
     minimumPrice: Number(minimumPrice),
     description,
@@ -210,11 +206,11 @@ if (edit === "true") {
     multiline
     textAlignVertical="top"
     placeholder={`Example:
-• Bridal Makeup
-• Party Makeup
-• HD Makeup
-• Airbrush Makeup
-• Hair Styling`}
+â€¢ Bridal Makeup
+â€¢ Party Makeup
+â€¢ HD Makeup
+â€¢ Airbrush Makeup
+â€¢ Hair Styling`}
     placeholderTextColor="#B99DAF"
     value={expertise}
     onChangeText={setExpertise}
@@ -240,17 +236,6 @@ if (edit === "true") {
                 </View>
             </View>
 
-            {/* City Covered */}
-            <View style={styles.card}>
-                <SectionTitle icon="map-marker-alt" title="City Covered" required />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Select Cities"
-                    placeholderTextColor="#B99DAF"
-                    value={cityCovered}
-                    onChangeText={setCityCovered}
-                />
-            </View>
 
             {/* Staff - multi select */}
             <View style={styles.card}>
@@ -308,9 +293,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-• Professional salon with 8+ years of experience.
-• Specialized in bridal and party makeup.
-• Premium products with hygienic services.`}
+â€¢ Professional salon with 8+ years of experience.
+â€¢ Specialized in bridal and party makeup.
+â€¢ Premium products with hygienic services.`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -324,11 +309,11 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-• Home service available
-• Advance booking required
-• Bridal packages available
-• Weekend appointments only
-• Travel charges may apply`}
+â€¢ Home service available
+â€¢ Advance booking required
+â€¢ Bridal packages available
+â€¢ Weekend appointments only
+â€¢ Travel charges may apply`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -724,3 +709,4 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 });
+

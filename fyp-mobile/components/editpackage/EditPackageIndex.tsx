@@ -50,6 +50,13 @@ const DANGER = "#D9534F";
 
 type DurationUnit = "HOURS" | "DAYS";
 
+type BookingType =
+  | "DURATION_BASED"
+  | "TIME_SLOT_BASED"
+  | "DELIVERY_BASED"
+  | "SETUP_BASED"
+  | "CUSTOM";
+
 type PackageImageAsset = {
   uri: string;
   name: string;
@@ -60,6 +67,188 @@ interface PackageDuration {
   value: number;
   unit: DurationUnit;
   price: number;
+}
+
+const bookingTypeOptions: {
+  label: string;
+  value: BookingType;
+}[] = [
+  { label: "Duration Based", value: "DURATION_BASED" },
+  { label: "Time Slot Based", value: "TIME_SLOT_BASED" },
+  { label: "Delivery Based", value: "DELIVERY_BASED" },
+  { label: "Setup Based", value: "SETUP_BASED" },
+  { label: "Custom", value: "CUSTOM" },
+];
+
+type OffsetUnit = "HOURS" | "DAYS";
+type OffsetDirection = "BEFORE" | "AFTER";
+type DurationInputUnit = "MINUTES" | "HOURS";
+
+interface FriendlyOffset {
+  value: string;
+  unit: OffsetUnit;
+  direction: OffsetDirection;
+}
+
+interface FriendlyDuration {
+  value: string;
+  unit: DurationInputUnit;
+}
+
+const EMPTY_OFFSET: FriendlyOffset = {
+  value: "",
+  unit: "HOURS",
+  direction: "BEFORE",
+};
+
+const EMPTY_DURATION_INPUT: FriendlyDuration = {
+  value: "",
+  unit: "MINUTES",
+};
+
+// number typed by vendor + unit + before/after -> signed minutes for the backend
+function offsetToMinutes(
+  offset: FriendlyOffset,
+): number | undefined {
+  const numeric = Number(offset.value);
+
+  if (
+    offset.value.trim().length === 0 ||
+    !Number.isFinite(numeric)
+  ) {
+    return undefined;
+  }
+
+  const magnitudeMinutes =
+    offset.unit === "DAYS"
+      ? numeric * 24 * 60
+      : numeric * 60;
+
+  return offset.direction === "BEFORE"
+    ? -magnitudeMinutes
+    : magnitudeMinutes;
+}
+
+// signed minutes coming from the backend/DB -> friendly value+unit+direction for the UI
+function minutesToOffset(
+  minutes: number | undefined | null,
+): FriendlyOffset {
+  if (
+    minutes === undefined ||
+    minutes === null ||
+    !Number.isFinite(minutes)
+  ) {
+    return { ...EMPTY_OFFSET };
+  }
+
+  const direction: OffsetDirection =
+    minutes < 0 ? "BEFORE" : "AFTER";
+
+  const abs = Math.abs(minutes);
+
+  if (abs !== 0 && abs % (24 * 60) === 0) {
+    return {
+      value: String(abs / (24 * 60)),
+      unit: "DAYS",
+      direction,
+    };
+  }
+
+  const hours = abs / 60;
+
+  return {
+    value: Number.isInteger(hours)
+      ? String(hours)
+      : hours.toFixed(1),
+    unit: "HOURS",
+    direction,
+  };
+}
+
+// number typed by vendor + unit -> plain minutes for the backend
+function durationInputToMinutes(
+  duration: FriendlyDuration,
+): number | undefined {
+  const numeric = Number(duration.value);
+
+  if (
+    duration.value.trim().length === 0 ||
+    !Number.isFinite(numeric)
+  ) {
+    return undefined;
+  }
+
+  return duration.unit === "HOURS"
+    ? numeric * 60
+    : numeric;
+}
+
+// plain minutes from the backend/DB -> friendly value+unit for the UI
+function minutesToDurationInput(
+  minutes: number | undefined | null,
+): FriendlyDuration {
+  if (
+    minutes === undefined ||
+    minutes === null ||
+    !Number.isFinite(minutes)
+  ) {
+    return { ...EMPTY_DURATION_INPUT };
+  }
+
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return {
+      value: String(minutes / 60),
+      unit: "HOURS",
+    };
+  }
+
+  return {
+    value: String(minutes),
+    unit: "MINUTES",
+  };
+}
+
+// friendly, human display strings used in the live Preview card
+function formatDurationDisplay(
+  minutes: number | undefined,
+): string {
+  if (minutes === undefined || !Number.isFinite(minutes)) {
+    return "—";
+  }
+
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+function formatOffsetDisplay(
+  minutes: number | undefined,
+): string {
+  if (minutes === undefined || !Number.isFinite(minutes)) {
+    return "—";
+  }
+
+  if (minutes === 0) {
+    return "Right when the event starts";
+  }
+
+  const direction = minutes < 0 ? "before" : "after";
+  const abs = Math.abs(minutes);
+
+  if (abs % (24 * 60) === 0) {
+    const days = abs / (24 * 60);
+    return `${days} day${days === 1 ? "" : "s"} ${direction} the event`;
+  }
+
+  if (abs % 60 === 0) {
+    const hours = abs / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"} ${direction} the event`;
+  }
+
+  return `${abs} minute${abs === 1 ? "" : "s"} ${direction} the event`;
 }
 
 const PackageScreen = () => {
@@ -106,6 +295,17 @@ const PackageScreen = () => {
 
   const [editableServices, setEditableServices] =
     useState("");
+
+    const [bookingType, setBookingType] =
+  useState<BookingType>("DURATION_BASED");
+
+// Friendly vendor-facing booking configuration state
+const [serviceDuration, setServiceDuration] = useState<FriendlyDuration>({ ...EMPTY_DURATION_INPUT });
+const [windowStart, setWindowStart] = useState<FriendlyOffset>({ ...EMPTY_OFFSET, direction: "BEFORE" });
+const [windowEnd, setWindowEnd] = useState<FriendlyOffset>({ ...EMPTY_OFFSET, direction: "AFTER" });
+const requiredServiceDurationMinutesValue = useMemo(() => durationInputToMinutes(serviceDuration), [serviceDuration]);
+const serviceWindowStartOffsetMinutesValue = useMemo(() => offsetToMinutes(windowStart), [windowStart]);
+const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowEnd), [windowEnd]);
 
   const [editableDurations, setEditableDurations] =
     useState<PackageDuration[]>([]);
@@ -197,39 +397,22 @@ const packageImageLimitReached =
   // Storage helpers
   // -------------------------------------------------------
 
-  const readUser = async (): Promise<
-    any | null
-  > => {
-    try {
-      const userRaw =
-        await getSecureData("user");
+ const readUser = async (): Promise<any | null> => {
+  try {
+    const userObj = await getUserData();
 
-      if (userRaw) {
-        return JSON.parse(userRaw);
-      }
-    } catch (err) {
-      console.error(
-        "Failed to parse user from SecureStore:",
-        err,
-      );
+    if (userObj) {
+      return userObj;
     }
+  } catch (err) {
+    console.error(
+      "Failed to read current user:",
+      err,
+    );
+  }
 
-    try {
-      const userObj =
-        await getUserData();
-
-      if (userObj) {
-        return userObj;
-      }
-    } catch (err) {
-      console.error(
-        "Failed to read user from AsyncStorage:",
-        err,
-      );
-    }
-
-    return null;
-  };
+  return null;
+};
 
   const writeUser = async (user: any) => {
     try {
@@ -418,6 +601,14 @@ const packageImageLimitReached =
     setEditableServices(
       packageDetails.services || "",
     );
+
+    setBookingType(
+  packageDetails.bookingType || "DURATION_BASED",
+);
+
+setServiceDuration(minutesToDurationInput(packageDetails.requiredServiceDurationMinutes));
+setWindowStart(minutesToOffset(packageDetails.serviceWindowStartOffsetMinutes));
+setWindowEnd(minutesToOffset(packageDetails.serviceWindowEndOffsetMinutes));
 
     setEditableDurations(
       Array.isArray(
@@ -688,42 +879,70 @@ const removeExistingImage = (index: number) => {
   // -------------------------------------------------------
 
   const isFormValid = useMemo(() => {
-    const validName =
-      editableName.trim().length > 0;
+  const hasName =
+    editableName.trim().length > 0;
 
-    const numericPrice =
-      Number(editablePrice);
+  const numericPrice = Number(editablePrice);
 
-    const validPrice =
-      editablePrice.trim().length > 0 &&
-      Number.isFinite(numericPrice) &&
-      numericPrice >= 0;
+  const hasPrice =
+    editablePrice.trim().length > 0 &&
+    Number.isFinite(numericPrice) &&
+    numericPrice >= 0;
 
-    const validDurations =
-      editableDurations.every(
-        (duration) =>
-          Number(duration.value) > 0 &&
-          Number(duration.price) >= 0,
-      );
+  if (!hasName || !hasPrice) {
+    return false;
+  }
 
-    const validCustomDuration =
-      !allowCustomDuration ||
-      (customDurationRate.trim().length > 0 &&
-        Number(customDurationRate) >= 0);
-
-    return (
-      validName &&
-      validPrice &&
-      validDurations &&
-      validCustomDuration
+  if (bookingType === "DURATION_BASED") {
+    const validDurations = editableDurations.every(
+      (duration) =>
+        Number(duration.value) > 0 &&
+        Number(duration.price) >= 0,
     );
-  }, [
-    editableName,
-    editablePrice,
-    editableDurations,
-    allowCustomDuration,
-    customDurationRate,
-  ]);
+
+    const customValid = allowCustomDuration
+      ? customDurationRate.trim().length > 0 &&
+        Number(customDurationRate) >= 0
+      : true;
+
+    return validDurations && customValid;
+  }
+
+  if (bookingType === "TIME_SLOT_BASED") {
+    return (
+      requiredServiceDurationMinutesValue !== undefined &&
+      requiredServiceDurationMinutesValue > 0
+    );
+  }
+
+  const startOffset = serviceWindowStartOffsetMinutesValue;
+  const endOffset = serviceWindowEndOffsetMinutesValue;
+
+  const validWindow =
+    startOffset !== undefined &&
+    endOffset !== undefined &&
+    startOffset <= endOffset;
+
+  if (bookingType === "CUSTOM") {
+    return validWindow;
+  }
+
+  const validRequiredDuration =
+    requiredServiceDurationMinutesValue !== undefined &&
+    requiredServiceDurationMinutesValue > 0;
+
+  return validRequiredDuration && validWindow;
+}, [
+  editableName,
+  editablePrice,
+  bookingType,
+  editableDurations,
+  allowCustomDuration,
+  customDurationRate,
+  requiredServiceDurationMinutesValue,
+  serviceWindowStartOffsetMinutesValue,
+  serviceWindowEndOffsetMinutesValue,
+]);
 
   // -------------------------------------------------------
   // Update package
@@ -774,38 +993,66 @@ const removeExistingImage = (index: number) => {
 
   try {
     const updatedData = {
-      packageName: editableName.trim(),
+  packageName: editableName.trim(),
 
-      price: Number(editablePrice),
+  price: Number(editablePrice),
 
-      description: editableDescription.trim(),
+  description: editableDescription.trim(),
 
-      services: editableServices.trim(),
+  services: editableServices.trim(),
 
-      durations: editableDurations.map(
-        (duration) => ({
-          value: Number(duration.value),
-          unit: duration.unit,
-          price: Number(duration.price),
-        }),
-      ),
+  bookingType,
 
-      allowCustomDuration,
+  requiredServiceDurationMinutes:
+    bookingType !== "DURATION_BASED" &&
+    bookingType !== "CUSTOM"
+      ? requiredServiceDurationMinutesValue
+      : undefined,
 
-      customDurationUnit:
-        allowCustomDuration
-          ? customDurationUnit
-          : undefined,
+  serviceWindowStartOffsetMinutes:
+    bookingType === "DELIVERY_BASED" ||
+    bookingType === "SETUP_BASED" ||
+    bookingType === "CUSTOM"
+      ? serviceWindowStartOffsetMinutesValue
+      : undefined,
 
-      customDurationRate:
-        allowCustomDuration
-          ? Number(customDurationRate)
-          : undefined,
+  serviceWindowEndOffsetMinutes:
+    bookingType === "DELIVERY_BASED" ||
+    bookingType === "SETUP_BASED" ||
+    bookingType === "CUSTOM"
+      ? serviceWindowEndOffsetMinutesValue
+      : undefined,
 
-      // IMPORTANT:
-      // Existing images remain attached to package
-      images: existingImages,
-    };
+  durations:
+    bookingType === "DURATION_BASED"
+      ? editableDurations.map(
+          (duration) => ({
+            value: Number(duration.value),
+            unit: duration.unit,
+            price: Number(duration.price),
+          }),
+        )
+      : [],
+
+  allowCustomDuration:
+    bookingType === "DURATION_BASED"
+      ? allowCustomDuration
+      : false,
+
+  customDurationUnit:
+    bookingType === "DURATION_BASED" &&
+    allowCustomDuration
+      ? customDurationUnit
+      : undefined,
+
+  customDurationRate:
+    bookingType === "DURATION_BASED" &&
+    allowCustomDuration
+      ? Number(customDurationRate)
+      : undefined,
+
+  images: existingImages,
+};
 
     // ---------------------------------------------------
     // 1. Update package details
@@ -883,35 +1130,42 @@ const removeExistingImage = (index: number) => {
       finalPackage,
     );
 
-    // ---------------------------------------------------
-    // 4. Sync local user cache
-    // ---------------------------------------------------
+   // ---------------------------------------------------
+// 4. Refresh local package cache from backend
+// ---------------------------------------------------
 
-    const user = await readUser();
+const user = await readUser();
 
-    if (!user || !user.packages) {
-      throw new Error(
-        "User or packages not found",
-      );
-    }
+if (user?._id) {
+  try {
+    const response = await axios.get(
+      `https://eventify-hub.onrender.com/vendor?userId=${user._id}`
+    );
 
-    const pkgIndex =
-      user.packages.findIndex(
-        (x: any) =>
-          String(x._id) ===
-          String(packageId),
-      );
+    const freshVendor = response?.data;
 
-    if (pkgIndex === -1) {
-      console.error(
-        "Package not found in local user cache",
-      );
-    } else {
-      user.packages[pkgIndex] =
-        finalPackage;
+    if (Array.isArray(freshVendor?.packages)) {
+      user.packages = freshVendor.packages;
 
       await writeUser(user);
+
+      const freshPackage = freshVendor.packages.find(
+        (pkg: any) =>
+          String(pkg._id) === String(packageId)
+      );
+
+      if (freshPackage) {
+        setPackageDetails(freshPackage);
+      }
     }
+  } catch (cacheError) {
+    console.warn(
+      "Package updated, but local cache refresh failed:",
+      cacheError
+    );
+  }
+}
+  
 
     // Clear newly selected images
     setNewImageAssets([]);
@@ -1465,6 +1719,63 @@ const removeExistingImage = (index: number) => {
               />
             </View>
 
+            {/* Booking Type */}
+
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>
+    Booking Type
+  </Text>
+
+  <Text style={styles.sectionSubtitle}>
+    Select how this package uses vendor availability.
+  </Text>
+
+  <View style={{ marginTop: 14, gap: 10 }}>
+    {bookingTypeOptions.map((option) => {
+      const selected =
+        bookingType === option.value;
+
+      return (
+        <TouchableOpacity
+          key={option.value}
+          onPress={() =>
+            setBookingType(option.value)
+          }
+          activeOpacity={0.8}
+          style={{
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: selected
+              ? "#7B2869"
+              : "#E5D8E2",
+            backgroundColor: selected
+              ? "#F5EAF2"
+              : "#FFFFFF",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: selected
+                ? "700"
+                : "500",
+              color: selected
+                ? "#7B2869"
+                : "#333333",
+            }}
+          >
+            {option.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+</View>
+
+{bookingType === "DURATION_BASED" && (
+  <>
             {/* -------------------------------------------
                 Fixed Durations
             ------------------------------------------- */}
@@ -1951,6 +2262,311 @@ const removeExistingImage = (index: number) => {
                 </View>
               )}
             </View>
+  </>
+)}
+{/* -------------------------------------------------
+    Non-Duration Booking Configuration
+------------------------------------------------- */}
+
+{bookingType !== "DURATION_BASED" && (
+  <View style={styles.card}>
+    <Text style={styles.sectionTitle}>
+      {bookingType === "TIME_SLOT_BASED"
+        ? "How long does this take?"
+        : bookingType === "DELIVERY_BASED"
+        ? "Delivery Details"
+        : bookingType === "SETUP_BASED"
+        ? "Setup Details"
+        : "Custom Service Window"}
+    </Text>
+
+    <Text style={styles.sectionSubtitle}>
+      {bookingType === "TIME_SLOT_BASED"
+        ? "This is how much of your time a single booking takes — e.g. a makeup session or a transport trip."
+        : bookingType === "DELIVERY_BASED"
+        ? "Tell us how long it takes you to deliver, and the earliest / latest you can deliver relative to the event."
+        : bookingType === "SETUP_BASED"
+        ? "Tell us how long setup takes, and the earliest / latest you can be there relative to the event."
+        : "Use this only if your service doesn't fit the other booking types. Optionally set how long the task takes, and the earliest / latest it can happen relative to the event."}
+    </Text>
+
+    {/* --------------------------------------------------
+        How long does it take (duration)
+    -------------------------------------------------- */}
+
+    {(bookingType === "TIME_SLOT_BASED" ||
+      bookingType === "DELIVERY_BASED" ||
+      bookingType === "SETUP_BASED" ||
+      bookingType === "CUSTOM") && (
+      <View style={{ marginTop: 18 }}>
+        <Text style={styles.smallLabel}>
+          {bookingType === "TIME_SLOT_BASED"
+            ? "Time needed per booking"
+            : bookingType === "DELIVERY_BASED"
+            ? "Time needed to deliver"
+            : bookingType === "SETUP_BASED"
+            ? "Time needed to set up"
+            : "Time needed (optional)"}
+        </Text>
+
+        <View style={styles.friendlyRow}>
+          <TextInput
+            style={[styles.input, styles.friendlyValueInput]}
+            value={serviceDuration.value}
+            onChangeText={(value) =>
+              setServiceDuration((prev) => ({
+                ...prev,
+                value: value.replace(/[^0-9]/g, ""),
+              }))
+            }
+            keyboardType="numeric"
+            placeholder={
+              bookingType === "TIME_SLOT_BASED"
+                ? "e.g. 1"
+                : bookingType === "DELIVERY_BASED"
+                ? "e.g. 30"
+                : "e.g. 2"
+            }
+            placeholderTextColor="#9C9CA3"
+          />
+
+          <View style={styles.friendlyToggleRow}>
+            {(["MINUTES", "HOURS"] as DurationInputUnit[]).map(
+              (unit) => {
+                const active = serviceDuration.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setServiceDuration((prev) => ({
+                        ...prev,
+                        unit,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "MINUTES" ? "Minutes" : "Hours"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+        </View>
+      </View>
+    )}
+
+    {/* --------------------------------------------------
+        Earliest it can happen (window start)
+    -------------------------------------------------- */}
+
+    {bookingType !== "TIME_SLOT_BASED" && (
+      <>
+        <View style={{ marginTop: 22 }}>
+          <Text style={styles.smallLabel}>
+            {bookingType === "DELIVERY_BASED"
+              ? "Earliest you can deliver"
+              : bookingType === "SETUP_BASED"
+              ? "How early you can start setup"
+              : "Earliest this can happen"}
+          </Text>
+
+          <View style={styles.friendlyRow}>
+            <TextInput
+              style={[styles.input, styles.friendlyValueInput]}
+              value={windowStart.value}
+              onChangeText={(value) =>
+                setWindowStart((prev) => ({
+                  ...prev,
+                  value: value.replace(/[^0-9]/g, ""),
+                }))
+              }
+              keyboardType="numeric"
+              placeholder="e.g. 2"
+              placeholderTextColor="#9C9CA3"
+            />
+
+            <View style={styles.friendlyToggleRow}>
+              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+                const active = windowStart.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowStart((prev) => ({ ...prev, unit }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "HOURS" ? "Hours" : "Days"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+              (direction) => {
+                const active = windowStart.direction === direction;
+
+                return (
+                  <TouchableOpacity
+                    key={direction}
+                    style={[
+                      styles.friendlyDirectionButton,
+                      active && styles.friendlyDirectionButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowStart((prev) => ({
+                        ...prev,
+                        direction,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {direction === "BEFORE"
+                        ? "Before the event"
+                        : "After event starts"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+        </View>
+
+        {/* --------------------------------------------------
+            Latest it can happen (window end)
+        -------------------------------------------------- */}
+
+        <View style={{ marginTop: 22 }}>
+          <Text style={styles.smallLabel}>
+            {bookingType === "DELIVERY_BASED"
+              ? "Latest you can deliver"
+              : bookingType === "SETUP_BASED"
+              ? "Setup must be finished by"
+              : "Latest this can happen"}
+          </Text>
+
+          <View style={styles.friendlyRow}>
+            <TextInput
+              style={[styles.input, styles.friendlyValueInput]}
+              value={windowEnd.value}
+              onChangeText={(value) =>
+                setWindowEnd((prev) => ({
+                  ...prev,
+                  value: value.replace(/[^0-9]/g, ""),
+                }))
+              }
+              keyboardType="numeric"
+              placeholder="e.g. 0"
+              placeholderTextColor="#9C9CA3"
+            />
+
+            <View style={styles.friendlyToggleRow}>
+              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+                const active = windowEnd.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowEnd((prev) => ({ ...prev, unit }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "HOURS" ? "Hours" : "Days"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+              (direction) => {
+                const active = windowEnd.direction === direction;
+
+                return (
+                  <TouchableOpacity
+                    key={direction}
+                    style={[
+                      styles.friendlyDirectionButton,
+                      active && styles.friendlyDirectionButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowEnd((prev) => ({
+                        ...prev,
+                        direction,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {direction === "BEFORE"
+                        ? "Before the event"
+                        : "At / after event starts"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+
+          <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
+            Tip: enter 0 + "After event starts" to mean right when the
+            event begins.
+          </Text>
+        </View>
+      </>
+    )}
+  </View>
+)}
 
 {/* -------------------------------------------
     Package Images
@@ -2219,164 +2835,317 @@ const removeExistingImage = (index: number) => {
     </View>
   )}
 </View>
-            {/* -------------------------------------------
-                Live Preview
-            ------------------------------------------- */}
+{/* -------------------------------------------------
+            Live Preview
+        ------------------------------------------------- */}
+
+        {(editableName ||
+          editablePrice ||
+          editableDescription ||
+          editableServices ||
+          editableDurations.length > 0 ||
+          allowCustomDuration) && (
+          <View style={styles.previewCard}>
+            <Text style={styles.previewTag}>
+              PREVIEW
+            </Text>
 
             <View
-              style={
-                styles.previewCard
-              }
+              style={styles.previewRow}
             >
               <Text
-                style={styles.previewTag}
+                style={styles.previewName}
+                numberOfLines={1}
               >
-                PREVIEW
+                {editableName ||
+                  "Package Name"}
               </Text>
 
+              {!!editablePrice && (
+                <Text
+                  style={styles.previewPrice}
+                >
+                  Rs. {editablePrice}
+                </Text>
+              )}
+            </View>
+
+            {!!editableDescription && (
+              <Text
+                style={styles.previewDescription}
+              >
+                {editableDescription}
+              </Text>
+            )}
+
+            {!!editableServices && (
+              <Text style={styles.previewServices}>
+                Includes: {editableServices}
+              </Text>
+            )}
+
+    {/* Booking Type Preview — shown exactly once */}
+
+<View style={styles.previewDurationSection}>
+  <Text style={styles.previewSectionTitle}>
+    Booking Type
+  </Text>
+
+  <View style={styles.previewDurationRow}>
+    <Text style={styles.previewDurationText}>
+      Type
+    </Text>
+
+    <Text style={styles.previewDurationPrice}>
+      {bookingTypeOptions.find(
+        (option) => option.value === bookingType,
+      )?.label || bookingType}
+    </Text>
+  </View>
+
+  {bookingType === "TIME_SLOT_BASED" &&
+    requiredServiceDurationMinutesValue !== undefined && (
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Time needed per booking
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatDurationDisplay(
+            requiredServiceDurationMinutesValue,
+          )}
+        </Text>
+      </View>
+    )}
+
+  {bookingType === "DELIVERY_BASED" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time to deliver
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Earliest delivery
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowStartOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Latest delivery
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowEndOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+    </>
+  )}
+
+  {bookingType === "SETUP_BASED" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time to set up
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Earliest arrival
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowStartOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Setup finished by
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowEndOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+    </>
+  )}
+
+  {bookingType === "CUSTOM" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time needed
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      {serviceWindowStartOffsetMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Earliest
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatOffsetDisplay(
+              serviceWindowStartOffsetMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      {serviceWindowEndOffsetMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Latest
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatOffsetDisplay(
+              serviceWindowEndOffsetMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+    </>
+  )}
+</View>
+
+            {bookingType === "DURATION_BASED" &&
+              editableDurations.length > 0 && (
               <View
                 style={
-                  styles.previewRow
+                  styles.previewDurationSection
                 }
               >
                 <Text
                   style={
-                    styles.previewName
+                    styles.previewSectionTitle
                   }
-                  numberOfLines={1}
                 >
-                  {editableName ||
-                    "Package Name"}
+                  Fixed Durations
+                </Text>
+
+                {editableDurations.map(
+                  (
+                    duration,
+                    index,
+                  ) => (
+                    <View
+                      key={`preview-${index}`}
+                      style={
+                        styles.previewDurationRow
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.previewDurationText
+                        }
+                      >
+                        {duration.value}{" "}
+                        {duration.unit ===
+                        "HOURS"
+                          ? duration.value ===
+                            1
+                            ? "Hour"
+                            : "Hours"
+                          : duration.value ===
+                            1
+                          ? "Day"
+                          : "Days"}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.previewDurationPrice
+                        }
+                      >
+                        Rs.{" "}
+                        {Number(
+                          duration.price ||
+                            0,
+                        ).toLocaleString()}
+                      </Text>
+                    </View>
+                  ),
+                )}
+              </View>
+            )}
+
+            {bookingType === "DURATION_BASED" &&
+            allowCustomDuration && (
+              <View
+                style={
+                  styles.previewCustomBox
+                }
+              >
+                <Text
+                  style={
+                    styles.previewCustomTitle
+                  }
+                >
+                  Custom Duration
                 </Text>
 
                 <Text
                   style={
-                    styles.previewPrice
+                    styles.previewCustomText
                   }
                 >
                   Rs.{" "}
                   {Number(
-                    editablePrice || 0,
+                    customDurationRate ||
+                      0,
                   ).toLocaleString()}
+                  /
+                  {customDurationUnit ===
+                  "DAYS"
+                    ? "day"
+                    : "hour"}
                 </Text>
               </View>
+            )}
+          </View>
+        )}
 
-              {editableDescription.trim()
-                .length > 0 && (
-                <Text
-                  style={
-                    styles.previewDescription
-                  }
-                >
-                  {editableDescription}
-                </Text>
-              )}
-
-              {editableServices.trim()
-                .length > 0 && (
-                <Text
-                  style={
-                    styles.previewServices
-                  }
-                >
-                  {editableServices}
-                </Text>
-              )}
-
-              {editableDurations.length >
-                0 && (
-                <View
-                  style={
-                    styles.previewDurationSection
-                  }
-                >
-                  <Text
-                    style={
-                      styles.previewSectionTitle
-                    }
-                  >
-                    Fixed Durations
-                  </Text>
-
-                  {editableDurations.map(
-                    (
-                      duration,
-                      index,
-                    ) => (
-                      <View
-                        key={`preview-${index}`}
-                        style={
-                          styles.previewDurationRow
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.previewDurationText
-                          }
-                        >
-                          {duration.value}{" "}
-                          {duration.unit ===
-                          "HOURS"
-                            ? duration.value ===
-                              1
-                              ? "Hour"
-                              : "Hours"
-                            : duration.value ===
-                              1
-                            ? "Day"
-                            : "Days"}
-                        </Text>
-
-                        <Text
-                          style={
-                            styles.previewDurationPrice
-                          }
-                        >
-                          Rs.{" "}
-                          {Number(
-                            duration.price ||
-                              0,
-                          ).toLocaleString()}
-                        </Text>
-                      </View>
-                    ),
-                  )}
-                </View>
-              )}
-
-              {allowCustomDuration && (
-                <View
-                  style={
-                    styles.previewCustomBox
-                  }
-                >
-                  <Text
-                    style={
-                      styles.previewCustomTitle
-                    }
-                  >
-                    Custom Duration
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.previewCustomText
-                    }
-                  >
-                    Rs.{" "}
-                    {Number(
-                      customDurationRate ||
-                        0,
-                    ).toLocaleString()}
-                    /
-                    {customDurationUnit ===
-                    "DAYS"
-                      ? "day"
-                      : "hour"}
-                  </Text>
-                </View>
-              )}
-            </View>
 
             <View
               style={{
@@ -2527,11 +3296,81 @@ const removeExistingImage = (index: number) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-    paddingTop: 55,
+  friendlyRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "stretch",
   },
+
+  friendlyValueInput: {
+    width: 90,
+  },
+
+  friendlyToggleRow: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  friendlyToggleButton: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1.5,
+    borderColor: "#EFE0EB",
+    borderRadius: 14,
+    backgroundColor: "#FCFAFB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  friendlyToggleButtonActive: {
+    backgroundColor: "#7B2869",
+    borderColor: "#7B2869",
+  },
+
+  friendlyDirectionButton: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: "#EFE0EB",
+    borderRadius: 14,
+    backgroundColor: "#FCFAFB",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+
+  friendlyDirectionButtonActive: {
+    backgroundColor: "#7B2869",
+    borderColor: "#7B2869",
+  },
+
+  friendlyToggleText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#776873",
+    textAlign: "center",
+  },
+
+  friendlyToggleTextActive: {
+    color: "#FFFFFF",
+  },
+
+  priceContainerSmall: {
+  flexDirection: "row",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 12,
+  backgroundColor: "#FCFAFB",
+  overflow: "hidden",
+},
+
+container: {
+  flex: 1,
+  backgroundColor: BG,
+  paddingTop: 55,
+},
 
   header: {
     flexDirection: "row",
@@ -2887,18 +3726,6 @@ const styles = StyleSheet.create({
   durationPriceWrapper: {
     marginTop: 12,
   },
-
-  priceContainerSmall: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 46,
-    borderWidth: 1.2,
-    borderColor: "#E5D7E1",
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-  },
-
   pricePrefixSmall: {
     fontSize: 13,
     fontWeight: "800",
@@ -3368,6 +4195,47 @@ uploadingRow: {
 uploadingSmallText: {
   fontSize: 11,
   color: TEXT_MUTED,
+},
+
+bookingTypeGrid: {
+  gap: 10,
+  marginTop: 14,
+},
+
+bookingTypeOption: {
+  minHeight: 52,
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 14,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+  backgroundColor: CARD,
+},
+
+bookingTypeOptionSelected: {
+  borderColor: PRIMARY,
+  backgroundColor: PRIMARY_SOFT,
+},
+
+bookingTypeOptionText: {
+  flex: 1,
+  fontSize: 14,
+  fontWeight: "600",
+  color: TEXT_DARK,
+},
+
+bookingTypeOptionTextSelected: {
+  color: PRIMARY,
+  fontWeight: "700",
+},
+helperText: {
+  fontSize: 13,
+  color: TEXT_MUTED,
+  lineHeight: 19,
+  marginTop: 6,
 },
 });
 

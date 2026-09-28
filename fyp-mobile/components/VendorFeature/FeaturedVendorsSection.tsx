@@ -13,9 +13,10 @@ import {
 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
+import getMarketplaceEventContext from '../../services/getMarketplaceEventContext';
 import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
 import { FeaturedVendorPublicEntry } from '../../types/promotion.types';
+import checkVendorsAvailability from '../../services/checkVendorsAvailability';
 
 const COLORS = {
   text: '#1F2937',
@@ -32,27 +33,99 @@ export function FeaturedVendorsSection() {
 
   const [vendors, setVendors] = useState<FeaturedVendorPublicEntry[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
+useEffect(() => {
+  let cancelled = false;
 
-    getActiveFeaturedVendors(10)
-      .then((result) => {
-        if (!cancelled) {
-          setVendors(result);
-        }
-      })
-      .catch((error) => {
-        console.error(
-          '[Featured Vendors] Failed to load:',
-          error,
-        );
-      });
+  const loadFeaturedVendors = async () => {
+    try {
+     const context =
+  await getMarketplaceEventContext();
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+const {
+  eventCityId,
+  categoryIds,
+  eventDate,
+  startTime,
+  durationMinutes,
+  hasAvailabilityContext,
+} = context;
 
+const featured =
+  await getActiveFeaturedVendors({
+    limit: 10,
+    eventCityId,
+    categoryIds,
+  });
+
+if (cancelled) {
+  return;
+}
+
+if (featured.length === 0) {
+  setVendors([]);
+  return;
+}
+
+if (!hasAvailabilityContext) {
+  setVendors(featured);
+  return;
+}
+
+      if (
+  !eventDate ||
+  !startTime ||
+  typeof durationMinutes !== 'number' ||
+  !Number.isFinite(durationMinutes) ||
+  durationMinutes <= 0
+) {
+  setVendors(featured);
+  return;
+}
+
+// Reuse existing single availability authority.
+const availability =
+  await checkVendorsAvailability({
+    vendorIds: featured.map(
+      (vendor) => vendor.vendorId,
+    ),
+    eventDate,
+    startTime,
+    durationMinutes,
+  });
+
+      if (cancelled) {
+        return;
+      }
+
+      const availableVendorIds = new Set(
+        (availability ?? [])
+          .filter((result) => result.available)
+          .map((result) => result.vendorId),
+      );
+
+      setVendors(
+        featured.filter((vendor) =>
+          availableVendorIds.has(vendor.vendorId),
+        ),
+      );
+    } catch (error) {
+      console.error(
+        '[Featured Vendors] Failed to load:',
+        error,
+      );
+
+      if (!cancelled) {
+        setVendors([]);
+      }
+    }
+  };
+
+  void loadFeaturedVendors();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
   if (vendors.length === 0) {
     return null;
   }

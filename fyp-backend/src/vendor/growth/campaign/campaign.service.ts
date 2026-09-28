@@ -16,6 +16,7 @@ import {
 import { User } from '../../../schemas/user.schema';
 
 import { FeatureAccessService } from '../feature-access.service';
+import { CityService } from '../../../city/city.service';
 
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 
@@ -29,7 +30,7 @@ export class CampaignService {
     private readonly userModel: Model<User>,
 
     private readonly featureAccessService: FeatureAccessService,
-    
+    private readonly cityService: CityService,
       ) {}
 
   // =========================================================
@@ -942,151 +943,340 @@ if (
   // Only campaigns that are live right now are publicly served.
   // =========================================================
 
-    async getActiveSponsoredCampaigns() {
-    await this.syncCampaignLifecycle();
+    async getActiveSponsoredCampaigns(options?: {
+  eventCityId?: string;
+  categoryIds?: string[];
+  page?: number;
+  limit?: number;
+  viewAll?: boolean;
+}) {
+  await this.syncCampaignLifecycle();
 
-    const now = new Date();
+  const now = new Date();
 
-    const campaigns = await this.campaignModel
-      .find({
-        status: CampaignStatus.ACTIVE,
-        startDate: {
-          $lte: now,
-        },
-        endDate: {
-          $gte: now,
-        },
-      })
+  const eventCityId =
+    options?.eventCityId?.trim() || '';
+
+  const categoryIds = [
+    ...new Set(
+      (options?.categoryIds || [])
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (eventCityId) {
+    await this.cityService.requireActiveCity(
+      eventCityId,
+    );
+  }
+
+  if (
+    categoryIds.some(
+      (id) => !Types.ObjectId.isValid(id),
+    )
+  ) {
+    throw new BadRequestException(
+      'Invalid categoryId',
+    );
+  }
+
+  const page = Math.max(
+    Number(options?.page) || 1,
+    1,
+  );
+
+  const requestedLimit = Math.max(
+    Number(options?.limit) || 4,
+    1,
+  );
+
+  /*
+   * Dashboard can never receive more than 4 campaigns.
+   * View All may request up to 20 per page.
+   */
+  const limit = options?.viewAll
+    ? Math.min(requestedLimit, 20)
+    : Math.min(requestedLimit, 4);
+
+  const campaignQuery: Record<string, any> = {
+    status: CampaignStatus.ACTIVE,
+
+    startDate: {
+      $lte: now,
+    },
+
+    endDate: {
+      $gte: now,
+    },
+  };
+
+  /*
+   * selectedServices are converted by mobile to their
+   * existing category IDs.
+   *
+   * Campaign.categoryId is already the canonical campaign
+   * category relation, so no second relevance field/system.
+   */
+  if (categoryIds.length > 0) {
+    campaignQuery.categoryId = {
+      $in: categoryIds.map(
+        (id) => new Types.ObjectId(id),
+      ),
+    };
+  }
+
+  const campaigns =
+    await this.campaignModel
+      .find(campaignQuery)
       .sort({
-        createdAt: -1,
+        _id: 1,
       })
       .lean();
 
-    if (!campaigns.length) {
-      return [];
-    }
+  if (!campaigns.length) {
+    return options?.viewAll
+      ? {
+          items: [],
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasMore: false,
+        }
+      : [];
+  }
 
-    const vendorIds = [
-      ...new Set(
-        campaigns.map((campaign: any) =>
-          campaign.vendorId.toString(),
-        ),
+  const vendorIds = [
+    ...new Set(
+      campaigns.map((campaign: any) =>
+        campaign.vendorId.toString(),
       ),
-    ];
+    ),
+  ];
 
-    const vendors = await this.userModel
-      .find({
-        _id: {
-          $in: vendorIds.map(
-            (id) => new Types.ObjectId(id),
-          ),
-        },
-        role: 'Vendor',
-      })
+  const vendorQuery: Record<string, any> = {
+    _id: {
+      $in: vendorIds.map(
+        (id) => new Types.ObjectId(id),
+      ),
+    },
+
+    role: 'Vendor',
+  };
+
+  /*
+   * Reuse Phase 4A canonical vendor service coverage.
+   * Sponsored campaign is relevant to the event only if
+   * its vendor serves eventCityId.
+   */
+  if (eventCityId) {
+    vendorQuery.serviceLocationCityIds =
+      new Types.ObjectId(eventCityId);
+  }
+
+  const vendors =
+    await this.userModel
+      .find(vendorQuery)
       .select(
-        '_id name contactDetails packages buisnessCategory',
+        '_id name contactDetails packages buisnessCategory serviceLocationCityIds',
       )
       .lean();
 
-    const vendorMap = new Map(
-      vendors.map((vendor: any) => [
-        vendor._id.toString(),
-        vendor,
-      ]),
-    );
+  const vendorMap = new Map(
+    vendors.map((vendor: any) => [
+      vendor._id.toString(),
+      vendor,
+    ]),
+  );
 
-    const eligibleCampaigns: any[] = [];
+  const eligibleCampaigns: any[] = [];
 
-    for (const campaign of campaigns as any[]) {
-      const vendorId =
-        campaign.vendorId.toString();
+  for (const campaign of campaigns as any[]) {
+    const vendorId =
+      campaign.vendorId.toString();
 
-      /*
-       * Campaign must still have valid Growth/Premium
-       * campaign access at serving time.
-       *
-       * Subscription expiry therefore immediately removes
-       * the campaign from public Sponsored placements
-       * without deleting campaign history.
-       */
-      const campaignAccessEndDate =
-        await this.featureAccessService
-          .getCampaignAccessEndDate(vendorId);
+    const vendor =
+      vendorMap.get(vendorId);
 
-      if (
-        !campaignAccessEndDate ||
-        campaignAccessEndDate.getTime() <= now.getTime()
-      ) {
-        continue;
-      }
-
-      const vendor = vendorMap.get(vendorId);
-
-      if (!vendor) {
-        continue;
-      }
-
-      const linkedPackage = (
-        (vendor as any).packages || []
-      ).find(
-        (pkg: any) =>
-          pkg?._id?.toString() ===
-          String(campaign.packageId),
-      );
-
-      /*
-       * Never publicly serve a campaign whose linked
-       * package no longer exists.
-       */
-      if (!linkedPackage) {
-        continue;
-      }
-
-      eligibleCampaigns.push({
-        _id: campaign._id,
-
-        title: campaign.title,
-        image: campaign.image,
-        description: campaign.description,
-        offerLabel:
-          campaign.offerLabel || null,
-
-        startDate: campaign.startDate,
-        endDate: campaign.endDate,
-
-        vendorId,
-        vendorName:
-          (vendor as any).name || 'Vendor',
-
-        brandName:
-          (vendor as any).contactDetails
-            ?.brandName || null,
-
-        categoryId:
-          campaign.categoryId,
-
-        packageId:
-          campaign.packageId,
-
-        package: {
-          _id: linkedPackage._id,
-          packageName:
-            linkedPackage.packageName,
-          description:
-            linkedPackage.description,
-          price:
-            linkedPackage.price,
-          images:
-            linkedPackage.images || [],
-        },
-
-        sponsored: true,
-      });
+    /*
+     * Includes event-city relevance because vendors outside
+     * the requested service city were not loaded above.
+     */
+    if (!vendor) {
+      continue;
     }
 
-        return eligibleCampaigns;
+    /*
+     * Reuse existing campaign subscription eligibility.
+     */
+    const campaignAccessEndDate =
+      await this.featureAccessService
+        .getCampaignAccessEndDate(
+          vendorId,
+        );
+
+    if (
+      !campaignAccessEndDate ||
+      campaignAccessEndDate.getTime() <=
+        now.getTime()
+    ) {
+      continue;
+    }
+
+    const linkedPackage = (
+      (vendor as any).packages || []
+    ).find(
+      (pkg: any) =>
+        pkg?._id?.toString() ===
+        String(campaign.packageId),
+    );
+
+    /*
+     * Existing exact sponsored-package eligibility rule.
+     */
+    if (!linkedPackage) {
+      continue;
+    }
+
+    eligibleCampaigns.push({
+      _id: campaign._id,
+
+      title: campaign.title,
+      image: campaign.image,
+      description:
+        campaign.description,
+
+      offerLabel:
+        campaign.offerLabel || null,
+
+      startDate:
+        campaign.startDate,
+
+      endDate:
+        campaign.endDate,
+
+      vendorId,
+
+      vendorName:
+        (vendor as any).name ||
+        'Vendor',
+
+      brandName:
+        (vendor as any)
+          .contactDetails
+          ?.brandName || null,
+
+      categoryId:
+        campaign.categoryId,
+
+      packageId:
+        campaign.packageId,
+
+      package: {
+        _id:
+          linkedPackage._id,
+
+        packageName:
+          linkedPackage.packageName,
+
+        description:
+          linkedPackage.description,
+
+        price:
+          linkedPackage.price,
+
+        images:
+          linkedPackage.images || [],
+      },
+
+      sponsored: true,
+    });
   }
 
+  /*
+   * Stable + fair backend rotation.
+   *
+   * Base list is stable (_id ascending).
+   * UTC day changes the starting campaign.
+   * During the same day repeated requests receive the same
+   * ordering, while subsequent days rotate exposure fairly.
+   *
+   * No ranking/Phase 4C logic is introduced here.
+   */
+  if (eligibleCampaigns.length > 1) {
+    const utcDayNumber = Math.floor(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+      ) /
+        (24 * 60 * 60 * 1000),
+    );
+
+    const rotationOffset =
+      utcDayNumber %
+      eligibleCampaigns.length;
+
+    const rotated = [
+      ...eligibleCampaigns.slice(
+        rotationOffset,
+      ),
+      ...eligibleCampaigns.slice(
+        0,
+        rotationOffset,
+      ),
+    ];
+
+    eligibleCampaigns.splice(
+      0,
+      eligibleCampaigns.length,
+      ...rotated,
+    );
+  }
+
+  /*
+   * Dashboard contract:
+   * maximum 4 campaigns.
+   */
+  if (!options?.viewAll) {
+    return eligibleCampaigns.slice(
+      0,
+      limit,
+    );
+  }
+
+  /*
+   * View All uses the exact same eligible + rotated source,
+   * only paginated.
+   */
+  const total =
+    eligibleCampaigns.length;
+
+  const totalPages =
+    total === 0
+      ? 0
+      : Math.ceil(total / limit);
+
+  const start =
+    (page - 1) * limit;
+
+  const items =
+    eligibleCampaigns.slice(
+      start,
+      start + limit,
+    );
+
+  return {
+    items,
+    page,
+    limit,
+    total,
+    totalPages,
+    hasMore:
+      start + items.length < total,
+  };
+}
   // =========================================================
   // Phase 14A.10 — Sponsored Campaign Analytics
   // =========================================================

@@ -10,6 +10,7 @@ import { VendorAvailabilityModule } from "../vendor-availability/vendor-availabi
 import { PayoutModule } from "../payout/payout.module";
 import { CommissionConfig, CommissionConfigSchema } from "src/schemas/commission-config.schema";
 import { VendorGrowthModule } from "../vendor/growth/vendor-growth.module";
+import { CityModule } from '../city/city.module';
 
 @Module({
     imports: [
@@ -25,6 +26,7 @@ import { VendorGrowthModule } from "../vendor/growth/vendor-growth.module";
         VendorAvailabilityModule,
         PayoutModule,
         VendorGrowthModule,
+        CityModule,
     ],
     controllers: [OrderController],
     providers: [OrderService],

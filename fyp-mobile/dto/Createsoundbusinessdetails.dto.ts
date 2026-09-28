@@ -1,4 +1,4 @@
-//fyp-mobile/dto/Createsoundbusinessdetails.dto.ts
+﻿//fyp-mobile/dto/Createsoundbusinessdetails.dto.ts
 
 export type DownPaymentType = 'PERCENTAGE' | 'FIXED';
 export type YesNo = 'YES' | 'NO';
@@ -16,7 +16,7 @@ export interface CreateSoundBusinessDetailsDto {
 
     travelsToClientHome: boolean;
 
-    cityCovered: string;
+    cityCovered?: string;
 
     // e.g. MALE, FEMALE, TRANSGENDER
     staffGender: string[];

@@ -2,7 +2,9 @@
 import getAllCategories from "@/services/getAllCategories";
 import { saveSecureData, getSecureData } from "@/store";
 import { useVendorsAvailability } from "@/hooks/useVendorsAvailability";
-
+import getActiveCities, {
+  ActiveCity,
+} from "@/services/getActiveCities";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -117,6 +119,19 @@ const updateCustomDuration = (
   const [guests, setGuests] = useState("");
 
   // -------------------------------------------------------
+// STEP 7 & 8 — EVENT LOCATION
+// -------------------------------------------------------
+
+const [cities, setCities] = useState<ActiveCity[]>([]);
+const [citiesLoading, setCitiesLoading] = useState(false);
+
+const [eventCityId, setEventCityId] = useState("");
+const [eventAddress, setEventAddress] = useState("");
+
+const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+const [citySearch, setCitySearch] = useState("");
+
+  // -------------------------------------------------------
   // DESIRED SERVICES (Phase 3 — shown right after event details)
   // -------------------------------------------------------
 
@@ -141,12 +156,14 @@ const updateCustomDuration = (
   // -------------------------------------------------------
 
   const [errors, setErrors] = useState({
-    eventName: "",
-    eventType: "",
-    eventDate: "",
-    guests: "",
-    selectedServices: "",
-  });
+  eventName: "",
+  eventType: "",
+  eventDate: "",
+  guests: "",
+  eventCityId: "",
+  eventAddress: "",
+  selectedServices: "",
+});
 
   // -------------------------------------------------------
   // LOAD CATEGORIES
@@ -163,11 +180,77 @@ const updateCustomDuration = (
       }
     };
 
-    loadCategories();
-  }, []);
+ loadCategories();
+}, []);
 
-  // -------------------------------------------------------
-  // AVAILABILITY DATE
+// -------------------------------------------------------
+// LOAD ACTIVE CITIES
+// -------------------------------------------------------
+
+useEffect(() => {
+  const loadCities = async () => {
+    try {
+      setCitiesLoading(true);
+
+      const response = await getActiveCities();
+
+setCities(
+  Array.isArray(response)
+    ? response
+    : [],
+);
+    } catch (error) {
+      console.error("Error loading cities:", error);
+      setCities([]);
+    } finally {
+      setCitiesLoading(false);
+    }
+  };
+
+  loadCities();
+}, []);
+
+const filteredCities = useMemo(() => {
+  const safeCities = Array.isArray(cities)
+    ? cities
+    : [];
+
+  const query = citySearch
+    .trim()
+    .toLowerCase();
+
+  if (!query) {
+    return safeCities;
+  }
+
+  return safeCities.filter((city) => {
+    const searchable = [
+      city.name,
+      city.stateProvinceName,
+      city.stateProvinceCode,
+      city.countryName,
+      city.countryCode,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchable.includes(query);
+  });
+}, [cities, citySearch]);
+
+const selectedCity = useMemo(
+  () =>
+    Array.isArray(cities)
+      ? cities.find(
+          (city) => city._id === eventCityId,
+        )
+      : undefined,
+  [cities, eventCityId],
+);
+
+// -------------------------------------------------------
+// AVAILABILITY DATE
   // -------------------------------------------------------
 
   const availabilityDate = useMemo(() => {
@@ -211,13 +294,21 @@ const updateCustomDuration = (
         : "Event date is required",
 
       guests: guests.trim()
-        ? ""
-        : "Guest count is required",
+  ? ""
+  : "Guest count is required",
 
-      selectedServices:
-        selectedServices.length > 0
-          ? ""
-          : "Select at least one service",
+eventCityId: eventCityId
+  ? ""
+  : "Event city is required",
+
+eventAddress: eventAddress.trim()
+  ? ""
+  : "Event address is required",
+
+selectedServices:
+  selectedServices.length > 0
+    ? ""
+    : "Select at least one service",
     };
 
     setErrors(newErrors);
@@ -358,19 +449,31 @@ const updateCustomDuration = (
     eventId = generateEventId();
   }
 
+  const eventStartTime = timeToHHMM(startTime);
+
+const eventEndDateTime = new Date(startTime);
+eventEndDateTime.setMinutes(
+  eventEndDateTime.getMinutes() + durationMinutes
+);
+
+const eventEndTime = timeToHHMM(eventEndDateTime);
+
   await saveSecureData(
     "eventDetails",
     JSON.stringify({
-      eventId,
-      eventName,
-      eventType,
-      eventDate,
-      startTime: timeToHHMM(startTime),
-      durationMinutes,
-      guests,
-      selectedServices,
-      vendorIds,
-    })
+  eventId,
+  eventName,
+  eventType,
+  eventDate,
+  startTime: eventStartTime,
+  endTime: eventEndTime,
+  durationMinutes,
+  guests,
+  eventCityId,
+  eventAddress: eventAddress.trim(),
+  selectedServices,
+  vendorIds,
+})
   );
 
   return true;
@@ -864,17 +967,184 @@ const handleContinue = async () => {
         />
       </View>
 
-      {!!errors.guests && (
-        <Text
-          style={styles.errorText}
-          testID="guests-error-bottom"
-        >
-          {errors.guests}
-        </Text>
-      )}
+     {!!errors.guests && (
+  <Text
+    style={styles.errorText}
+    testID="guests-error-bottom"
+  >
+    {errors.guests}
+  </Text>
+)}
 
-      {/* ==================================================
-          VENDOR AVAILABILITY PREVIEW
+{/* ==================================================
+    STEP 7 — EVENT CITY
+================================================== */}
+
+<Text style={styles.label}>
+  Event City
+</Text>
+
+<TouchableOpacity
+  style={styles.inputWrapper}
+  onPress={() =>
+    setCityDropdownOpen((prev) => !prev)
+  }
+  activeOpacity={0.8}
+>
+  <Ionicons
+    name="location-outline"
+    size={19}
+    color={PRIMARY}
+  />
+
+  <Text
+    style={[
+      styles.inputText,
+      !selectedCity && { color: "#AAAAAA" },
+    ]}
+  >
+    {selectedCity
+      ? `${selectedCity.name}, ${selectedCity.stateProvinceName}`
+      : "Select event city"}
+  </Text>
+
+  {citiesLoading ? (
+    <ActivityIndicator
+      size="small"
+      color={PRIMARY}
+    />
+  ) : (
+    <Ionicons
+      name={
+        cityDropdownOpen
+          ? "chevron-up"
+          : "chevron-down"
+      }
+      size={18}
+      color="#777777"
+    />
+  )}
+</TouchableOpacity>
+
+{!!errors.eventCityId && (
+  <Text style={styles.errorText}>
+    {errors.eventCityId}
+  </Text>
+)}
+
+{cityDropdownOpen && (
+  <View style={styles.cityDropdown}>
+    <View style={styles.citySearchWrapper}>
+      <Ionicons
+        name="search-outline"
+        size={18}
+        color="#777777"
+      />
+
+      <TextInput
+        style={styles.citySearchInput}
+        placeholder="Search city, state or country"
+        placeholderTextColor="#AAAAAA"
+        value={citySearch}
+        onChangeText={setCitySearch}
+      />
+    </View>
+
+   {filteredCities.length === 0 ? (
+  <Text style={styles.cityEmptyText}>
+    No active cities found.
+  </Text>
+) : (
+  <ScrollView
+    style={styles.cityOptionsScroll}
+    nestedScrollEnabled
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator
+  >
+    {filteredCities.map((city) => (
+      <TouchableOpacity
+        key={city._id}
+        style={styles.cityOption}
+        onPress={() => {
+          setEventCityId(city._id);
+          setCityDropdownOpen(false);
+          setCitySearch("");
+
+          setErrors((prev) => ({
+            ...prev,
+            eventCityId: "",
+          }));
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cityOptionName}>
+            {city.name}
+          </Text>
+
+          <Text style={styles.cityOptionMeta}>
+            {city.stateProvinceName},{" "}
+            {city.countryName}
+          </Text>
+        </View>
+
+        {eventCityId === city._id && (
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={PRIMARY}
+          />
+        )}
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+)}
+  </View>
+)}
+
+{/* ==================================================
+    STEP 8 — EVENT ADDRESS
+================================================== */}
+
+<Text style={styles.label}>
+  Event Address
+</Text>
+
+<View style={styles.addressWrapper}>
+  <Ionicons
+    name="navigate-outline"
+    size={19}
+    color={PRIMARY}
+    style={{ marginTop: 3 }}
+  />
+
+  <TextInput
+    style={styles.addressInput}
+    placeholder="Enter venue / event address"
+    placeholderTextColor="#AAAAAA"
+    value={eventAddress}
+    onChangeText={(value) => {
+      setEventAddress(value);
+
+      if (value.trim()) {
+        setErrors((prev) => ({
+          ...prev,
+          eventAddress: "",
+        }));
+      }
+    }}
+    multiline
+    textAlignVertical="top"
+  />
+</View>
+
+{!!errors.eventAddress && (
+  <Text style={styles.errorText}>
+    {errors.eventAddress}
+  </Text>
+)}
+
+{/* ==================================================
+    VENDOR AVAILABILITY PREVIEW
           (depends on date/time/duration above, so it sits
           right after the 6 core event-detail steps)
       ================================================== */}
@@ -1533,9 +1803,90 @@ customDurationPreviewText: {
   fontWeight: "700",
   color: PRIMARY,
 },
-  availabilityCard: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
+cityOptionsScroll: {
+  maxHeight: 260,
+},
+  cityDropdown: {
+  width: "100%",
+  backgroundColor: "#FFFFFF",
+  borderRadius: 14,
+  marginTop: -7,
+  marginBottom: 16,
+  padding: 10,
+  borderWidth: 1,
+  borderColor: "#E7D8E2",
+  maxHeight: 300,
+},
+
+citySearchWrapper: {
+  minHeight: 46,
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#FAFAFA",
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  marginBottom: 8,
+},
+
+citySearchInput: {
+  flex: 1,
+  marginLeft: 8,
+  fontSize: 13,
+  color: "#222222",
+},
+
+cityOption: {
+  minHeight: 54,
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 10,
+  paddingVertical: 8,
+  borderBottomWidth: 1,
+  borderBottomColor: "#F1E8EE",
+},
+
+cityOptionName: {
+  fontSize: 13,
+  fontWeight: "800",
+  color: "#222222",
+},
+
+cityOptionMeta: {
+  fontSize: 11,
+  color: "#888888",
+  marginTop: 3,
+},
+
+cityEmptyText: {
+  padding: 15,
+  textAlign: "center",
+  fontSize: 12,
+  color: "#888888",
+},
+
+addressWrapper: {
+  width: "100%",
+  minHeight: 85,
+  backgroundColor: "#FFFFFF",
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  paddingVertical: 13,
+  flexDirection: "row",
+  alignItems: "flex-start",
+  marginBottom: 15,
+},
+
+addressInput: {
+  flex: 1,
+  minHeight: 58,
+  marginLeft: 10,
+  fontSize: 14,
+  color: "#222222",
+},
+
+availabilityCard: {
+  width: "100%",
+  backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 16,
     marginBottom: 22,

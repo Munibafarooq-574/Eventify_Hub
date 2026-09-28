@@ -931,6 +931,32 @@ export class User extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Category' })
   buisnessCategory?: any;
 
+  @Prop({
+  type: [
+    {
+      type: MongooseSchema.Types.ObjectId,
+      ref: 'City',
+    },
+  ],
+  default: [],
+  index: true,
+})
+serviceLocationCityIds: Types.ObjectId[];
+
+@Prop({
+  type: MongooseSchema.Types.ObjectId,
+  ref: 'City',
+  default: null,
+})
+businessCityId?: Types.ObjectId | null;
+
+@Prop({
+  type: String,
+  trim: true,
+  default: '',
+})
+businessAddress?: string;
+
   @Prop({ type: ContactDetailsSchema })
   contactDetails?: ContactDetails;
 

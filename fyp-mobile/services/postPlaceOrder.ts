@@ -1,41 +1,4 @@
 
-//fyp-mobile/services/postPlaceOrder.ts
-/*import axios, { AxiosRequestConfig } from "axios";
-
-interface ServiceItem {
-    vendorId: string;
-    serviceName: string;
-    price: number;
-}
-
-interface PlaceOrderPayload {
-    organizerId: string;
-    eventDate: string; // in ISO format
-    eventTime: string;
-    services: ServiceItem[];
-    eventName: string;
-    eventType?: string;
-    guests: number;
-    durationMinutes?: number; // NEW
-}
-
-export default async function postPlaceOrder(orderData: PlaceOrderPayload) {
-    const url = `https://eventify-hub.onrender.com/orders`;
-    // const url = `http://192.168.100.15:3000/orders`;
-    const config: AxiosRequestConfig = {
-        method: "POST",
-        url,
-        data: orderData,
-    };
-
-    try {
-        const response = await axios(config);
-        return response.data;
-    } catch (error) {
-        console.error("Error placing order:", error);
-        throw error;
-    }
-}*/
 
 // fyp-mobile/services/postPlaceOrder.ts
 
@@ -49,8 +12,8 @@ export interface ServiceItem {
   vendorId: string;
   serviceName: string;
   price: number;
+  packageId: string;
 }
-
 /**
  * Place order payload
  */
@@ -63,6 +26,9 @@ export interface PlaceOrderPayload {
   eventType?: string;
   guests: number;
   durationMinutes?: number;
+
+  eventCityId: string;
+  eventAddress: string;
 }
 
 /**
@@ -93,6 +59,14 @@ export default async function postPlaceOrder(
   if (!orderData.eventName) {
     throw new Error("Event name is required.");
   }
+
+  if (!orderData.eventCityId) {
+  throw new Error("Event city is required.");
+}
+
+if (!orderData.eventAddress?.trim()) {
+  throw new Error("Event address is required.");
+}
 
   if (
     orderData.guests === undefined ||
@@ -174,6 +148,10 @@ export default async function postPlaceOrder(
 
       eventName: orderData.eventName,
 
+      eventCityId: orderData.eventCityId,
+
+      eventAddress: orderData.eventAddress.trim(),
+
       ...(orderData.eventType
         ? {
             eventType: orderData.eventType,
@@ -190,10 +168,9 @@ export default async function postPlaceOrder(
 
       services: orderData.services.map((service) => ({
         vendorId: service.vendorId,
-
         serviceName: service.serviceName,
-
         price: Number(service.price),
+        packageId: service.packageId,
       })),
     },
   };

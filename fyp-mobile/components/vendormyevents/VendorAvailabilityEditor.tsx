@@ -12,7 +12,9 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from '@react-native-community/datetimepicker';
 import { Calendar } from 'react-native-calendars';
 
 import patchVendorAvailability from '@/services/patchVendorAvailability';
@@ -415,16 +417,20 @@ const VendorAvailabilityEditor = ({
       }}
     >
       <View style={styles.editorContainer}>
-        <View style={styles.editorHeader}>
-          <TouchableOpacity style={styles.editorCloseButton} disabled={editorSaving} onPress={onClose}>
-            <Ionicons name="close" size={22} color={PRIMARY} />
-          </TouchableOpacity>
-          <View style={styles.editorHeaderTitleWrap}>
+                <View style={styles.editorHeader}>
+          <View style={styles.editorHeaderTitleWrap} pointerEvents="none">
             <Text style={styles.editorTitle}>Manage Availability</Text>
             <Text style={styles.editorSubtitle}>Set your working days & hours</Text>
           </View>
-          <View style={styles.editorHeaderIcon}>
-            <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+
+          <View style={styles.editorHeaderRow}>
+            <TouchableOpacity style={styles.editorCloseButton} disabled={editorSaving} onPress={onClose}>
+              <Ionicons name="close" size={22} color={PRIMARY} />
+            </TouchableOpacity>
+
+            <View style={styles.editorHeaderIcon}>
+              <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+            </View>
           </View>
         </View>
 
@@ -703,23 +709,53 @@ const VendorAvailabilityEditor = ({
                 </TouchableOpacity>
               </View>
 
-              <DateTimePicker
-                value={slotPickerMode === 'start' ? draftStart : draftEnd}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                themeVariant="light"
-                textColor={Platform.OS === 'ios' ? '#1A1A1A' : undefined}
-                onChange={(_, date) => {
-                  if (!date) return;
-                  if (slotPickerMode === 'start') {
-                    setDraftStart(date);
-                    if (date >= draftEnd) setDraftEnd(addMinutes(date, 60));
-                  } else {
-                    setDraftEnd(date);
-                  }
-                }}
-                style={styles.timePicker}
-              />
+                          {Platform.OS === 'ios' ? (
+                <DateTimePicker
+                  value={slotPickerMode === 'start' ? draftStart : draftEnd}
+                  mode="time"
+                  display="spinner"
+                  themeVariant="light"
+                  textColor="#1A1A1A"
+                  onChange={(_, date) => {
+                    if (!date) return;
+                    if (slotPickerMode === 'start') {
+                      setDraftStart(date);
+                      if (date >= draftEnd) setDraftEnd(addMinutes(date, 60));
+                    } else {
+                      setDraftEnd(date);
+                    }
+                  }}
+                  style={styles.timePicker}
+                />
+              ) : (
+                <TouchableOpacity
+                  style={styles.androidTimeButton}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    const currentValue = slotPickerMode === 'start' ? draftStart : draftEnd;
+                    DateTimePickerAndroid.open({
+                      value: currentValue,
+                      mode: 'time',
+                      display: 'default',
+                      onChange: (_, date) => {
+                        if (!date) return;
+                        if (slotPickerMode === 'start') {
+                          setDraftStart(date);
+                          if (date >= draftEnd) setDraftEnd(addMinutes(date, 60));
+                        } else {
+                          setDraftEnd(date);
+                        }
+                      },
+                    });
+                  }}
+                >
+                  <Ionicons name="time-outline" size={20} color={PRIMARY} />
+                  <Text style={styles.androidTimeButtonText}>
+                    Tap to set {slotPickerMode === 'start' ? 'start' : 'end'} time
+                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color={PRIMARY} />
+                </TouchableOpacity>
+              )}
 
               <View style={styles.pickerPreview}>
                 <Ionicons name="time-outline" size={18} color={PRIMARY} />
@@ -767,23 +803,35 @@ export default VendorAvailabilityEditor;
 
 const styles = StyleSheet.create({
   editorContainer: { flex: 1, backgroundColor: PRIMARY_LIGHT },
-  editorHeader: {
+    editorHeader: {
     backgroundColor: PRIMARY,
-    paddingTop: Platform.OS === 'ios' ? 55 : 25,
+    paddingTop: Platform.OS === 'ios' ? 55 : 50,
     paddingHorizontal: 16,
-    paddingBottom: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingBottom: 30,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    position: 'relative',
+  },
+  editorHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   editorCloseButton: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
   },
-  editorHeaderTitleWrap: { flex: 1, marginLeft: 12 },
-  editorTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
-  editorSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.72)', marginTop: 3 },
+  editorHeaderTitleWrap: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 55 : 50,
+    left: 0,
+    right: 0,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+    editorTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
+    editorSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.72)', marginTop: 3, textAlign: 'center' },
   editorHeaderIcon: {
     width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
@@ -878,5 +926,22 @@ const styles = StyleSheet.create({
   pickerButtonsRow: { flexDirection: 'row', gap: 10 },
   pickerBackButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 14, minHeight: 50, paddingHorizontal: 18 },
   pickerBackButtonText: { color: PRIMARY, fontSize: 13, fontWeight: '800' },
-  pickerPrimaryButtonFlex: { flex: 1, backgroundColor: PRIMARY, borderRadius: 14, minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+   pickerPrimaryButtonFlex: { flex: 1, backgroundColor: PRIMARY, borderRadius: 14, minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  androidTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: PRIMARY_LIGHT,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E4C7DC',
+    paddingVertical: 16,
+    marginVertical: 4,
+  },
+  androidTimeButtonText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: PRIMARY,
+  },
 });

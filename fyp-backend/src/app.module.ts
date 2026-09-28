@@ -19,6 +19,7 @@ import { PayoutModule } from './payout/payout.module';
 import { CancellationModule } from './cancellation/cancellation.module';
 import { BookingChangeModule } from './booking-change/booking-change.module';
 import { AdminModule } from './admin/admin.module';
+import { CityModule } from './city/city.module';
 
 
 @Module({
@@ -31,6 +32,7 @@ import { AdminModule } from './admin/admin.module';
     AuthModule,
     CategoryModule,
     VendorModule,
+     CityModule,
     VendorGrowthModule,
     MessagesModule,
     ChatModule,

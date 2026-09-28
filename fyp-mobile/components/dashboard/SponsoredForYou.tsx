@@ -8,6 +8,7 @@ import getSponsoredCampaigns, {
   SponsoredCampaign,
 } from "@/services/getSponsoredCampaigns";
 import { Ionicons } from "@expo/vector-icons";
+import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
 import { router } from "expo-router";
 import React, {
   useCallback,
@@ -153,26 +154,37 @@ const SponsoredForYou: React.FC = () => {
   >({});
 
   const loadCampaigns = useCallback(async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const result =
-        await getSponsoredCampaigns();
+   const {
+  eventCityId,
+  categoryIds,
+} = await getMarketplaceEventContext();
 
-      setCampaigns(
-        Array.isArray(result) ? result : [],
-      );
-    } catch (error) {
-      console.error(
-        "Sponsored campaigns error:",
-        error,
-      );
+    const result =
+      await getSponsoredCampaigns({
+        eventCityId,
+        categoryIds,
+        limit: 4,
+      });
 
-      setCampaigns([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setCampaigns(
+      Array.isArray(result)
+        ? result.slice(0, 4)
+        : [],
+    );
+  } catch (error) {
+    console.error(
+      "Sponsored campaigns error:",
+      error,
+    );
+
+    setCampaigns([]);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     loadCampaigns();
@@ -821,8 +833,25 @@ const SponsoredForYou: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <FlatList
+  <View style={styles.container}>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>
+        Sponsored For You
+      </Text>
+
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() =>
+          router.push("/sponsoredcampaigns")
+        }
+      >
+        <Text style={styles.viewAllText}>
+          View All
+        </Text>
+      </TouchableOpacity>
+    </View>
+
+    <FlatList
         ref={flatListRef}
         data={campaigns}
         horizontal
@@ -877,7 +906,25 @@ const styles = StyleSheet.create({
     // paddingHorizontal is applied dynamically above
     // (SIDE_SPACING) so each card centers on screen.
   },
+sectionHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 16,
+  marginBottom: 10,
+},
 
+sectionTitle: {
+  fontSize: 17,
+  fontWeight: "800",
+  color: COLORS.textDark,
+},
+
+viewAllText: {
+  fontSize: 13,
+  fontWeight: "700",
+  color: COLORS.primary,
+},
   card: {
     width: CARD_WIDTH,
     height: 200,

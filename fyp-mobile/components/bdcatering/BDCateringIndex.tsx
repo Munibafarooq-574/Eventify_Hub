@@ -1,4 +1,4 @@
-import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
+﻿import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getSecureData } from "@/store";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -69,7 +69,6 @@ const BusinessDetailsForm = () => {
 const [travelsToClientHome, setTravelsToClientHome] =
   useState<"YES" | "NO" | null>(null);
 
-const [cityCovered, setCityCovered] = useState("");
 const [staffGender, setStaffGender] = useState<string[]>([]);
 
 const [foodTesting, setFoodTesting] = useState(false);
@@ -111,7 +110,6 @@ const [covidCompliant, setCovidCompliant] =
 
       setExpertise(data.expertise || []);
       setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
-      setCityCovered(data.cityCovered || "");
       setStaffGender(data.staff || []);
       setFoodTesting(!!data.provideFoodTesting);
       setSoundSystem(!!data.provideSoundSystem);
@@ -180,7 +178,6 @@ const submit = async () => {
 
     if (
         expertise.length === 0 ||
-        !cityCovered.trim() ||
         staffGender.length === 0 ||
         !minimumPrice ||
         !description ||
@@ -206,7 +203,6 @@ const submit = async () => {
         const dto = {
   expertise,
   travelsToClientHome: travelsToClientHome === "YES",
-  cityCovered,
   staff: staffGender,
   provideFoodTesting: foodTesting,
   provideDecoration: decoration,
@@ -393,25 +389,6 @@ i===2 && styles.dotAccent
         Cities Covered
 ============================= */}
 
-<View style={styles.card}>
-  <SectionTitle
-    icon="map-marker-alt"
-    title="Cities Covered"
-    required
-  />
-
-  <Text style={styles.hint}>
-    Enter the cities you serve
-  </Text>
-
-  <TextInput
-    style={styles.input}
-    placeholder="e.g. Islamabad, Lahore, Karachi"
-    placeholderTextColor="#B8B8B8"
-    value={cityCovered}
-    onChangeText={setCityCovered}
-  />
-</View>
 
 {/* ============================
         Staff
@@ -606,12 +583,12 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder={`Example:
-    • Wedding Catering
-    • Buffet & BBQ Setup
-    • Customized Menu
-    • Live Cooking Stations
-    • Professional Staff
-    • Complete Event Food Management`}
+    â€¢ Wedding Catering
+    â€¢ Buffet & BBQ Setup
+    â€¢ Customized Menu
+    â€¢ Live Cooking Stations
+    â€¢ Professional Staff
+    â€¢ Complete Event Food Management`}
         placeholderTextColor="#B8B8B8"
         
     />
@@ -635,12 +612,12 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder={`Example:
-    • Free Food Tasting Available
-    • Travel Charges Apply Outside City
-    • Minimum Booking: 100 Guests
-    • Advance Booking Recommended
-    • Extra Charges for Late-Night Events
-    • Customized Menu Available on Request`}
+    â€¢ Free Food Tasting Available
+    â€¢ Travel Charges Apply Outside City
+    â€¢ Minimum Booking: 100 Guests
+    â€¢ Advance Booking Recommended
+    â€¢ Extra Charges for Late-Night Events
+    â€¢ Customized Menu Available on Request`}
         placeholderTextColor="#B8B8B8"
     />
 </View>
@@ -1112,3 +1089,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+

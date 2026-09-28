@@ -1097,226 +1097,353 @@ const category =
               {pkg.services || "N/A"}
             </Text>
           </View>
+           
+           {/* Booking Configuration */}
+<View style={styles.packageInfoSection}>
+  <View style={styles.sectionTitleWithIcon}>
+    <Ionicons
+      name="calendar-outline"
+      size={16}
+      color={PRIMARY}
+    />
 
-          {/* Fixed Durations */}
-          <View
-            style={
-              styles.packageInfoSection
-            }
-          >
-            <View
-              style={
-                styles.sectionTitleWithIcon
-              }
-            >
-              <Ionicons
-                name="time-outline"
-                size={16}
-                color={PRIMARY}
-              />
+    <Text style={styles.servicesLabel}>
+      Booking Type
+    </Text>
+  </View>
 
-              <Text
-                style={
-                  styles.servicesLabel
-                }
-              >
-                Fixed Duration Options
-              </Text>
-            </View>
+  <Text style={styles.packageDetailItem}>
+    {pkg.bookingType === "DURATION_BASED"
+      ? "Duration Based"
+      : pkg.bookingType === "TIME_SLOT_BASED"
+      ? "Time Slot Based"
+      : pkg.bookingType === "DELIVERY_BASED"
+      ? "Delivery Based"
+      : pkg.bookingType === "SETUP_BASED"
+      ? "Setup Based"
+      : pkg.bookingType === "CUSTOM"
+      ? "Custom"
+      : "Not configured"}
+  </Text>
+</View>
 
-            {Array.isArray(
-              pkg.durations
-            ) &&
-            pkg.durations.length > 0 ? (
-              <View
-                style={styles.durationList}
-              >
-                {pkg.durations.map(
-                  (
-                    duration: any,
-                    index: number
-                  ) => {
-                    const unit =
-                      duration.unit ===
-                      "DAYS"
-                        ? "day"
-                        : "hour";
+{/* DURATION BASED */}
+{(!pkg.bookingType || pkg.bookingType === "DURATION_BASED") && (
+  <>
+    <View style={styles.packageInfoSection}>
+      <View style={styles.sectionTitleWithIcon}>
+        <Ionicons
+          name="time-outline"
+          size={16}
+          color={PRIMARY}
+        />
 
-                    const displayUnit =
-                      Number(
-                        duration.value
-                      ) === 1
-                        ? unit
-                        : `${unit}s`;
+        <Text style={styles.servicesLabel}>
+          Fixed Duration Options
+        </Text>
+      </View>
 
-                    return (
-                      <View
-                        key={`${pkg._id}-duration-${index}`}
-                        style={
-                          styles.durationCard
-                        }
-                      >
-                        <View
-                          style={
-                            styles.durationLeft
-                          }
-                        >
-                          <View
-                            style={
-                              styles.durationIcon
-                            }
-                          >
-                            <Ionicons
-                              name={
-                                duration.unit ===
-                                "DAYS"
-                                  ? "calendar-outline"
-                                  : "time-outline"
-                              }
-                              size={16}
-                              color={PRIMARY}
-                            />
-                          </View>
+      {Array.isArray(pkg.durations) &&
+      pkg.durations.length > 0 ? (
+        <View style={styles.durationList}>
+          {pkg.durations.map(
+            (duration: any, index: number) => {
+              const unit =
+                duration.unit === "DAYS"
+                  ? "day"
+                  : "hour";
 
-                          <View>
-                            <Text
-                              style={
-                                styles.durationValue
-                              }
-                            >
-                              {duration.value}{" "}
-                              {displayUnit}
-                            </Text>
+              const displayUnit =
+                Number(duration.value) === 1
+                  ? unit
+                  : `${unit}s`;
 
-                            <Text
-                              style={
-                                styles.durationType
-                              }
-                            >
-                              Fixed duration
-                            </Text>
-                          </View>
-                        </View>
-
-                        <Text
-                          style={
-                            styles.durationPrice
-                          }
-                        >
-                          Rs.{" "}
-                          {Number(
-                            duration.price ||
-                              0
-                          ).toLocaleString()}
-                        </Text>
-                      </View>
-                    );
-                  }
-                )}
-              </View>
-            ) : (
-              <Text
-                style={
-                  styles.noDurationText
-                }
-              >
-                No fixed durations available.
-              </Text>
-            )}
-          </View>
-
-          {/* Custom Duration */}
-          <View
-            style={
-              styles.packageInfoSection
-            }
-          >
-            <View
-              style={
-                styles.sectionTitleWithIcon
-              }
-            >
-              <Ionicons
-                name="options-outline"
-                size={16}
-                color={PRIMARY}
-              />
-
-              <Text
-                style={
-                  styles.servicesLabel
-                }
-              >
-                Custom Duration
-              </Text>
-            </View>
-
-            {pkg.allowCustomDuration ? (
-              <View
-                style={
-                  styles.customDurationBox
-                }
-              >
+              return (
                 <View
-                  style={
-                    styles.customDurationHeader
-                  }
+                  key={`${pkg._id}-duration-${index}`}
+                  style={styles.durationCard}
                 >
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color="#2E9D63"
-                  />
+                  <View style={styles.durationLeft}>
+                    <View style={styles.durationIcon}>
+                      <Ionicons
+                        name={
+                          duration.unit === "DAYS"
+                            ? "calendar-outline"
+                            : "time-outline"
+                        }
+                        size={16}
+                        color={PRIMARY}
+                      />
+                    </View>
 
-                  <Text
-                    style={
-                      styles.customDurationTitle
-                    }
-                  >
-                    Custom Duration Available
+                    <View>
+                      <Text style={styles.durationValue}>
+                        {duration.value} {displayUnit}
+                      </Text>
+
+                      <Text style={styles.durationType}>
+                        Fixed duration
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.durationPrice}>
+                    Rs.{" "}
+                    {Number(
+                      duration.price || 0
+                    ).toLocaleString()}
                   </Text>
                 </View>
+              );
+            }
+          )}
+        </View>
+      ) : (
+        <Text style={styles.noDurationText}>
+          No fixed durations available.
+        </Text>
+      )}
+    </View>
 
-                <Text
-                  style={
-                    styles.customDurationText
-                  }
-                >
-                  Rate: Rs.{" "}
-                  {Number(
-                    pkg.customDurationRate ||
-                      0
-                  ).toLocaleString()}
-                  /
-                  {pkg.customDurationUnit ===
-                  "DAYS"
-                    ? "day"
-                    : "hour"}
-                </Text>
-              </View>
-            ) : (
-              <View
-                style={
-                  styles.customDurationDisabled
-                }
-              >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={20}
-                  color="#999"
-                />
+    <View style={styles.packageInfoSection}>
+      <View style={styles.sectionTitleWithIcon}>
+        <Ionicons
+          name="options-outline"
+          size={16}
+          color={PRIMARY}
+        />
 
-                <Text
-                  style={
-                    styles.customDurationDisabledText
-                  }
-                >
-                  Custom duration is not available
-                  for this package.
-                </Text>
-              </View>
-            )}
+        <Text style={styles.servicesLabel}>
+          Custom Duration
+        </Text>
+      </View>
+
+      {pkg.allowCustomDuration ? (
+        <View style={styles.customDurationBox}>
+          <View style={styles.customDurationHeader}>
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color="#2E9D63"
+            />
+
+            <Text style={styles.customDurationTitle}>
+              Custom Duration Available
+            </Text>
           </View>
+
+          <Text style={styles.customDurationText}>
+            Rate: Rs.{" "}
+            {Number(
+              pkg.customDurationRate || 0
+            ).toLocaleString()}
+            /
+            {pkg.customDurationUnit === "DAYS"
+              ? "day"
+              : "hour"}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.customDurationDisabled}>
+          <Ionicons
+            name="close-circle-outline"
+            size={20}
+            color="#999"
+          />
+
+          <Text
+            style={
+              styles.customDurationDisabledText
+            }
+          >
+            Custom duration is not available for this
+            package.
+          </Text>
+        </View>
+      )}
+    </View>
+  </>
+)}
+
+{/* TIME SLOT BASED */}
+{pkg.bookingType === "TIME_SLOT_BASED" && (
+  <View style={styles.packageInfoSection}>
+    <View style={styles.sectionTitleWithIcon}>
+      <Ionicons
+        name="time-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.servicesLabel}>
+        Time Slot Configuration
+      </Text>
+    </View>
+
+    <Text style={styles.packageDetailItem}>
+      Time Needed Per Booking:{" "}
+      {pkg.requiredServiceDurationMinutes
+        ? `${pkg.requiredServiceDurationMinutes} minutes`
+        : "N/A"}
+    </Text>
+  </View>
+)}
+
+{/* DELIVERY BASED */}
+{pkg.bookingType === "DELIVERY_BASED" && (
+  <View style={styles.packageInfoSection}>
+    <View style={styles.sectionTitleWithIcon}>
+      <Ionicons
+        name="car-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.servicesLabel}>
+        Delivery Configuration
+      </Text>
+    </View>
+
+    <Text style={styles.packageDetailItem}>
+      Delivery Time:{" "}
+      {pkg.requiredServiceDurationMinutes
+        ? `${pkg.requiredServiceDurationMinutes} minutes`
+        : "N/A"}
+    </Text>
+
+    <Text style={styles.packageDetailItem}>
+      Earliest Delivery:{" "}
+      {typeof pkg.serviceWindowStartOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowStartOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowStartOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowStartOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowStartOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+
+    <Text style={styles.packageDetailItem}>
+      Latest Delivery:{" "}
+      {typeof pkg.serviceWindowEndOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowEndOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowEndOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowEndOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowEndOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+  </View>
+)}
+
+{/* SETUP BASED */}
+{pkg.bookingType === "SETUP_BASED" && (
+  <View style={styles.packageInfoSection}>
+    <View style={styles.sectionTitleWithIcon}>
+      <Ionicons
+        name="construct-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.servicesLabel}>
+        Setup Configuration
+      </Text>
+    </View>
+
+    <Text style={styles.packageDetailItem}>
+      Setup Duration:{" "}
+      {pkg.requiredServiceDurationMinutes
+        ? `${pkg.requiredServiceDurationMinutes} minutes`
+        : "N/A"}
+    </Text>
+
+    <Text style={styles.packageDetailItem}>
+      Earliest Setup:{" "}
+      {typeof pkg.serviceWindowStartOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowStartOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowStartOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowStartOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowStartOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+
+    <Text style={styles.packageDetailItem}>
+      Setup Finished By:{" "}
+      {typeof pkg.serviceWindowEndOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowEndOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowEndOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowEndOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowEndOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+  </View>
+)}
+
+{/* CUSTOM */}
+{pkg.bookingType === "CUSTOM" && (
+  <View style={styles.packageInfoSection}>
+    <View style={styles.sectionTitleWithIcon}>
+      <Ionicons
+        name="options-outline"
+        size={16}
+        color={PRIMARY}
+      />
+
+      <Text style={styles.servicesLabel}>
+        Custom Service Window
+      </Text>
+    </View>
+
+    {pkg.requiredServiceDurationMinutes ? (
+      <Text style={styles.packageDetailItem}>
+        Time Needed:{" "}
+        {pkg.requiredServiceDurationMinutes} minutes
+      </Text>
+    ) : null}
+
+    <Text style={styles.packageDetailItem}>
+      Earliest Service:{" "}
+      {typeof pkg.serviceWindowStartOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowStartOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowStartOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowStartOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowStartOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+
+    <Text style={styles.packageDetailItem}>
+      Latest Service:{" "}
+      {typeof pkg.serviceWindowEndOffsetMinutes ===
+      "number"
+        ? pkg.serviceWindowEndOffsetMinutes === 0
+          ? "At event time"
+          : pkg.serviceWindowEndOffsetMinutes < 0
+          ? `${Math.abs(
+              pkg.serviceWindowEndOffsetMinutes
+            )} minutes before event`
+          : `${pkg.serviceWindowEndOffsetMinutes} minutes after event`
+        : "N/A"}
+    </Text>
+  </View>
+)}
 
           {/* Base Price */}
           <View

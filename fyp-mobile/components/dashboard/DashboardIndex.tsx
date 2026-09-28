@@ -10,6 +10,7 @@ import BottomNavigationFinal from './BottomNavigationFinal';
 import { FeaturedVendorsSection } from '../VendorFeature/FeaturedVendorsSection';
 import { FeaturedPackagesSection } from '../VendorFeature/FeaturedPackagesSection';
 import SponsoredForYou from './SponsoredForYou';
+import RecommendedForYourEvent from './RecommendedForYourEvent';
 
 const COLORS = {
   bg: '#FDF2F8',
@@ -28,7 +29,9 @@ const DashboardIndex: React.FC = () => {
           
           <SponsoredForYou />
 
-          <FeaturedVendorsSection />
+        <RecommendedForYourEvent />
+
+        <FeaturedVendorsSection />
 
           <FeaturedPackagesSection />
 

@@ -91,6 +91,12 @@ const DashboardScreen = () => {
     const [analytics, setAnalytics] = useState<VendorAnalytics | null>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true);
     const [analyticsError, setAnalyticsError] = useState<boolean>(false);
+
+    // Order stats (the 5 top cards: Orders/Pending/Processing/
+    // Completed/Cancelled) failing shouldn't silently leave them
+    // at 0 forever — track it separately so we can show a small
+    // "tap to retry" banner instead of a wrong-looking dashboard.
+    const [orderStatsError, setOrderStatsError] = useState<boolean>(false);
     const [subscriptionAccess, setSubscriptionAccess] =
     useState<SubscriptionAccessState | null>(null);
 
@@ -207,6 +213,41 @@ const packageLimitReached =
     }
   }, []);
 
+    // Fetches just the order stats cards. Kept separate from fetchData
+    // so the "Unable to load order stats" retry banner can call this
+    // directly without re-fetching packages/monthly stats too.
+    // getVendorOrderStats() already retries once internally on
+    // 520/502/503/504 (Render.com cold start), so by the time an
+    // error reaches here it's a genuine, non-transient failure.
+    const fetchOrderStats = React.useCallback(async (userId: string) => {
+        try {
+            const statsData = await getVendorOrderStats("Vendor", userId);
+
+            setOrderStats({
+                totalOrders: statsData.totalOrders ?? 0,
+                pending: (statsData as any).pending ?? 0,
+                processing: statsData.processing ?? 0,
+                completed: statsData.completed ?? 0,
+                cancelled: (statsData as any).cancelled ?? 0,
+            });
+
+            setOrderStatsError(false);
+        } catch (error) {
+            console.error("Error fetching order stats:", error);
+            setOrderStatsError(true);
+        }
+    }, []);
+
+    const retryOrderStats = React.useCallback(async () => {
+        const user = await getUserData();
+
+        if (!user?._id) {
+            return;
+        }
+
+        await fetchOrderStats(user._id);
+    }, [fetchOrderStats]);
+
     const fetchData = React.useCallback(async () => {
     try {
         const user = await getUserData();
@@ -245,15 +286,7 @@ if (!user?._id) {
     );
 }
 
-        const statsData = await getVendorOrderStats("Vendor", user._id);
-
-        setOrderStats({
-            totalOrders: statsData.totalOrders ?? 0,
-            pending: (statsData as any).pending ?? 0,
-            processing: statsData.processing ?? 0,
-            completed: statsData.completed ?? 0,
-            cancelled: (statsData as any).cancelled ?? 0,
-        });
+        await fetchOrderStats(user._id);
 
         const response = await getOrderStatsMonthly(user._id);
 
@@ -280,7 +313,7 @@ if (!user?._id) {
     } finally {
         setLoading(false);
     }
-}, []);
+}, [fetchOrderStats]);
 
    const fetchAnalytics = React.useCallback(async () => {
     try {
@@ -771,6 +804,25 @@ if (!hasValidSubscription) {
 
 </View>
                     </View>
+
+                    {/* ---------- Order stats retry notice ---------- */}
+                    {orderStatsError && (
+                        <TouchableOpacity
+                            style={styles.orderStatsErrorRow}
+                            activeOpacity={0.8}
+                            onPress={retryOrderStats}
+                        >
+                            <Ionicons
+                                name="refresh-outline"
+                                size={14}
+                                color="#FFFFFF"
+                            />
+
+                            <Text style={styles.orderStatsErrorText}>
+                                Order numbers couldn't load — tap to retry
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     {/* ---------- Order Overview (4 cards) ---------- */}
                     <ScrollView
@@ -1995,6 +2047,23 @@ headerActionButton: {
         backgroundColor: "#FF5D5D",
         borderWidth: 1.5,
         borderColor: "#5E0A55",
+    },
+
+    orderStatsErrorRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        gap: 6,
+        backgroundColor: "rgba(255,255,255,0.15)",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginBottom: 12,
+    },
+    orderStatsErrorText: {
+        color: "#FFFFFF",
+        fontSize: 12,
+        fontWeight: "600",
     },
 
     // Stats

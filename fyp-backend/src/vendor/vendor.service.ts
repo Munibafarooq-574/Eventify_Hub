@@ -12,9 +12,11 @@ import {
   SoundBusinessDetails,
   GenericBusinessDetails,
   VendorApprovalStatus,
+  PackageBookingType,
 } from '../schemas/user.schema';
 import { CampaignService } from './growth/campaign/campaign.service';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
+import { CityService } from '../city/city.service';
 import { CreatePhotographerBusinessDetailsDto } from './dto/create-photographer-business-details.dto';
 import { CreateSalonBusinessDetailsDto } from './dto/create-salon-business-details.dto';
 import { CreateVenueBusinessDetailsDto } from './dto/create-venue-business-details.dto';
@@ -57,6 +59,7 @@ export class VendorService {
     private fileUploadService: FileUploadService,
     private readonly featureAccessService: FeatureAccessService,
     private readonly campaignService: CampaignService,
+private readonly cityService: CityService,
 ) { }
 
     async getAllVendorsByCategoryId(categoryId: string): Promise<User[]> {
@@ -200,22 +203,50 @@ async createContactDetails(
 
   let fileUrl: any = null;
 
+ await this.cityService.requireActiveCity(
+  createContactDetailsDto.businessCityId,
+);
+
+await this.cityService.requireActiveCities(
+  createContactDetailsDto.serviceLocationCityIds,
+);
+
+const {
+  businessCityId,
+  serviceLocationCityIds,
+  officialAddress,
+  ...contactDetailsData
+} = createContactDetailsDto;
+
   if (file) {
     fileUrl =
       await this.fileUploadService.uploadFile(file);
   }
 
   user.contactDetails = {
-    ...createContactDetailsDto,
-    brandLogo:
-      fileUrl?.Location ||
-      user.contactDetails?.brandLogo ||
-      '',
-  };
+  ...contactDetailsData,
+  officialAddress,
+  brandLogo:
+    fileUrl?.Location ||
+    user.contactDetails?.brandLogo ||
+    '',
+};
 
-  user.markModified('contactDetails');
+user.businessCityId = new Types.ObjectId(
+  businessCityId,
+);
 
-  return await user.save();
+user.serviceLocationCityIds =
+  serviceLocationCityIds.map(
+    (cityId) => new Types.ObjectId(cityId),
+  );
+
+user.businessAddress =
+  officialAddress?.trim() || '';
+
+user.markModified('contactDetails');
+
+return await user.save();
 }
 
 
@@ -238,6 +269,20 @@ async updateContactDetails(
       'Only Vendor accounts can update vendor contact details.',
     );
   }
+  await this.cityService.requireActiveCity(
+  dto.businessCityId,
+);
+
+await this.cityService.requireActiveCities(
+  dto.serviceLocationCityIds,
+);
+
+const {
+  businessCityId,
+  serviceLocationCityIds,
+  officialAddress,
+  ...contactDetailsData
+} = dto;
 
   let logo =
     user.contactDetails?.brandLogo || '';
@@ -251,16 +296,29 @@ async updateContactDetails(
   }
 
   user.contactDetails = {
-    ...(
-      (user.contactDetails as any)
-        ?.toObject?.() ??
-      user.contactDetails
-    ),
-    ...dto,
-    brandLogo: logo,
-  };
+  ...(
+    (user.contactDetails as any)
+      ?.toObject?.() ??
+    user.contactDetails
+  ),
+  ...contactDetailsData,
+  officialAddress,
+  brandLogo: logo,
+};
+ 
+user.businessCityId = new Types.ObjectId(
+  businessCityId,
+);
 
-  user.markModified('contactDetails');
+user.serviceLocationCityIds =
+  serviceLocationCityIds.map(
+    (cityId) => new Types.ObjectId(cityId),
+  );
+
+user.businessAddress =
+  officialAddress?.trim() || '';
+
+user.markModified('contactDetails');
 
   /**
    * If vendor was rejected or profile was incomplete,
@@ -602,6 +660,90 @@ user.vendorApprovalStatus =
 
   return user.save();
 }
+private validatePackageBookingConfiguration(pkg: {
+  bookingType?: PackageBookingType;
+  requiredServiceDurationMinutes?: number;
+  serviceWindowStartOffsetMinutes?: number;
+  serviceWindowEndOffsetMinutes?: number;
+}): void {
+  // Backward compatibility:
+  // Old packages may not have bookingType.
+  if (!pkg.bookingType) {
+    return;
+  }
+
+  const hasValidRequiredDuration =
+    typeof pkg.requiredServiceDurationMinutes === 'number' &&
+    Number.isFinite(pkg.requiredServiceDurationMinutes) &&
+    pkg.requiredServiceDurationMinutes > 0;
+
+  const hasValidStartOffset =
+    typeof pkg.serviceWindowStartOffsetMinutes === 'number' &&
+    Number.isFinite(pkg.serviceWindowStartOffsetMinutes);
+
+  const hasValidEndOffset =
+    typeof pkg.serviceWindowEndOffsetMinutes === 'number' &&
+    Number.isFinite(pkg.serviceWindowEndOffsetMinutes);
+
+  const hasValidWindow =
+    hasValidStartOffset &&
+    hasValidEndOffset &&
+    pkg.serviceWindowStartOffsetMinutes! <=
+      pkg.serviceWindowEndOffsetMinutes!;
+
+  switch (pkg.bookingType) {
+    case PackageBookingType.DURATION_BASED:
+      // Existing duration/pricing validation remains unchanged.
+      return;
+
+    case PackageBookingType.TIME_SLOT_BASED:
+      if (!hasValidRequiredDuration) {
+        throw new BadRequestException(
+          'TIME_SLOT_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
+        );
+      }
+      return;
+
+    case PackageBookingType.DELIVERY_BASED:
+      if (!hasValidRequiredDuration) {
+        throw new BadRequestException(
+          'DELIVERY_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
+        );
+      }
+
+      if (!hasValidWindow) {
+        throw new BadRequestException(
+          'DELIVERY_BASED packages require a valid service window where start offset is less than or equal to end offset.',
+        );
+      }
+      return;
+
+    case PackageBookingType.SETUP_BASED:
+      if (!hasValidRequiredDuration) {
+        throw new BadRequestException(
+          'SETUP_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
+        );
+      }
+
+      if (!hasValidWindow) {
+        throw new BadRequestException(
+          'SETUP_BASED packages require a valid service window where start offset is less than or equal to end offset.',
+        );
+      }
+      return;
+
+    case PackageBookingType.CUSTOM:
+      if (!hasValidWindow) {
+        throw new BadRequestException(
+          'CUSTOM packages require a valid service window where start offset is less than or equal to end offset.',
+        );
+      }
+      return;
+
+    default:
+      throw new BadRequestException('Invalid package booking type.');
+  }
+}
 async addPackages(
     userId: string,
     createPackagesDto: CreatePackagesDto,
@@ -628,6 +770,10 @@ async addPackages(
         throw new BadRequestException(
             `Package limit reached. Your current subscription allows up to ${maxPackages} packages.`,
         );
+    }
+
+        for (const pkg of createPackagesDto.packages) {
+      this.validatePackageBookingConfiguration(pkg);
     }
 
     // Normalize new packages so they always match the Package schema
@@ -698,10 +844,37 @@ async getVendorApprovalStatus(userId: string) {
 }
 
     async getContactDetails(userId: string) {
-        const user = await this.userModel.findById(userId).select('contactDetails');
-        if (!user) throw new NotFoundException('User not found');
-        return user.contactDetails;
-    }
+  const user = await this.userModel
+    .findById(userId)
+    .select(
+      'contactDetails businessCityId businessAddress serviceLocationCityIds',
+    )
+    .exec();
+
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  const contactDetails =
+    (user.contactDetails as any)?.toObject?.() ??
+    user.contactDetails ??
+    {};
+
+  return {
+    ...contactDetails,
+
+    businessCityId:
+      user.businessCityId?.toString() ?? null,
+
+    businessAddress:
+      user.businessAddress ?? '',
+
+    serviceLocationCityIds:
+      (user.serviceLocationCityIds ?? []).map(
+        (cityId) => cityId.toString(),
+      ),
+  };
+}
 
     async getBusinessDetails(userId: string) {
         const user = await this.userModel.findById(userId).select(
@@ -1120,6 +1293,28 @@ async updatePackage(
         throw new NotFoundException('Package not found');
     }
 
+        const mergedBookingConfiguration = {
+      bookingType:
+        updateDto.bookingType ??
+        existingPackage.bookingType,
+
+      requiredServiceDurationMinutes:
+        updateDto.requiredServiceDurationMinutes ??
+        existingPackage.requiredServiceDurationMinutes,
+
+      serviceWindowStartOffsetMinutes:
+        updateDto.serviceWindowStartOffsetMinutes ??
+        existingPackage.serviceWindowStartOffsetMinutes,
+
+      serviceWindowEndOffsetMinutes:
+        updateDto.serviceWindowEndOffsetMinutes ??
+        existingPackage.serviceWindowEndOffsetMinutes,
+    };
+
+    this.validatePackageBookingConfiguration(
+      mergedBookingConfiguration,
+    );
+    
     // Prevent image-upload bypass through PATCH.
     // Existing/smaller image lists are allowed.
     // Any image increase must use the dedicated upload endpoint.

@@ -10,9 +10,12 @@ export interface ContactDetails {
     facebookLink?: string;
     bookingEmail: string;
     website?: string;
-    city: string;
+    // Legacy business city text.
+// Keep temporarily until existing vendor data is migrated.
+    city?: string;
     officialAddress?: string;
     officialGoogleLink?: string;
+
 }
 
 export const ContactDetailsSchema = new Schema<ContactDetails>({
@@ -24,7 +27,7 @@ export const ContactDetailsSchema = new Schema<ContactDetails>({
     facebookLink: { type: String },
     bookingEmail: { type: String, required: true },
     website: { type: String },
-    city: { type: String, required: true },
+    city: { type: String, required: false },
     officialAddress: { type: String },
     officialGoogleLink: { type: String },
 });

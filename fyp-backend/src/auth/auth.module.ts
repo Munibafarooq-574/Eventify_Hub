@@ -19,6 +19,8 @@ import {
   NotificationSchema,
 } from '../schemas/notification.schema';
 
+import { CityModule } from '../city/city.module';
+
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
@@ -33,7 +35,7 @@ import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
   imports: [
     PassportModule,
     VendorGrowthModule,
-
+    CityModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

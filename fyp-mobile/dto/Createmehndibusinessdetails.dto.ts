@@ -1,9 +1,9 @@
-// fyp-mobile/dto/CreateMehndiBusinessDetails.dto.ts
+﻿// fyp-mobile/dto/CreateMehndiBusinessDetails.dto.ts
 
 export interface CreateMehndiBusinessDetailsDto {
     mehndiType: string[]; // e.g. ['BRIDAL', 'PARTY', 'ARABIC', 'GLITTER']
     travelsToClientHome: boolean;
-    cityCovered: string;
+    cityCovered?: string;
     staffGender: string[]; // e.g. ['MALE', 'FEMALE', 'TRANSGENDER']
     minimumPrice?: number;
     description: string;

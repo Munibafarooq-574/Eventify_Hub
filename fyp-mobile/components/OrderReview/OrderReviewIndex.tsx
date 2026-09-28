@@ -138,24 +138,35 @@ const OrderReviewScreen = () => {
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
 
       const services = cartData.vendors.flatMap((vendor: any) =>
-        vendor.packages.map((pkg: any) => ({
-          vendorId: vendor.vendor._id,
-          serviceName: pkg.packageName,
-          price: pkg.price,
-        })),
-      );
+      vendor.packages.map((pkg: any) => ({
+        vendorId: vendor.vendor._id,
+        serviceName: pkg.packageName,
+        price: pkg.price,
+        packageId: pkg.packageId,
+      })),
+    );
 
       setPlacingOrder(true);
 
-      const response = await postPlaceOrder({
-        organizerId: user._id,
-        eventDate: eventDetails?.eventDate,
-        eventTime: eventDetails?.eventTime || '18:00',
-        services,
-        guests: eventDetails?.guests,
-        eventName: eventDetails?.eventName,
-        eventType: eventDetails?.eventType,
-      });
+    const response = await postPlaceOrder({
+      organizerId: user._id,
+
+      eventDate: eventDetails?.eventDate,
+      eventTime: eventDetails?.eventTime || '18:00',
+
+      durationMinutes: Number(
+        eventDetails?.durationMinutes || 60,
+      ),
+
+      eventCityId: eventDetails?.eventCityId,
+      eventAddress: eventDetails?.eventAddress,
+
+      services,
+
+      guests: eventDetails?.guests,
+      eventName: eventDetails?.eventName,
+      eventType: eventDetails?.eventType,
+    });
 
       if (response) {
         Toast.show({

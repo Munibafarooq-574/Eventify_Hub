@@ -1,4 +1,4 @@
-// fyp-mobile/components/bdgeneric/BDGenericIndex.tsx
+﻿// fyp-mobile/components/bdgeneric/BDGenericIndex.tsx
 import { CreateGenericBusinessDetailsDto } from "@/dto/CreateGenericBusinessDetails.dto";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
@@ -117,9 +117,6 @@ const BDGenericIndex = () => {
     const [teamGenders, setTeamGenders] = useState<string[]>([]);
     const [yearsExperience, setYearsExperience] = useState("");
 
-    const [cityCovered, setCityCovered] =
-        useState("");
-
     const [minimumPrice, setMinimumPrice] =
         useState("");
 
@@ -195,10 +192,6 @@ const BDGenericIndex = () => {
                         data.description || ""
                     );
 
-                    setCityCovered(
-                        data.cityCovered || ""
-                    );
-
                     setMinimumPrice(
                         data.minimumPrice
                             ?.toString() || ""
@@ -249,7 +242,6 @@ const BDGenericIndex = () => {
             teamGenders.length === 0 ||
             !yearsExperience.trim() ||
             !description.trim() ||
-            !cityCovered.trim() ||
             !minimumPrice ||
             travelsToClientHome === null ||
             !downPaymentType ||
@@ -266,7 +258,7 @@ const BDGenericIndex = () => {
 
         const parsedYearsExperience = Number(yearsExperience);
         if (!Number.isInteger(parsedYearsExperience) || parsedYearsExperience < 0 || parsedYearsExperience > 100) {
-            Alert.alert("Invalid Experience", "Enter experience in whole years (0–100).");
+            Alert.alert("Invalid Experience", "Enter experience in whole years (0â€“100).");
             return;
         }
 
@@ -344,9 +336,6 @@ const BDGenericIndex = () => {
                 {
                     description:
                         description.trim(),
-
-                    cityCovered:
-                        cityCovered.trim(),
 
                     minimumPrice:
                         parsedMinimumPrice,
@@ -609,25 +598,6 @@ router.replace("/vendorprofilepending");
                 </Text>
             </View>
 
-            {/* City */}
-
-            <View style={styles.card}>
-                <SectionTitle
-                    icon="map-marker-alt"
-                    title="City Covered"
-                    required
-                />
-
-                <TextInput
-                    style={styles.input}
-                    placeholder="Example: Lahore"
-                    placeholderTextColor="#B99DAF"
-                    value={cityCovered}
-                    onChangeText={
-                        setCityCovered
-                    }
-                />
-            </View>
 
             {/* Travel */}
 

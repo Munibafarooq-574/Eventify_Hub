@@ -15,6 +15,21 @@ export interface PackageDto {
 
   services: string;
 
+    // Determines how this package uses vendor availability
+  bookingType?:
+    | "DURATION_BASED"
+    | "TIME_SLOT_BASED"
+    | "DELIVERY_BASED"
+    | "SETUP_BASED"
+    | "CUSTOM";
+
+  // Required vendor service time where applicable
+  requiredServiceDurationMinutes?: number;
+
+  // Service window relative to event start
+  serviceWindowStartOffsetMinutes?: number;
+  serviceWindowEndOffsetMinutes?: number;
+
   // Fixed duration options
   durations?: PackageDurationOptionDto[];
 

@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -30,10 +31,35 @@ export class CampaignController {
   // =========================================================
 
   @Get('public/active')
-  async getActiveSponsoredCampaigns() {
-    return this.campaignService
-      .getActiveSponsoredCampaigns();
-  }
+async getActiveSponsoredCampaigns(
+  @Query('eventCityId')
+  eventCityId?: string,
+
+  @Query('categoryIds')
+  categoryIds?: string,
+
+  @Query('page')
+  page = '1',
+
+  @Query('limit')
+  limit = '4',
+
+  @Query('viewAll')
+  viewAll = 'false',
+) {
+  return this.campaignService.getActiveSponsoredCampaigns({
+    eventCityId,
+    categoryIds: categoryIds
+      ? categoryIds
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      : [],
+    page: Number(page),
+    limit: Number(limit),
+    viewAll: viewAll === 'true',
+  });
+}
 
     // =========================================================
   // Phase 14A.10 — Sponsored Campaign Analytics

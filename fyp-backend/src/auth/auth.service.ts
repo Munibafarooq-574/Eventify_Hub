@@ -24,7 +24,7 @@ import { SearchVendorsDto } from './dto/search-vendors.dto';
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { SubscriptionService } from '../vendor/growth/subscription/subscription.service';
-
+import { CityService } from '../city/city.service';
 /**
  * =============================================================
  * PUBLIC VENDOR PROJECTION
@@ -56,7 +56,9 @@ const PUBLIC_VENDOR_SELECT = [
   'businessDetailsType',
 
   'contactDetails',
-
+  'businessCityId',
+'businessAddress',
+'serviceLocationCityIds',
   'coverImage',
   'images',
   'packages',
@@ -98,6 +100,7 @@ export class AuthService {
     private fileUploadService: FileUploadService,
 
 private readonly subscriptionService: SubscriptionService,
+private readonly cityService: CityService,
 ) {}
 
   // =========================================================
@@ -724,6 +727,12 @@ async searchUsers(
             PUBLIC_VENDOR_SELECT,
           )
 
+          .populate({
+          path: 'businessCityId',
+          select:
+            'name stateProvinceCode stateProvinceName countryCode countryName',
+        })
+
           .lean();
 
       const visibleVendors =
@@ -770,105 +779,21 @@ return visibleVendors.map(
     }
 
     // =====================================================
-    // CITY
-    // =====================================================
+// EVENT CITY / SERVICE COVERAGE
+// =====================================================
 
-    if (filters.city) {
-      query['$or'] = [
-        ...(
-          query['$or'] ||
-          []
-        ),
+if (filters.eventCityId) {
+  // Validate that the supplied ID exists and points to
+  // an active canonical City.
+  await this.cityService.requireActiveCity(
+    filters.eventCityId,
+  );
 
-        {
-          'photographerBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'salonBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'cateringBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'venueBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'cakeBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'mehndiBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'soundBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-
-        {
-          'genericBusinessDetails.cityCovered':
-            {
-              $regex:
-                filters.city,
-
-              $options:
-                'i',
-            },
-        },
-      ];
-    }
+  // Vendor is discoverable for the event only when
+  // that city exists in the vendor's service coverage.
+  query['serviceLocationCityIds'] =
+    new Types.ObjectId(filters.eventCityId);
+}
 
     // =====================================================
     // STAFF
@@ -949,10 +874,15 @@ return visibleVendors.map(
     let filteredUsers =
       users;
 
-    if (
-      typeof filters.minRating ===
-      'number'
-    ) {
+    const minRating =
+  filters.minRating !== undefined
+    ? Number(filters.minRating)
+    : undefined;
+
+if (
+  minRating !== undefined &&
+  Number.isFinite(minRating)
+) {
       const vendorIds =
         users.map(
           (user) =>
@@ -1004,8 +934,7 @@ return visibleVendors.map(
               ) ?? 0;
 
             return (
-              avg >=
-              filters.minRating!
+              avg >= minRating
             );
           },
         );
@@ -1032,36 +961,117 @@ return visibleVendors.map(
 private async filterVendorsWithActiveSubscription(
   vendors: any[],
 ): Promise<any[]> {
-  const accessResults =
-    await Promise.all(
-      vendors.map(
-        async (vendor) => {
-          const access =
-            await this.subscriptionService.getSubscriptionAccessState(
-              vendor._id.toString(),
-            );
+  const accessResults = await Promise.all(
+    vendors.map(async (vendor, originalIndex) => {
+      const access =
+        await this.subscriptionService.getSubscriptionAccessState(
+          vendor._id.toString(),
+        );
 
-          return {
-            vendor,
-            visible:
-              access.accessAllowed ===
-              true,
-          };
-        },
-      ),
-    );
+      const effectivePlan = String(
+        access.effectivePlan ?? 'basic',
+      ).toLowerCase();
+
+      const hasPriorityVisibility =
+        access.features?.priorityVisibility === true;
+
+      return {
+        vendor,
+        originalIndex,
+        visible: access.accessAllowed === true,
+        effectivePlan,
+        isPaidPlan: access.isPaidPlan === true,
+        hasPriorityVisibility,
+      };
+    }),
+  );
 
   return accessResults
-    .filter(
-      ({ visible }) =>
-        visible,
-    )
+    // -------------------------------------------------------
+    // 1. MANDATORY ELIGIBILITY
+    // -------------------------------------------------------
+    // Expired/ineligible vendors are excluded.
+    // Category/city and other search filters have already
+    // been applied before this method is called.
+    .filter(({ visible }) => visible)
+
+    // -------------------------------------------------------
+    // 2. ORGANIC RELEVANCE
+    // -------------------------------------------------------
+    // Preserve the ordering produced by the existing
+    // discovery/search pipeline.
+    //
+    // Subscription must not replace organic relevance.
+    // -------------------------------------------------------
+
+    // -------------------------------------------------------
+    // 3. SUBSCRIPTION ENTITLEMENT / LIMITED WEIGHTING
+    // -------------------------------------------------------
+    .sort((a, b) => {
+  /*
+   * LIMITED SUBSCRIPTION WEIGHTING
+   *
+   * Preserve the existing organic/discovery order.
+   * PRIORITY_VISIBILITY may only break a local tie between
+   * adjacent organic results; it must not move every paid
+   * vendor ahead of every Basic vendor.
+   *
+   * Growth and Premium both use the same entitlement, so
+   * Premium does not automatically outrank Growth.
+   */
+  const organicDistance = Math.abs(
+    a.originalIndex - b.originalIndex,
+  );
+
+  if (
+    organicDistance <= 1 &&
+    a.hasPriorityVisibility !==
+      b.hasPriorityVisibility
+  ) {
+    return Number(b.hasPriorityVisibility) -
+      Number(a.hasPriorityVisibility);
+  }
+
+  return a.originalIndex - b.originalIndex;
+})
+
+    // -------------------------------------------------------
+    // 4. FINAL MARKETPLACE RESULT
+    // -------------------------------------------------------
     .map(
-      ({ vendor }) =>
+      ({
         vendor,
+        effectivePlan,
+        isPaidPlan,
+        hasPriorityVisibility,
+      }) => ({
+        ...vendor,
+
+        marketplaceSubscription: {
+          effectivePlan,
+
+          // Trial uses Basic entitlements but must not display
+          // a paid subscription badge.
+          subscriptionBadge:
+            isPaidPlan && effectivePlan === 'growth'
+              ? 'Growth'
+              : isPaidPlan && effectivePlan === 'premium'
+                ? 'Premium'
+                : null,
+
+          isGrowth:
+            isPaidPlan &&
+            effectivePlan === 'growth',
+
+          isPremium:
+            isPaidPlan &&
+            effectivePlan === 'premium',
+
+          hasPriorityVisibility,
+        },
+      }),
     );
 }
-
   // =========================================================
   // UNIFIED BUSINESS DETAILS
   // =========================================================

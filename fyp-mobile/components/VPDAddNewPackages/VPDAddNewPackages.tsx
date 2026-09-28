@@ -1,4 +1,3 @@
-
 // fyp-mobile/components/VPDAddNewPackages/VPDAddNewPackages.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,6 +18,13 @@ import {
 } from "@/store";
 
 type DurationUnit = "HOURS" | "DAYS";
+
+type BookingType =
+  | "DURATION_BASED"
+  | "TIME_SLOT_BASED"
+  | "DELIVERY_BASED"
+  | "SETUP_BASED"
+  | "CUSTOM";
 
 interface PackageDuration {
   value: number;
@@ -53,6 +59,199 @@ const EMPTY_DURATION: PackageDuration = {
   price: 0,
 };
 
+const bookingTypeOptions: {
+  label: string;
+  value: BookingType;
+}[] = [
+  { label: "Duration Based", value: "DURATION_BASED" },
+  { label: "Time Slot Based", value: "TIME_SLOT_BASED" },
+  { label: "Delivery Based", value: "DELIVERY_BASED" },
+  { label: "Setup Based", value: "SETUP_BASED" },
+  { label: "Custom", value: "CUSTOM" },
+];
+
+// ===========================================================
+// Friendly time helpers
+// ---------------------------------------------------------
+// The backend stores everything as plain numbers of minutes
+// (a signed "offset" relative to the event start time, and a
+// plain "required duration"). Typing raw minutes like "-120"
+// is confusing for a vendor, so the UI below lets them pick a
+// number + a unit (Hours/Days) + Before/After the event, and
+// these helpers convert that back and forth to minutes.
+// ===========================================================
+
+type OffsetUnit = "HOURS" | "DAYS";
+type OffsetDirection = "BEFORE" | "AFTER";
+type DurationInputUnit = "MINUTES" | "HOURS";
+
+interface FriendlyOffset {
+  value: string;
+  unit: OffsetUnit;
+  direction: OffsetDirection;
+}
+
+interface FriendlyDuration {
+  value: string;
+  unit: DurationInputUnit;
+}
+
+const EMPTY_OFFSET: FriendlyOffset = {
+  value: "",
+  unit: "HOURS",
+  direction: "BEFORE",
+};
+
+const EMPTY_DURATION_INPUT: FriendlyDuration = {
+  value: "",
+  unit: "MINUTES",
+};
+
+// number typed by vendor + unit + before/after -> signed minutes for the backend
+function offsetToMinutes(
+  offset: FriendlyOffset,
+): number | undefined {
+  const numeric = Number(offset.value);
+
+  if (
+    offset.value.trim().length === 0 ||
+    !Number.isFinite(numeric)
+  ) {
+    return undefined;
+  }
+
+  const magnitudeMinutes =
+    offset.unit === "DAYS"
+      ? numeric * 24 * 60
+      : numeric * 60;
+
+  return offset.direction === "BEFORE"
+    ? -magnitudeMinutes
+    : magnitudeMinutes;
+}
+
+// signed minutes coming from the backend/DB -> friendly value+unit+direction for the UI
+function minutesToOffset(
+  minutes: number | undefined | null,
+): FriendlyOffset {
+  if (
+    minutes === undefined ||
+    minutes === null ||
+    !Number.isFinite(minutes)
+  ) {
+    return { ...EMPTY_OFFSET };
+  }
+
+  const direction: OffsetDirection =
+    minutes < 0 ? "BEFORE" : "AFTER";
+
+  const abs = Math.abs(minutes);
+
+  if (abs !== 0 && abs % (24 * 60) === 0) {
+    return {
+      value: String(abs / (24 * 60)),
+      unit: "DAYS",
+      direction,
+    };
+  }
+
+  const hours = abs / 60;
+
+  return {
+    value: Number.isInteger(hours)
+      ? String(hours)
+      : hours.toFixed(1),
+    unit: "HOURS",
+    direction,
+  };
+}
+
+// number typed by vendor + unit -> plain minutes for the backend
+function durationInputToMinutes(
+  duration: FriendlyDuration,
+): number | undefined {
+  const numeric = Number(duration.value);
+
+  if (
+    duration.value.trim().length === 0 ||
+    !Number.isFinite(numeric)
+  ) {
+    return undefined;
+  }
+
+  return duration.unit === "HOURS"
+    ? numeric * 60
+    : numeric;
+}
+
+// plain minutes from the backend/DB -> friendly value+unit for the UI
+function minutesToDurationInput(
+  minutes: number | undefined | null,
+): FriendlyDuration {
+  if (
+    minutes === undefined ||
+    minutes === null ||
+    !Number.isFinite(minutes)
+  ) {
+    return { ...EMPTY_DURATION_INPUT };
+  }
+
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return {
+      value: String(minutes / 60),
+      unit: "HOURS",
+    };
+  }
+
+  return {
+    value: String(minutes),
+    unit: "MINUTES",
+  };
+}
+
+// friendly, human display strings used in the live Preview card
+function formatDurationDisplay(
+  minutes: number | undefined,
+): string {
+  if (minutes === undefined || !Number.isFinite(minutes)) {
+    return "—";
+  }
+
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+function formatOffsetDisplay(
+  minutes: number | undefined,
+): string {
+  if (minutes === undefined || !Number.isFinite(minutes)) {
+    return "—";
+  }
+
+  if (minutes === 0) {
+    return "Right when the event starts";
+  }
+
+  const direction = minutes < 0 ? "before" : "after";
+  const abs = Math.abs(minutes);
+
+  if (abs % (24 * 60) === 0) {
+    const days = abs / (24 * 60);
+    return `${days} day${days === 1 ? "" : "s"} ${direction} the event`;
+  }
+
+  if (abs % 60 === 0) {
+    const hours = abs / 60;
+    return `${hours} hour${hours === 1 ? "" : "s"} ${direction} the event`;
+  }
+
+  return `${abs} minute${abs === 1 ? "" : "s"} ${direction} the event`;
+}
+
 export default function VendorPackagesScreen() {
   const { packageId } = useLocalSearchParams<{
     packageId?: string;
@@ -66,6 +265,44 @@ export default function VendorPackagesScreen() {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [services, setServices] = useState("");
+
+  const [bookingType, setBookingType] =
+  useState<BookingType>("DURATION_BASED");
+
+// Friendly (vendor-facing) state — never raw signed minutes.
+// "How long does the task take" (delivery drop-off, setup, a time slot)
+const [serviceDuration, setServiceDuration] =
+  useState<FriendlyDuration>({ ...EMPTY_DURATION_INPUT });
+
+// "How early can it happen, relative to the event" (e.g. "2 hours before")
+const [windowStart, setWindowStart] = useState<FriendlyOffset>({
+  ...EMPTY_OFFSET,
+  direction: "BEFORE",
+});
+
+// "How late can it happen, relative to the event" (e.g. "at event start")
+const [windowEnd, setWindowEnd] = useState<FriendlyOffset>({
+  ...EMPTY_OFFSET,
+  direction: "AFTER",
+});
+
+// Derived plain-minute values — this is what actually gets sent to
+// the backend and used in validation. Nothing above the vendor's
+// eyes ever shows these raw numbers.
+const requiredServiceDurationMinutesValue = useMemo(
+  () => durationInputToMinutes(serviceDuration),
+  [serviceDuration],
+);
+
+const serviceWindowStartOffsetMinutesValue = useMemo(
+  () => offsetToMinutes(windowStart),
+  [windowStart],
+);
+
+const serviceWindowEndOffsetMinutesValue = useMemo(
+  () => offsetToMinutes(windowEnd),
+  [windowEnd],
+);
 
   const [durations, setDurations] = useState<
     PackageDuration[]
@@ -138,28 +375,7 @@ const [currentPackageCount, setCurrentPackageCount] = useState(0);
       // READ VENDOR FROM EITHER STORAGE
       // =====================================================
 
-      let userData: any = null;
-
-      try {
-        const userRaw =
-          await getSecureData("user");
-
-        if (userRaw) {
-          userData =
-            JSON.parse(userRaw);
-        }
-      } catch (secureError) {
-        console.warn(
-          "[ADD PACKAGE] SecureStore user unavailable:",
-          secureError,
-        );
-      }
-
-      // Current app login commonly stores user here.
-      if (!userData) {
-        userData =
-          await getUserData();
-      }
+      const userData = await getUserData();
 
       if (!userData?._id) {
         throw new Error(
@@ -335,6 +551,27 @@ const existingPackage =
           existingPackage.services || "",
         );
 
+         setBookingType(
+          existingPackage.bookingType || "DURATION_BASED",
+        );
+
+        setServiceDuration(
+          minutesToDurationInput(
+            existingPackage.requiredServiceDurationMinutes,
+          ),
+        );
+
+        setWindowStart(
+          minutesToOffset(
+            existingPackage.serviceWindowStartOffsetMinutes,
+          ),
+        );
+
+        setWindowEnd(
+          minutesToOffset(
+            existingPackage.serviceWindowEndOffsetMinutes,
+          ),
+        );
         setDurations(
           Array.isArray(existingPackage.durations)
             ? existingPackage.durations.map(
@@ -594,17 +831,21 @@ const removeImageAsset = (index: number) => {
   // ---------------------------------------------------------
 
   const isFormValid = useMemo(() => {
-    const hasName =
-      packageName.trim().length > 0;
+  const hasName =
+    packageName.trim().length > 0;
 
-    const numericPrice =
-      Number(price);
+  const numericPrice = Number(price);
 
-    const hasPrice =
-      price.trim().length > 0 &&
-      Number.isFinite(numericPrice) &&
-      numericPrice >= 0;
+  const hasPrice =
+    price.trim().length > 0 &&
+    Number.isFinite(numericPrice) &&
+    numericPrice >= 0;
 
+  if (!hasName || !hasPrice) {
+    return false;
+  }
+
+  if (bookingType === "DURATION_BASED") {
     const validDurations = durations.every(
       (duration) =>
         Number(duration.value) > 0 &&
@@ -616,20 +857,44 @@ const removeImageAsset = (index: number) => {
         Number(customDurationRate) >= 0
       : true;
 
-    return (
-      hasName &&
-      hasPrice &&
-      validDurations &&
-      customValid
-    );
-  }, [
-    packageName,
-    price,
-    durations,
-    allowCustomDuration,
-    customDurationRate,
-  ]);
+    return validDurations && customValid;
+  }
 
+  if (bookingType === "TIME_SLOT_BASED") {
+    return (
+      requiredServiceDurationMinutesValue !== undefined &&
+      requiredServiceDurationMinutesValue > 0
+    );
+  }
+
+  const startOffset = serviceWindowStartOffsetMinutesValue;
+  const endOffset = serviceWindowEndOffsetMinutesValue;
+
+  const validWindow =
+    startOffset !== undefined &&
+    endOffset !== undefined &&
+    startOffset <= endOffset;
+
+  if (bookingType === "CUSTOM") {
+    return validWindow;
+  }
+
+  const validRequiredDuration =
+    requiredServiceDurationMinutesValue !== undefined &&
+    requiredServiceDurationMinutesValue > 0;
+
+  return validRequiredDuration && validWindow;
+}, [
+  packageName,
+  price,
+  bookingType,
+  durations,
+  allowCustomDuration,
+  customDurationRate,
+  requiredServiceDurationMinutesValue,
+  serviceWindowStartOffsetMinutesValue,
+  serviceWindowEndOffsetMinutesValue,
+]);
     // ---------------------------------------------------------
   // Upload images with 1 automatic retry on transient server errors
   // ---------------------------------------------------------
@@ -664,8 +929,7 @@ const removeImageAsset = (index: number) => {
   if (!isFormValid) {
     Alert.alert(
       "Incomplete Form",
-      "Please enter package name, valid price, and correct duration details."
-    );
+   "Please complete the required package and booking configuration."    );
     return;
   }
 
@@ -720,24 +984,7 @@ if (
   setLoading(true);
 
   try {
-    let storedUser: any = null;
-
-const secureUser =
-  await getSecureData("user");
-
-if (secureUser) {
-  try {
-    storedUser =
-      JSON.parse(secureUser);
-  } catch {
-    storedUser = null;
-  }
-}
-
-if (!storedUser) {
-  storedUser =
-    await getUserData();
-}
+   const storedUser = await getUserData();
 
 const userId: string | undefined =
   storedUser?._id;
@@ -758,28 +1005,58 @@ if (!userId) {
       }));
 
     const payload = {
-      packageName: packageName.trim(),
+  packageName: packageName.trim(),
 
-      price: Number(price),
+  price: Number(price),
 
-      description: description.trim(),
+  description: description.trim(),
 
-      services: services.trim(),
+  services: services.trim(),
 
-      durations: cleanedDurations,
+  bookingType,
 
-      allowCustomDuration,
+  requiredServiceDurationMinutes:
+    bookingType !== "DURATION_BASED" &&
+    bookingType !== "CUSTOM"
+      ? requiredServiceDurationMinutesValue
+      : undefined,
 
-      customDurationUnit:
-        allowCustomDuration
-          ? customDurationUnit
-          : undefined,
+  serviceWindowStartOffsetMinutes:
+    bookingType === "DELIVERY_BASED" ||
+    bookingType === "SETUP_BASED" ||
+    bookingType === "CUSTOM"
+      ? serviceWindowStartOffsetMinutesValue
+      : undefined,
 
-      customDurationRate:
-        allowCustomDuration
-          ? Number(customDurationRate)
-          : undefined,
-    };
+  serviceWindowEndOffsetMinutes:
+    bookingType === "DELIVERY_BASED" ||
+    bookingType === "SETUP_BASED" ||
+    bookingType === "CUSTOM"
+      ? serviceWindowEndOffsetMinutesValue
+      : undefined,
+
+  durations:
+    bookingType === "DURATION_BASED"
+      ? cleanedDurations
+      : [],
+
+  allowCustomDuration:
+    bookingType === "DURATION_BASED"
+      ? allowCustomDuration
+      : false,
+
+  customDurationUnit:
+    bookingType === "DURATION_BASED" &&
+    allowCustomDuration
+      ? customDurationUnit
+      : undefined,
+
+  customDurationRate:
+    bookingType === "DURATION_BASED" &&
+    allowCustomDuration
+      ? Number(customDurationRate)
+      : undefined,
+};
 
     // =====================================================
     // EDIT PACKAGE
@@ -1127,13 +1404,70 @@ if (!userId) {
           </View>
         </View>
 
+{/* Booking Type */}
+
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>
+    Booking Type
+  </Text>
+
+  <Text style={styles.sectionSubtitle}>
+    Select how this package uses vendor availability.
+  </Text>
+
+  <View style={{ marginTop: 14, gap: 10 }}>
+    {bookingTypeOptions.map((option) => {
+      const selected =
+        bookingType === option.value;
+
+      return (
+        <TouchableOpacity
+          key={option.value}
+          onPress={() =>
+            setBookingType(option.value)
+          }
+          activeOpacity={0.8}
+          style={{
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: selected
+              ? "#7B2869"
+              : "#E5D8E2",
+            backgroundColor: selected
+              ? "#F5EAF2"
+              : "#FFFFFF",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: selected
+                ? "700"
+                : "500",
+              color: selected
+                ? "#7B2869"
+                : "#333333",
+            }}
+          >
+            {option.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+</View>
+
         {/* -------------------------------------------------
             Fixed Duration Options
         ------------------------------------------------- */}
-
+         {bookingType === "DURATION_BASED" && (
+  <>
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderTextWrap}>
+              
               <Text
                 style={styles.sectionTitle}
               >
@@ -1387,7 +1721,7 @@ if (!userId) {
                 </View>
               ),
             )
-          )}
+                    )}
         </View>
 
         {/* -------------------------------------------------
@@ -1554,7 +1888,312 @@ if (!userId) {
             </View>
           )}
         </View>
+  </>
+)}
 
+{/* -------------------------------------------------
+    Non-Duration Booking Configuration
+------------------------------------------------- */}
+
+{bookingType !== "DURATION_BASED" && (
+  <View style={styles.card}>
+    <Text style={styles.sectionTitle}>
+      {bookingType === "TIME_SLOT_BASED"
+        ? "How long does this take?"
+        : bookingType === "DELIVERY_BASED"
+        ? "Delivery Details"
+        : bookingType === "SETUP_BASED"
+        ? "Setup Details"
+        : "Custom Service Window"}
+    </Text>
+
+    <Text style={styles.sectionSubtitle}>
+      {bookingType === "TIME_SLOT_BASED"
+        ? "This is how much of your time a single booking takes — e.g. a makeup session or a transport trip."
+        : bookingType === "DELIVERY_BASED"
+        ? "Tell us how long it takes you to deliver, and the earliest / latest you can deliver relative to the event."
+        : bookingType === "SETUP_BASED"
+        ? "Tell us how long setup takes, and the earliest / latest you can be there relative to the event."
+        : "Use this only if your service doesn't fit the other booking types. Optionally set how long the task takes, and the earliest / latest it can happen relative to the event."}
+    </Text>
+
+    {/* --------------------------------------------------
+        How long does it take (duration)
+    -------------------------------------------------- */}
+
+    {(bookingType === "TIME_SLOT_BASED" ||
+      bookingType === "DELIVERY_BASED" ||
+      bookingType === "SETUP_BASED" ||
+      bookingType === "CUSTOM") && (
+      <View style={{ marginTop: 18 }}>
+        <Text style={styles.smallLabel}>
+          {bookingType === "TIME_SLOT_BASED"
+            ? "Time needed per booking"
+            : bookingType === "DELIVERY_BASED"
+            ? "Time needed to deliver"
+            : bookingType === "SETUP_BASED"
+            ? "Time needed to set up"
+            : "Time needed (optional)"}
+        </Text>
+
+        <View style={styles.friendlyRow}>
+          <TextInput
+            style={[styles.input, styles.friendlyValueInput]}
+            value={serviceDuration.value}
+            onChangeText={(value) =>
+              setServiceDuration((prev) => ({
+                ...prev,
+                value: value.replace(/[^0-9]/g, ""),
+              }))
+            }
+            keyboardType="numeric"
+            placeholder={
+              bookingType === "TIME_SLOT_BASED"
+                ? "e.g. 1"
+                : bookingType === "DELIVERY_BASED"
+                ? "e.g. 30"
+                : "e.g. 2"
+            }
+            placeholderTextColor="#9C9CA3"
+          />
+
+          <View style={styles.friendlyToggleRow}>
+            {(["MINUTES", "HOURS"] as DurationInputUnit[]).map(
+              (unit) => {
+                const active = serviceDuration.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setServiceDuration((prev) => ({
+                        ...prev,
+                        unit,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "MINUTES" ? "Minutes" : "Hours"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+        </View>
+      </View>
+    )}
+
+    {/* --------------------------------------------------
+        Earliest it can happen (window start)
+    -------------------------------------------------- */}
+
+    {bookingType !== "TIME_SLOT_BASED" && (
+      <>
+        <View style={{ marginTop: 22 }}>
+          <Text style={styles.smallLabel}>
+            {bookingType === "DELIVERY_BASED"
+              ? "Earliest you can deliver"
+              : bookingType === "SETUP_BASED"
+              ? "How early you can start setup"
+              : "Earliest this can happen"}
+          </Text>
+
+          <View style={styles.friendlyRow}>
+            <TextInput
+              style={[styles.input, styles.friendlyValueInput]}
+              value={windowStart.value}
+              onChangeText={(value) =>
+                setWindowStart((prev) => ({
+                  ...prev,
+                  value: value.replace(/[^0-9]/g, ""),
+                }))
+              }
+              keyboardType="numeric"
+              placeholder="e.g. 2"
+              placeholderTextColor="#9C9CA3"
+            />
+
+            <View style={styles.friendlyToggleRow}>
+              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+                const active = windowStart.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowStart((prev) => ({ ...prev, unit }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "HOURS" ? "Hours" : "Days"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+              (direction) => {
+                const active = windowStart.direction === direction;
+
+                return (
+                  <TouchableOpacity
+                    key={direction}
+                    style={[
+                      styles.friendlyDirectionButton,
+                      active && styles.friendlyDirectionButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowStart((prev) => ({
+                        ...prev,
+                        direction,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {direction === "BEFORE"
+                        ? "Before the event"
+                        : "After event starts"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+        </View>
+
+        {/* --------------------------------------------------
+            Latest it can happen (window end)
+        -------------------------------------------------- */}
+
+        <View style={{ marginTop: 22 }}>
+          <Text style={styles.smallLabel}>
+            {bookingType === "DELIVERY_BASED"
+              ? "Latest you can deliver"
+              : bookingType === "SETUP_BASED"
+              ? "Setup must be finished by"
+              : "Latest this can happen"}
+          </Text>
+
+          <View style={styles.friendlyRow}>
+            <TextInput
+              style={[styles.input, styles.friendlyValueInput]}
+              value={windowEnd.value}
+              onChangeText={(value) =>
+                setWindowEnd((prev) => ({
+                  ...prev,
+                  value: value.replace(/[^0-9]/g, ""),
+                }))
+              }
+              keyboardType="numeric"
+              placeholder="e.g. 0"
+              placeholderTextColor="#9C9CA3"
+            />
+
+            <View style={styles.friendlyToggleRow}>
+              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+                const active = windowEnd.unit === unit;
+
+                return (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.friendlyToggleButton,
+                      active && styles.friendlyToggleButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowEnd((prev) => ({ ...prev, unit }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {unit === "HOURS" ? "Hours" : "Days"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+              (direction) => {
+                const active = windowEnd.direction === direction;
+
+                return (
+                  <TouchableOpacity
+                    key={direction}
+                    style={[
+                      styles.friendlyDirectionButton,
+                      active && styles.friendlyDirectionButtonActive,
+                    ]}
+                    onPress={() =>
+                      setWindowEnd((prev) => ({
+                        ...prev,
+                        direction,
+                      }))
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.friendlyToggleText,
+                        active && styles.friendlyToggleTextActive,
+                      ]}
+                    >
+                      {direction === "BEFORE"
+                        ? "Before the event"
+                        : "At / after event starts"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
+
+          <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
+            Tip: enter 0 + "After event starts" to mean right when the
+            event begins.
+          </Text>
+        </View>
+      </>
+    )}
+  </View>
+)}
         {/* -------------------------------------------------
             Package Images
         ------------------------------------------------- */}
@@ -1870,14 +2509,178 @@ if (!userId) {
             )}
 
             {!!services && (
-              <Text
-                style={styles.previewServices}
-              >
-                {services}
+              <Text style={styles.previewServices}>
+                Includes: {services}
               </Text>
             )}
 
-            {durations.length > 0 && (
+    {/* Booking Type Preview — shown exactly once */}
+
+<View style={styles.previewDurationSection}>
+  <Text style={styles.previewSectionTitle}>
+    Booking Type
+  </Text>
+
+  <View style={styles.previewDurationRow}>
+    <Text style={styles.previewDurationText}>
+      Type
+    </Text>
+
+    <Text style={styles.previewDurationPrice}>
+      {bookingTypeOptions.find(
+        (option) => option.value === bookingType,
+      )?.label || bookingType}
+    </Text>
+  </View>
+
+  {bookingType === "TIME_SLOT_BASED" &&
+    requiredServiceDurationMinutesValue !== undefined && (
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Time needed per booking
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatDurationDisplay(
+            requiredServiceDurationMinutesValue,
+          )}
+        </Text>
+      </View>
+    )}
+
+  {bookingType === "DELIVERY_BASED" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time to deliver
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Earliest delivery
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowStartOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Latest delivery
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowEndOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+    </>
+  )}
+
+  {bookingType === "SETUP_BASED" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time to set up
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Earliest arrival
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowStartOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.previewDurationRow}>
+        <Text style={styles.previewDurationText}>
+          Setup finished by
+        </Text>
+
+        <Text style={styles.previewDurationPrice}>
+          {formatOffsetDisplay(
+            serviceWindowEndOffsetMinutesValue,
+          )}
+        </Text>
+      </View>
+    </>
+  )}
+
+  {bookingType === "CUSTOM" && (
+    <>
+      {requiredServiceDurationMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Time needed
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatDurationDisplay(
+              requiredServiceDurationMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      {serviceWindowStartOffsetMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Earliest
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatOffsetDisplay(
+              serviceWindowStartOffsetMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+
+      {serviceWindowEndOffsetMinutesValue !== undefined && (
+        <View style={styles.previewDurationRow}>
+          <Text style={styles.previewDurationText}>
+            Latest
+          </Text>
+
+          <Text style={styles.previewDurationPrice}>
+            {formatOffsetDisplay(
+              serviceWindowEndOffsetMinutesValue,
+            )}
+          </Text>
+        </View>
+      )}
+    </>
+  )}
+</View>
+
+            {bookingType === "DURATION_BASED" &&
+              durations.length > 0 && (
               <View
                 style={
                   styles.previewDurationSection
@@ -1937,7 +2740,8 @@ if (!userId) {
               </View>
             )}
 
-            {allowCustomDuration && (
+            {bookingType === "DURATION_BASED" &&
+            allowCustomDuration && (
               <View
                 style={
                   styles.previewCustomBox
@@ -2370,6 +3174,66 @@ const styles = StyleSheet.create({
 
   durationPriceWrapper: {
     marginTop: 12,
+  },
+
+  friendlyRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "stretch",
+  },
+
+  friendlyValueInput: {
+    width: 90,
+  },
+
+  friendlyToggleRow: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  friendlyToggleButton: {
+    flex: 1,
+    height: 50,
+    borderWidth: 1.5,
+    borderColor: "#EFE0EB",
+    borderRadius: 14,
+    backgroundColor: "#FCFAFB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  friendlyToggleButtonActive: {
+    backgroundColor: "#7B2869",
+    borderColor: "#7B2869",
+  },
+
+  friendlyDirectionButton: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: "#EFE0EB",
+    borderRadius: 14,
+    backgroundColor: "#FCFAFB",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+
+  friendlyDirectionButtonActive: {
+    backgroundColor: "#7B2869",
+    borderColor: "#7B2869",
+  },
+
+  friendlyToggleText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#776873",
+    textAlign: "center",
+  },
+
+  friendlyToggleTextActive: {
+    color: "#FFFFFF",
   },
 
   priceContainerSmall: {
@@ -2839,4 +3703,6 @@ upgradeButtonText: {
   fontSize: 12.5,
   fontWeight: "800",
 },
+
+
 });

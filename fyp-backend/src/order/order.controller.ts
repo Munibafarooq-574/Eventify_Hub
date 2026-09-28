@@ -28,11 +28,14 @@ async placeOrder(@Body() body: {
     eventName: string;
     eventType?: string;
     guests: number;
+    eventCityId: string;
+    eventAddress: string;
     services: {
-        vendorId: string;
-        serviceName: string;
-        price: number;
-    }[];
+    vendorId: string;
+    serviceName: string;
+    price: number;
+    packageId: string;
+}[];
     durationMinutes?: number;
 }) {
         try {
@@ -47,6 +50,8 @@ async placeOrder(@Body() body: {
                 body.guests,
                 body.eventType,
                 body.durationMinutes,
+                body.eventCityId,
+                body.eventAddress,
             );
             return order;
                 } catch (error) {

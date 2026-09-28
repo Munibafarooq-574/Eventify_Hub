@@ -1,4 +1,4 @@
-//fyp-mobile/dto/CreateCakeBusinessDetails.dto.ts
+﻿//fyp-mobile/dto/CreateCakeBusinessDetails.dto.ts
 
 export interface CreateCakeBusinessDetailsDto {
   cakeTypes: string[];
@@ -7,7 +7,7 @@ export interface CreateCakeBusinessDetailsDto {
 
   expertise: string;
 
-  cityCovered: string;
+  cityCovered?: string;
 
   description: string;
 

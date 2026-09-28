@@ -1,4 +1,4 @@
-import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
+﻿import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
@@ -39,7 +39,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
 
     const [deliveryToHome, setDeliveryToHome] = useState<string | null>(null);
     const [expertise, setExpertise] = useState("");
-    const [cityCovered, setCityCovered] = useState("");
     const [downPaymentType, setDownPaymentType] = useState<DownPaymentType>("");
     const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
@@ -77,7 +76,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 setDeliveryOptions(data.deliveryOptions || []);
                 setDeliveryToHome(data.deliveryToHome ? "YES" : "NO");
                 setExpertise(data.expertise || "");
-                setCityCovered(data.cityCovered || "");
                 setDescription(data.description || "");
                 setAdditionalInfo(data.additionalInfo || "");
                 setDownPaymentType(data.downPaymentType || "");
@@ -102,7 +100,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
             deliveryOptions.length === 0 ||
             deliveryToHome === null ||
             !expertise ||
-            !cityCovered ||
             !description ||
             !downPaymentType ||
             !downPayment ||
@@ -121,7 +118,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 minimumPrice: Number(minimumPrice),
                 deliveryOptions,
                 expertise,
-                cityCovered,
                 deliveryToHome: deliveryToHome === "YES",
                 description,
                 additionalInfo,
@@ -286,34 +282,18 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                       style={[styles.input, styles.textArea]}
                       multiline
                       placeholder={`Examples:
-              • Wedding Cakes
-              • Fondant Cakes
-              • Buttercream Cakes
-              • Floral Cake Designs
-              • 3-Tier Cakes
-              • Customized Theme Cakes`}
+              â€¢ Wedding Cakes
+              â€¢ Fondant Cakes
+              â€¢ Buttercream Cakes
+              â€¢ Floral Cake Designs
+              â€¢ 3-Tier Cakes
+              â€¢ Customized Theme Cakes`}
                          placeholderTextColor="#B99DAF"
                          value={expertise}
                          onChangeText={setExpertise}
                         />
                     </View>
 
-            {/* City Covered */}
-            <View style={styles.card}>
-            <SectionTitle
-                icon="map-marker-alt"
-                title="City Covered"
-                required
-            />
-
-            <TextInput
-                style={styles.input}
-                placeholder="Example: Karachi, Lahore, Islamabad"
-                placeholderTextColor="#B99DAF"
-                value={cityCovered}
-                onChangeText={setCityCovered}
-            />
-        </View>
             {/* Cake Description */}
             <View style={styles.card}>
                 <SectionTitle icon="align-left" title="Cake Description" required />
@@ -321,12 +301,12 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Examples:
-• Customized wedding cakes
-• Birthday cakes
-• Premium fondant designs
-• Fresh cream cakes
-• Theme based cakes
-• Eggless cakes available`}
+â€¢ Customized wedding cakes
+â€¢ Birthday cakes
+â€¢ Premium fondant designs
+â€¢ Fresh cream cakes
+â€¢ Theme based cakes
+â€¢ Eggless cakes available`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -340,12 +320,12 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Examples:
-• Free tasting available
-• Advance booking required
-• Delivery charges may apply
-• Midnight delivery available
-• Premium packaging included
-• Freshly baked on order`}
+â€¢ Free tasting available
+â€¢ Advance booking required
+â€¢ Delivery charges may apply
+â€¢ Midnight delivery available
+â€¢ Premium packaging included
+â€¢ Freshly baked on order`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -728,3 +708,4 @@ const styles = StyleSheet.create({
 });
 
 export default CakeBusinessDetailsScreen;
+

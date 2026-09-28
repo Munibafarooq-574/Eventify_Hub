@@ -64,6 +64,7 @@ export default function RootLayout() {
         <Stack.Screen name="bottommessages" options={{ headerShown: false }} />
         <Stack.Screen name="bdphotographer" options={{ headerShown: false }} />
         <Stack.Screen name="EventDetailsForm" options={{ headerShown: false }} />
+        <Stack.Screen name="sponsoredcampaigns"  options={{ headerShown: false }} />
         <Stack.Screen name="AI" options={{ headerShown: false }} />
         <Stack.Screen name="AIPackage" options={{ headerShown: false }} />
         <Stack.Screen name="OrderReview" options={{ headerShown: false }} />

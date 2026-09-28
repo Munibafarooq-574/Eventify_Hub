@@ -116,7 +116,6 @@ const BusinessDetailsScreen = () => {
   // Text Fields
   // ==========================
 
-  const [cityCovered, setCityCovered] = useState("");
 
   const [minimumPrice, setMinimumPrice] = useState("");
 
@@ -146,7 +145,6 @@ const BusinessDetailsScreen = () => {
         data.travelsToClientHome ? "YES" : "NO"
       );
       setDeliveryTime(data.deliveryTime || "");
-      setCityCovered(data.cityCovered || "");
       setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
       setAdditionalInfo(data.additionalInfo || "");
@@ -219,7 +217,6 @@ const BusinessDetailsScreen = () => {
       photoStyle.length === 0 ||
       travelsToClientHome === null ||
       !deliveryTime ||
-      !cityCovered ||
       !minimumPrice ||
       !description ||
       !downPaymentType ||
@@ -248,7 +245,6 @@ const BusinessDetailsScreen = () => {
   photoStyle,
   travelsToClientHome: travelsToClientHome === "YES",
   deliveryTime,
-  cityCovered,
   minimumPrice: Number(minimumPrice),
   description,
   additionalInfo,
@@ -629,42 +625,6 @@ if (edit === "true") {
 
 </View>
 
-{/* =========================
-      City Covered
-========================= */}
-
-<View style={styles.card}>
-
-    <SectionTitle
-        icon="map-marker-alt"
-        title="City Covered"
-        required
-    />
-
-    <Text style={styles.hint}>
-        Enter the cities where your photography team is available.
-    </Text>
-
-    <View style={styles.inputRow}>
-
-        <FontAwesome5
-            name="city"
-            size={16}
-            color="#780C60"
-            style={{ marginRight: 10 }}
-        />
-
-        <TextInput
-            style={styles.inputFlex}
-            placeholder="e.g. Islamabad, Lahore"
-            placeholderTextColor="#B99DAF"
-            value={cityCovered}
-            onChangeText={setCityCovered}
-        />
-
-    </View>
-
-</View>
 {/* =========================
         Staff
 ========================= */}

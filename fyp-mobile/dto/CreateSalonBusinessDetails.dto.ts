@@ -1,10 +1,10 @@
-// fyp-mobile/dto/CreateSalonBusinessDetails.dto.ts
+﻿// fyp-mobile/dto/CreateSalonBusinessDetails.dto.ts
 
 export interface CreateSalonBusinessDetailsDto {
     staffType: string; // e.g. 'SOLO' | 'SALON' | 'HOME-BASED SALON'
     expertise: string;
     travelsToClientHome: boolean;
-    cityCovered: string;
+    cityCovered?: string;
     staffGender: string[]; // e.g. ['MALE', 'FEMALE', 'TRANSGENDER']
     minimumPrice?: number;
     description: string;

@@ -38,6 +38,19 @@ interface PackageDetails {
   price?: number;
   services?: string;
 
+    bookingType?:
+    | "DURATION_BASED"
+    | "TIME_SLOT_BASED"
+    | "DELIVERY_BASED"
+    | "SETUP_BASED"
+    | "CUSTOM";
+
+  requiredServiceDurationMinutes?: number;
+
+  serviceWindowStartOffsetMinutes?: number;
+
+  serviceWindowEndOffsetMinutes?: number;
+
   durations?: PackageDuration[];
 
   allowCustomDuration?: boolean;
@@ -276,6 +289,106 @@ const PackageScreen = () => {
         ? unit
         : `${unit}s`
     }`;
+  };
+
+    // ---------------------------------------------------------
+  // Format booking type
+  // ---------------------------------------------------------
+
+  const formatBookingType = (
+    bookingType?: PackageDetails["bookingType"]
+  ) => {
+    switch (bookingType) {
+      case "DURATION_BASED":
+        return "Duration Based";
+
+      case "TIME_SLOT_BASED":
+        return "Time Slot Based";
+
+      case "DELIVERY_BASED":
+        return "Delivery Based";
+
+      case "SETUP_BASED":
+        return "Setup Based";
+
+      case "CUSTOM":
+        return "Custom";
+
+      default:
+        return "Duration Based";
+    }
+  };
+
+  // ---------------------------------------------------------
+  // Format service duration
+  // ---------------------------------------------------------
+
+  const formatServiceDuration = (minutes?: number) => {
+    if (
+      minutes === undefined ||
+      minutes === null ||
+      !Number.isFinite(minutes)
+    ) {
+      return "Not specified";
+    }
+
+    const absoluteMinutes = Math.abs(minutes);
+
+    if (absoluteMinutes === 0) {
+      return "0 minutes";
+    }
+
+    if (absoluteMinutes % 1440 === 0) {
+      const days = absoluteMinutes / 1440;
+
+      return `${days} ${days === 1 ? "day" : "days"}`;
+    }
+
+    if (absoluteMinutes % 60 === 0) {
+      const hours = absoluteMinutes / 60;
+
+      return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+    }
+
+    if (absoluteMinutes > 60) {
+      const hours = Math.floor(absoluteMinutes / 60);
+      const remainingMinutes = absoluteMinutes % 60;
+
+      return `${hours} ${
+        hours === 1 ? "hour" : "hours"
+      } ${remainingMinutes} ${
+        remainingMinutes === 1 ? "minute" : "minutes"
+      }`;
+    }
+
+    return `${absoluteMinutes} ${
+      absoluteMinutes === 1 ? "minute" : "minutes"
+    }`;
+  };
+
+  // ---------------------------------------------------------
+  // Format event-relative service window
+  // ---------------------------------------------------------
+
+  const formatServiceOffset = (minutes?: number) => {
+    if (
+      minutes === undefined ||
+      minutes === null ||
+      !Number.isFinite(minutes)
+    ) {
+      return "Not specified";
+    }
+
+    if (minutes === 0) {
+      return "At event time";
+    }
+
+    const direction =
+      minutes < 0 ? "before event" : "after event";
+
+    return `${formatServiceDuration(
+      Math.abs(minutes)
+    )} ${direction}`;
   };
 
   // ---------------------------------------------------------
@@ -611,316 +724,639 @@ const PackageScreen = () => {
 
             <View style={styles.divider} />
 
-            {/* ---------------------------------------------
-                Fixed Duration Options
-            --------------------------------------------- */}
+                          {/* ---------------------------------------------
+                  Booking Type
+              --------------------------------------------- */}
 
-            <View style={styles.durationSection}>
-              <View
-                style={styles.sectionTitleRow}
-              >
-                <View
-                  style={styles.infoIconCircle}
-                >
+              <View style={styles.infoRow}>
+                <View style={styles.infoIconCircle}>
                   <Ionicons
-                    name="time-outline"
-                    size={17}
+                    name="calendar-outline"
+                    size={16}
                     color="#780C60"
                   />
                 </View>
 
-                <Text
-                  style={styles.sectionTitle}
-                >
-                  Fixed Duration Options
-                </Text>
+                <View style={styles.infoTextWrapper}>
+                  <Text style={styles.sectionHeader}>
+                    Booking Type
+                  </Text>
+
+                  <Text style={styles.sectionText}>
+                    {formatBookingType(
+                      packageDetails.bookingType
+                    )}
+                  </Text>
+                </View>
               </View>
 
-              {packageDetails.durations &&
-              packageDetails.durations.length >
-                0 ? (
-                <View
-                  style={styles.durationList}
-                >
-                  {packageDetails.durations.map(
-                    (
-                      duration: PackageDuration,
-                      index: number
-                    ) => (
+              <View style={styles.divider} />
+
+              {/* =============================================
+                  DURATION BASED
+              ============================================= */}
+
+              {(!packageDetails.bookingType ||
+                packageDetails.bookingType ===
+                  "DURATION_BASED") && (
+                <>
+                  <View style={styles.durationSection}>
+                    <View style={styles.sectionTitleRow}>
+                      <View style={styles.infoIconCircle}>
+                        <Ionicons
+                          name="time-outline"
+                          size={17}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <Text style={styles.sectionTitle}>
+                        Fixed Duration Options
+                      </Text>
+                    </View>
+
+                    {packageDetails.durations &&
+                    packageDetails.durations.length > 0 ? (
+                      <View style={styles.durationList}>
+                        {packageDetails.durations.map(
+                          (
+                            duration: PackageDuration,
+                            index: number
+                          ) => (
+                            <View
+                              key={`duration-${index}`}
+                              style={styles.durationCard}
+                            >
+                              <View
+                                style={styles.durationIcon}
+                              >
+                                <Ionicons
+                                  name={
+                                    duration.unit ===
+                                    "HOURS"
+                                      ? "time-outline"
+                                      : "calendar-outline"
+                                  }
+                                  size={18}
+                                  color="#780C60"
+                                />
+                              </View>
+
+                              <View
+                                style={styles.durationInfo}
+                              >
+                                <Text
+                                  style={
+                                    styles.durationValue
+                                  }
+                                >
+                                  {formatDuration(
+                                    duration
+                                  )}
+                                </Text>
+
+                                <Text
+                                  style={
+                                    styles.durationLabel
+                                  }
+                                >
+                                  Fixed duration
+                                </Text>
+                              </View>
+
+                              <Text
+                                style={
+                                  styles.durationPrice
+                                }
+                              >
+                                Rs.{" "}
+                                {Number(
+                                  duration.price || 0
+                                ).toLocaleString()}
+                              </Text>
+                            </View>
+                          )
+                        )}
+                      </View>
+                    ) : (
+                      <View style={styles.noDataBox}>
+                        <Text style={styles.noDataText}>
+                          No fixed duration options
+                          added.
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  <View style={styles.durationSection}>
+                    <View style={styles.sectionTitleRow}>
+                      <View style={styles.infoIconCircle}>
+                        <Ionicons
+                          name="options-outline"
+                          size={17}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <Text style={styles.sectionTitle}>
+                        Custom Duration
+                      </Text>
+                    </View>
+
+                    {packageDetails.allowCustomDuration ? (
                       <View
-                        key={`duration-${index}`}
-                        style={
-                          styles.durationCard
-                        }
+                        style={styles.customDurationCard}
                       >
                         <View
+                          style={styles.customEnabledRow}
+                        >
+                          <View
+                            style={
+                              styles.customEnabledIcon
+                            }
+                          >
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={22}
+                              color="#2E9D63"
+                            />
+                          </View>
+
+                          <View
+                            style={
+                              styles.customEnabledText
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.customEnabledTitle
+                              }
+                            >
+                              Custom Duration Allowed
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.customEnabledSubtitle
+                              }
+                            >
+                              Customers can request a
+                              custom event duration.
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          style={styles.customDetailsRow}
+                        >
+                          <View
+                            style={
+                              styles.customDetailItem
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.customDetailLabel
+                              }
+                            >
+                              Unit
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.customDetailValue
+                              }
+                            >
+                              {formatUnit(
+                                packageDetails.customDurationUnit
+                              )}
+                            </Text>
+                          </View>
+
+                          <View
+                            style={
+                              styles.customDetailDivider
+                            }
+                          />
+
+                          <View
+                            style={
+                              styles.customDetailItem
+                            }
+                          >
+                            <Text
+                              style={
+                                styles.customDetailLabel
+                              }
+                            >
+                              Rate
+                            </Text>
+
+                            <Text
+                              style={
+                                styles.customRateValue
+                              }
+                            >
+                              Rs.{" "}
+                              {Number(
+                                packageDetails.customDurationRate ||
+                                  0
+                              ).toLocaleString()}
+                              /
+                              {packageDetails.customDurationUnit ===
+                              "DAYS"
+                                ? "day"
+                                : "hour"}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : (
+                      <View
+                        style={
+                          styles.customDisabledCard
+                        }
+                      >
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={22}
+                          color="#9A8993"
+                        />
+
+                        <View
                           style={
-                            styles.durationIcon
+                            styles.customDisabledText
                           }
                         >
-                          <Ionicons
-                            name={
-                              duration.unit ===
-                              "HOURS"
-                                ? "time-outline"
-                                : "calendar-outline"
+                          <Text
+                            style={
+                              styles.customDisabledTitle
                             }
+                          >
+                            Custom Duration Disabled
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.customDisabledSubtitle
+                            }
+                          >
+                            Only the fixed duration
+                            options above are available.
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {/* =============================================
+                  TIME SLOT BASED
+              ============================================= */}
+
+              {packageDetails.bookingType ===
+                "TIME_SLOT_BASED" && (
+                <View style={styles.durationSection}>
+                  <View style={styles.sectionTitleRow}>
+                    <View style={styles.infoIconCircle}>
+                      <Ionicons
+                        name="time-outline"
+                        size={17}
+                        color="#780C60"
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Time Slot Configuration
+                    </Text>
+                  </View>
+
+                  <View style={styles.durationCard}>
+                    <View style={styles.durationIcon}>
+                      <Ionicons
+                        name="hourglass-outline"
+                        size={18}
+                        color="#780C60"
+                      />
+                    </View>
+
+                    <View style={styles.durationInfo}>
+                      <Text style={styles.durationLabel}>
+                        Time Needed Per Booking
+                      </Text>
+
+                      <Text style={styles.durationValue}>
+                        {formatServiceDuration(
+                          packageDetails.requiredServiceDurationMinutes
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* =============================================
+                  DELIVERY BASED
+              ============================================= */}
+
+              {packageDetails.bookingType ===
+                "DELIVERY_BASED" && (
+                <View style={styles.durationSection}>
+                  <View style={styles.sectionTitleRow}>
+                    <View style={styles.infoIconCircle}>
+                      <Ionicons
+                        name="car-outline"
+                        size={17}
+                        color="#780C60"
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Delivery Configuration
+                    </Text>
+                  </View>
+
+                  <View style={styles.durationList}>
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="time-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Delivery Time
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceDuration(
+                            packageDetails.requiredServiceDurationMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="play-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Earliest Delivery
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowStartOffsetMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="flag-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Latest Delivery
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowEndOffsetMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* =============================================
+                  SETUP BASED
+              ============================================= */}
+
+              {packageDetails.bookingType ===
+                "SETUP_BASED" && (
+                <View style={styles.durationSection}>
+                  <View style={styles.sectionTitleRow}>
+                    <View style={styles.infoIconCircle}>
+                      <Ionicons
+                        name="construct-outline"
+                        size={17}
+                        color="#780C60"
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Setup Configuration
+                    </Text>
+                  </View>
+
+                  <View style={styles.durationList}>
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="time-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Setup Duration
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceDuration(
+                            packageDetails.requiredServiceDurationMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="play-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Earliest Arrival
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowStartOffsetMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="checkmark-circle-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Setup Finished By
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowEndOffsetMinutes
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* =============================================
+                  CUSTOM
+              ============================================= */}
+
+              {packageDetails.bookingType === "CUSTOM" && (
+                <View style={styles.durationSection}>
+                  <View style={styles.sectionTitleRow}>
+                    <View style={styles.infoIconCircle}>
+                      <Ionicons
+                        name="options-outline"
+                        size={17}
+                        color="#780C60"
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Custom Service Window
+                    </Text>
+                  </View>
+
+                  <View style={styles.durationList}>
+                    {packageDetails.requiredServiceDurationMinutes !==
+                      undefined && (
+                      <View style={styles.durationCard}>
+                        <View style={styles.durationIcon}>
+                          <Ionicons
+                            name="time-outline"
                             size={18}
                             color="#780C60"
                           />
                         </View>
 
-                        <View
-                          style={
-                            styles.durationInfo
-                          }
-                        >
+                        <View style={styles.durationInfo}>
                           <Text
-                            style={
-                              styles.durationValue
-                            }
+                            style={styles.durationLabel}
                           >
-                            {formatDuration(
-                              duration
+                            Time Needed
+                          </Text>
+
+                          <Text
+                            style={styles.durationValue}
+                          >
+                            {formatServiceDuration(
+                              packageDetails.requiredServiceDurationMinutes
                             )}
                           </Text>
-
-                          <Text
-                            style={
-                              styles.durationLabel
-                            }
-                          >
-                            Fixed duration
-                          </Text>
                         </View>
+                      </View>
+                    )}
 
-                        <Text
-                          style={
-                            styles.durationPrice
-                          }
-                        >
-                          Rs.{" "}
-                          {Number(
-                            duration.price || 0
-                          ).toLocaleString()}
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="play-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
+
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Earliest Service
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowStartOffsetMinutes
+                          )}
                         </Text>
                       </View>
-                    )
-                  )}
-                </View>
-              ) : (
-                <View
-                  style={styles.noDataBox}
-                >
-                  <Text
-                    style={styles.noDataText}
-                  >
-                    No fixed duration options
-                    added.
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* ---------------------------------------------
-                Custom Duration
-            --------------------------------------------- */}
-
-            <View style={styles.durationSection}>
-              <View
-                style={styles.sectionTitleRow}
-              >
-                <View
-                  style={styles.infoIconCircle}
-                >
-                  <Ionicons
-                    name="options-outline"
-                    size={17}
-                    color="#780C60"
-                  />
-                </View>
-
-                <Text
-                  style={styles.sectionTitle}
-                >
-                  Custom Duration
-                </Text>
-              </View>
-
-              {packageDetails.allowCustomDuration ? (
-                <View
-                  style={
-                    styles.customDurationCard
-                  }
-                >
-                  <View
-                    style={
-                      styles.customEnabledRow
-                    }
-                  >
-                    <View
-                      style={
-                        styles.customEnabledIcon
-                      }
-                    >
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={22}
-                        color="#2E9D63"
-                      />
                     </View>
 
-                    <View
-                      style={
-                        styles.customEnabledText
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.customEnabledTitle
-                        }
-                      >
-                        Custom Duration Allowed
-                      </Text>
+                    <View style={styles.durationCard}>
+                      <View style={styles.durationIcon}>
+                        <Ionicons
+                          name="flag-outline"
+                          size={18}
+                          color="#780C60"
+                        />
+                      </View>
 
-                      <Text
-                        style={
-                          styles.customEnabledSubtitle
-                        }
-                      >
-                        Customers can request a
-                        custom event duration.
-                      </Text>
+                      <View style={styles.durationInfo}>
+                        <Text style={styles.durationLabel}>
+                          Latest Service
+                        </Text>
+
+                        <Text style={styles.durationValue}>
+                          {formatServiceOffset(
+                            packageDetails.serviceWindowEndOffsetMinutes
+                          )}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-
-                  <View
-                    style={
-                      styles.customDetailsRow
-                    }
-                  >
-                    <View
-                      style={
-                        styles.customDetailItem
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.customDetailLabel
-                        }
-                      >
-                        Unit
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.customDetailValue
-                        }
-                      >
-                        {formatUnit(
-                          packageDetails.customDurationUnit
-                        )}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={
-                        styles.customDetailDivider
-                      }
-                    />
-
-                    <View
-                      style={
-                        styles.customDetailItem
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.customDetailLabel
-                        }
-                      >
-                        Rate
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.customRateValue
-                        }
-                      >
-                        Rs.{" "}
-                        {Number(
-                          packageDetails.customDurationRate ||
-                            0
-                        ).toLocaleString()}
-                        /
-                        {packageDetails.customDurationUnit ===
-                        "DAYS"
-                          ? "day"
-                          : "hour"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                <View
-                  style={
-                    styles.customDisabledCard
-                  }
-                >
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={22}
-                    color="#9A8993"
-                  />
-
-                  <View
-                    style={
-                      styles.customDisabledText
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.customDisabledTitle
-                      }
-                    >
-                      Custom Duration Disabled
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.customDisabledSubtitle
-                      }
-                    >
-                      Only the fixed duration options
-                      above are available.
-                    </Text>
                   </View>
                 </View>
               )}
+
+              <View style={styles.divider} />
             </View>
-          </View>
-        ) : (
-          <View style={styles.loadingBox}>
-            <Ionicons
-              name="cube-outline"
-              size={42}
-              color="#780C60"
-            />
+          ) : (
+            <View style={styles.loadingBox}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={44}
+                color="#780C60"
+              />
 
-            <Text
-              style={[
-                styles.sectionText,
-                { marginTop: 10 },
-              ]}
-            >
-              Package not found.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+              <Text style={styles.emptyTitle}>
+                Package Not Found
+              </Text>
 
+              <Text style={styles.emptyText}>
+                This package could not be found.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
       {/* ---------------------------------------------------
           Delete Confirmation Modal
       --------------------------------------------------- */}

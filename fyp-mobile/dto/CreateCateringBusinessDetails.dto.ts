@@ -1,9 +1,9 @@
-//fyp-mobile/dto/CreateCateringBusinessDetails.dto.ts
+﻿//fyp-mobile/dto/CreateCateringBusinessDetails.dto.ts
 
 /*export interface CreateCateringBusinessDetailsDto {
     expertise: string;
     travelsToClientHome: boolean;
-    cityCovered: string;
+    cityCovered?: string;
     staff: string; // ['MALE', 'FEMALE', 'TRANSGENDER']
     provideFoodTesting?: boolean; // Optional
     provideDecoration?: boolean; // Optional
@@ -27,7 +27,7 @@ export interface CreateCateringBusinessDetailsDto {
     travelsToClientHome: boolean;
 
     // Cities
-    cityCovered: string;
+    cityCovered?: string;
 
     // Multiple Staff Types
     staff: string[];
@@ -56,3 +56,4 @@ export interface CreateCateringBusinessDetailsDto {
 
     covidCompliant: "YES" | "NO";
 }
+

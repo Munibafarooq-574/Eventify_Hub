@@ -1,10 +1,10 @@
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
 
-import getAllVendorsByCategoryId from "@/services/getAllVendorsByCategoryId";
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
 import checkVendorsAvailability from "@/services/checkVendorsAvailability";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -35,12 +35,14 @@ export default function App() {
   const [loadingVendorDetails, setLoadingVendorDetails] = useState(false);
   const [eventTiming, setEventTiming] = useState<{
   eventId?: string;
+  eventCityId: string;
+  eventAddress?: string;
   eventDate: string;
   startTime: string;
   endTime: string;
   durationMinutes: number;
 } | null>(null);
-    const routeParams = useLocalSearchParams();
+  const routeParams = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryIdToName, setCategoryIdToName] = useState<Record<string, string>>({});
 
@@ -49,53 +51,36 @@ export default function App() {
     fetchCategoryName();
   }, []);
   
-  const getEventTimingParams = async () => {
-    const raw = await getSecureData("eventDetails");
-    if (!raw) return null;
+ const getEventTimingParams = async () => {
+  const context =
+    await getMarketplaceEventContext();
 
-    try {
-      const parsed = JSON.parse(raw);
+  if (
+    !context.eventCityId ||
+    !context.eventDate ||
+    !context.startTime ||
+    !context.endTime ||
+    !context.durationMinutes
+  ) {
+    return null;
+  }
 
-      if (!parsed.eventDate || !parsed.startTime || !parsed.durationMinutes) {
-        return null;
-      }
-
-      const dateOnly = new Date(parsed.eventDate).toISOString().split("T")[0];
-
-      const [hours, minutes] = parsed.startTime
-  .split(":")
-  .map(Number);
-
-const startDateTime = new Date(parsed.eventDate);
-startDateTime.setHours(hours, minutes, 0, 0);
-
-const endDateTime = new Date(
-  startDateTime.getTime() +
-    parsed.durationMinutes * 60 * 1000
-);
-
-const endHours = endDateTime
-  .getHours()
-  .toString()
-  .padStart(2, "0");
-
-const endMinutes = endDateTime
-  .getMinutes()
-  .toString()
-  .padStart(2, "0");
-
-return {
-  eventId: parsed.eventId,
-  eventDate: dateOnly,
-  startTime: parsed.startTime,
-  durationMinutes: parsed.durationMinutes,
-  endTime: `${endHours}:${endMinutes}`,
-};
-    } catch (error) {
-      console.error("Error parsing eventDetails:", error);
-      return null;
-    }
+  return {
+    eventId: context.eventId,
+    eventCityId:
+      context.eventCityId,
+    eventAddress:
+      context.eventAddress ?? "",
+    eventDate:
+      context.eventDate,
+    startTime:
+      context.startTime,
+    endTime:
+      context.endTime,
+    durationMinutes:
+      context.durationMinutes,
   };
+};
 
 const formatTime = (time?: string) => {
   if (!time) return "";
@@ -153,9 +138,16 @@ const formatTime = (time?: string) => {
 
     console.log("Category IDs:", categoryIds);
 
-    const city = Array.isArray(routeParams?.city)
-      ? routeParams.city[0]
-      : routeParams?.city;
+    const timing = await getEventTimingParams();
+    setEventTiming(timing);
+
+    if (!timing?.eventCityId) {
+      console.error(
+        "Event City is missing from event context.",
+      );
+      setData([]);
+      return;
+    }
 
     const staff = Array.isArray(routeParams?.staff)
       ? routeParams.staff[0]
@@ -171,9 +163,10 @@ const formatTime = (time?: string) => {
       ? routeParams.minRating[0]
       : routeParams?.minRating;
 
-    const filters = {
+    
+     const filters = {
       name: searchQuery || undefined,
-      city: city || undefined,
+      eventCityId: timing.eventCityId,
       staff: staff || undefined,
       cancellationPolicy: cancellationPolicy || undefined,
       minRating: minRatingStr
@@ -200,10 +193,10 @@ const mergedResults = resultsPerCategory.flat();
     const vendorResults = Array.from(uniqueVendorsMap.values());
     console.log("Total vendors after merge:", vendorResults.length);
 
-    const timing = await getEventTimingParams();
-    setEventTiming(timing);
-
-    if (!timing || !vendorResults.length) { setData(vendorResults); return; }
+    if (!vendorResults.length) {
+      setData([]);
+      return;
+    }
 
     setCheckingAvailability(true);
     try {
@@ -279,7 +272,24 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     const brandName = item?.contactDetails?.brandName || item?.ContactDetails?.brandName || item?.BusinessDetails?.brandName || "Vendor";
     const vendorName = item?.name || item?.vendorName || item?.ownerName || "Vendor";
     const categoryName = item?.buisnessCategory?.name || item?.buisnessCategory?.categoryName || item?.category?.name || item?.categoryName || item?.serviceName || categoryIdToName[item?._matchedCategoryId] || "Category";
-    const city = item?.contactDetails?.city || "Pakistan";
+    const businessCity = item?.businessCityId;
+    const subscriptionBadge =
+  item?.marketplaceSubscription?.subscriptionBadge;
+
+      const isPremium =
+        subscriptionBadge === "Premium";
+
+      const isGrowth =
+        subscriptionBadge === "Growth";
+    const city =
+      businessCity?.name
+        ? [
+            businessCity.name,
+            businessCity.stateProvinceCode,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : "";
 
     return (
       <TouchableOpacity activeOpacity={0.85} style={styles.card}
@@ -302,7 +312,38 @@ router.push({
         <View style={styles.cardTopRow}>
           <Image source={{ uri: item?.contactDetails?.brandLogo || item?.ContactDetails?.brandLogo || item?.coverImage || item?.images?.[0] || "https://via.placeholder.com/300" }} style={styles.image} />
           <View style={styles.cardContent}>
-            <Text style={styles.brandName} numberOfLines={1}>{brandName}</Text>
+            <View style={styles.brandRow}>
+  <Text
+    style={styles.brandName}
+    numberOfLines={1}
+  >
+    {brandName}
+  </Text>
+
+  {isPremium ? (
+    <View style={[styles.subscriptionBadge, styles.premiumBadge]}>
+      <Ionicons
+        name="diamond-outline"
+        size={scale(11)}
+        color="#7A4B00"
+      />
+      <Text style={styles.premiumBadgeText}>
+        Premium
+      </Text>
+    </View>
+  ) : isGrowth ? (
+    <View style={[styles.subscriptionBadge, styles.growthBadge]}>
+      <Ionicons
+        name="trending-up-outline"
+        size={scale(11)}
+        color={COLORS.primary}
+      />
+      <Text style={styles.growthBadgeText}>
+        Growth
+      </Text>
+    </View>
+  ) : null}
+</View>
             <Text style={styles.vendorName} numberOfLines={1}>{vendorName}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{categoryName}</Text>
             <View style={styles.ratingRow}>
@@ -312,10 +353,21 @@ router.push({
               </View>
               <Text style={styles.reviewText}>({reviewCount} review{reviewCount === 1 ? "" : "s"})</Text>
             </View>
-            <View style={styles.row}>
-              <Ionicons name="location-outline" size={scale(13)} color={COLORS.primary} />
-              <Text style={styles.address} numberOfLines={1}>{city}</Text>
-            </View>
+            {city ? (
+          <View style={styles.row}>
+            <Ionicons
+              name="location-outline"
+              size={scale(13)}
+              color={COLORS.primary}
+            />
+            <Text
+              style={styles.address}
+              numberOfLines={1}
+            >
+              {city}
+            </Text>
+          </View>
+        ) : null}
           </View>
         </View>
 
@@ -440,8 +492,53 @@ const styles = StyleSheet.create({
   headerSubtitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: scale(4), gap: scale(6) },
   headerDot: { width: scale(5), height: scale(5), borderRadius: scale(2.5), backgroundColor: COLORS.success },
   headerSubtitle: { fontSize: scale(12.5), color: COLORS.inkMuted, fontWeight: "500" },
+brandRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: scale(6),
+  marginBottom: scale(2),
+},
 
-  brandName: { fontSize: scale(17), fontWeight: "800", color: COLORS.primaryDark, marginBottom: scale(2) },
+brandName: {
+  fontSize: scale(17),
+  fontWeight: "800",
+  color: COLORS.primaryDark,
+  flexShrink: 1,
+},
+
+subscriptionBadge: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: scale(3),
+  paddingHorizontal: scale(7),
+  paddingVertical: scale(3),
+  borderRadius: scale(10),
+},
+
+premiumBadge: {
+  backgroundColor: "#FFF3D6",
+  borderWidth: 1,
+  borderColor: "#E7C46A",
+},
+
+premiumBadgeText: {
+  fontSize: scale(10),
+  fontWeight: "800",
+  color: "#7A4B00",
+},
+
+growthBadge: {
+  backgroundColor: COLORS.primarySoft,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+},
+
+growthBadgeText: {
+  fontSize: scale(10),
+  fontWeight: "800",
+  color: COLORS.primary,
+},
   vendorName: { fontSize: scale(12), color: COLORS.inkMuted, marginBottom: scale(4) },
 
   // Loading banner

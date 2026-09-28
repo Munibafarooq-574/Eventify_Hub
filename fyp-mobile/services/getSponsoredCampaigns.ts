@@ -31,21 +31,102 @@ export interface SponsoredCampaign {
   sponsored: true;
 }
 
-export async function getSponsoredCampaigns(): Promise<
-  SponsoredCampaign[]
+export interface SponsoredCampaignsPage {
+  items: SponsoredCampaign[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+export interface SponsoredCampaignQuery {
+  eventCityId?: string;
+  categoryIds?: string[];
+  page?: number;
+  limit?: number;
+  viewAll?: boolean;
+}
+
+export async function getSponsoredCampaigns(
+  query: SponsoredCampaignQuery = {},
+): Promise<
+  SponsoredCampaign[] | SponsoredCampaignsPage
 > {
   try {
-    const response =
-      await growthApi.get<SponsoredCampaign[]>(
-        "/vendor/growth/campaign/public/active",
-      );
+    const params = new URLSearchParams();
 
-    return Array.isArray(response) ? response : [];
+    if (query.eventCityId) {
+      params.append(
+        "eventCityId",
+        query.eventCityId,
+      );
+    }
+
+    if (query.categoryIds?.length) {
+      params.append(
+        "categoryIds",
+        query.categoryIds.join(","),
+      );
+    }
+
+    if (query.page) {
+      params.append(
+        "page",
+        String(query.page),
+      );
+    }
+
+    if (query.limit) {
+      params.append(
+        "limit",
+        String(query.limit),
+      );
+    }
+
+    if (query.viewAll) {
+      params.append(
+        "viewAll",
+        "true",
+      );
+    }
+
+    const queryString = params.toString();
+
+    const response = await growthApi.get<
+      | SponsoredCampaign[]
+      | SponsoredCampaignsPage
+    >(
+      `/vendor/growth/campaign/public/active${
+        queryString
+          ? `?${queryString}`
+          : ""
+      }`,
+    );
+
+    if (query.viewAll) {
+      return response as SponsoredCampaignsPage;
+    }
+
+    return Array.isArray(response)
+      ? response
+      : [];
   } catch (error) {
     console.error(
       "Failed to load sponsored campaigns:",
       error,
     );
+
+    if (query.viewAll) {
+      return {
+        items: [],
+        page: query.page || 1,
+        limit: query.limit || 10,
+        total: 0,
+        totalPages: 0,
+        hasMore: false,
+      };
+    }
 
     return [];
   }

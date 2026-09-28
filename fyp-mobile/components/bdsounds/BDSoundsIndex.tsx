@@ -1,4 +1,4 @@
-import postSoundBusinessDetails from "@/services/Postsoundbusinessdetails";
+﻿import postSoundBusinessDetails from "@/services/Postsoundbusinessdetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import { getSecureData } from "@/store";
@@ -42,7 +42,6 @@ const BDSoundIndex = () => {
     const [soundType, setSoundType] = useState<string[]>([]);
     const [equipmentProvided, setEquipmentProvided] = useState<string[]>([]);
     const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
-    const [cityCovered, setCityCovered] = useState<string>("");
     const [staffGender, setStaffGender] = useState<string[]>([]);
     const [minimumPrice, setMinimumPrice] = useState<string>("");
     const [description, setDescription] = useState<string>("");
@@ -66,7 +65,6 @@ const BDSoundIndex = () => {
       setSoundType(data.soundType || []);
       setEquipmentProvided(data.equipmentProvided || []);
       setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
-      setCityCovered(data.cityCovered || "");
       setStaffGender(data.staffGender || []);
       setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
@@ -106,7 +104,6 @@ const BDSoundIndex = () => {
             soundType.length === 0 ||
             equipmentProvided.length === 0 ||
             travelsToClientHome === null ||
-            !cityCovered ||
             staffGender.length === 0 ||
             !minimumPrice ||
             !description ||
@@ -127,7 +124,6 @@ const BDSoundIndex = () => {
     soundType,
     equipmentProvided,
     travelsToClientHome: travel,
-    cityCovered,
     staffGender,
     minimumPrice: Number(minimumPrice),
     description,
@@ -269,17 +265,6 @@ if (edit === "true") {
                 </View>
             </View>
 
-            {/* City Covered */}
-            <View style={styles.card}>
-                <SectionTitle icon="map-marker-alt" title="City Covered" required />
-                <TextInput
-                    style={styles.input}
-                    placeholder="Select Cities"
-                    placeholderTextColor="#B99DAF"
-                    value={cityCovered}
-                    onChangeText={setCityCovered}
-                />
-            </View>
 
             {/* Staff - multi select */}
             <View style={styles.card}>
@@ -337,9 +322,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-• Professional DJ & Sound services for weddings and events.
-• High-quality sound system with experienced staff.
-• Available for indoor and outdoor functions.`}
+â€¢ Professional DJ & Sound services for weddings and events.
+â€¢ High-quality sound system with experienced staff.
+â€¢ Available for indoor and outdoor functions.`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -353,11 +338,11 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-• Generator backup available
-• Setup completed before event starts
-• Travel charges may apply
-• Extra equipment available on request
-• Advance booking recommended`}
+â€¢ Generator backup available
+â€¢ Setup completed before event starts
+â€¢ Travel charges may apply
+â€¢ Extra equipment available on request
+â€¢ Advance booking recommended`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
@@ -753,3 +738,4 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
 });
+

@@ -17,6 +17,7 @@ import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availa
 import { PayoutService } from 'src/payout/payout.service';
 import { CommissionConfig } from 'src/schemas/commission-config.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
+import { CityService } from 'src/city/city.service';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -44,8 +45,9 @@ export class OrderService {
     private readonly connection: Connection,
 
     private readonly availabilityService: VendorAvailabilityService,
-private readonly payoutService: PayoutService,
-private readonly featureAccessService: FeatureAccessService,
+    private readonly payoutService: PayoutService,
+    private readonly featureAccessService: FeatureAccessService,
+    private readonly cityService: CityService,
 ) { }
 
             // Create a new order
@@ -53,12 +55,33 @@ private readonly featureAccessService: FeatureAccessService,
     organizerId: string,
     eventDate: Date,
     eventTime: string,
-    services: { vendorId: string; serviceName: string; price: number }[],
+    services: {
+    vendorId: string;
+    serviceName: string;
+    price: number;
+    packageId: string;
+}[],
     eventName: string,
     guests: number,
     eventType?: string,
-    durationMinutes = 60,
+durationMinutes = 60,
+eventCityId?: string,
+eventAddress?: string,
 ): Promise<Order> {
+
+    if (!eventCityId) {
+    throw new BadRequestException('Event city is required');
+}
+
+if (!eventAddress?.trim()) {
+    throw new BadRequestException('Event address is required');
+}
+
+// Final backend authority:
+// eventCityId must exist and must currently be active.
+await this.cityService.requireActiveCity(eventCityId);
+
+const normalizedEventAddress = eventAddress.trim();
       // Calculate event start/end datetime
 const [h, m] = (eventTime || '00:00').split(':').map(Number);
 
@@ -93,6 +116,43 @@ try {
             ),
         ];
 
+        const eventCityObjectId =
+    new Types.ObjectId(eventCityId);
+
+const vendorsServingEventCity =
+    await this.userModel
+        .find({
+            _id: {
+                $in: uniqueVendorIds.map(
+                    (vendorId) =>
+                        new Types.ObjectId(vendorId),
+                ),
+            },
+            role: 'Vendor',
+            serviceLocationCityIds: eventCityObjectId,
+        })
+        .select('_id')
+        .session(session)
+        .lean();
+
+const servingVendorIds = new Set(
+    vendorsServingEventCity.map((vendor) =>
+        vendor._id.toString(),
+    ),
+);
+
+const vendorOutsideServiceArea =
+    uniqueVendorIds.find(
+        (vendorId) =>
+            !servingVendorIds.has(vendorId),
+    );
+
+if (vendorOutsideServiceArea) {
+    throw new ConflictException(
+        'One or more selected vendors do not serve the event city.',
+    );
+}
+
         const vendorAccessResults = await Promise.all(
             uniqueVendorIds.map(async (vendorId) => ({
                 vendorId,
@@ -113,16 +173,22 @@ try {
             );
         }
 
-        // Check every selected vendor before creating anything
-        const results = await this.availabilityService.checkMany(
-            services.map((service) => service.vendorId),
+       // Final authoritative availability check for every selected package.
+// Each package keeps its own bookingType / duration / service-window rules.
+const results = await Promise.all(
+    services.map((service) =>
+        this.availabilityService.checkVendorAvailability(
+            service.vendorId,
             eventStartDateTime,
             eventEndDateTime,
-        );
+            service.packageId,
+        ),
+    ),
+);
 
-        const unavailable = results.find(
-            (result) => !result.available,
-        );
+const unavailable = results.find(
+    (result) => !result.available,
+);
 
         if (unavailable) {
             throw new ConflictException(
@@ -146,6 +212,9 @@ try {
                     eventName,
                     eventType,
                     guests,
+
+                    eventCityId: eventCityObjectId,
+                    eventAddress: normalizedEventAddress,
 
                     totalAmount,
                     discount: 0,
@@ -176,6 +245,7 @@ try {
                             ),
                             serviceName: service.serviceName,
                             price: service.price,
+                            packageId: service.packageId,
                             status: 'pending',
 
                             eventStartDateTime,

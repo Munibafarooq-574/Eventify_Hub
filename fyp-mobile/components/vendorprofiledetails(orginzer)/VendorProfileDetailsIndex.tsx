@@ -530,24 +530,26 @@ const VendorDetailsScreen: React.FC =
 
         if (isEventMode) {
           const checkResult =
-            await checkVendorsAvailability({
-              vendorIds: [
-                vendorData._id,
-              ],
-              eventDate: String(
-                Array.isArray(eventDate)
-                  ? eventDate[0]
-                  : eventDate,
-              ),
-              startTime: String(
-                Array.isArray(startTime)
-                  ? startTime[0]
-                  : startTime,
-              ),
-              durationMinutes: Number(
-                durationMinutes,
-              ),
-            });
+  await checkVendorsAvailability({
+    vendorIds: [
+      vendorData._id,
+    ],
+    eventDate: String(
+      Array.isArray(eventDate)
+        ? eventDate[0]
+        : eventDate,
+    ),
+    startTime: String(
+      Array.isArray(startTime)
+        ? startTime[0]
+        : startTime,
+    ),
+    durationMinutes: Number(
+      durationMinutes,
+    ),
+    packageId:
+      activePackage || undefined,
+  });
 
           setAvailabilityCheck(
             checkResult?.[0] ?? null,
@@ -578,12 +580,13 @@ const VendorDetailsScreen: React.FC =
         fetchVendorAvailability();
       }
     }, [
-      vendorData?._id,
-      eventDate,
-      startTime,
-      durationMinutes,
-      bookingMode,
-    ]);
+  vendorData?._id,
+  eventDate,
+  startTime,
+  durationMinutes,
+  bookingMode,
+  activePackage,
+]);
 
   type TodayAvailabilitySummary = {
   day: string;

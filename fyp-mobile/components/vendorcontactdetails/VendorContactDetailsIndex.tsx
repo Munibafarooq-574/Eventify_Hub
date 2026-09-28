@@ -1,6 +1,9 @@
 // fyp-mobile/components/vendorcontactdetails/VendorContactDetailsIndex.tsx
 
 import postContactDetails from "@/services/postContactDetails";
+import getActiveCities, {
+  ActiveCity,
+} from "@/services/getActiveCities";
 import { getSecureData } from "@/store";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -13,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -27,8 +31,24 @@ const ContactDetailsScreen = () => {
   const [facebookLink, setFacebookLink] = useState<string>("");
   const [bookingEmail, setBookingEmail] = useState<string>("");
   const [website, setWebsite] = useState<string>("");
-  const [city, setCity] = useState<string>("");
-  const [address, setAddress] = useState<string>("");
+  const [cities, setCities] = useState<ActiveCity[]>([]);
+const [citiesLoading, setCitiesLoading] = useState(false);
+
+const [businessCityId, setBusinessCityId] = useState("");
+const [businessCitySearch, setBusinessCitySearch] = useState("");
+const [businessCityOpen, setBusinessCityOpen] = useState(false);
+
+const [
+  serviceLocationCityIds,
+  setServiceLocationCityIds,
+] = useState<string[]>([]);
+
+const [serviceCitySearch, setServiceCitySearch] =
+  useState("");
+const [serviceCitiesOpen, setServiceCitiesOpen] =
+  useState(false);
+
+const [address, setAddress] = useState<string>("");
   const [googleLink, setGoogleLink] = useState<string>("");
 
   const [logoUri, setLogoUri] = useState<string | null>(null);
@@ -66,6 +86,74 @@ const ContactDetailsScreen = () => {
     }, 3200);
   };
 
+  useEffect(() => {
+  const loadCities = async () => {
+    try {
+      setCitiesLoading(true);
+
+      const data = await getActiveCities();
+
+      setCities(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.log("Cities load error:", error);
+      showSnackbar("Unable to load cities.");
+    } finally {
+      setCitiesLoading(false);
+    }
+  };
+
+  loadCities();
+}, []);
+
+const filteredBusinessCities = cities.filter((city) => {
+  const query = businessCitySearch.trim().toLowerCase();
+
+  if (!query) return true;
+
+  const searchable = [
+    city.name,
+    city.stateProvinceName,
+    city.stateProvinceCode,
+    city.countryName,
+    city.countryCode,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(query);
+});
+
+const filteredServiceCities = cities.filter((city) => {
+  const query = serviceCitySearch.trim().toLowerCase();
+
+  if (!query) return true;
+
+  const searchable = [
+    city.name,
+    city.stateProvinceName,
+    city.stateProvinceCode,
+    city.countryName,
+    city.countryCode,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(query);
+});
+
+const selectedBusinessCity = cities.find(
+  (city) => city._id === businessCityId,
+);
+
+const toggleServiceCity = (cityId: string) => {
+  setServiceLocationCityIds((current) =>
+    current.includes(cityId)
+      ? current.filter((id) => id !== cityId)
+      : [...current, cityId],
+  );
+};
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateAnim = useRef(new Animated.Value(40)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
@@ -143,7 +231,6 @@ const ContactDetailsScreen = () => {
     const trimmedFacebook = facebookLink.trim();
     const trimmedBookingEmail = bookingEmail.trim();
     const trimmedWebsite = website.trim();
-    const trimmedCity = city.trim();
     const trimmedAddress = address.trim();
     const trimmedGoogleLink = googleLink.trim();
 
@@ -206,12 +293,12 @@ const ContactDetailsScreen = () => {
       return;
     }
 
-    if (!/^03\d{9}$/.test(trimmedContactNumber)) {
-      showSnackbar(
-        "Enter a valid Pakistani mobile number: 11 digits starting with 03."
-      );
-      return;
-    }
+    if (!/^\+?[0-9]{7,15}$/.test(trimmedContactNumber)) {
+  showSnackbar(
+    "Enter a valid phone number with 7 to 15 digits. You may include a leading + country code."
+  );
+  return;
+}
 
     const hasInstagram = trimmedInstagram.length > 0;
     const hasFacebook = trimmedFacebook.length > 0;
@@ -245,15 +332,17 @@ const ContactDetailsScreen = () => {
       return;
     }
 
-    if (!trimmedCity) {
-      showSnackbar("City is required.");
-      return;
-    }
+      if (!businessCityId) {
+    showSnackbar("Business City is required.");
+    return;
+  }
 
-    if (!/^[A-Za-zÀ-ÿ\s.'-]{2,}$/.test(trimmedCity)) {
-      showSnackbar("Enter a valid city name.");
-      return;
-    }
+  if (serviceLocationCityIds.length === 0) {
+    showSnackbar(
+      "Select at least one Service City.",
+    );
+    return;
+  }
 
     if (trimmedWebsite && !isValidUrl(trimmedWebsite)) {
       showSnackbar(
@@ -299,7 +388,18 @@ const ContactDetailsScreen = () => {
       }
 
       formData.append("bookingEmail", trimmedBookingEmail);
-      formData.append("city", trimmedCity);
+
+    formData.append(
+      "businessCityId",
+      businessCityId,
+    );
+
+    serviceLocationCityIds.forEach((cityId) => {
+      formData.append(
+        "serviceLocationCityIds",
+        cityId,
+      );
+    });
 
       if (trimmedWebsite) {
         formData.append("website", trimmedWebsite);
@@ -475,26 +575,22 @@ router.replace(route as any);
           </Text>
 
           <View style={styles.phoneInputContainer}>
-            <Text style={styles.flag}>
-              🇵🇰
-            </Text>
+  <TextInput
+    style={styles.phoneInput}
+    placeholder="+1 2025550123"
+    placeholderTextColor="#999"
+    keyboardType="phone-pad"
+    value={contactNumber}
+    maxLength={16}
+    onChangeText={(text) => {
+      const normalized = text
+        .replace(/[^0-9+]/g, "")
+        .replace(/(?!^)\+/g, "");
 
-                  <TextInput
-        style={styles.phoneInput}
-        placeholder="03XXXXXXXXX"
-        placeholderTextColor="#999"
-        keyboardType="phone-pad"
-        value={contactNumber}
-        maxLength={11}
-        onChangeText={(text) => {
-          const digitsOnly = text.replace(/[^0-9]/g, "");
-
-          if (digitsOnly.length <= 11) {
-            setContactNumber(digitsOnly);
-          }
-        }}
-      />
-          </View>
+      setContactNumber(normalized);
+    }}
+  />
+</View>
         </View>
 
         {/* Social Media section note */}
@@ -574,21 +670,200 @@ router.replace(route as any);
           />
         </View>
 
-        {/* City */}
+        {/* Business City */}
 
-        <View style={styles.inputCard}>
-          <Text style={styles.label}>
-            City *
+<View style={styles.inputCard}>
+  <Text style={styles.label}>
+    Business City *
+  </Text>
+
+  <TouchableOpacity
+    style={styles.citySelector}
+    activeOpacity={0.8}
+    onPress={() => {
+      setBusinessCityOpen((current) => !current);
+      setServiceCitiesOpen(false);
+    }}
+  >
+    <Text
+      style={[
+        styles.citySelectorText,
+        !selectedBusinessCity &&
+          styles.cityPlaceholderText,
+      ]}
+    >
+      {selectedBusinessCity
+        ? `${selectedBusinessCity.name}, ${selectedBusinessCity.stateProvinceName}, ${selectedBusinessCity.countryCode}`
+        : citiesLoading
+          ? "Loading cities..."
+          : "Select Business City"}
+    </Text>
+
+    <Text style={styles.cityArrow}>
+      {businessCityOpen ? "▲" : "▼"}
+    </Text>
+  </TouchableOpacity>
+
+  {businessCityOpen && (
+    <View style={styles.cityDropdown}>
+      <TextInput
+        style={styles.citySearchInput}
+        placeholder="Search city, state or country"
+        placeholderTextColor="#999"
+        value={businessCitySearch}
+        onChangeText={setBusinessCitySearch}
+      />
+
+      <ScrollView
+  style={styles.cityOptionsScroll}
+  nestedScrollEnabled
+  keyboardShouldPersistTaps="handled"
+  showsVerticalScrollIndicator
+>
+  {filteredBusinessCities.map((item) => (
+    <TouchableOpacity
+      key={item._id}
+      style={styles.cityOption}
+      onPress={() => {
+        setBusinessCityId(item._id);
+        setBusinessCitySearch("");
+        setBusinessCityOpen(false);
+      }}
+    >
+      <Text style={styles.cityOptionTitle}>
+        {item.name}
+      </Text>
+
+      <Text style={styles.cityOptionSubtitle}>
+        {item.stateProvinceName},{" "}
+        {item.countryName}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
+      {!citiesLoading &&
+        filteredBusinessCities.length === 0 && (
+          <Text style={styles.noCitiesText}>
+            No cities found.
+          </Text>
+        )}
+    </View>
+  )}
+</View>
+
+{/* Service Cities */}
+
+<View style={styles.inputCard}>
+  <Text style={styles.label}>
+    Service Cities *
+  </Text>
+
+  <Text style={styles.fieldHint}>
+    Select all cities where you provide services.
+  </Text>
+
+  {serviceLocationCityIds.length > 0 && (
+    <View style={styles.selectedCitiesWrap}>
+      {serviceLocationCityIds.map((cityId) => {
+        const selectedCity = cities.find(
+          (item) => item._id === cityId,
+        );
+
+        if (!selectedCity) return null;
+
+        return (
+          <TouchableOpacity
+            key={cityId}
+            style={styles.selectedCityChip}
+            onPress={() => toggleServiceCity(cityId)}
+          >
+            <Text style={styles.selectedCityChipText}>
+              {selectedCity.name} ×
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  )}
+
+  <TouchableOpacity
+    style={styles.citySelector}
+    activeOpacity={0.8}
+    onPress={() => {
+      setServiceCitiesOpen((current) => !current);
+      setBusinessCityOpen(false);
+    }}
+  >
+    <Text style={styles.citySelectorText}>
+      {citiesLoading
+        ? "Loading cities..."
+        : "Add Service Cities"}
+    </Text>
+
+    <Text style={styles.cityArrow}>
+      {serviceCitiesOpen ? "▲" : "▼"}
+    </Text>
+  </TouchableOpacity>
+
+  {serviceCitiesOpen && (
+    <View style={styles.cityDropdown}>
+      <TextInput
+        style={styles.citySearchInput}
+        placeholder="Search city, state or country"
+        placeholderTextColor="#999"
+        value={serviceCitySearch}
+        onChangeText={setServiceCitySearch}
+      />
+
+     <ScrollView
+  style={styles.cityOptionsScroll}
+  nestedScrollEnabled
+  keyboardShouldPersistTaps="handled"
+  showsVerticalScrollIndicator
+>
+  {filteredServiceCities.map((item) => {
+    const selected =
+      serviceLocationCityIds.includes(item._id);
+
+    return (
+      <TouchableOpacity
+        key={item._id}
+        style={[
+          styles.cityOption,
+          selected && styles.cityOptionSelected,
+        ]}
+        onPress={() =>
+          toggleServiceCity(item._id)
+        }
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cityOptionTitle}>
+            {item.name}
           </Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Enter City"
-            placeholderTextColor="#999"
-            value={city}
-            onChangeText={setCity}
-          />
+          <Text style={styles.cityOptionSubtitle}>
+            {item.stateProvinceName},{" "}
+            {item.countryName}
+          </Text>
         </View>
+
+        <Text style={styles.cityCheck}>
+          {selected ? "✓" : ""}
+        </Text>
+      </TouchableOpacity>
+    );
+  })}
+</ScrollView>
+
+      {!citiesLoading &&
+        filteredServiceCities.length === 0 && (
+          <Text style={styles.noCitiesText}>
+            No cities found.
+          </Text>
+        )}
+    </View>
+  )}
+</View>
 
         {/* Official Address */}
 
@@ -941,6 +1216,121 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.4,
   },
+  citySelector: {
+  minHeight: 46,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingVertical: 8,
+},
+
+citySelectorText: {
+  flex: 1,
+  fontSize: 15,
+  color: "#222",
+  marginRight: 10,
+},
+
+cityPlaceholderText: {
+  color: "#999",
+},
+
+cityArrow: {
+  color: "#780C60",
+  fontSize: 12,
+  fontWeight: "700",
+},
+
+cityDropdown: {
+  marginTop: 10,
+  maxHeight: 280,
+  borderWidth: 1,
+  borderColor: "#E8D6E3",
+  borderRadius: 14,
+  overflow: "hidden",
+},
+
+cityOptionsScroll: {
+  maxHeight: 220,
+},
+
+citySearchInput: {
+  fontSize: 14,
+  color: "#222",
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: "#EEE",
+},
+
+cityOption: {
+  minHeight: 52,
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderBottomWidth: 1,
+  borderBottomColor: "#F1F1F1",
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+cityOptionSelected: {
+  backgroundColor: "#FBEFF7",
+},
+
+cityOptionTitle: {
+  color: "#222",
+  fontSize: 14,
+  fontWeight: "600",
+},
+
+cityOptionSubtitle: {
+  color: "#777",
+  fontSize: 12,
+  marginTop: 2,
+},
+
+cityCheck: {
+  color: "#780C60",
+  fontSize: 18,
+  fontWeight: "800",
+  marginLeft: 10,
+},
+
+fieldHint: {
+  color: "#777",
+  fontSize: 12,
+  marginBottom: 8,
+},
+
+selectedCitiesWrap: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  marginBottom: 6,
+},
+
+selectedCityChip: {
+  backgroundColor: "#FBEFF7",
+  borderWidth: 1,
+  borderColor: "#E8C5DC",
+  borderRadius: 20,
+  paddingHorizontal: 11,
+  paddingVertical: 7,
+  marginRight: 7,
+  marginBottom: 7,
+},
+
+selectedCityChipText: {
+  color: "#780C60",
+  fontSize: 12,
+  fontWeight: "700",
+},
+
+noCitiesText: {
+  color: "#777",
+  fontSize: 13,
+  textAlign: "center",
+  paddingVertical: 14,
+},
 });
 
 export default ContactDetailsScreen;
