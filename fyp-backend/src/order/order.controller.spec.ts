@@ -36,13 +36,22 @@ describe('OrderController - Unit Tests', () => {
 
   it('should place an order', async () => {
     const body = {
-      organizerId: validObjectId,
-      eventDate: '2025-06-01',
-      eventTime: '6PM',
-      eventName: 'Wedding',
-      guests: 200,
-      services: [{ vendorId: validObjectId, serviceName: 'Catering', price: 10000 }],
-    };
+  organizerId: validObjectId,
+  eventDate: '2026-12-01',
+  eventTime: '18:00',
+  eventName: 'Wedding',
+  guests: 200,
+  eventCityId: validObjectId,
+  eventAddress: 'Test Event Address',
+  services: [
+    {
+      vendorId: validObjectId,
+      serviceName: 'Catering',
+      price: 10000,
+      packageId: validObjectId,
+    },
+  ],
+};
     const result = await controller.placeOrder(body);
     expect(result._id).toBe('order123');
   });
