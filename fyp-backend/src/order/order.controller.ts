@@ -30,6 +30,7 @@ async placeOrder(@Body() body: {
     guests: number;
     eventCityId: string;
     eventAddress: string;
+    selectedCategoryIds?: string[];
     services: {
     vendorId: string;
     serviceName: string;
@@ -52,7 +53,9 @@ async placeOrder(@Body() body: {
                 body.durationMinutes,
                 body.eventCityId,
                 body.eventAddress,
+                body.selectedCategoryIds,
             );
+            
             return order;
                 } catch (error) {
             console.error('Error placing order:', error);

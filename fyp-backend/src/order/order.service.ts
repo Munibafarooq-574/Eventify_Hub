@@ -18,6 +18,7 @@ import { PayoutService } from 'src/payout/payout.service';
 import { CommissionConfig } from 'src/schemas/commission-config.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CityService } from 'src/city/city.service';
+import { Category } from 'src/schemas/category.schema';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -41,6 +42,9 @@ export class OrderService {
     @InjectModel(CommissionConfig.name)
     private readonly commissionConfigModel: Model<CommissionConfig>,
 
+    @InjectModel(Category.name)
+    private readonly categoryModel: Model<Category>,
+
     @InjectConnection()
     private readonly connection: Connection,
 
@@ -49,6 +53,7 @@ export class OrderService {
     private readonly featureAccessService: FeatureAccessService,
     private readonly cityService: CityService,
 ) { }
+
 
             // Create a new order
     async createOrder(
@@ -67,6 +72,7 @@ export class OrderService {
 durationMinutes = 60,
 eventCityId?: string,
 eventAddress?: string,
+selectedCategoryIds?: string[],
 ): Promise<Order> {
 
     if (!eventCityId) {
@@ -82,7 +88,50 @@ if (!eventAddress?.trim()) {
 await this.cityService.requireActiveCity(eventCityId);
 
 const normalizedEventAddress = eventAddress.trim();
-      // Calculate event start/end datetime
+
+// Phase 5: validate Desired Services against existing active Categories.
+const uniqueSelectedCategoryIds = [
+    ...new Set(selectedCategoryIds ?? []),
+];
+
+let validatedSelectedCategoryIds: Types.ObjectId[] = [];
+
+if (uniqueSelectedCategoryIds.length > 0) {
+    // Reject malformed MongoDB IDs before constructing ObjectIds.
+    const invalidCategoryId = uniqueSelectedCategoryIds.find(
+        (categoryId) => !Types.ObjectId.isValid(categoryId),
+    );
+
+    if (invalidCategoryId) {
+        throw new BadRequestException(
+            'One or more selected category IDs are invalid',
+        );
+    }
+
+    const categories = await this.categoryModel
+        .find({
+            _id: {
+                $in: uniqueSelectedCategoryIds.map(
+                    (categoryId) => new Types.ObjectId(categoryId),
+                ),
+            },
+            isActive: { $ne: false },
+        })
+        .select('_id')
+        .lean();
+
+    if (categories.length !== uniqueSelectedCategoryIds.length) {
+        throw new BadRequestException(
+            'One or more selected categories do not exist or are inactive',
+        );
+    }
+
+    validatedSelectedCategoryIds = categories.map(
+        (category) => new Types.ObjectId(category._id.toString()),
+    );
+}
+
+// Calculate event start/end datetime
 const [h, m] = (eventTime || '00:00').split(':').map(Number);
 
 const eventStartDateTime = new Date(eventDate);
@@ -215,6 +264,7 @@ const unavailable = results.find(
 
                     eventCityId: eventCityObjectId,
                     eventAddress: normalizedEventAddress,
+                    selectedCategoryIds: validatedSelectedCategoryIds,
 
                     totalAmount,
                     discount: 0,

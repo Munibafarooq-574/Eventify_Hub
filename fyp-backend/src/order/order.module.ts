@@ -11,6 +11,10 @@ import { PayoutModule } from "../payout/payout.module";
 import { CommissionConfig, CommissionConfigSchema } from "src/schemas/commission-config.schema";
 import { VendorGrowthModule } from "../vendor/growth/vendor-growth.module";
 import { CityModule } from '../city/city.module';
+import {
+  Category,
+  CategorySchema,
+} from '../schemas/category.schema';
 
 @Module({
     imports: [
@@ -20,6 +24,7 @@ import { CityModule } from '../city/city.module';
             { name: VendorOrder.name, schema: VendorOrderSchema },
             { name: Notification.name, schema: NotificationSchema },
             { name: CommissionConfig.name, schema: CommissionConfigSchema },
+            { name: Category.name, schema: CategorySchema, },
 
             
         ]),

@@ -197,41 +197,58 @@ if (rawUser) {
       )
     : [];
 
-    let categoryIds: string[] = [];
-
-    if (selectedServices.length > 0) {
-      const categories =
-        await getAllCategories();
-
-      const selectedNames =
+    const selectedCategoryIds: string[] =
+  Array.isArray(parsed?.selectedCategoryIds)
+    ? Array.from(
         new Set(
-          selectedServices.map(
-            (service) =>
-              service.toLowerCase(),
-          ),
-        );
-
-      categoryIds = Array.from(
-        new Set(
-          (categories ?? [])
-            .filter((category: any) =>
-              selectedNames.has(
-                String(
-                  category?.name ?? "",
-                )
-                  .trim()
-                  .toLowerCase(),
-              ),
-            )
-            .map((category: any) =>
-              String(
-                category?._id ?? "",
-              ).trim(),
+          (parsed.selectedCategoryIds as unknown[])
+            .map((categoryId) =>
+              String(categoryId ?? "").trim(),
             )
             .filter(Boolean),
         ),
-      );
-    }
+      )
+    : [];
+
+let categoryIds: string[] =
+  selectedCategoryIds;
+
+if (
+  categoryIds.length === 0 &&
+  selectedServices.length > 0
+) {
+  const categories =
+    await getAllCategories();
+
+  const selectedNames =
+    new Set(
+      selectedServices.map(
+        (service) =>
+          service.toLowerCase(),
+      ),
+    );
+
+  categoryIds = Array.from(
+    new Set(
+      (categories ?? [])
+        .filter((category: any) =>
+          selectedNames.has(
+            String(
+              category?.name ?? "",
+            )
+              .trim()
+              .toLowerCase(),
+          ),
+        )
+        .map((category: any) =>
+          String(
+            category?._id ?? "",
+          ).trim(),
+        )
+        .filter(Boolean),
+    ),
+  );
+}
 
     const endTime =
       calculateEndTime(

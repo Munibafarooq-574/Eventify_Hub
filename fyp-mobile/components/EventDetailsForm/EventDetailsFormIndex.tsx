@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
+  Image,
   Alert,
   Platform,
   ScrollView,
@@ -449,7 +450,13 @@ selectedServices:
     eventId = generateEventId();
   }
 
-  const eventStartTime = timeToHHMM(startTime);
+const selectedCategoryIds = categories
+  .filter((category) =>
+    selectedServices.includes(category.name)
+  )
+  .map((category) => category._id);
+
+const eventStartTime = timeToHHMM(startTime);
 
 const eventEndDateTime = new Date(startTime);
 eventEndDateTime.setMinutes(
@@ -472,6 +479,7 @@ const eventEndTime = timeToHHMM(eventEndDateTime);
   eventCityId,
   eventAddress: eventAddress.trim(),
   selectedServices,
+  selectedCategoryIds,
   vendorIds,
 })
   );
@@ -1402,8 +1410,17 @@ const handleContinue = async () => {
               toggleService(service.name)
             }
           >
-            <Ionicons
-              name={
+            
+          {!!service.image && (
+            <Image
+              source={{ uri: service.image }}
+              style={styles.serviceImage}
+              resizeMode="cover"
+            />
+          )}
+
+          <Ionicons
+            name={
                 selectedServices.includes(
                   service.name
                 )
@@ -1471,6 +1488,11 @@ const handleContinue = async () => {
 // =======================================================
 
 const styles = StyleSheet.create({
+   serviceImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
   container: {
     flexGrow: 1,
     backgroundColor: PRIMARY_LIGHT,

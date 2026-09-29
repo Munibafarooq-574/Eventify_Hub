@@ -25,6 +25,12 @@ export class Order extends Document {
 eventCityId: Types.ObjectId;
 
 @Prop({
+  type: [{ type: Types.ObjectId, ref: 'Category' }],
+  default: [],
+})
+selectedCategoryIds: Types.ObjectId[];
+
+@Prop({
   type: String,
   required: true,
   trim: true,
