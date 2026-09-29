@@ -879,6 +879,14 @@ export class User extends Document {
   @Prop()
   city: string;
 
+  @Prop({
+  type: MongooseSchema.Types.ObjectId,
+  ref: 'City',
+  default: null,
+  index: true,
+})
+clientCityId?: Types.ObjectId | null;
+
   @Prop()
   role: string;
 

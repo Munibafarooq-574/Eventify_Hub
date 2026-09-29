@@ -158,16 +158,17 @@ const SponsoredForYou: React.FC = () => {
     setLoading(true);
 
    const {
-  eventCityId,
+  discoveryCityId,
   categoryIds,
 } = await getMarketplaceEventContext();
 
     const result =
-      await getSponsoredCampaigns({
-        eventCityId,
-        categoryIds,
-        limit: 4,
-      });
+    await getSponsoredCampaigns({
+      eventCityId:
+      discoveryCityId,
+      categoryIds,
+      limit: 4,
+    });
 
     setCampaigns(
       Array.isArray(result)

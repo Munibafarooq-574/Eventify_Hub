@@ -45,16 +45,17 @@ const SponsoredCampaignsViewAll = () => {
 
   const getContext =
   useCallback(async () => {
-    const {
-      eventCityId,
-      categoryIds,
-    } =
-      await getMarketplaceEventContext();
+  const {
+  discoveryCityId,
+  categoryIds,
+} =
+  await getMarketplaceEventContext();
 
-    return {
-      eventCityId,
-      categoryIds,
-    };
+return {
+  eventCityId:
+    discoveryCityId,
+  categoryIds,
+};
   }, []);
 
   const loadPage = useCallback(

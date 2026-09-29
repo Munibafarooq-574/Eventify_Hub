@@ -32,6 +32,7 @@ export class RegisterDto {
   @IsMongoId()
   categoryId?: string;
 
+
   /**
    * TEMPORARY backward compatibility.
    * Remove after old mobile registration flow is migrated.
@@ -43,4 +44,8 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+@IsMongoId()
+clientCityId?: string;
 }

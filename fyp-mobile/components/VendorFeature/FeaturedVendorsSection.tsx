@@ -38,22 +38,20 @@ useEffect(() => {
 
   const loadFeaturedVendors = async () => {
     try {
-     const context =
-  await getMarketplaceEventContext();
-
-const {
-  eventCityId,
+  const {
+  discoveryCityId,
   categoryIds,
   eventDate,
   startTime,
   durationMinutes,
   hasAvailabilityContext,
-} = context;
+} = await getMarketplaceEventContext();
 
 const featured =
   await getActiveFeaturedVendors({
     limit: 10,
-    eventCityId,
+    eventCityId:
+      discoveryCityId,
     categoryIds,
   });
 

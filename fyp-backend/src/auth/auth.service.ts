@@ -148,15 +148,13 @@ private readonly cityService: CityService,
     }
 
     const isVendor =
-      normalizedRole === 'vendor';
+  normalizedRole === 'vendor';
 
-    /**
-     * categoryId is the new canonical property.
-     *
-     * buisnessCategories remains temporarily supported
-     * for backward compatibility with the current
-     * mobile app.
-     */
+    const isClient =
+      normalizedRole === 'client' ||
+      normalizedRole === 'organizer';
+
+
     const selectedCategoryId =
       categoryId ?? buisnessCategories;
 
@@ -200,6 +198,19 @@ private readonly cityService: CityService,
         );
       }
     }
+
+    // =====================================================
+// CLIENT CITY VALIDATION
+// =====================================================
+
+if (
+  isClient &&
+  registerDto.clientCityId
+) {
+  await this.cityService.requireActiveCity(
+    registerDto.clientCityId,
+  );
+}
 
     // =====================================================
     // CHECK EXISTING USER
@@ -251,7 +262,16 @@ private readonly cityService: CityService,
 
       role,
     };
-
+    
+        if (
+      isClient &&
+      registerDto.clientCityId
+    ) {
+      userPayload.clientCityId =
+        new Types.ObjectId(
+          registerDto.clientCityId,
+        );
+    }
     /**
      * Only vendors should have
      * a business category.

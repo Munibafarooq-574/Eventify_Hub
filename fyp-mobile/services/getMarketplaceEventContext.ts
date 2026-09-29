@@ -4,6 +4,7 @@ import { getSecureData } from "@/store";
 export interface MarketplaceEventContext {
   eventId?: string;
   eventCityId?: string;
+  discoveryCityId?: string;
   eventAddress?: string;
 
   eventDate?: string;
@@ -102,22 +103,50 @@ const calculateEndTime = (
 
 export default async function getMarketplaceEventContext(): Promise<MarketplaceEventContext> {
   const raw =
-    await getSecureData("eventDetails");
+  await getSecureData("eventDetails");
+
+const rawUser =
+  await getSecureData("user");
+
+let clientCityId:
+  | string
+  | undefined;
+
+if (rawUser) {
+  try {
+    const parsedUser =
+      JSON.parse(rawUser);
+
+    clientCityId =
+      cleanString(
+        parsedUser?.clientCityId,
+      );
+  } catch {
+    clientCityId = undefined;
+  }
+}
 
   if (!raw) {
-    return {
-      selectedServices: [],
-      categoryIds: [],
-      hasEventContext: false,
-      hasAvailabilityContext: false,
-    };
-  }
+  return {
+    eventCityId: undefined,
+    discoveryCityId:
+      clientCityId,
+    selectedServices: [],
+    categoryIds: [],
+    hasEventContext: false,
+    hasAvailabilityContext: false,
+  };
+}
 
   try {
     const parsed = JSON.parse(raw);
 
     const eventCityId =
-      cleanString(parsed?.eventCityId);
+  cleanString(parsed?.eventCityId);
+
+    const discoveryCityId =
+      eventCityId ||
+      clientCityId;
 
     const eventAddress =
       cleanString(parsed?.eventAddress);
@@ -219,6 +248,7 @@ export default async function getMarketplaceEventContext(): Promise<MarketplaceE
     return {
       eventId,
       eventCityId,
+      discoveryCityId,
       eventAddress,
       eventDate,
       startTime,
