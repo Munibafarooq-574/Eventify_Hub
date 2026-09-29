@@ -264,19 +264,27 @@ if (campaignDurationMs > maxCampaignDurationMs) {
  * Only an earlier calendar date is rejected.
  */
 
-const startDay = Date.UTC(
-  startDate.getUTCFullYear(),
-  startDate.getUTCMonth(),
-  startDate.getUTCDate(),
+const todayStart = new Date(
+  now.getFullYear(),
+  now.getMonth(),
+  now.getDate(),
+  0,
+  0,
+  0,
+  0,
 );
 
-const todayDay = Date.UTC(
-  now.getUTCFullYear(),
-  now.getUTCMonth(),
-  now.getUTCDate(),
+const campaignStartDay = new Date(
+  startDate.getFullYear(),
+  startDate.getMonth(),
+  startDate.getDate(),
+  0,
+  0,
+  0,
+  0,
 );
 
-if (startDay < todayDay) {
+if (campaignStartDay.getTime() < todayStart.getTime()) {
   throw new BadRequestException(
     'Campaign start date cannot be in the past',
   );
