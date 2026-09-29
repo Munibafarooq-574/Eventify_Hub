@@ -67,12 +67,14 @@ export class CreatePhotographerBusinessDetailsDto  {
   @IsString()
   deliveryTime: string;
 
-  // ===============================
-  // City Covered
-  // ===============================
+// ===============================
+// City Covered
+// Legacy field - DB city IDs are handled in Contact Details
+// ===============================
 
-  @IsString()
-  cityCovered: string;
+@IsOptional()
+@IsString()
+cityCovered?: string;
 
   // ===============================
   // Starting Price

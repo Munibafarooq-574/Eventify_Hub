@@ -128,10 +128,8 @@ export class PhotographerBusinessDetails extends BusinessDetails {
   // City Covered
   // ===============================
 
-  @Prop({
-    required: true,
-  })
-  cityCovered: string;
+  @Prop()
+cityCovered?: string;
 
   // ===============================
   // Starting Price
