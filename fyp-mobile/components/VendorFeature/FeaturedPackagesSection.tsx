@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getActiveFeaturedPackages } from '../../services/getActiveFeaturedPackages';
 import { FeaturedPackagePublicEntry } from '../../types/promotion.types';
+import getMarketplaceEventContext from '../../services/getMarketplaceEventContext';
+import checkVendorsAvailability from '../../services/checkVendorsAvailability';
 
 const COLORS = {
   text: '#1F2937',
@@ -36,42 +38,146 @@ export function FeaturedPackagesSection() {
     FeaturedPackagePublicEntry[]
   >([]);
 
-  useEffect(() => {
-    let cancelled = false;
+ useEffect(() => {
+  let cancelled = false;
 
-    getActiveFeaturedPackages(10)
-      .then((result) => {
-        if (!cancelled) {
-          setPackages(result);
+  const loadFeaturedPackages =
+    async () => {
+      try {
+        const {
+          discoveryCityId,
+          categoryIds,
+          eventDate,
+          startTime,
+          durationMinutes,
+          hasAvailabilityContext,
+        } =
+          await getMarketplaceEventContext();
+
+        const featured =
+          await getActiveFeaturedPackages({
+            limit: 10,
+            eventCityId:
+              discoveryCityId,
+            categoryIds,
+          });
+
+        if (cancelled) {
+          return;
         }
-      })
-      .catch((error) => {
+
+        if (featured.length === 0) {
+          setPackages([]);
+          return;
+        }
+
+        // No real event timing:
+        // preserve city/general discovery.
+        if (!hasAvailabilityContext) {
+          setPackages(featured);
+          return;
+        }
+
+        if (
+          !eventDate ||
+          !startTime ||
+          typeof durationMinutes !==
+            'number' ||
+          !Number.isFinite(
+            durationMinutes,
+          ) ||
+          durationMinutes <= 0
+        ) {
+          setPackages(featured);
+          return;
+        }
+
+        /*
+         * Featured packages can belong to
+         * different vendors/packages.
+         *
+         * Check each package using the same
+         * existing availability authority so
+         * package booking configuration remains
+         * the source of truth.
+         */
+        const checks =
+          await Promise.all(
+            featured.map(async (pkg) => {
+              const availability =
+                await checkVendorsAvailability({
+                  vendorIds: [
+                    pkg.vendorId,
+                  ],
+                  eventDate,
+                  startTime,
+                  durationMinutes,
+                  packageId:
+                    pkg.packageId,
+                });
+
+              const available =
+                (availability ?? []).some(
+                  (result) =>
+                    result.vendorId ===
+                      pkg.vendorId &&
+                    result.available,
+                );
+
+              return {
+                pkg,
+                available,
+              };
+            }),
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        setPackages(
+          checks
+            .filter(
+              ({ available }) =>
+                available,
+            )
+            .map(({ pkg }) => pkg),
+        );
+      } catch (error) {
         console.error(
           '[Featured Packages] Failed to load:',
           error,
         );
-      });
 
-    return () => {
-      cancelled = true;
+        if (!cancelled) {
+          setPackages([]);
+        }
+      }
     };
-  }, []);
+
+  void loadFeaturedPackages();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   if (packages.length === 0) {
     return null;
   }
 
   const handlePackagePress = (
-    pkg: FeaturedPackagePublicEntry,
-  ) => {
-    router.push({
-      pathname: '/vendorprofiledetails',
-      params: {
-        id: pkg.vendorId,
-        packageId: pkg.packageId,
-      },
-    });
-  };
+  pkg: FeaturedPackagePublicEntry,
+) => {
+  router.push({
+    pathname: '/vendorprofiledetails',
+    params: {
+      id: pkg.vendorId,
+      packageId: pkg.packageId,
+      openTab: 'Packages',
+    },
+  });
+};
 
   return (
     <View style={styles.section}>

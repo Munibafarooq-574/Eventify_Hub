@@ -30,7 +30,9 @@ export function FeaturedPackagesSection({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     let cancelled = false;
-    getActiveFeaturedPackages(10)
+        getActiveFeaturedPackages({
+      limit: 10,
+    })
       .then((result) => {
         if (!cancelled) setPackages(result);
       })

@@ -49,6 +49,11 @@ interface FeaturedVendorDiscoveryContext {
   categoryIds?: string[];
 }
 
+interface FeaturedPackageDiscoveryContext {
+  eventCityId?: string;
+  categoryIds?: string[];
+}
+
 @Injectable()
 export class PromotionService {
   constructor(
@@ -463,120 +468,301 @@ async getActiveFeaturedVendors(
   return results;
 }
 
-  async getActiveFeaturedPackages(
+async getActiveFeaturedPackages(
   limit = 20,
+  context: FeaturedPackageDiscoveryContext = {},
 ): Promise<FeaturedPackagePublicEntry[]> {
   const now = new Date();
 
-  const activePromotions = await this.promotionModel
-    .find({
-      type: PromotionType.FEATURED_PACKAGE,
-      status: PromotionStatus.ACTIVE,
-      endDate: { $gt: now },
-    })
-    .sort({ startDate: -1 })
-    .limit(limit)
-    .lean();
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 20, 1),
+    20,
+  );
+
+  const eventCityId =
+    context.eventCityId?.trim() || undefined;
+
+  const categoryIds = Array.from(
+    new Set(
+      (context.categoryIds ?? [])
+        .map((id) => id.trim())
+        .filter((id) =>
+          Types.ObjectId.isValid(id),
+        ),
+    ),
+  );
+
+  if (
+    eventCityId &&
+    !Types.ObjectId.isValid(eventCityId)
+  ) {
+    return [];
+  }
+
+  // Do not limit before mandatory eligibility.
+  const activePromotions =
+    await this.promotionModel
+      .find({
+        type: PromotionType.FEATURED_PACKAGE,
+        status: PromotionStatus.ACTIVE,
+        startDate: { $lte: now },
+        endDate: { $gt: now },
+      })
+      .sort({
+        startDate: -1,
+        _id: 1,
+      })
+      .lean();
 
   if (!activePromotions.length) {
     return [];
   }
 
   const vendorIds = [
-    ...new Set(activePromotions.map((p) => p.vendorId.toString())),
+    ...new Set(
+      activePromotions.map((promotion) =>
+        promotion.vendorId.toString(),
+      ),
+    ),
   ];
-  const packageIds = activePromotions.map((p) => p.packageId);
 
-// A featured-package promotion can outlive the subscription
-// that created it. Re-check current entitlement at serving time
-// so expired/downgraded vendors are not publicly featured.
-const eligibilityChecks = await Promise.all(
-  vendorIds.map(async (idStr) => {
-    const allowed =
-      await this.featureAccessService.canUseFeature(
-        idStr,
-        FeatureKey.FEATURED_PACKAGE,
-      );
+  const packageIds = activePromotions
+    .map((promotion) =>
+      promotion.packageId?.toString(),
+    )
+    .filter(
+      (id): id is string =>
+        typeof id === 'string' &&
+        id.length > 0,
+    );
 
-    return [idStr, allowed] as const;
-  }),
-);
+  // Promotion can outlive the subscription that
+  // created it, so re-check current entitlement.
+  const eligibilityChecks =
+    await Promise.all(
+      vendorIds.map(async (vendorId) => {
+        const allowed =
+          await this.featureAccessService.canUseFeature(
+            vendorId,
+            FeatureKey.FEATURED_PACKAGE,
+          );
 
-const eligibleVendorIds = new Set(
-  eligibilityChecks
-    .filter(([, allowed]) => allowed)
-    .map(([idStr]) => idStr),
-);
+        return [
+          vendorId,
+          allowed,
+        ] as const;
+      }),
+    );
 
-const vendors = await this.userModel
-    .find({ _id: { $in: vendorIds.map((id) => new Types.ObjectId(id)) } })
-     .select('name coverImage packages contactDetails')
+  const eligibleVendorIds = new Set(
+    eligibilityChecks
+      .filter(([, allowed]) => allowed)
+      .map(([vendorId]) => vendorId),
+  );
+
+  const vendors = await this.userModel
+    .find({
+      _id: {
+        $in: vendorIds.map(
+          (id) => new Types.ObjectId(id),
+        ),
+      },
+
+      role: 'Vendor',
+
+      ...(eventCityId
+        ? {
+            serviceLocationCityIds:
+              new Types.ObjectId(eventCityId),
+          }
+        : {}),
+
+      ...(categoryIds.length > 0
+        ? {
+            buisnessCategory: {
+              $in: categoryIds.map(
+                (id) =>
+                  new Types.ObjectId(id),
+              ),
+            },
+          }
+        : {}),
+    })
+    .select(
+      'name coverImage packages contactDetails buisnessCategory serviceLocationCityIds',
+    )
     .lean();
 
   const vendorById = new Map(
-    vendors.map((v: any) => [v._id.toString(), v]),
+    vendors.map((vendor: any) => [
+      vendor._id.toString(),
+      vendor,
+    ]),
   );
 
-  // Package-specific rating (requires Review.packageId — Step 2)
-  const ratingAgg = await this.reviewModel.aggregate([
-    { $match: { packageId: { $in: packageIds } } },
-    {
-      $group: {
-        _id: '$packageId',
-        averageRating: { $avg: '$rating' },
-        totalReviews: { $sum: 1 },
-      },
-    },
-  ]);
+  const ratingAgg =
+    packageIds.length > 0
+      ? await this.reviewModel.aggregate([
+          {
+            $match: {
+              packageId: {
+                $in: packageIds,
+              },
+            },
+          },
+          {
+            $group: {
+              _id: '$packageId',
+              averageRating: {
+                $avg: '$rating',
+              },
+              totalReviews: {
+                $sum: 1,
+              },
+            },
+          },
+        ])
+      : [];
+
   const ratingByPackage = new Map(
-    ratingAgg.map((r: any) => [r._id, r]),
+    ratingAgg.map((rating: any) => [
+      rating._id?.toString(),
+      rating,
+    ]),
   );
 
-  // Package-specific order count (requires VendorOrder.packageId — Step 1)
-  const orderAgg = await this.vendorOrderModel.aggregate([
-    { $match: { packageId: { $in: packageIds } } },
-    { $group: { _id: '$packageId', orderCount: { $sum: 1 } } },
-  ]);
+  const orderAgg =
+    packageIds.length > 0
+      ? await this.vendorOrderModel.aggregate([
+          {
+            $match: {
+              packageId: {
+                $in: packageIds,
+              },
+            },
+          },
+          {
+            $group: {
+              _id: '$packageId',
+              orderCount: {
+                $sum: 1,
+              },
+            },
+          },
+        ])
+      : [];
+
   const orderCountByPackage = new Map(
-    orderAgg.map((o: any) => [o._id, o.orderCount]),
+    orderAgg.map((order: any) => [
+      order._id?.toString(),
+      order.orderCount,
+    ]),
   );
 
-  return activePromotions
-  .map((promo: any) => {
-    const vendorId = promo.vendorId.toString();
+  const results: FeaturedPackagePublicEntry[] =
+    [];
+
+  for (const promotion of activePromotions) {
+    const vendorId =
+      promotion.vendorId.toString();
 
     if (!eligibleVendorIds.has(vendorId)) {
-      return null;
+      continue;
     }
 
-    const vendor = vendorById.get(vendorId);
-    if (!vendor) return null;
+    const vendor =
+      vendorById.get(vendorId);
 
-      const pkg = (vendor.packages || []).find(
-        (p: any) => p?._id && p._id.toString() === promo.packageId,
+    if (!vendor) {
+      continue;
+    }
+
+    const promotionPackageId =
+      promotion.packageId?.toString();
+
+    if (!promotionPackageId) {
+      continue;
+    }
+
+    const pkg = (
+      vendor.packages || []
+    ).find(
+      (item: any) =>
+        item?._id &&
+        item._id.toString() ===
+          promotionPackageId,
+    );
+
+    // Deleted/non-existing package must never
+    // remain publicly featured.
+    if (!pkg) {
+      continue;
+    }
+
+    const ratingInfo =
+      ratingByPackage.get(
+        promotionPackageId,
       );
-      if (!pkg) return null;
 
-      const ratingInfo = ratingByPackage.get(promo.packageId);
+    results.push({
+      promotionId:
+        promotion._id.toString(),
 
-      return {
-        promotionId: promo._id.toString(),
-        vendorId: vendor._id.toString(),
-        vendorName: vendor.contactDetails?.brandName || vendor.name,
-        coverImage: vendor.coverImage || null,
-        packageId: pkg._id.toString(),
-        packageName: pkg.packageName,
-        price: pkg.price,
-        rating: ratingInfo
-          ? Math.round(ratingInfo.averageRating * 10) / 10
+      vendorId:
+        vendor._id.toString(),
+
+      vendorName:
+        vendor.contactDetails?.brandName ||
+        vendor.name,
+
+      coverImage:
+        pkg.images?.[0] ||
+        vendor.coverImage ||
+        null,
+
+      packageId:
+        pkg._id.toString(),
+
+      packageName:
+        pkg.packageName,
+
+      price:
+        Number(pkg.price || 0),
+
+      rating:
+        ratingInfo
+          ? Math.round(
+              Number(
+                ratingInfo.averageRating ||
+                  0,
+              ) * 10,
+            ) / 10
           : null,
-        totalReviews: ratingInfo ? ratingInfo.totalReviews : 0,
-        orderCount: orderCountByPackage.get(promo.packageId) || 0,
-      };
-    })
-    .filter((e): e is FeaturedPackagePublicEntry => e !== null);
-}
 
+      totalReviews:
+        ratingInfo
+          ? Number(
+              ratingInfo.totalReviews || 0,
+            )
+          : 0,
+
+      orderCount:
+        Number(
+          orderCountByPackage.get(
+            promotionPackageId,
+          ) || 0,
+        ),
+    });
+
+    // Limit only after entitlement +
+    // city + category + package eligibility.
+    if (results.length >= safeLimit) {
+      break;
+    }
+  }
+
+  return results;
+}
   // ---------------------------------------------------------------
   // Bulk lookups — Phase 9 DiscoveryService
   //

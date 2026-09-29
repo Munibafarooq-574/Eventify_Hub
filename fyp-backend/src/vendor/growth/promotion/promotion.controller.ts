@@ -147,14 +147,42 @@ export class PromotionController {
 
   // GET /vendor/growth/promotion/featured-package/active?limit=20
   // Public — currently featured packages.
-  @Get('featured-package/active')
-  getActiveFeaturedPackages(
-    @Query('limit') limit?: string,
-  ) {
-    return this.promotionService.getActiveFeaturedPackages(
-      limit
-        ? parseInt(limit, 10)
-        : undefined,
-    );
-  }
+ // GET /vendor/growth/promotion/featured-package/active
+//
+// Optional:
+// ?limit=10
+// &eventCityId=<cityId>
+// &categoryIds=<categoryId1>,<categoryId2>
+@Get('featured-package/active')
+getActiveFeaturedPackages(
+  @Query('limit') limit?: string,
+  @Query('eventCityId')
+  eventCityId?: string,
+  @Query('categoryIds')
+  categoryIds?: string,
+) {
+  const parsedLimit = Number(limit);
+
+  return this.promotionService.getActiveFeaturedPackages(
+    Number.isFinite(parsedLimit) &&
+      parsedLimit > 0
+      ? parsedLimit
+      : 20,
+    {
+      eventCityId:
+        typeof eventCityId === 'string' &&
+        eventCityId.trim()
+          ? eventCityId.trim()
+          : undefined,
+
+      categoryIds:
+        typeof categoryIds === 'string'
+          ? categoryIds
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean)
+          : [],
+    },
+  );
+}
 }
