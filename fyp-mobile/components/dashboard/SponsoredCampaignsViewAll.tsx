@@ -19,12 +19,16 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
+const PRIMARY = "#780C60";
 
 const PAGE_SIZE = 10;
 
@@ -190,24 +194,42 @@ return {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
+      <StatusBar barStyle="light-content" />
+
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
+        <View
+          style={styles.headerTitleWrap}
+          pointerEvents="none"
         >
-          <Ionicons
-            name="arrow-back"
-            size={22}
-            color="#2A1B25"
-          />
-        </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            Sponsored For You
+          </Text>
+          <Text style={styles.headerSubtitle}>
+            Promoted packages picked for you
+          </Text>
+        </View>
 
-        <Text style={styles.headerTitle}>
-          Sponsored For You
-        </Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={22}
+              color={PRIMARY}
+            />
+          </TouchableOpacity>
 
-        <View style={styles.headerSpacer} />
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="megaphone-outline"
+              size={20}
+              color="#FFFFFF"
+            />
+          </View>
+        </View>
       </View>
 
       <FlatList
@@ -315,7 +337,7 @@ return {
           );
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -326,29 +348,61 @@ const styles = StyleSheet.create({
   },
 
   header: {
+    backgroundColor: PRIMARY,
+    paddingTop: Platform.OS === "ios" ? 55 : 50,
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    position: "relative",
+  },
+
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: "#FFFFFF",
+    justifyContent: "space-between",
   },
 
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerTitleWrap: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 55 : 50,
+    left: 0,
+    right: 0,
+    height: 40,
+    alignItems: "center",
     justifyContent: "center",
   },
 
   headerTitle: {
-    flex: 1,
-    textAlign: "center",
     fontSize: 18,
     fontWeight: "800",
-    color: "#2A1B25",
+    color: "#FFFFFF",
+    textAlign: "center",
   },
 
-  headerSpacer: {
+  headerSubtitle: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.72)",
+    marginTop: 3,
+    textAlign: "center",
+  },
+
+  headerIcon: {
     width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   listContent: {

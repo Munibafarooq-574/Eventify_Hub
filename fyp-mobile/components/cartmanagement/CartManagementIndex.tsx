@@ -12,6 +12,7 @@ import {
 import Toast from 'react-native-toast-message';
 
 import { getSecureData, saveSecureData } from '@/store';
+import getActiveCities from '@/services/getActiveCities';
 
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8EAF2';
@@ -29,6 +30,9 @@ const CartManagementIndexScreen: React.FC = () => {
     const [cateringCategory, setCateringCategory] = useState<any>(null);
     const [guests, setGuests] = useState<number>(0);
 
+        const [eventCityName, setEventCityName] = useState('');
+        const [eventAddress, setEventAddress] = useState('');
+
     useEffect(() => {
         navigation.setOptions({
             headerShown: false,
@@ -38,15 +42,52 @@ const CartManagementIndexScreen: React.FC = () => {
             try {
                 const storedCart = await getSecureData('cartData');
 
-                const eventDetailsRaw = await getSecureData('eventDetails');
+                 const eventDetailsRaw = await getSecureData('eventDetails');
 
-                if (eventDetailsRaw) {
-                    const eventDetails = JSON.parse(eventDetailsRaw);
+if (eventDetailsRaw) {
+    const eventDetails = JSON.parse(eventDetailsRaw);
 
-                    if (eventDetails?.guests !== undefined) {
-                        setGuests(parseInt(eventDetails.guests.toString(), 10));
-                    }
+    if (eventDetails?.guests !== undefined) {
+        setGuests(
+            parseInt(
+                eventDetails.guests.toString(),
+                10
+            )
+        );
+    }
+
+    setEventAddress(
+        typeof eventDetails?.eventAddress === 'string'
+            ? eventDetails.eventAddress.trim()
+            : ''
+    );
+
+    if (eventDetails?.eventCityId) {
+        try {
+            const activeCities = await getActiveCities();
+
+            const selectedCity = Array.isArray(activeCities)
+                ? activeCities.find(
+                      (city: any) =>
+                          city?._id === eventDetails.eventCityId
+                  )
+                : undefined;
+
+                    setEventCityName(
+                        selectedCity?.name || ''
+                    );
+                } catch (error) {
+                    console.error(
+                        'Error loading event city:',
+                        error
+                    );
+
+                    setEventCityName('');
                 }
+            } else {
+                setEventCityName('');
+            }
+        }
 
                 const categoriesRaw = await getSecureData('categories');
 
@@ -181,73 +222,73 @@ const CartManagementIndexScreen: React.FC = () => {
     };
 
     const handleUpdateQuantity = (
-    vendorIndex: number,
-    packageIndex: number,
-    delta: number
-) => {
-    if (!cartData?.vendors) return;
+        vendorIndex: number,
+        packageIndex: number,
+        delta: number
+    ) => {
+        if (!cartData?.vendors) return;
 
-    const updatedCart = {
-        ...cartData,
-        vendors: [...cartData.vendors],
+        const updatedCart = {
+            ...cartData,
+            vendors: [...cartData.vendors],
+        };
+
+        const vendor = {
+            ...updatedCart.vendors[vendorIndex],
+            packages: [
+                ...updatedCart.vendors[vendorIndex].packages,
+            ],
+        };
+
+        const pkg = {
+            ...vendor.packages[packageIndex],
+        };
+
+        pkg.quantity = Math.max(
+            1,
+            Number(pkg.quantity || 1) + delta
+        );
+
+        vendor.packages[packageIndex] = pkg;
+        updatedCart.vendors[vendorIndex] = vendor;
+
+        saveSecureData(
+            'cartData',
+            JSON.stringify(updatedCart)
+        );
+
+        setCartData(updatedCart);
     };
-
-    const vendor = {
-        ...updatedCart.vendors[vendorIndex],
-        packages: [
-            ...updatedCart.vendors[vendorIndex].packages,
-        ],
-    };
-
-    const pkg = {
-        ...vendor.packages[packageIndex],
-    };
-
-    pkg.quantity = Math.max(
-        1,
-        Number(pkg.quantity || 1) + delta
-    );
-
-    vendor.packages[packageIndex] = pkg;
-    updatedCart.vendors[vendorIndex] = vendor;
-
-    saveSecureData(
-        'cartData',
-        JSON.stringify(updatedCart)
-    );
-
-    setCartData(updatedCart);
-};
 
     // -----------------------------------------
     // Calculate total
     // -----------------------------------------
 
-   const calculateTotalAmount = () => {
-    if (!cartData?.vendors) return 0;
+    const calculateTotalAmount = () => {
+        if (!cartData?.vendors) return 0;
 
-    let totalAmount = 0;
+        let totalAmount = 0;
 
-    cartData.vendors.forEach((vendor: any) => {
-        if (!vendor?.packages) return;
+        cartData.vendors.forEach((vendor: any) => {
+            if (!vendor?.packages) return;
 
-        vendor.packages.forEach((pkg: any) => {
-            const isCatering =
-                cateringCategory?._id &&
-                vendor?.vendor?.buisnessCategory ===
-                    cateringCategory._id;
+            vendor.packages.forEach((pkg: any) => {
+                const isCatering =
+                    cateringCategory?._id &&
+                    vendor?.vendor?.buisnessCategory ===
+                        cateringCategory._id;
 
-            const quantity = Number(pkg?.quantity || 1);
-            const unitPrice = Number(pkg?.price || 0);
+                const quantity = Number(pkg?.quantity || 1);
+                const unitPrice = Number(pkg?.price || 0);
 
-            totalAmount += isCatering
-                ? unitPrice * Number(guests || 0) * quantity
-                : unitPrice * quantity;
+                totalAmount += isCatering
+                    ? unitPrice * Number(guests || 0) * quantity
+                    : unitPrice * quantity;
+            });
         });
-    });
 
-    return totalAmount;
-};
+        return totalAmount;
+    };
 
     // -----------------------------------------
     // Checkout
@@ -294,17 +335,17 @@ const CartManagementIndexScreen: React.FC = () => {
 
     const vendorCount = cartData?.vendors?.length || 0;
 
-   const packageCount =
-    cartData?.vendors?.reduce(
-        (total: number, vendor: any) =>
-            total +
-            (vendor?.packages?.reduce(
-                (s: number, p: any) =>
-                    s + Number(p?.quantity || 1),
-                0
-            ) || 0),
-        0
-    ) || 0;
+    const packageCount =
+        cartData?.vendors?.reduce(
+            (total: number, vendor: any) =>
+                total +
+                (vendor?.packages?.reduce(
+                    (s: number, p: any) =>
+                        s + Number(p?.quantity || 1),
+                    0
+                ) || 0),
+            0
+        ) || 0;
 
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('en-PK');
@@ -383,12 +424,58 @@ const CartManagementIndexScreen: React.FC = () => {
                     </Text>
                 </View>
 
-                <View style={styles.goldDot} />
-            </View>
+        <View style={styles.goldDot} />
+</View>
 
-            {/* =====================================
-                CART CONTENT
-            ===================================== */}
+{/* Event Location */}
+{(eventCityName || eventAddress) && (
+    <View style={styles.eventLocationCard}>
+        <View style={styles.eventLocationIcon}>
+            <Ionicons
+                name="location-outline"
+                size={20}
+                color={PRIMARY}
+            />
+        </View>
+
+        <View style={styles.eventLocationContent}>
+            <Text style={styles.eventLocationTitle}>
+                Event Location
+            </Text>
+
+            {!!eventCityName && (
+                <View style={styles.eventLocationRow}>
+                    <Text style={styles.eventLocationLabel}>
+                        City
+                    </Text>
+
+                    <Text style={styles.eventLocationValue}>
+                        {eventCityName}
+                    </Text>
+                </View>
+            )}
+
+            {!!eventAddress && (
+                <View style={styles.eventLocationRow}>
+                    <Text style={styles.eventLocationLabel}>
+                        Address
+                    </Text>
+
+                    <Text
+                        style={styles.eventLocationValue}
+                        numberOfLines={3}
+                    >
+                        {eventAddress}
+                    </Text>
+                </View>
+            )}
+        </View>
+    </View>
+)}
+
+{/* =====================================
+    CART CONTENT
+===================================== */}
 
             <ScrollView
                 style={styles.scrollView}
@@ -446,7 +533,7 @@ const CartManagementIndexScreen: React.FC = () => {
                         {cartData.vendors.map(
                             (vendor: any, vendorIndex: number) => {
 
-                                 const vendorName =
+                                const vendorName =
                                     vendor?.vendorName ||
                                     vendor?.vendor?.contactDetails?.brandName ||
                                     vendor?.vendor?.ContactDetails?.brandName ||
@@ -463,16 +550,8 @@ const CartManagementIndexScreen: React.FC = () => {
                                     >
                                         {/* Vendor Header */}
 
-                                        <View
-                                            style={
-                                                styles.vendorHeader
-                                            }
-                                        >
-                                            <View
-                                                style={
-                                                    styles.vendorIcon
-                                                }
-                                            >
+                                        <View style={styles.vendorHeader}>
+                                            <View style={styles.vendorIcon}>
                                                 <Ionicons
                                                     name="storefront-outline"
                                                     size={21}
@@ -480,42 +559,23 @@ const CartManagementIndexScreen: React.FC = () => {
                                                 />
                                             </View>
 
-                                            <View
-                                                style={
-                                                    styles.vendorInfo
-                                                }
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.vendorLabel
-                                                    }
-                                                >
+                                            <View style={styles.vendorInfo}>
+                                                <Text style={styles.vendorLabel}>
                                                     VENDOR
                                                 </Text>
 
                                                 <Text
-                                                    style={
-                                                        styles.vendorName
-                                                    }
+                                                    style={styles.vendorName}
                                                     numberOfLines={1}
                                                 >
                                                     {vendorName}
                                                 </Text>
                                             </View>
 
-                                            <View
-                                                style={
-                                                    styles.packageCountBadge
-                                                }
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.packageCountText
-                                                    }
-                                                >
+                                            <View style={styles.packageCountBadge}>
+                                                <Text style={styles.packageCountText}>
                                                     {packages.length}{' '}
-                                                    {packages.length ===
-                                                    1
+                                                    {packages.length === 1
                                                         ? 'Package'
                                                         : 'Packages'}
                                                 </Text>
@@ -524,11 +584,7 @@ const CartManagementIndexScreen: React.FC = () => {
 
                                         {/* Divider */}
 
-                                        <View
-                                            style={
-                                                styles.vendorDivider
-                                            }
-                                        />
+                                        <View style={styles.vendorDivider} />
 
                                         {/* Packages */}
 
@@ -544,181 +600,204 @@ const CartManagementIndexScreen: React.FC = () => {
                                                         cateringCategory._id;
 
                                                 const packagePrice =
-                                                    Number(
-                                                        pkg?.price || 0
-                                                    );
+                                                    Number(pkg?.price || 0);
 
                                                 const finalPrice =
                                                     isCatering
                                                         ? packagePrice *
-                                                          Number(
-                                                              guests || 0
-                                                          )
+                                                          Number(guests || 0)
                                                         : packagePrice;
 
                                                 return (
                                                     <View
                                                         key={`${packageIndex}-${pkg?.packageName || 'package'}`}
-                                                        style={
-                                                            styles.packageCard
-                                                        }
+                                                        style={styles.packageCard}
                                                     >
-                                                        <View
-                                                            style={
-                                                                styles.packageIcon
-                                                            }
-                                                        >
+                                                        <View style={styles.packageIcon}>
                                                             <Ionicons
                                                                 name="cube-outline"
                                                                 size={20}
-                                                                color={
-                                                                    PRIMARY
-                                                                }
+                                                                color={PRIMARY}
                                                             />
                                                         </View>
 
-                                                        <View
-                                                            style={
-                                                                styles.packageInfo
-                                                            }
-                                                        >
+                                                        <View style={styles.packageInfo}>
                                                             <Text
-                                                                style={
-                                                                    styles.packageName
-                                                                }
-                                                                numberOfLines={
-                                                                    2
-                                                                }
+                                                                style={styles.packageName}
+                                                                numberOfLines={2}
                                                             >
-                                                                {
-                                                                    pkg?.packageName
-                                                                }
+                                                                {pkg?.packageName}
                                                             </Text>
 
                                                             {isCatering && (
-                                                                <View
-                                                                    style={
-                                                                        styles.guestTag
-                                                                    }
-                                                                >
+                                                                <View style={styles.guestTag}>
                                                                     <Ionicons
                                                                         name="people-outline"
-                                                                        size={
-                                                                            12
-                                                                        }
-                                                                        color={
-                                                                            GOLD
-                                                                        }
+                                                                        size={12}
+                                                                        color={GOLD}
                                                                     />
 
-                                                                    <Text
-                                                                        style={
-                                                                            styles.guestTagText
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            guests
-                                                                        }{' '}
+                                                                    <Text style={styles.guestTagText}>
+                                                                        {guests}{' '}
                                                                         guests
                                                                     </Text>
                                                                 </View>
                                                             )}
 
-                                                            <Text
-                                                                style={
-                                                                    styles.packagePrice
-                                                                }
-                                                            >
+                                                            <Text style={styles.packagePrice}>
                                                                 Rs.{' '}
-                                                                {formatCurrency(
-                                                                    finalPrice
-                                                                )}
-                                                            </Text>
-                                                                                                                        <Text
-                                                                style={{
-                                                                    fontSize: 10,
-                                                                    color: MUTED,
-                                                                    marginTop: 2,
-                                                                }}
-                                                            >
-                                                                {pkg.eventDate} • {pkg.startTime}–{pkg.endTime}
+                                                                {formatCurrency(finalPrice)}
                                                             </Text>
 
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 10,
-                                                                    color: MUTED,
-                                                                    marginTop: 2,
-                                                                }}
-                                                            >
-                                                                Duration: {pkg.durationMinutes ? `${(pkg.durationMinutes / 60).toFixed(pkg.durationMinutes % 60 === 0 ? 0 : 1)} hr` : 'N/A'}
-                                                                {pkg.priceBasis === 'custom' ? ' • Custom rate' : ' • Fixed rate'}
-                                                                {typeof pkg.basePrice === 'number' && pkg.basePrice !== pkg.price ? ` • Base: Rs. ${pkg.basePrice.toLocaleString()}` : ''}
-                                                            </Text>
+                                                            {/* Booking Details */}
 
-                                                            <View
-                                                                style={{
-                                                                    flexDirection: 'row',
-                                                                    alignItems: 'center',
-                                                                    marginTop: 6,
-                                                                }}
-                                                            >
-                                                                <TouchableOpacity
-                                                                    onPress={() =>
-                                                                        handleUpdateQuantity(
-                                                                            vendorIndex,
-                                                                            packageIndex,
-                                                                            -1
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Ionicons
-                                                                        name="remove-circle-outline"
-                                                                        size={20}
-                                                                        color={PRIMARY}
-                                                                    />
-                                                                </TouchableOpacity>
+                                                            <View style={styles.bookingDetailsBox}>
+                                                                <View style={styles.bookingDetailItem}>
+                                                                    <View style={styles.bookingDetailIcon}>
+                                                                        <Ionicons
+                                                                            name="calendar-outline"
+                                                                            size={14}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </View>
 
-                                                                <Text
-                                                                    style={{
-                                                                        marginHorizontal: 8,
-                                                                        fontWeight: '700',
-                                                                    }}
-                                                                >
-                                                                    {pkg.quantity || 1}
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        {pkg.eventDate || 'Date not selected'}
+                                                                    </Text>
+                                                                </View>
+
+                                                                <View style={styles.bookingDetailItem}>
+                                                                    <View style={styles.bookingDetailIcon}>
+                                                                        <Ionicons
+                                                                            name="time-outline"
+                                                                            size={14}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </View>
+
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        {pkg.startTime || '--:--'}
+                                                                        {pkg.endTime ? ` – ${pkg.endTime}` : ''}
+                                                                    </Text>
+                                                                </View>
+
+                                                                <View style={styles.bookingDetailItem}>
+                                                                    <View style={styles.bookingDetailIcon}>
+                                                                        <Ionicons
+                                                                            name="hourglass-outline"
+                                                                            size={14}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </View>
+
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        {pkg.durationMinutes
+                                                                            ? `${(pkg.durationMinutes / 60).toFixed(
+                                                                                  pkg.durationMinutes % 60 === 0 ? 0 : 1
+                                                                              )} ${
+                                                                                  pkg.durationMinutes === 60
+                                                                                      ? 'Hour'
+                                                                                      : 'Hours'
+                                                                              }`
+                                                                            : 'Duration N/A'}
+                                                                    </Text>
+                                                                </View>
+
+                                                                <View style={styles.bookingDetailItem}>
+                                                                    <View style={styles.bookingDetailIcon}>
+                                                                        <Ionicons
+                                                                            name="pricetag-outline"
+                                                                            size={14}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </View>
+
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        {pkg.priceBasis === 'custom'
+                                                                            ? 'Custom Rate'
+                                                                            : 'Fixed Rate'}
+                                                                    </Text>
+                                                                </View>
+
+                                                                {typeof pkg.basePrice === 'number' &&
+                                                                    pkg.basePrice !== pkg.price && (
+                                                                        <View style={styles.bookingDetailItem}>
+                                                                            <View style={styles.bookingDetailIcon}>
+                                                                                <Ionicons
+                                                                                    name="cash-outline"
+                                                                                    size={14}
+                                                                                    color={PRIMARY}
+                                                                                />
+                                                                            </View>
+
+                                                                            <Text style={styles.bookingDetailText}>
+                                                                                Base: Rs.{' '}
+                                                                                {formatCurrency(pkg.basePrice)}
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
+                                                            </View>
+
+                                                            {/* Quantity */}
+
+                                                            <View style={styles.quantityRow}>
+                                                                <Text style={styles.quantityLabel}>
+                                                                    Quantity
                                                                 </Text>
 
-                                                                <TouchableOpacity
-                                                                    onPress={() =>
-                                                                        handleUpdateQuantity(
-                                                                            vendorIndex,
-                                                                            packageIndex,
-                                                                            1
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Ionicons
-                                                                        name="add-circle-outline"
-                                                                        size={20}
-                                                                        color={PRIMARY}
-                                                                    />
-                                                                </TouchableOpacity>
+                                                                <View style={styles.quantityControl}>
+                                                                    <TouchableOpacity
+                                                                        style={styles.quantityButton}
+                                                                        onPress={() =>
+                                                                            handleUpdateQuantity(
+                                                                                vendorIndex,
+                                                                                packageIndex,
+                                                                                -1
+                                                                            )
+                                                                        }
+                                                                        activeOpacity={0.75}
+                                                                    >
+                                                                        <Ionicons
+                                                                            name="remove"
+                                                                            size={17}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </TouchableOpacity>
+
+                                                                    <Text style={styles.quantityValue}>
+                                                                        {pkg.quantity || 1}
+                                                                    </Text>
+
+                                                                    <TouchableOpacity
+                                                                        style={styles.quantityButton}
+                                                                        onPress={() =>
+                                                                            handleUpdateQuantity(
+                                                                                vendorIndex,
+                                                                                packageIndex,
+                                                                                1
+                                                                            )
+                                                                        }
+                                                                        activeOpacity={0.75}
+                                                                    >
+                                                                        <Ionicons
+                                                                            name="add"
+                                                                            size={17}
+                                                                            color={PRIMARY}
+                                                                        />
+                                                                    </TouchableOpacity>
+                                                                </View>
                                                             </View>
                                                         </View>
 
                                                         <TouchableOpacity
-                                                            style={
-                                                                styles.removeButton
-                                                            }
+                                                            style={styles.removeButton}
                                                             onPress={() =>
                                                                 handleDeletePackage(
                                                                     vendorIndex,
                                                                     packageIndex
                                                                 )
                                                             }
-                                                            activeOpacity={
-                                                                0.75
-                                                            }
+                                                            activeOpacity={0.75}
                                                         >
                                                             <Ionicons
                                                                 name="trash-outline"
@@ -749,11 +828,7 @@ const CartManagementIndexScreen: React.FC = () => {
                                     />
                                 </View>
 
-                                <Text
-                                    style={
-                                        styles.priceSummaryTitle
-                                    }
-                                >
+                                <Text style={styles.priceSummaryTitle}>
                                     Price Summary
                                 </Text>
                             </View>
@@ -765,9 +840,7 @@ const CartManagementIndexScreen: React.FC = () => {
 
                                 <Text style={styles.priceValue}>
                                     Rs.{' '}
-                                    {formatCurrency(
-                                        totalAmount
-                                    )}
+                                    {formatCurrency(totalAmount)}
                                 </Text>
                             </View>
 
@@ -775,32 +848,18 @@ const CartManagementIndexScreen: React.FC = () => {
 
                             <View style={styles.totalRow}>
                                 <View>
-                                    <Text
-                                        style={
-                                            styles.totalLabel
-                                        }
-                                    >
+                                    <Text style={styles.totalLabel}>
                                         Total Amount
                                     </Text>
 
-                                    <Text
-                                        style={
-                                            styles.totalSubLabel
-                                        }
-                                    >
+                                    <Text style={styles.totalSubLabel}>
                                         Payable at checkout
                                     </Text>
                                 </View>
 
-                                <Text
-                                    style={
-                                        styles.totalAmount
-                                    }
-                                >
+                                <Text style={styles.totalAmount}>
                                     Rs.{' '}
-                                    {formatCurrency(
-                                        totalAmount
-                                    )}
+                                    {formatCurrency(totalAmount)}
                                 </Text>
                             </View>
                         </View>
@@ -817,19 +876,11 @@ const CartManagementIndexScreen: React.FC = () => {
                             </View>
 
                             <View style={styles.secureTextContainer}>
-                                <Text
-                                    style={
-                                        styles.secureTitle
-                                    }
-                                >
+                                <Text style={styles.secureTitle}>
                                     Secure Checkout
                                 </Text>
 
-                                <Text
-                                    style={
-                                        styles.secureDescription
-                                    }
-                                >
+                                <Text style={styles.secureDescription}>
                                     Your payment information is
                                     protected.
                                 </Text>
@@ -856,11 +907,7 @@ const CartManagementIndexScreen: React.FC = () => {
                                 Total Payable
                             </Text>
 
-                            <Text
-                                style={
-                                    styles.bottomAmountSubLabel
-                                }
-                            >
+                            <Text style={styles.bottomAmountSubLabel}>
                                 {packageCount} item
                                 {packageCount !== 1 ? 's' : ''}
                             </Text>
@@ -895,11 +942,7 @@ const CartManagementIndexScreen: React.FC = () => {
                             activeOpacity={0.85}
                         >
                             <View style={styles.checkoutButtonContent}>
-                                <Text
-                                    style={
-                                        styles.checkoutButtonText
-                                    }
-                                >
+                                <Text style={styles.checkoutButtonText}>
                                     Proceed to Checkout
                                 </Text>
 
@@ -1541,4 +1584,135 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         marginRight: 9,
     },
+
+    // ==========================================
+    // Booking details + Quantity
+    // ==========================================
+
+    bookingDetailsBox: {
+        marginTop: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#F2E3EB',
+        gap: 7,
+    },
+
+    bookingDetailItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+
+    bookingDetailIcon: {
+        width: 26,
+        height: 26,
+        borderRadius: 8,
+        backgroundColor: PRIMARY_LIGHT,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+    },
+
+    bookingDetailText: {
+        flex: 1,
+        fontSize: 11,
+        lineHeight: 16,
+        color: TEXT,
+        fontWeight: '600',
+    },
+
+    quantityRow: {
+        marginTop: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+
+    quantityLabel: {
+        fontSize: 11,
+        color: MUTED,
+        fontWeight: '700',
+    },
+
+    quantityControl: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: PRIMARY_LIGHT,
+        borderRadius: 10,
+        padding: 3,
+    },
+
+    quantityButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: BORDER,
+    },
+
+    quantityValue: {
+        minWidth: 32,
+        textAlign: 'center',
+        fontSize: 13,
+        fontWeight: '800',
+        color: TEXT,
+    },
+    eventLocationCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+},
+
+eventLocationIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: PRIMARY_LIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+},
+
+eventLocationContent: {
+    flex: 1,
+},
+
+eventLocationTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: TEXT,
+    marginBottom: 8,
+},
+
+eventLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 3,
+},
+
+eventLocationLabel: {
+    width: 58,
+    fontSize: 11,
+    fontWeight: '700',
+    color: MUTED,
+},
+
+eventLocationValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT,
+    lineHeight: 17,
+},
 });

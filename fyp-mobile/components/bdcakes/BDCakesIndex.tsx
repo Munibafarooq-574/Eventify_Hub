@@ -282,12 +282,12 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                       style={[styles.input, styles.textArea]}
                       multiline
                       placeholder={`Examples:
-              â€¢ Wedding Cakes
-              â€¢ Fondant Cakes
-              â€¢ Buttercream Cakes
-              â€¢ Floral Cake Designs
-              â€¢ 3-Tier Cakes
-              â€¢ Customized Theme Cakes`}
+    Wedding Cakes
+    Fondant Cakes
+    Buttercream Cakes
+    Floral Cake Designs
+    3-Tier Cakes
+    Customized Theme Cakes`}
                          placeholderTextColor="#B99DAF"
                          value={expertise}
                          onChangeText={setExpertise}
@@ -301,12 +301,12 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Examples:
-â€¢ Customized wedding cakes
-â€¢ Birthday cakes
-â€¢ Premium fondant designs
-â€¢ Fresh cream cakes
-â€¢ Theme based cakes
-â€¢ Eggless cakes available`}
+    Customized wedding cakes
+    Birthday cakes
+    Premium fondant designs
+    Fresh cream cakes
+    Theme based cakes
+    Eggless cakes available`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -320,12 +320,12 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Examples:
-â€¢ Free tasting available
-â€¢ Advance booking required
-â€¢ Delivery charges may apply
-â€¢ Midnight delivery available
-â€¢ Premium packaging included
-â€¢ Freshly baked on order`}
+    Free tasting available
+    Advance booking required
+    Delivery charges may apply
+    Midnight delivery available
+    Premium packaging included
+    Freshly baked on order`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}
