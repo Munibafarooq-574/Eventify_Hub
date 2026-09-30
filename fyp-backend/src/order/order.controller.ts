@@ -36,6 +36,12 @@ async placeOrder(@Body() body: {
     serviceName: string;
     price: number;
     packageId: string;
+    durationMinutes?: number;
+    quantity?: number;
+    requiredServiceWindow?: {
+        startDateTime: string;
+        endDateTime: string;
+    };
 }[];
     durationMinutes?: number;
 }) {

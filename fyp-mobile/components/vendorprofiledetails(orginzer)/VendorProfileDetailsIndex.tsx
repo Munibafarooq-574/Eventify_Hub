@@ -385,7 +385,11 @@ const VendorDetailsScreen: React.FC =
   campaignId,
   source,
   availablePackageIds,
+  packageOnly,
 } = useGlobalSearchParams();
+
+const isPackageOnlyMode =
+  (Array.isArray(packageOnly) ? packageOnly[0] : packageOnly) === "true";
 
 const phase6AvailablePackageIds = useMemo(() => {
   if (!availablePackageIds) {
@@ -511,11 +515,15 @@ const phase6AvailablePackageIds = useMemo(() => {
         null,
       );
 
-    const [availabilityCheck, setAvailabilityCheck] =
-      useState<{
-        available: boolean;
-        reason?: string;
-      } | null>(null);
+const [availabilityCheck, setAvailabilityCheck] =
+  useState<{
+    available: boolean;
+    reason?: string;
+    requiredServiceWindow?: {
+      startDateTime: string;
+      endDateTime: string;
+    };
+  } | null>(null);
 
     const [availabilityLoading, setAvailabilityLoading] =
       useState(false);
@@ -689,33 +697,42 @@ const todayAvailabilitySummary =
 
     const REVIEWS_LIMIT = 20;
 
-    // ---------------------------------------------------------
-    // Package handling
-    // ---------------------------------------------------------
 
         // ---------------------------------------------------------
     // Package handling
     // ---------------------------------------------------------
 
     useEffect(() => {
-      if (
-        typeof packageId === 'string' &&
-        packageId
-      ) {
-        setActiveTab('Packages');
-        setActivePackage(
-          packageId,
-        );
-      } else if (
-        typeof openTab === 'string' &&
-        openTab === 'Packages'
-      ) {
-        setActiveTab('Packages');
-      }
-    }, [
-      packageId,
-      openTab,
-    ]);
+  if (isPackageOnlyMode) {
+    setActiveTab('Packages');
+
+    if (
+      typeof packageId === 'string' &&
+      packageId
+    ) {
+      setActivePackage(packageId);
+    }
+
+    return;
+  }
+
+  if (
+    typeof packageId === 'string' &&
+    packageId
+  ) {
+    setActiveTab('Packages');
+    setActivePackage(packageId);
+  } else if (
+    typeof openTab === 'string' &&
+    openTab === 'Packages'
+  ) {
+    setActiveTab('Packages');
+  }
+}, [
+  packageId,
+  openTab,
+  isPackageOnlyMode,
+]);
 
     const visiblePackages = useMemo(() => {
   const packages = Array.isArray(vendorData?.packages)
@@ -1538,6 +1555,15 @@ Toast.show({
           ),
           durationMinutes: selectedDurationMinutes,
           quantity: 1,
+          requiredServiceWindow:
+         availabilityCheck?.requiredServiceWindow
+    ? {
+        startDateTime:
+          availabilityCheck.requiredServiceWindow.startDateTime,
+        endDateTime:
+          availabilityCheck.requiredServiceWindow.endDateTime,
+      }
+    : undefined,
         };
 
         // Match strictly on the resolved vendor id — never on a nested
@@ -1995,7 +2021,7 @@ if (
           {/* ------------------------------------------------ */}
           {/* Tabs */}
           {/* ------------------------------------------------ */}
-
+{!isPackageOnlyMode && (
           <View
             style={
               styles.tabContainer
@@ -2046,6 +2072,7 @@ if (
               </TouchableOpacity>
             ))}
           </View>
+          )}
 
           {/* ================================================= */}
           {/* DETAILS */}
@@ -3171,6 +3198,65 @@ if (
                     </Text>
                   </View>
 
+
+                  {/* Final Required Service Window */}
+
+{availabilityCheck?.available &&
+  availabilityCheck.requiredServiceWindow && (
+    <View
+      style={
+        styles.availabilityInfoRow
+      }
+    >
+      <View
+        style={
+          styles.availabilityLabelRow
+        }
+      >
+        <Ionicons
+          name="time-outline"
+          size={15}
+          color={TEXT_MUTED}
+        />
+
+        <Text
+          style={
+            styles.availabilityLabel
+          }
+        >
+          Required Service Window
+        </Text>
+      </View>
+
+      <Text
+        style={
+          styles.availabilityValue
+        }
+      >
+        {new Date(
+          availabilityCheck.requiredServiceWindow.startDateTime,
+        ).toLocaleTimeString(
+          'en-US',
+          {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          },
+        )}
+        {' - '}
+        {new Date(
+          availabilityCheck.requiredServiceWindow.endDateTime,
+        ).toLocaleTimeString(
+          'en-US',
+          {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          },
+        )}
+      </Text>
+    </View>
+  )}
                   {/* Vendor Slots */}
                   <View
                     style={
@@ -3359,10 +3445,9 @@ if (
                       styles.noPackagesText
                     }
                   >
-                    This vendor
-                    has not added
-                    any packages
-                    yet.
+                    {isEventMode
+                  ? 'No packages from this vendor are available for your selected event.'
+                  : 'This vendor has not added any packages yet.'}
                   </Text>
                 </View>
               ) : (
@@ -3734,26 +3819,103 @@ if (
 
           {/* Booking Type Configuration */}
 
-          {selectedPackage.bookingType === 'DURATION_BASED' && (
-            <View style={styles.packageInfoSection}>
-              <View style={styles.sectionTitleWithIcon}>
-                <Ionicons
-                  name="time-outline"
-                  size={16}
-                  color={PRIMARY}
-                />
+         {selectedPackage.bookingType === 'DURATION_BASED' && (
+  <View style={styles.packageInfoSection}>
+    <View style={styles.sectionTitleWithIcon}>
+      <Ionicons
+        name="time-outline"
+        size={16}
+        color={PRIMARY}
+      />
 
-                <Text style={styles.servicesLabel}>
-                  Duration Configuration
-                </Text>
+      <Text style={styles.servicesLabel}>
+        Duration Options
+      </Text>
+    </View>
+
+    {Array.isArray(selectedPackage.durations) &&
+    selectedPackage.durations.length > 0 ? (
+      <View style={styles.durationList}>
+        {selectedPackage.durations.map(
+          (duration: any, index: number) => (
+            <View
+              key={`${duration.value}-${duration.unit}-${index}`}
+              style={styles.durationCard}
+            >
+              <View style={styles.durationLeft}>
+                <View style={styles.durationIcon}>
+                  <Ionicons
+                    name="time-outline"
+                    size={16}
+                    color={PRIMARY}
+                  />
+                </View>
+
+                <View>
+                  <Text style={styles.durationValue}>
+                    {duration.value}{' '}
+                    {duration.unit === 'HOURS'
+                      ? Number(duration.value) === 1
+                        ? 'Hour'
+                        : 'Hours'
+                      : duration.unit === 'DAYS'
+                        ? Number(duration.value) === 1
+                          ? 'Day'
+                          : 'Days'
+                        : duration.unit}
+                  </Text>
+
+                  <Text style={styles.durationType}>
+                    Fixed Duration
+                  </Text>
+                </View>
               </View>
 
-              <Text style={styles.packageDetailItem}>
-                Required Duration:{' '}
-                {selectedPackage.requiredServiceDurationMinutes ?? 'N/A'} minutes
+              <Text style={styles.durationPrice}>
+                Rs.{' '}
+                {Number(
+                  duration.price || 0,
+                ).toLocaleString()}
               </Text>
             </View>
-          )}
+          ),
+        )}
+      </View>
+    ) : (
+      <Text style={styles.noDurationText}>
+        No fixed duration options available.
+      </Text>
+    )}
+
+    {selectedPackage.allowCustomDuration &&
+    Number(selectedPackage.customDurationRate) > 0 ? (
+      <View style={styles.customDurationBox}>
+        <View style={styles.customDurationHeader}>
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={18}
+            color="#2E6E4B"
+          />
+
+          <Text style={styles.customDurationTitle}>
+            Custom Duration Available
+          </Text>
+        </View>
+
+        <Text style={styles.customDurationText}>
+          Rs.{' '}
+          {Number(
+            selectedPackage.customDurationRate,
+          ).toLocaleString()}{' '}
+          per{' '}
+          {selectedPackage.customDurationUnit === 'DAYS'
+            ? 'day'
+            : 'hour'}
+        </Text>
+      </View>
+    ) : null}
+  </View>
+)}
 
           {selectedPackage.bookingType === 'TIME_SLOT_BASED' && (
             <View style={styles.packageInfoSection}>

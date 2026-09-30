@@ -380,7 +380,7 @@ router.push({
   startTime: eventTiming?.startTime || "",
   endTime: eventTiming?.endTime || "",
   durationMinutes: String(eventTiming?.durationMinutes || 0),
-  openTab: "Packages",
+  openTab: "Details",
   bookingMode: eventTiming ? "event" : "browse",
   availablePackageIds: JSON.stringify(availablePackageIds),
 },
@@ -478,7 +478,7 @@ router.push({
         <TouchableOpacity style={styles.viewButton}
          onPress={() =>
   router.push({
-  pathname: "/vendorprofiledetails",
+   pathname: "/vendorpackagebooking",
    params: {
   id: item._id,
   eventId: eventTiming?.eventId || "",
@@ -487,7 +487,9 @@ router.push({
   endTime: eventTiming?.endTime || "",
   durationMinutes: String(eventTiming?.durationMinutes || 0),
   openTab: "Packages",
+  packageOnly: "true",
   bookingMode: eventTiming ? "event" : "browse",
+  availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
 }

@@ -5,8 +5,12 @@ export interface AvailabilityCheckResult {
   vendorId: string;
   available: boolean;
   reason?: string;
-}
 
+  requiredServiceWindow?: {
+    startDateTime: string;
+    endDateTime: string;
+  };
+}
 export default function checkVendorsAvailability(
  payload: {
   vendorIds: string[];

@@ -65,6 +65,12 @@ export class OrderService {
     serviceName: string;
     price: number;
     packageId: string;
+    durationMinutes?: number;
+    quantity?: number;
+    requiredServiceWindow?: {
+        startDateTime: string;
+        endDateTime: string;
+    };
 }[],
     eventName: string,
     guests: number,
@@ -225,14 +231,24 @@ if (vendorOutsideServiceArea) {
        // Final authoritative availability check for every selected package.
 // Each package keeps its own bookingType / duration / service-window rules.
 const results = await Promise.all(
-    services.map((service) =>
-        this.availabilityService.checkVendorAvailability(
+    services.map((service) => {
+        const selectedDurationMinutes =
+            Number(service.durationMinutes) > 0
+                ? Number(service.durationMinutes)
+                : durationMinutes;
+
+        const requestedEndDateTime = new Date(
+            eventStartDateTime.getTime() +
+                selectedDurationMinutes * 60000,
+        );
+
+        return this.availabilityService.checkVendorAvailability(
             service.vendorId,
             eventStartDateTime,
-            eventEndDateTime,
+            requestedEndDateTime,
             service.packageId,
-        ),
-    ),
+        );
+    }),
 );
 
 const unavailable = results.find(
@@ -283,8 +299,29 @@ const unavailable = results.find(
         // Create VendorOrders
         const vendorOrderIds: Types.ObjectId[] = [];
 
-        for (const service of services) {
+        for (const [serviceIndex, service] of services.entries()) {
 
+                const finalAvailability =
+        results[serviceIndex];
+
+    if (
+        !finalAvailability?.available ||
+        !finalAvailability.requiredServiceWindow
+    ) {
+        throw new ConflictException(
+            'Final service window could not be resolved for this package.',
+        );
+    }
+
+    const finalServiceStartDateTime =
+        new Date(
+            finalAvailability.requiredServiceWindow.startDateTime,
+        );
+
+    const finalServiceEndDateTime =
+        new Date(
+            finalAvailability.requiredServiceWindow.endDateTime,
+        );
             const [vendorOrder] =
                 await this.vendorOrderModel.create(
                     [
@@ -298,8 +335,11 @@ const unavailable = results.find(
                             packageId: service.packageId,
                             status: 'pending',
 
-                            eventStartDateTime,
-                            eventEndDateTime,
+                            eventStartDateTime:
+                            finalServiceStartDateTime,
+
+                            eventEndDateTime:
+                            finalServiceEndDateTime,
                         },
                     ],
                     { session },

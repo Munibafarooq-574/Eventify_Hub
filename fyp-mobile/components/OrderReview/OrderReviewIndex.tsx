@@ -82,9 +82,17 @@ const OrderReviewScreen = () => {
           cateringCategory?._id &&
           vendor?.vendor?.buisnessCategory === cateringCategory._id;
 
-        totalAmount += isCatering
-          ? Number(pkg?.price || 0) * Number(guests || 0)
-          : Number(pkg?.price || 0);
+            const quantity = Math.max(
+        1,
+        Number(pkg?.quantity || 1),
+      );
+
+      totalAmount += isCatering
+        ? Number(pkg?.price || 0) *
+          Number(guests || 0) *
+          quantity
+        : Number(pkg?.price || 0) *
+          quantity;
       });
     });
 
@@ -138,13 +146,27 @@ const OrderReviewScreen = () => {
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
 
       const services = cartData.vendors.flatMap((vendor: any) =>
-      vendor.packages.map((pkg: any) => ({
-        vendorId: vendor.vendor._id,
-        serviceName: pkg.packageName,
-        price: pkg.price,
-        packageId: pkg.packageId,
-      })),
-    );
+  vendor.packages.map((pkg: any) => ({
+    vendorId: vendor.vendor._id,
+    serviceName: pkg.packageName,
+    price: Number(pkg.price),
+    packageId: pkg.packageId,
+
+    durationMinutes: Number(
+      pkg.durationMinutes ||
+        eventDetails?.durationMinutes ||
+        60,
+    ),
+
+    quantity: Math.max(
+      1,
+      Number(pkg.quantity || 1),
+    ),
+
+    requiredServiceWindow:
+      pkg.requiredServiceWindow,
+  })),
+);
 
       setPlacingOrder(true);
 
