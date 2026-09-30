@@ -320,64 +320,81 @@ const category =
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
             <Toast />
 
-            {/* Cover Image with floating header */}
-            <View style={styles.coverWrapper}>
-                <Image
-                    testID="vendor-cover-image"
-                    source={{
-                        uri: vendorData?.contactDetails?.brandLogo
-                            ? `${vendorData.contactDetails.brandLogo}`
-                            : "https://via.placeholder.com/600x300",
-                    }}
-                    style={styles.coverImage}
-                />
-                <View style={styles.coverOverlay} />
-
-                {/* Floating Header */}
-                <View style={styles.header}>
+                              {/* Hero: Themed box with full DP + side tabs */}
+            <View style={styles.heroWrapper}>
+                {/* Top row: back + name */}
+                <View style={styles.heroTopRow}>
                     <TouchableOpacity
                         testID="back-button"
                         onPress={() => router.back()}
-                        style={styles.backIconButton}
+                        style={styles.heroBackButton}
                         activeOpacity={0.7}
                     >
                         <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
                     </TouchableOpacity>
 
-                    <Text style={styles.title} numberOfLines={1}>{vendorData.name}</Text>
+                    <Text style={styles.heroTitle} numberOfLines={1}>
+                        {vendorData.name}
+                    </Text>
 
                     <View style={styles.headerSpacer} />
                 </View>
-            </View>
 
-            {/* Tab Navigation */}
-            <View style={styles.tabContainer}>
-                {["Details", "Packages", "Reviews"].map((tab) => (
-                    <TouchableOpacity
-                        key={tab}
-                        testID={
-                            tab === "Details"
-                                ? "tab-details"
-                                : tab === "Packages"
-                                    ? "tab-packages"
-                                    : "tab-reviews"
-                        } // ✅ Add testID here
-                        style={[styles.tab, activeTab === tab && styles.activeTab]}
-                        onPress={() =>
-                            setActiveTab(tab as "Details" | "Packages" | "Reviews")
-                        }
-                        activeOpacity={0.8}
-                    >
-                        <Text
-                            style={[
-                                styles.tabText,
-                                activeTab === tab && styles.activeTabText,
-                            ]}
-                        >
-                            {tab}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+                {/* Body: DP box + vertical tab rail */}
+                <View style={styles.heroBody}>
+                    <View style={styles.heroImageFrame}>
+                        <Image
+                            testID="vendor-cover-image"
+                            source={{
+                                uri: vendorData?.contactDetails?.brandLogo
+                                    ? `${vendorData.contactDetails.brandLogo}`
+                                    : "https://via.placeholder.com/600x600",
+                            }}
+                            style={styles.heroImage}
+                            resizeMode="contain"
+                        />
+                    </View>
+
+                    <View style={styles.heroTabRail}>
+                        {(
+                            [
+                                { name: "Details", icon: "information-circle-outline", id: "tab-details" },
+                                { name: "Packages", icon: "gift-outline", id: "tab-packages" },
+                                { name: "Reviews", icon: "star-outline", id: "tab-reviews" },
+                            ] as const
+                        ).map((t) => {
+                            const isActive = activeTab === t.name;
+
+                            return (
+                                <TouchableOpacity
+                                    key={t.name}
+                                    testID={t.id}
+                                    style={[
+                                        styles.heroTab,
+                                        isActive && styles.heroTabActive,
+                                    ]}
+                                    onPress={() => setActiveTab(t.name)}
+                                    activeOpacity={0.85}
+                                >
+                                    <Ionicons
+                                        name={t.icon}
+                                        size={20}
+                                        color={isActive ? PRIMARY : "#FFFFFF"}
+                                    />
+                                    <Text
+                                        style={[
+                                            styles.heroTabLabel,
+                                            isActive && styles.heroTabLabelActive,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {t.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                </View>
             </View>
 
             {activeTab === "Details" && (
@@ -386,13 +403,83 @@ const category =
                     {/* Name + Price Card */}
                     <View style={styles.card}>
                         <View style={styles.rowContainer}>
-                            <Text testID="vendor-name" style={styles.name}>
-                                {vendorData.name}
-                            </Text>
+                           <View
+  style={{
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  }}
+>
+  <Text
+    testID="vendor-name"
+    style={{
+      fontSize: 19,
+      lineHeight: 25,
+      fontWeight: '800',
+      color: TEXT_DARK,
+      letterSpacing: -0.2,
+    }}
+    numberOfLines={2}
+    ellipsizeMode="tail"
+  >
+    {(
+      vendorData?.contactDetails?.brandName ||
+      vendorData?.name ||
+      ''
+    )
+      // allow a clean line break after _ - or . instead of mid-word
+      .replace(/([_\-.])/g, '$1\u200B')}
+  </Text>
+
+  {!!vendorData?.contactDetails?.brandName &&
+    vendorData?.contactDetails?.brandName !== vendorData?.name && (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 6,
+          alignSelf: 'flex-start',
+          backgroundColor: PRIMARY_SOFT,
+          paddingHorizontal: 10,
+          paddingVertical: 3,
+          borderRadius: 10,
+          maxWidth: '100%',
+        }}
+      >
+        <Ionicons
+          name="person-outline"
+          size={12}
+          color={PRIMARY}
+        />
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{
+            fontSize: 12.5,
+            lineHeight: 18,
+            color: PRIMARY,
+            fontWeight: '600',
+            marginLeft: 5,
+            flexShrink: 1,
+          }}
+        >
+          {vendorData?.name}
+        </Text>
+      </View>
+    )}
+</View>
                             <View style={styles.priceBadge}>
                                 <Text testID="vendor-price" style={styles.price}>
                                     Rs. {businessDetails?.minimumPrice || "N/A"}/-
                                 </Text>
+
+                                <Text
+                                  style={
+                                 styles.perHead
+                                     }
+                                >
+                                   Starting price
+                                 </Text>
                                 
                             </View>
                         </View>
@@ -405,103 +492,132 @@ const category =
                         </View>
                     </View>
 
-                    {/* Photos Section */}
-                    {/* Photos Section */}
-<View style={[styles.card, styles.photosSection]}>
-    <View style={styles.sectionTitleRow}>
-        <View style={styles.sectionTitleWithIcon}>
-            <View style={styles.sectionIconCircle}>
-                <Ionicons name="images-outline" size={16} color={PRIMARY} />
-            </View>
-            <Text style={styles.sectionTitle}>Photos</Text>
-            {vendorData.images.length > 0 && (
-                <View style={styles.photoCountBadge}>
-                    <Text style={styles.photoCountText}>{vendorData.images.length}</Text>
-                </View>
-            )}
-        </View>
-         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-    {vendorData.images.length > 0 && (
-        <TouchableOpacity
-            testID="see-all-photos"
-            onPress={() =>
-                router.push({
-                    pathname: "/vendorprofileimages",
-                    params: { vendorId: vendorData._id },
-                })
-            }
-            activeOpacity={0.7}
-            style={styles.seeAllButton}
-        >
-            <Text style={styles.seeAllLink}>See All</Text>
-            <Ionicons
-                name="chevron-forward"
-                size={14}
-                color={PRIMARY}
-            />
-        </TouchableOpacity>
-    )}
+                                      {/* Photos Section */}
+                    <View style={[styles.card, styles.photosSection]}>
+                        {/* Header */}
+                        <View style={styles.sectionTitleRow}>
+                            <View style={styles.sectionTitleWithIcon}>
+                                <View style={styles.sectionIconCircle}>
+                                    <Ionicons name="images-outline" size={16} color={PRIMARY} />
+                                </View>
+                                <Text style={styles.sectionTitle}>Photos</Text>
+                                {vendorData.images.length > 0 && (
+                                    <View style={styles.photoCountBadge}>
+                                        <Text style={styles.photoCountText}>
+                                            {vendorData.images.length}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
 
-    <TouchableOpacity
-    testID="add-portfolio-photos"
-    onPress={() =>
-    router.push({
-        pathname: "/imagesuploaded",
-        params: {
-            vendorId: vendorData._id,
-        },
-    })
-}
-    activeOpacity={0.8}
-    style={styles.managePortfolioButton}
->
-    <Ionicons
-        name="images-outline"
-        size={15}
-        color="#FFFFFF"
-    />
+                            {vendorData.images.length > 0 && (
+                                <TouchableOpacity
+                                    testID="see-all-photos"
+                                    onPress={() =>
+                                        router.push({
+                                            pathname: "/imagesuploaded",
+                                            params: { vendorId: vendorData._id },
+                                        })
+                                    }
+                                    activeOpacity={0.7}
+                                    style={styles.seeAllButton}
+                                >
+                                    
+                                </TouchableOpacity>
+                            )}
+                        </View>
 
-    <Text style={styles.managePortfolioButtonText}>
-        Manage Portfolio
-    </Text>
-</TouchableOpacity>
-</View>
-    </View>
+                        {/* Photos strip */}
+                        {vendorData.images.length > 0 ? (
+                            <ScrollView
+                                testID="scroll-view"
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.photoContainer}
+                                contentContainerStyle={styles.photoContainerContent}
+                            >
+                                {vendorData.images.map((image: string, index: number) => (
+                                    <TouchableOpacity
+                                        key={index}
+                                        activeOpacity={0.85}
+                                                                                onPress={() =>
+                                            router.push({
+                                                pathname: '/imagesuploaded',
+                                                params: { vendorId: vendorData._id },
+                                            })
+                                        }
+                                        style={styles.photoWrapper}
+                                    >
+                                        <Image
+                                            source={{ uri: `${image}` }}
+                                            style={styles.photo}
+                                            resizeMode="cover"
+                                        />
+                                    </TouchableOpacity>
+                                ))}
 
-    {vendorData.images.length > 0 ? (
-        <ScrollView
-            testID="scroll-view"
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.photoContainer}
-            contentContainerStyle={styles.photoContainerContent}
-        >
-            {vendorData.images.map((image: string, index: number) => (
-                <TouchableOpacity
-                    key={index}
-                    activeOpacity={0.85}
-                    onPress={() =>
-                        router.push({
-                            pathname: '/vendorprofileimages',
-                            params: { vendorId: vendorData._id },
-                        })
-                    }
-                    style={styles.photoWrapper}
-                >
-                    <Image
-                        source={{ uri: `${image}` }}
-                        style={styles.photo}
-                    />
-                </TouchableOpacity>
-            ))}
-        </ScrollView>
-    ) : (
-        <View style={styles.noPhotosBox}>
-            <Ionicons name="image-outline" size={26} color="#C9A9BE" />
-            <Text style={styles.noPhotosText}>No photos added yet</Text>
-        </View>
-    )}
-</View>
+                                {/* Add tile at the end */}
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        router.push({
+                                            pathname: "/imagesuploaded",
+                                            params: { vendorId: vendorData._id },
+                                        })
+                                    }
+                                    style={styles.addPhotoTile}
+                                >
+                                    <View style={styles.addPhotoTileIcon}>
+                                        <Ionicons name="add" size={22} color={PRIMARY} />
+                                    </View>
+                                    <Text style={styles.addPhotoTileText}>Add</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.noPhotosBox}>
+                                <Ionicons name="image-outline" size={26} color="#C9A9BE" />
+                                <Text style={styles.noPhotosText}>No photos added yet</Text>
+                            </View>
+                        )}
+
+                        {/* Manage Portfolio: full-width button */}
+                        <TouchableOpacity
+                            testID="add-portfolio-photos"
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/imagesuploaded",
+                                    params: { vendorId: vendorData._id },
+                                })
+                            }
+                            activeOpacity={0.85}
+                            style={styles.managePortfolioFull}
+                        >
+                            <View style={styles.managePortfolioFullLeft}>
+                                <View style={styles.managePortfolioFullIcon}>
+                                    <Ionicons
+                                        name="cloud-upload-outline"
+                                        size={18}
+                                        color="#FFFFFF"
+                                    />
+                                </View>
+
+                                <View>
+                                    <Text style={styles.managePortfolioFullTitle}>
+                                        Manage Portfolio
+                                    </Text>
+                                    <Text style={styles.managePortfolioFullSub}>
+                                        Add, remove or reorder your photos
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Ionicons
+                                name="chevron-forward"
+                                size={18}
+                                color={PRIMARY}
+                            />
+                        </TouchableOpacity>
+                    </View>
                     {/* Business Details Card */}
                     <View style={styles.card}>
                         <View style={styles.detailsHeader}>
@@ -2169,10 +2285,19 @@ const styles = StyleSheet.create({
         position: 'relative',
         backgroundColor: '#000',
     },
-    coverImage: {
+        coverImage: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover',
+        resizeMode: 'contain',
+    },
+    coverImageBlur: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%',
     },
     coverOverlay: {
         position: 'absolute',
@@ -2326,12 +2451,73 @@ const styles = StyleSheet.create({
     photoContainer: {
         flexDirection: 'row',
     },
-    photo: {
-        width: 104,
-        height: 104,
-        borderRadius: 12,
-        marginRight: 10,
+        photo: {
+        width: 120,
+        height: 120,
+        borderRadius: 16,
         backgroundColor: '#EEE',
+    },
+
+        addPhotoTile: {
+        width: 120,
+        height: 120,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderStyle: 'dashed',
+        borderColor: PRIMARY_LIGHT,
+        backgroundColor: '#FBF6FA',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    },
+    addPhotoTileIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: PRIMARY_SOFT,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addPhotoTileText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: PRIMARY,
+    },
+    managePortfolioFull: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 12,
+        backgroundColor: PRIMARY_SOFT,
+        borderWidth: 1,
+        borderColor: '#E9C7DD',
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+    },
+    managePortfolioFullLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: 12,
+    },
+    managePortfolioFullIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: PRIMARY,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    managePortfolioFullTitle: {
+        fontSize: 14,
+        fontWeight: '800',
+        color: TEXT_DARK,
+    },
+    managePortfolioFullSub: {
+        fontSize: 11,
+        color: TEXT_MUTED,
+        marginTop: 2,
     },
     detailsHeader: {
         flexDirection: 'row',
@@ -3459,6 +3645,92 @@ packageImageViewerClose: {
 packageImageTouchable: {
   marginRight: 10,
 },
+
+    heroWrapper: {
+        backgroundColor: PRIMARY,
+        paddingTop: 44,
+        paddingHorizontal: 16,
+        paddingBottom: 20,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    heroTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    heroBackButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    heroTitle: {
+        flex: 1,
+        fontSize: 17,
+        fontWeight: '700',
+        textAlign: 'center',
+        color: '#FFFFFF',
+        marginHorizontal: 8,
+    },
+    heroBody: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        gap: 12,
+    },
+    heroImageFrame: {
+        flex: 1,
+        aspectRatio: 1,
+        backgroundColor: PRIMARY_LIGHT,
+        borderRadius: 24,
+        padding: 6,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.35)',
+        shadowColor: '#000',
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 6,
+    },
+    heroImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 18,
+    },
+    heroTabRail: {
+        width: 74,
+        justifyContent: 'space-between',
+        gap: 10,
+    },
+    heroTab: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.14)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.22)',
+    },
+    heroTabActive: {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 4,
+    },
+    heroTabLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    heroTabLabelActive: {
+        color: PRIMARY,
+    },
 
 });
 
