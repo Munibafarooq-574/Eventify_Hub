@@ -20,12 +20,23 @@ export class SearchVendorsDto {
   @IsMongoId({
     message: 'categoryId must be a valid category ID',
   })
-  categoryId?: string;
+    categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  eventDate?: string;
+
+  @IsOptional()
+  @IsString()
+  startTime?: string;
+
+   @IsOptional()
+  @IsNumberString()
+  durationMinutes?: string;
 
   @IsOptional()
   @IsNumberString()
   minRating?: string;
-
   @IsOptional()
   staff?: 'MALE' | 'FEMALE' ;
 
