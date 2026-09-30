@@ -23,15 +23,15 @@ const MUTED = '#8A7F87';
 const BORDER = '#F0DCE7';
 
 const CartManagementIndexScreen: React.FC = () => {
-    const router = useRouter();
-    const navigation = useNavigation();
+const router = useRouter();
+const navigation = useNavigation();
 
-    const [cartData, setCartData] = useState<any>(null);
-    const [cateringCategory, setCateringCategory] = useState<any>(null);
-    const [guests, setGuests] = useState<number>(0);
+const [cartData, setCartData] = useState<any>(null);
+const [cateringCategory, setCateringCategory] = useState<any>(null);
+const [guests, setGuests] = useState<number>(0);
 
-        const [eventCityName, setEventCityName] = useState('');
-        const [eventAddress, setEventAddress] = useState('');
+const [eventCityName, setEventCityName] = useState('');
+ const [eventAddress, setEventAddress] = useState('');
 
     useEffect(() => {
         navigation.setOptions({
@@ -599,6 +599,41 @@ if (eventDetailsRaw) {
                                                         ?.buisnessCategory ===
                                                         cateringCategory._id;
 
+                                                        const serviceWindowStart =
+                                                        pkg?.requiredServiceWindow?.startDateTime
+                                                            ? new Date(
+                                                                pkg.requiredServiceWindow.startDateTime
+                                                            )
+                                                            : null;
+
+                                                    const serviceWindowEnd =
+                                                        pkg?.requiredServiceWindow?.endDateTime
+                                                            ? new Date(
+                                                                pkg.requiredServiceWindow.endDateTime
+                                                            )
+                                                            : null;
+
+                                                    const formatServiceTime = (
+                                                        value: Date | null
+                                                    ) => {
+                                                        if (
+                                                            !value ||
+                                                            Number.isNaN(value.getTime())
+                                                        ) {
+                                                            return null;
+                                                        }
+
+                                                        return value.toLocaleTimeString([], {
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        });
+                                                    };
+
+                                                    const serviceStartText =
+                                                        formatServiceTime(serviceWindowStart);
+
+                                                    const serviceEndText =
+                                                        formatServiceTime(serviceWindowEnd);
                                                 const packagePrice =
                                                     Number(pkg?.price || 0);
 
@@ -676,9 +711,18 @@ if (eventDetailsRaw) {
                                                                     </View>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {pkg.startTime || '--:--'}
-                                                                        {pkg.endTime ? ` – ${pkg.endTime}` : ''}
-                                                                    </Text>
+    {serviceStartText
+        ? pkg.bookingType === 'DELIVERY_BASED'
+            ? `${pkg.serviceWindowLabel || 'Delivery'}: ${serviceStartText}`
+            : serviceEndText
+              ? `${pkg.serviceWindowLabel || 'Service'}: ${serviceStartText} – ${serviceEndText}`
+              : `${pkg.serviceWindowLabel || 'Service'}: ${serviceStartText}`
+        : `${pkg.startTime || ''}${
+              pkg.endTime
+                  ? ` – ${pkg.endTime}`
+                  : ''
+          }`}
+</Text>
                                                                 </View>
 
                                                                 <View style={styles.bookingDetailItem}>
@@ -714,28 +758,51 @@ if (eventDetailsRaw) {
 
                                                                     <Text style={styles.bookingDetailText}>
                                                                         {pkg.priceBasis === 'custom'
-                                                                            ? 'Custom Rate'
+                                                                            ? 'Custom Duration'
                                                                             : 'Fixed Rate'}
                                                                     </Text>
                                                                 </View>
 
-                                                                {typeof pkg.basePrice === 'number' &&
-                                                                    pkg.basePrice !== pkg.price && (
-                                                                        <View style={styles.bookingDetailItem}>
-                                                                            <View style={styles.bookingDetailIcon}>
-                                                                                <Ionicons
-                                                                                    name="cash-outline"
-                                                                                    size={14}
-                                                                                    color={PRIMARY}
-                                                                                />
-                                                                            </View>
+                                                    {pkg.priceBasis === 'custom' &&
+                                                        Number(pkg.customDurationRate) > 0 &&
+                                                        Number(pkg.durationMinutes) > 0 && (
+                                                            <View style={styles.bookingDetailItem}>
+                                                                <View style={styles.bookingDetailIcon}>
+                                                                    <Ionicons
+                                                                        name="cash-outline"
+                                                                        size={14}
+                                                                        color={PRIMARY}
+                                                                    />
+                                                                </View>
 
-                                                                            <Text style={styles.bookingDetailText}>
-                                                                                Base: Rs.{' '}
-                                                                                {formatCurrency(pkg.basePrice)}
-                                                                            </Text>
-                                                                        </View>
-                                                                    )}
+                                                                <View style={{ flex: 1 }}>
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        Rate: Rs.{' '}
+                                                                        {formatCurrency(
+                                                                            Number(pkg.customDurationRate)
+                                                                        )}{' '}
+                                                                        /{' '}
+                                                                        {pkg.customDurationUnit === 'DAYS'
+                                                                            ? 'day'
+                                                                            : 'hour'}
+                                                                    </Text>
+
+                                                                    <Text style={styles.bookingDetailText}>
+                                                                        {pkg.customDurationUnit === 'DAYS'
+                                                                            ? `${Number(pkg.durationMinutes) / (24 * 60)} day(s)`
+                                                                            : `${Number(pkg.durationMinutes) / 60} hour(s)`}
+                                                                        {' × Rs. '}
+                                                                        {formatCurrency(
+                                                                            Number(pkg.customDurationRate)
+                                                                        )}
+                                                                        {' = Rs. '}
+                                                                        {formatCurrency(
+                                                                            Number(pkg.price)
+                                                                        )}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                        )}
                                                             </View>
 
                                                             {/* Quantity */}

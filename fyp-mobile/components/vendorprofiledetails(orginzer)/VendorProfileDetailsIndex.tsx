@@ -1541,8 +1541,33 @@ Toast.show({
           packageId: String(pkg._id),
           packageName: pkg.packageName,
           price: resolvedPrice,
+          vendorId: String(vendorData._id),
+          categoryId: String(vendorData.buisnessCategory),
           basePrice: Number(pkg.price || 0),
           priceBasis: basis || 'fixed',
+          bookingType:
+          pkg.bookingType || 'DURATION_BASED',
+
+        requiredServiceDurationMinutes:
+          pkg.requiredServiceDurationMinutes,
+
+        serviceWindowStartOffsetMinutes:
+          pkg.serviceWindowStartOffsetMinutes,
+
+        serviceWindowEndOffsetMinutes:
+          pkg.serviceWindowEndOffsetMinutes,
+
+        customDurationUnit:
+          pkg.bookingType === 'DURATION_BASED' &&
+          basis === 'custom'
+            ? pkg.customDurationUnit
+            : undefined,
+
+        customDurationRate:
+          pkg.bookingType === 'DURATION_BASED' &&
+          basis === 'custom'
+            ? Number(pkg.customDurationRate || 0)
+            : undefined,
           eventId: resolvedEventId,
           eventDate: String(
             Array.isArray(eventDate) ? eventDate[0] : eventDate,
@@ -1564,6 +1589,14 @@ Toast.show({
           availabilityCheck.requiredServiceWindow.endDateTime,
       }
     : undefined,
+    serviceWindowLabel:
+  pkg.bookingType === 'DELIVERY_BASED'
+    ? 'Delivery'
+    : pkg.bookingType === 'SETUP_BASED'
+      ? 'Setup'
+      : pkg.bookingType === 'TIME_SLOT_BASED'
+        ? 'Appointment'
+        : 'Service',
         };
 
         // Match strictly on the resolved vendor id — never on a nested
@@ -1943,45 +1976,17 @@ if (
         >
           <Toast />
 
+                    {/* ------------------------------------------------ */}
+          {/* Hero: Themed box with full DP + side tabs */}
           {/* ------------------------------------------------ */}
-          {/* Cover */}
-          {/* ------------------------------------------------ */}
 
-          <View
-            style={
-              styles.coverWrapper
-            }
-          >
-            <Image
-          testID="vendor-cover-image"
-          source={{
-            uri: vendorData?.contactDetails?.brandLogo
-              ? String(vendorData.contactDetails.brandLogo)
-              : 'https://via.placeholder.com/600x300',
-          }}
-          style={styles.coverImage}
-          resizeMode="cover"
-        />
-
-            <View
-              style={
-                styles.coverOverlay
-              }
-            />
-
-            <View
-              style={
-                styles.header
-              }
-            >
+          <View style={styles.heroWrapper}>
+            {/* Top row: back + name + cart */}
+            <View style={styles.heroTopRow}>
               <TouchableOpacity
                 testID="back-button"
-                onPress={() =>
-                  router.back()
-                }
-                style={
-                  styles.backIconButton
-                }
+                onPress={() => router.back()}
+                style={styles.heroIconButton}
                 activeOpacity={0.7}
               >
                 <Ionicons
@@ -1992,21 +1997,18 @@ if (
               </TouchableOpacity>
 
               <Text
-                style={styles.title}
+                style={styles.heroTitle}
                 numberOfLines={1}
+                ellipsizeMode="tail"
               >
                 {vendorData.name}
               </Text>
 
               <TouchableOpacity
                 onPress={() =>
-                  router.push(
-                    '/cartmanagement' as never,
-                  )
+                  router.push('/cartmanagement' as never)
                 }
-                style={
-                  styles.cartIconButton
-                }
+                style={styles.heroIconButton}
                 activeOpacity={0.7}
               >
                 <Ionicons
@@ -2016,64 +2018,97 @@ if (
                 />
               </TouchableOpacity>
             </View>
-          </View>
 
-          {/* ------------------------------------------------ */}
-          {/* Tabs */}
-          {/* ------------------------------------------------ */}
-{!isPackageOnlyMode && (
-          <View
-            style={
-              styles.tabContainer
-            }
-          >
-            {[
-              'Details',
-              'Packages',
-              'Reviews',
-            ].map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                testID={
-                  tab ===
-                  'Details'
-                    ? 'tab-details'
-                    : tab ===
-                      'Packages'
-                    ? 'tab-packages'
-                    : 'tab-reviews'
-                }
-                style={[
-                  styles.tab,
-                  activeTab ===
-                    tab &&
-                    styles.activeTab,
-                ]}
-                onPress={() =>
-                  setActiveTab(
-                    tab as
-                      | 'Details'
-                      | 'Packages'
-                      | 'Reviews',
-                  )
-                }
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab ===
-                      tab &&
-                      styles.activeTabText,
-                  ]}
-                >
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          )}
+            {/* Body: DP box + vertical tab rail */}
+            <View style={styles.heroBody}>
+              <View style={styles.heroImageFrame}>
+                <Image
+                  testID="vendor-cover-image"
+                  source={{
+                    uri: vendorData?.contactDetails?.brandLogo
+                      ? String(vendorData.contactDetails.brandLogo)
+                      : 'https://via.placeholder.com/600x600',
+                  }}
+                  style={styles.heroImage}
+                  resizeMode="contain"
+                />
+              </View>
 
+              <View style={styles.heroTabRail}>
+                {(
+                  (isPackageOnlyMode
+                    ? [
+                        {
+                          name: 'Packages',
+                          icon: 'gift-outline',
+                          id: 'tab-packages',
+                        },
+                        {
+                          name: 'Details',
+                          icon: 'information-circle-outline',
+                          id: 'tab-details',
+                        },
+                        {
+                          name: 'Reviews',
+                          icon: 'star-outline',
+                          id: 'tab-reviews',
+                        },
+                      ]
+                    : [
+                        {
+                          name: 'Details',
+                          icon: 'information-circle-outline',
+                          id: 'tab-details',
+                        },
+                        {
+                          name: 'Packages',
+                          icon: 'gift-outline',
+                          id: 'tab-packages',
+                        },
+                        {
+                          name: 'Reviews',
+                          icon: 'star-outline',
+                          id: 'tab-reviews',
+                        },
+                      ]) as {
+                    name: 'Details' | 'Packages' | 'Reviews';
+                    icon: keyof typeof Ionicons.glyphMap;
+                    id: string;
+                  }[]
+                ).map((t) => {
+                  const isActive = activeTab === t.name;
+
+                  return (
+                    <TouchableOpacity
+                      key={t.name}
+                      testID={t.id}
+                      style={[
+                        styles.heroTab,
+                        isActive && styles.heroTabActive,
+                      ]}
+                      onPress={() => setActiveTab(t.name)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons
+                        name={t.icon}
+                        size={20}
+                        color={isActive ? PRIMARY : '#FFFFFF'}
+                      />
+                      <Text
+                        style={[
+                          styles.heroTabLabel,
+                          isActive && styles.heroTabLabelActive,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {t.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
           {/* ================================================= */}
           {/* DETAILS */}
           {/* ================================================= */}
@@ -2095,15 +2130,71 @@ if (
                     styles.rowContainer
                   }
                 >
-                  <Text
-                    testID="vendor-name"
-                    style={
-                      styles.name
-                    }
-                  >
-                    {vendorData.name}
-                  </Text>
+              <View
+  style={{
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  }}
+>
+  <Text
+    testID="vendor-name"
+    style={{
+      fontSize: 19,
+      lineHeight: 25,
+      fontWeight: '800',
+      color: TEXT_DARK,
+      letterSpacing: -0.2,
+    }}
+    numberOfLines={2}
+    ellipsizeMode="tail"
+  >
+    {(
+      vendorData?.contactDetails?.brandName ||
+      vendorData?.name ||
+      ''
+    )
+      // allow a clean line break after _ - or . instead of mid-word
+      .replace(/([_\-.])/g, '$1\u200B')}
+  </Text>
 
+  {!!vendorData?.contactDetails?.brandName &&
+    vendorData?.contactDetails?.brandName !== vendorData?.name && (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginTop: 6,
+          alignSelf: 'flex-start',
+          backgroundColor: PRIMARY_SOFT,
+          paddingHorizontal: 10,
+          paddingVertical: 3,
+          borderRadius: 10,
+          maxWidth: '100%',
+        }}
+      >
+        <Ionicons
+          name="person-outline"
+          size={12}
+          color={PRIMARY}
+        />
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{
+            fontSize: 12.5,
+            lineHeight: 18,
+            color: PRIMARY,
+            fontWeight: '600',
+            marginLeft: 5,
+            flexShrink: 1,
+          }}
+        >
+          {vendorData?.name}
+        </Text>
+      </View>
+    )}
+</View>
                   <View
                     style={
                       styles.priceBadge
@@ -2236,10 +2327,11 @@ if (
                         router.push(
                           {
                             pathname:
-                              '/vendorprofileimages',
+                              '/imagesuploaded',
                             params: {
                               vendorId:
                                 vendorData._id,
+                              readOnly: 'true',
                             },
                           },
                         )
@@ -2297,14 +2389,15 @@ if (
                           activeOpacity={
                             0.85
                           }
-                          onPress={() =>
+                             onPress={() =>
                             router.push(
                               {
                                 pathname:
-                                  '/vendorprofileimages',
+                                  '/imagesuploaded',
                                 params: {
                                   vendorId:
                                     vendorData._id,
+                                  readOnly: 'true',
                                 },
                               },
                             )
@@ -5106,7 +5199,102 @@ const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
   },
+  heroWrapper: {
+    backgroundColor: PRIMARY,
+    paddingTop: 44,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
 
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  heroIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  heroTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#FFFFFF',
+    marginHorizontal: 8,
+  },
+
+  heroBody: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+
+  heroImageFrame: {
+    flex: 1,
+    aspectRatio: 1,
+    backgroundColor: PRIMARY_LIGHT,
+    borderRadius: 24,
+    padding: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 6,
+  },
+
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+
+  heroTabRail: {
+    width: 74,
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  heroTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+
+  heroTabActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+
+  heroTabLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  heroTabLabelActive: {
+    color: PRIMARY,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 40,
