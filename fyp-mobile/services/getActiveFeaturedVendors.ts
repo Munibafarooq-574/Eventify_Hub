@@ -7,6 +7,9 @@ export interface FeaturedVendorQuery {
   limit?: number;
   eventCityId?: string;
   categoryIds?: string[];
+  eventDate?: string;
+  startTime?: string;
+  durationMinutes?: number;
 }
 
 export async function getActiveFeaturedVendors(
@@ -47,7 +50,32 @@ export async function getActiveFeaturedVendors(
     );
   }
 
-  const queryString = query.toString();
+  if (options.eventDate?.trim()) {
+  query.append(
+    'eventDate',
+    options.eventDate.trim(),
+  );
+}
+
+if (options.startTime?.trim()) {
+  query.append(
+    'startTime',
+    options.startTime.trim(),
+  );
+}
+
+if (
+  typeof options.durationMinutes === 'number' &&
+  Number.isFinite(options.durationMinutes) &&
+  options.durationMinutes > 0
+) {
+  query.append(
+    'durationMinutes',
+    String(options.durationMinutes),
+  );
+}
+
+const queryString = query.toString();
 
   return growthApi.get<FeaturedVendorPublicEntry[]>(
     `/vendor/growth/promotion/featured-vendor/active${

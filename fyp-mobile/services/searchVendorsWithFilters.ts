@@ -4,6 +4,9 @@ const searchVendorsWithFilters = async (filters: {
   name?: string;
   categoryId?: string;
   eventCityId?: string;
+  eventDate?: string;
+  startTime?: string;
+  durationMinutes?: number;
   minRating?: number;
   staff?: string;
   cancellationPolicy?: string;
@@ -28,6 +31,27 @@ const searchVendorsWithFilters = async (filters: {
         filters.eventCityId,
       );
     }
+
+  if (filters.eventDate) {
+  query.append(
+    "eventDate",
+    filters.eventDate,
+  );
+}
+
+if (filters.startTime) {
+  query.append(
+    "startTime",
+    filters.startTime,
+  );
+}
+
+if (filters.durationMinutes !== undefined) {
+  query.append(
+    "durationMinutes",
+    String(filters.durationMinutes),
+  );
+}
 
     if (filters.minRating) {
       query.append(

@@ -75,6 +75,9 @@ export class PromotionController {
     @Query('limit') limit?: string,
     @Query('eventCityId') eventCityId?: string,
     @Query('categoryIds') categoryIds?: string,
+    @Query('eventDate') eventDate?: string,
+    @Query('startTime') startTime?: string,
+    @Query('durationMinutes') durationMinutes?: string,
   ) {
     const parsedLimit = Number(limit);
 
@@ -90,12 +93,24 @@ export class PromotionController {
             : undefined,
 
         categoryIds:
-          typeof categoryIds === 'string'
-            ? categoryIds
-                .split(',')
-                .map((id) => id.trim())
-                .filter(Boolean)
-            : [],
+  typeof categoryIds === 'string'
+    ? categoryIds
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [],
+
+eventDate:
+  eventDate?.trim() || undefined,
+
+startTime:
+  startTime?.trim() || undefined,
+
+durationMinutes:
+  durationMinutes &&
+  Number.isFinite(Number(durationMinutes))
+    ? Number(durationMinutes)
+    : undefined,
       },
     );
   }
@@ -160,6 +175,12 @@ getActiveFeaturedPackages(
   eventCityId?: string,
   @Query('categoryIds')
   categoryIds?: string,
+  @Query('eventDate')
+  eventDate?: string,
+  @Query('startTime')
+  startTime?: string,
+  @Query('durationMinutes')
+  durationMinutes?: string,
 ) {
   const parsedLimit = Number(limit);
 
@@ -176,12 +197,24 @@ getActiveFeaturedPackages(
           : undefined,
 
       categoryIds:
-        typeof categoryIds === 'string'
-          ? categoryIds
-              .split(',')
-              .map((id) => id.trim())
-              .filter(Boolean)
-          : [],
+  typeof categoryIds === 'string'
+    ? categoryIds
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [],
+
+eventDate:
+  eventDate?.trim() || undefined,
+
+startTime:
+  startTime?.trim() || undefined,
+
+durationMinutes:
+  durationMinutes &&
+  Number.isFinite(Number(durationMinutes))
+    ? Number(durationMinutes)
+    : undefined,
     },
   );
 }

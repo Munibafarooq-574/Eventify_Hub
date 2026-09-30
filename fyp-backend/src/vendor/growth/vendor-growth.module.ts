@@ -13,6 +13,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CityModule } from '../../city/city.module';
+import { VendorAvailabilityModule } from '../../vendor-availability/vendor-availability.module';
+
 
 // Subscription
 import {
@@ -136,10 +138,11 @@ import { VendorModule } from 'src/vendor/vendor.module';
     
     // Provides VendorAnalyticsService used by
     // BadgeService and AnalyticsService.
-        forwardRef(() => VendorModule),
-        CityModule,
-        FileUploadModule,
-  ],
+    forwardRef(() => VendorModule),
+    CityModule,
+    forwardRef(() => VendorAvailabilityModule),
+    FileUploadModule,
+        ],
 
   controllers: [
     SubscriptionController,

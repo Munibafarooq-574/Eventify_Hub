@@ -7,6 +7,9 @@ export interface FeaturedPackageQuery {
   limit?: number;
   eventCityId?: string;
   categoryIds?: string[];
+  eventDate?: string;
+  startTime?: string;
+  durationMinutes?: number;
 }
 
 export async function getActiveFeaturedPackages(
@@ -47,8 +50,33 @@ export async function getActiveFeaturedPackages(
     );
   }
 
-  const queryString =
-    query.toString();
+ if (options.eventDate?.trim()) {
+  query.append(
+    'eventDate',
+    options.eventDate.trim(),
+  );
+}
+
+if (options.startTime?.trim()) {
+  query.append(
+    'startTime',
+    options.startTime.trim(),
+  );
+}
+
+if (
+  typeof options.durationMinutes === 'number' &&
+  Number.isFinite(options.durationMinutes) &&
+  options.durationMinutes > 0
+) {
+  query.append(
+    'durationMinutes',
+    String(options.durationMinutes),
+  );
+}
+
+const queryString =
+  query.toString();
 
   return growthApi.get<
     FeaturedPackagePublicEntry[]

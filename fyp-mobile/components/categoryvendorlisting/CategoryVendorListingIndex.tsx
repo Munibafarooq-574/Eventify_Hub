@@ -1,7 +1,6 @@
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
 
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
-import checkVendorsAvailability from "@/services/checkVendorsAvailability";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
@@ -164,9 +163,12 @@ const formatTime = (time?: string) => {
       : routeParams?.minRating;
 
     
-     const filters = {
+         const filters = {
       name: searchQuery || undefined,
       eventCityId: timing.eventCityId,
+      eventDate: timing.eventDate,
+      startTime: timing.startTime,
+      durationMinutes: timing.durationMinutes,
       staff: staff || undefined,
       cancellationPolicy: cancellationPolicy || undefined,
       minRating: minRatingStr
@@ -198,21 +200,8 @@ const mergedResults = resultsPerCategory.flat();
       return;
     }
 
-    setCheckingAvailability(true);
-    try {
-      const vendorIds = vendorResults.map((vendor: any) => vendor._id);
-      const availabilityResults = await checkVendorsAvailability({ vendorIds, eventDate: timing.eventDate, startTime: timing.startTime, durationMinutes: timing.durationMinutes });
-      const availableIds = new Set((availabilityResults ?? []).filter((result: any) => result.available).map((result: any) => result.vendorId));
-      const availableVendors = vendorResults.filter((vendor: any) => availableIds.has(vendor._id));
-      console.log("Available vendors:", availableVendors.length);
-      setData(availableVendors);
-      fetchVendorDetails(availableVendors);
-    } catch (error) {
-      console.error("Error checking vendor availability:", error);
-      setData([]);
-    } finally {
-      setCheckingAvailability(false);
-    }
+    setData(vendorResults);
+    fetchVendorDetails(vendorResults);
   } catch (error) {
     console.error("Error fetching vendors:", error);
     setData([]);

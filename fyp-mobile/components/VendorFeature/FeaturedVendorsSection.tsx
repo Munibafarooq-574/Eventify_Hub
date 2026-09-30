@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import getMarketplaceEventContext from '../../services/getMarketplaceEventContext';
 import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
 import { FeaturedVendorPublicEntry } from '../../types/promotion.types';
-import checkVendorsAvailability from '../../services/checkVendorsAvailability';
+
 
 const COLORS = {
   text: '#1F2937',
@@ -53,59 +53,25 @@ const featured =
     eventCityId:
       discoveryCityId,
     categoryIds,
+    eventDate:
+      hasAvailabilityContext
+        ? eventDate
+        : undefined,
+    startTime:
+      hasAvailabilityContext
+        ? startTime
+        : undefined,
+    durationMinutes:
+      hasAvailabilityContext
+        ? durationMinutes
+        : undefined,
   });
-
 if (cancelled) {
   return;
 }
 
-if (featured.length === 0) {
-  setVendors([]);
-  return;
-}
+setVendors(featured);
 
-if (!hasAvailabilityContext) {
-  setVendors(featured);
-  return;
-}
-
-      if (
-  !eventDate ||
-  !startTime ||
-  typeof durationMinutes !== 'number' ||
-  !Number.isFinite(durationMinutes) ||
-  durationMinutes <= 0
-) {
-  setVendors(featured);
-  return;
-}
-
-// Reuse existing single availability authority.
-const availability =
-  await checkVendorsAvailability({
-    vendorIds: featured.map(
-      (vendor) => vendor.vendorId,
-    ),
-    eventDate,
-    startTime,
-    durationMinutes,
-  });
-
-      if (cancelled) {
-        return;
-      }
-
-      const availableVendorIds = new Set(
-        (availability ?? [])
-          .filter((result) => result.available)
-          .map((result) => result.vendorId),
-      );
-
-      setVendors(
-        featured.filter((vendor) =>
-          availableVendorIds.has(vendor.vendorId),
-        ),
-      );
     } catch (error) {
       console.error(
         '[Featured Vendors] Failed to load:',

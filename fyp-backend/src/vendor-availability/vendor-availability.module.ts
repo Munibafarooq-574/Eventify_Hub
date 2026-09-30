@@ -1,5 +1,5 @@
 //fyp-backend/src/vendor-availability/vendor-availability.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/schemas/user.schema';
 import { VendorOrder, VendorOrderSchema } from 'src/schemas/vendor-order.schema';
@@ -8,9 +8,9 @@ import { VendorAvailabilityController } from './vendor-availability.controller';
 import { VendorGrowthModule } from 'src/vendor/growth/vendor-growth.module';
 
 @Module({
-  imports: [
-  VendorGrowthModule,
-  MongooseModule.forFeature([
+     imports: [
+    forwardRef(() => VendorGrowthModule),
+    MongooseModule.forFeature([
     { name: User.name, schema: UserSchema },
     { name: VendorOrder.name, schema: VendorOrderSchema },
   ]),

@@ -1,4 +1,4 @@
-import checkVendorsAvailability from "@/services/checkVendorsAvailability";
+
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
@@ -64,9 +64,12 @@ if (
       const resultsPerCategory = await Promise.all(
         categoryIds.map((categoryId: string) =>
           searchVendorsWithFilters({
-            categoryId,
-            eventCityId,
-          }),
+          categoryId,
+          eventCityId,
+          eventDate,
+          startTime,
+          durationMinutes,
+        })
         ),
       );
 
@@ -99,37 +102,12 @@ if (
         return;
       }
 
-      /*
-       * Availability remains a mandatory eligibility rule.
-       * Reuse the existing backend availability authority.
+            /*
+       * Backend discovery already applies the authoritative
+       * package-aware availability engine.
        */
-      const availability =
-        await checkVendorsAvailability({
-          vendorIds: discoveredVendors.map(
-            (vendor: any) => vendor._id,
-          ),
-          eventDate: new Date(eventDate)
-            .toISOString()
-            .split("T")[0],
-          startTime,
-          durationMinutes,
-        });
-
-      const availableIds = new Set(
-        (availability ?? [])
-          .filter((result: any) => result.available)
-          .map((result: any) => result.vendorId),
-      );
-
-      /*
-       * Backend ordering is preserved.
-       * Dashboard only needs a compact recommendation preview.
-       */
-      const recommended = discoveredVendors
-        .filter((vendor: any) =>
-          availableIds.has(vendor._id),
-        )
-        .slice(0, 6);
+      const recommended =
+        discoveredVendors.slice(0, 6);
 
       setVendors(recommended);
 

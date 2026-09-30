@@ -349,10 +349,14 @@ if (!hasAccess) {
         };
       }
 
-      const bookingType = selectedPackage.bookingType;
+            const bookingType = selectedPackage.bookingType;
+
+      // Preserve the original event/requested start because some package
+      // booking types calculate their service window relative to event start.
+      const eventStartDateTime = new Date(startDateTime);
 
       switch (bookingType) {
-                case 'DURATION_BASED': {
+        case 'DURATION_BASED': {
           const requestedDurationMinutes =
             (endDateTime.getTime() - startDateTime.getTime()) /
             60000;
@@ -398,9 +402,7 @@ if (!hasAccess) {
             durations.length === 0 &&
             !selectedPackage.allowCustomDuration
           ) {
-            // Backward compatibility:
-            // legacy duration-based packages may not have duration
-            // options configured yet, so keep their existing behavior.
+            // Backward compatibility for legacy packages.
             break;
           }
 
@@ -447,6 +449,8 @@ if (!hasAccess) {
             }
           }
 
+          // Required service window remains the requested event/package
+          // start and duration.
           break;
         }
 
@@ -467,8 +471,10 @@ if (!hasAccess) {
             };
           }
 
+          startDateTime = new Date(eventStartDateTime);
+
           endDateTime = new Date(
-            startDateTime.getTime() +
+            eventStartDateTime.getTime() +
               requiredDuration * 60000,
           );
 
@@ -499,15 +505,13 @@ if (!hasAccess) {
             };
           }
 
-          const eventStart = new Date(startDateTime);
-
           startDateTime = new Date(
-            eventStart.getTime() +
+            eventStartDateTime.getTime() +
               startOffset * 60000,
           );
 
           endDateTime = new Date(
-            eventStart.getTime() +
+            eventStartDateTime.getTime() +
               endOffset * 60000,
           );
 

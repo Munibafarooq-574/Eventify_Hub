@@ -15,6 +15,7 @@ import { Review } from '../../../schemas/review.schema';
 import { VendorOrder } from '../../../schemas/vendor-order.schema';
 import { PromotionStatus, PromotionType } from './promotion.types';
 import { FeatureAccessService } from '../feature-access.service';
+import { VendorAvailabilityService } from '../../../vendor-availability/vendor-availability.service';
 import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
 
@@ -47,11 +48,17 @@ export interface FeaturedPackagePublicEntry {
 interface FeaturedVendorDiscoveryContext {
   eventCityId?: string;
   categoryIds?: string[];
+  eventDate?: string;
+  startTime?: string;
+  durationMinutes?: number;
 }
 
 interface FeaturedPackageDiscoveryContext {
   eventCityId?: string;
   categoryIds?: string[];
+  eventDate?: string;
+  startTime?: string;
+  durationMinutes?: number;
 }
 
 @Injectable()
@@ -66,11 +73,12 @@ export class PromotionService {
         @InjectModel(Review.name)
     private readonly reviewModel: Model<Review>,
 
-    @InjectModel(VendorOrder.name)
-    private readonly vendorOrderModel: Model<VendorOrder>,
+  @InjectModel(VendorOrder.name)
+private readonly vendorOrderModel: Model<VendorOrder>,
 
-    private readonly featureAccessService: FeatureAccessService,
-  ) {}
+private readonly featureAccessService: FeatureAccessService,
+private readonly availabilityService: VendorAvailabilityService,
+) {}
 
   // ---------------------------------------------------------------
   // Featured Vendor — vendor-facing
@@ -346,12 +354,42 @@ async getActiveFeaturedVendors(
     ),
   );
 
-  if (
-    eventCityId &&
-    !Types.ObjectId.isValid(eventCityId)
-  ) {
-    return [];
-  }
+if (
+  eventCityId &&
+  !Types.ObjectId.isValid(eventCityId)
+) {
+  return [];
+}
+
+const hasAvailabilityContext =
+  Boolean(context.eventDate) &&
+  Boolean(context.startTime) &&
+  typeof context.durationMinutes === 'number' &&
+  Number.isFinite(context.durationMinutes) &&
+  context.durationMinutes > 0;
+
+let eventStartDateTime: Date | undefined;
+let eventEndDateTime: Date | undefined;
+
+if (hasAvailabilityContext) {
+  const [hours, minutes] =
+    context.startTime!.split(':').map(Number);
+
+  eventStartDateTime =
+    new Date(context.eventDate!);
+
+  eventStartDateTime.setHours(
+    hours,
+    minutes,
+    0,
+    0,
+  );
+
+  eventEndDateTime = new Date(
+    eventStartDateTime.getTime() +
+      context.durationMinutes! * 60000,
+  );
+}
 
   // Do NOT limit here.
   // Mandatory eligibility must happen before final limit.
@@ -407,16 +445,45 @@ async getActiveFeaturedVendors(
           : {}),
       })
       .select(
-        'name contactDetails city buisnessCategory serviceLocationCityIds',
+        'name contactDetails city buisnessCategory serviceLocationCityIds packages',
       )
       .populate('buisnessCategory', 'name')
       .lean();
 
     if (!vendor) {
-      continue;
-    }
+  continue;
+}
 
-    const reviews = await this.reviewModel
+if (
+  hasAvailabilityContext &&
+  eventStartDateTime &&
+  eventEndDateTime
+) {
+  const packages =
+    (vendor as any).packages ?? [];
+
+  const packageChecks =
+    await Promise.all(
+      packages.map((pkg: any) =>
+        this.availabilityService.checkVendorAvailability(
+          vendorId,
+          eventStartDateTime!,
+          eventEndDateTime!,
+          pkg._id?.toString(),
+        ),
+      ),
+    );
+
+  if (
+    !packageChecks.some(
+      (result) => result.available,
+    )
+  ) {
+    continue;
+  }
+}
+
+const reviews = await this.reviewModel
       .find({
         vendorId: new Types.ObjectId(vendorId),
       })
@@ -492,12 +559,42 @@ async getActiveFeaturedPackages(
     ),
   );
 
-  if (
-    eventCityId &&
-    !Types.ObjectId.isValid(eventCityId)
-  ) {
-    return [];
-  }
+ if (
+  eventCityId &&
+  !Types.ObjectId.isValid(eventCityId)
+) {
+  return [];
+}
+
+const hasAvailabilityContext =
+  Boolean(context.eventDate) &&
+  Boolean(context.startTime) &&
+  typeof context.durationMinutes === 'number' &&
+  Number.isFinite(context.durationMinutes) &&
+  context.durationMinutes > 0;
+
+let eventStartDateTime: Date | undefined;
+let eventEndDateTime: Date | undefined;
+
+if (hasAvailabilityContext) {
+  const [hours, minutes] =
+    context.startTime!.split(':').map(Number);
+
+  eventStartDateTime =
+    new Date(context.eventDate!);
+
+  eventStartDateTime.setHours(
+    hours,
+    minutes,
+    0,
+    0,
+  );
+
+  eventEndDateTime = new Date(
+    eventStartDateTime.getTime() +
+      context.durationMinutes! * 60000,
+  );
+}
 
   // Do not limit before mandatory eligibility.
   const activePromotions =
@@ -695,14 +792,32 @@ async getActiveFeaturedPackages(
 
     // Deleted/non-existing package must never
     // remain publicly featured.
-    if (!pkg) {
-      continue;
-    }
+  if (!pkg) {
+  continue;
+}
 
-    const ratingInfo =
-      ratingByPackage.get(
-        promotionPackageId,
-      );
+if (
+  hasAvailabilityContext &&
+  eventStartDateTime &&
+  eventEndDateTime
+) {
+  const availability =
+    await this.availabilityService.checkVendorAvailability(
+      vendorId,
+      eventStartDateTime,
+      eventEndDateTime,
+      promotionPackageId,
+    );
+
+  if (!availability.available) {
+    continue;
+  }
+}
+
+const ratingInfo =
+  ratingByPackage.get(
+    promotionPackageId,
+  );
 
     results.push({
       promotionId:
