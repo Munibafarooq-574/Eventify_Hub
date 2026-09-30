@@ -1030,21 +1030,23 @@ if (
                   ),
                 );
 
-              const availablePackageIds =
-                packageResults
-                  .filter(
-                    ({ availability }) =>
-                      availability.available,
-                  )
-                  .map(
-                    ({ packageId }) =>
-                      packageId,
-                  );
+              const availablePackageResults =
+              packageResults.filter(
+                ({ availability }) =>
+                  availability.available,
+              );
 
-              return {
-                vendor,
-                availablePackageIds,
-              };
+            const availablePackageIds =
+              availablePackageResults.map(
+                ({ packageId }) =>
+                  packageId,
+              );
+
+            return {
+              vendor,
+              availablePackageIds,
+              availablePackageResults,
+            };
             },
           ),
         );
@@ -1055,29 +1057,49 @@ if (
             availablePackageIds.length > 0,
         )
         .map(
-          ({
-            vendor,
-            availablePackageIds,
-          }) => {
-            const result =
-              this.attachBusinessDetails(
-                vendor,
-              );
+  ({
+    vendor,
+    availablePackageIds,
+    availablePackageResults,
+  }) => {
+    const result =
+      this.attachBusinessDetails(
+        vendor,
+      );
 
-            return {
-              ...result,
-              packages:
-                Array.isArray(result.packages)
-                  ? result.packages.filter(
-                      (pkg: any) =>
-                        availablePackageIds.includes(
-                          pkg._id.toString(),
-                        ),
-                    )
-                  : [],
-            };
-          },
-        );
+    return {
+      ...result,
+
+      packages:
+        Array.isArray(result.packages)
+          ? result.packages
+              .filter(
+                (pkg: any) =>
+                  availablePackageIds.includes(
+                    pkg._id.toString(),
+                  ),
+              )
+              .map((pkg: any) => {
+                const packageAvailability =
+                  availablePackageResults.find(
+                    ({ packageId }) =>
+                      packageId ===
+                      pkg._id.toString(),
+                  );
+
+                return {
+                  ...pkg,
+
+                  requiredServiceWindow:
+                    packageAvailability
+                      ?.availability
+                      ?.requiredServiceWindow,
+                };
+              })
+          : [],
+    };
+  },
+);
     }
 
     return visibleVendors.map(

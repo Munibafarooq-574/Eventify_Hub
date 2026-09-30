@@ -92,6 +92,16 @@ const formatTime = (time?: string) => {
   return `${hour12}:${String(minutes).padStart(2, "0")}${period}`;
 };
 
+const formatServiceWindowTime = (dateTime?: string) => {
+  if (!dateTime) return "";
+
+  return new Date(dateTime).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
   const fetchData = async () => {
   try {
     const categoryIdsRaw = Array.isArray(routeParams?.categoryIds)
@@ -189,6 +199,11 @@ const formatTime = (time?: string) => {
   })
 );
 
+console.log(
+  "PHASE 7 VENDOR SEARCH RESPONSE:",
+  JSON.stringify(resultsPerCategory, null, 2)
+);
+
 const mergedResults = resultsPerCategory.flat();
     const uniqueVendorsMap = new Map<string, any>();
     mergedResults.forEach((vendor: any) => { if (vendor?._id) uniqueVendorsMap.set(vendor._id, vendor); });
@@ -253,7 +268,22 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
   }, [data, checkingAvailability]);
 
   const renderItem = ({ item }: any) => {
-    const review = vendorReviews[item._id];
+  const review = vendorReviews[item._id];
+
+  const availablePackage = Array.isArray(item?.packages)
+    ? item.packages.find(
+        (pkg: any) => pkg?.requiredServiceWindow
+      )
+    : undefined;
+
+    const requiredServiceWindow =
+  availablePackage?.requiredServiceWindow;
+  
+    const availablePackageIds = Array.isArray(item?.packages)
+  ? item.packages
+      .map((pkg: any) => String(pkg?._id || ""))
+      .filter(Boolean)
+  : [];
     const rating = review?.averageRating ? Number(review.averageRating).toFixed(1) : "0.0";
     const reviewCount = review?.totalReviews || 0;
 
@@ -294,6 +324,7 @@ router.push({
   durationMinutes: String(eventTiming?.durationMinutes || 0),
   openTab: "Packages",
   bookingMode: eventTiming ? "event" : "browse",
+  availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
 }
@@ -367,11 +398,18 @@ router.push({
           <Ionicons name="checkmark-circle" size={scale(16)} color={COLORS.success} />
           <View style={styles.availabilityTextContainer}>
             <Text style={styles.availableText}>Available</Text>
-            {eventTiming && (
-              <Text style={styles.selectedTimeText}>
-                {eventTiming.eventDate} • {formatTime(eventTiming.startTime)} - {formatTime(eventTiming.endTime)}
-              </Text>
-            )}
+            {requiredServiceWindow?.startDateTime &&
+          requiredServiceWindow?.endDateTime && (
+            <Text style={styles.selectedTimeText}>
+              {formatServiceWindowTime(
+                requiredServiceWindow.startDateTime
+              )}{" "}
+              -{" "}
+              {formatServiceWindowTime(
+                requiredServiceWindow.endDateTime
+              )}
+            </Text>
+          )}
           </View>
         </View>
       </View>
@@ -399,7 +437,7 @@ router.push({
 })
 }
          >
-          <Text style={styles.viewButtonText}>View</Text>
+          <Text style={styles.viewButtonText}>View Packages</Text>
           <Ionicons name="chevron-forward" size={scale(14)} color="white" />
         </TouchableOpacity>
       </View>

@@ -29,6 +29,15 @@ export interface AvailabilityResult {
   vendorId: string;
   available: boolean;
   reason?: string;
+
+  // Phase 7:
+  // Final package-aware service window resolved by the existing
+  // availability engine. Frontend must display this value instead
+  // of recalculating availability/service timing.
+  requiredServiceWindow?: {
+    startDateTime: Date;
+    endDateTime: Date;
+  };
 }
 
 @Injectable()
@@ -777,13 +786,20 @@ if (!hasAccess) {
     }
 
     // ---------------------------------------------------------
-    // Available
-    // ---------------------------------------------------------
+// Available
+// ---------------------------------------------------------
 
-    return {
-      vendorId,
-      available: true,
-    };
+return {
+  vendorId,
+  available: true,
+
+  // These are the FINAL package-aware dates after the existing
+  // bookingType calculation above has been applied.
+  requiredServiceWindow: {
+    startDateTime,
+    endDateTime,
+  },
+};
   }
 
     async checkMany(

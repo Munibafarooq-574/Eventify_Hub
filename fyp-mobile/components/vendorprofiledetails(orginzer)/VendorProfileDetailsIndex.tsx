@@ -15,6 +15,7 @@ import axios from 'axios';
 import { router, useGlobalSearchParams } from 'expo-router';
 import React, {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -372,18 +373,39 @@ const getRelevantVendorSlots = (
 const VendorDetailsScreen: React.FC =
   () => {
     const {
-      id,
-      packageId,
-      openTab,
-      eventId,
-      eventDate,
-      startTime,
-      endTime,
-      durationMinutes,
-      bookingMode,
-      campaignId,
-      source,
-    } = useGlobalSearchParams();
+  id,
+  packageId,
+  openTab,
+  eventId,
+  eventDate,
+  startTime,
+  endTime,
+  durationMinutes,
+  bookingMode,
+  campaignId,
+  source,
+  availablePackageIds,
+} = useGlobalSearchParams();
+
+const phase6AvailablePackageIds = useMemo(() => {
+  if (!availablePackageIds) {
+    return null;
+  }
+
+  const raw = Array.isArray(availablePackageIds)
+    ? availablePackageIds[0]
+    : availablePackageIds;
+
+  try {
+    const parsed = JSON.parse(String(raw));
+
+    return Array.isArray(parsed)
+      ? parsed.map(String)
+      : [];
+  } catch {
+    return [];
+  }
+}, [availablePackageIds]);
 
     const [activeTab, setActiveTab] =
       useState<
@@ -695,30 +717,45 @@ const todayAvailabilitySummary =
       openTab,
     ]);
 
-        const getSelectedPackage = () => {
-      if (
-        !vendorData?.packages ||
-        !Array.isArray(vendorData.packages) ||
-        vendorData.packages.length === 0
-      ) {
-        return null;
-      }
+    const visiblePackages = useMemo(() => {
+  const packages = Array.isArray(vendorData?.packages)
+    ? vendorData.packages
+    : [];
 
-      if (activePackage) {
-        const matchedPackage =
-          vendorData.packages.find(
-            (pkg: any) =>
-              String(pkg._id) ===
-              String(activePackage),
-          );
+  if (phase6AvailablePackageIds === null) {
+    return packages;
+  }
 
-        if (matchedPackage) {
-          return matchedPackage;
-        }
-      }
+  return packages.filter((pkg: any) =>
+    phase6AvailablePackageIds.includes(
+      String(pkg?._id),
+    ),
+  );
+}, [
+  vendorData?.packages,
+  phase6AvailablePackageIds,
+]);
 
-      return vendorData.packages[0] || null;
-    };
+  const getSelectedPackage = () => {
+  if (visiblePackages.length === 0) {
+    return null;
+  }
+
+  if (activePackage) {
+    const matchedPackage =
+      visiblePackages.find(
+        (pkg: any) =>
+          String(pkg._id) ===
+          String(activePackage),
+      );
+
+    if (matchedPackage) {
+      return matchedPackage;
+    }
+  }
+
+  return visiblePackages[0] || null;
+};
 
         const handlePackageSelect = (
       selectedPackageId: string,
@@ -3296,10 +3333,7 @@ if (
                 Available Packages
               </Text>
 
-              {!vendorData?.packages ||
-              vendorData
-                .packages
-                .length === 0 ? (
+              {visiblePackages.length === 0 ? (
                 <View
                   style={
                     styles.noPackagesBox
@@ -3349,7 +3383,7 @@ if (
                       paddingRight: 8,
                     }}
                   >
-                    {vendorData.packages.map(
+                    {visiblePackages.map(
                       (
                         pkg: any,
                       ) => {
