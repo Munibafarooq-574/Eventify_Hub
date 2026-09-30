@@ -95,13 +95,66 @@ const formatTime = (time?: string) => {
 const formatServiceWindowTime = (dateTime?: string) => {
   if (!dateTime) return "";
 
-  return new Date(dateTime).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const match = dateTime.match(/T(\d{2}):(\d{2})/);
+
+  if (!match) return "";
+
+  const hour24 = Number(match[1]);
+  const minute = match[2];
+
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+
+  return `${hour12}:${minute} ${period}`;
 };
 
+const getServiceWindowLabel = (
+  pkg: any,
+  requiredServiceWindow: any
+) => {
+  if (
+    !requiredServiceWindow?.startDateTime ||
+    !requiredServiceWindow?.endDateTime
+  ) {
+    return "";
+  }
+
+  const start = formatServiceWindowTime(
+    requiredServiceWindow.startDateTime
+  );
+
+  const end = formatServiceWindowTime(
+    requiredServiceWindow.endDateTime
+  );
+
+  switch (pkg?.bookingType) {
+    case "DELIVERY_BASED":
+      return start === end
+        ? `Delivery at ${start}`
+        : `Delivery: ${start} - ${end}`;
+
+    case "SETUP_BASED":
+      return start === end
+        ? `Setup at ${start}`
+        : `Setup: ${start} - ${end}`;
+
+    case "TIME_SLOT_BASED":
+      return start === end
+        ? `Time Slot: ${start}`
+        : `Time Slot: ${start} - ${end}`;
+
+    case "CUSTOM":
+      return start === end
+        ? `Service at ${start}`
+        : `Service Window: ${start} - ${end}`;
+
+    case "DURATION_BASED":
+    default:
+      return start === end
+        ? `Service at ${start}`
+        : `Service: ${start} - ${end}`;
+  }
+};
   const fetchData = async () => {
   try {
     const categoryIdsRaw = Array.isArray(routeParams?.categoryIds)
@@ -198,6 +251,11 @@ const formatServiceWindowTime = (dateTime?: string) => {
     }));
   })
 );
+
+console.log("PHASE 7 EVENT INPUT:", {
+  eventTiming,
+  filters,
+});
 
 console.log(
   "PHASE 7 VENDOR SEARCH RESPONSE:",
@@ -401,12 +459,9 @@ router.push({
             {requiredServiceWindow?.startDateTime &&
           requiredServiceWindow?.endDateTime && (
             <Text style={styles.selectedTimeText}>
-              {formatServiceWindowTime(
-                requiredServiceWindow.startDateTime
-              )}{" "}
-              -{" "}
-              {formatServiceWindowTime(
-                requiredServiceWindow.endDateTime
+              {getServiceWindowLabel(
+                availablePackage,
+                requiredServiceWindow
               )}
             </Text>
           )}
