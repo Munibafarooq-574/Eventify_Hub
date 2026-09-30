@@ -20,6 +20,7 @@ import {
 } from '../schemas/notification.schema';
 
 import { CityModule } from '../city/city.module';
+import { VendorAvailabilityModule } from '../vendor-availability/vendor-availability.module';
 
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -31,11 +32,13 @@ import { AdminRoleGuard } from './admin-role.guard';
 import { FileUploadService } from '../file-upload/file-upload.service';
 import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
 
+
 @Module({
   imports: [
     PassportModule,
     VendorGrowthModule,
     CityModule,
+    VendorAvailabilityModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
