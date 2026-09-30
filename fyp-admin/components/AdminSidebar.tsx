@@ -17,6 +17,7 @@ const navigation = [
       { label: "Vendors", href: "/vendors" },
       { label: "Clients", href: "/clients" },
       { label: "Categories", href: "/categories" },
+      { label: "Cities", href: "/cities" },
     ],
   },
   {
