@@ -25,6 +25,8 @@ import { SearchVendorsDto } from './dto/search-vendors.dto';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { SubscriptionService } from '../vendor/growth/subscription/subscription.service';
 import { CityService } from '../city/city.service';
+import { VendorAvailabilityService } from '../vendor-availability/vendor-availability.service';
+
 /**
  * =============================================================
  * PUBLIC VENDOR PROJECTION
@@ -101,6 +103,7 @@ export class AuthService {
 
 private readonly subscriptionService: SubscriptionService,
 private readonly cityService: CityService,
+private readonly availabilityService: VendorAvailabilityService,
 ) {}
 
   // =========================================================
@@ -756,13 +759,13 @@ async searchUsers(
           .lean();
 
       const visibleVendors =
-  await this.filterVendorsWithActiveSubscription(
-    allVendors,
-  );
-
-return visibleVendors.map(
-  this.attachBusinessDetails,
-);
+      await this.filterVendorsWithActiveSubscription(
+        allVendors,
+      );
+   
+    return visibleVendors.map(
+      this.attachBusinessDetails,
+    );
     }
 
     const query: any = {
@@ -964,14 +967,122 @@ if (
     // UNIFIED BUSINESS DETAILS
     // =====================================================
 
-    const visibleVendors =
-  await this.filterVendorsWithActiveSubscription(
-    filteredUsers,
-  );
+       const visibleVendors =
+      await this.filterVendorsWithActiveSubscription(
+        filteredUsers,
+      );
 
-return visibleVendors.map(
-  this.attachBusinessDetails,
-);
+    // =====================================================
+    // TIME-AWARE PACKAGE AVAILABILITY
+    // =====================================================
+    // Use the existing package booking configuration and
+    // the existing VendorAvailabilityService only.
+    if (
+      filters.eventDate &&
+      filters.startTime &&
+      filters.durationMinutes
+    ) {
+      const [h, m] = filters.startTime
+        .split(':')
+        .map(Number);
+
+      const eventStartDateTime =
+        new Date(filters.eventDate);
+
+      eventStartDateTime.setHours(
+        h || 0,
+        m || 0,
+        0,
+        0,
+      );
+
+      const eventEndDateTime =
+        new Date(
+          eventStartDateTime.getTime() +
+            Number(filters.durationMinutes) * 60000,
+        );
+
+      const availabilityResults =
+        await Promise.all(
+          visibleVendors.map(
+            async (vendor: any) => {
+              const relevantPackages =
+                Array.isArray(vendor.packages)
+                  ? vendor.packages
+                  : [];
+
+              const packageResults =
+                await Promise.all(
+                  relevantPackages.map(
+                    async (pkg: any) => ({
+                      packageId:
+                        pkg._id.toString(),
+
+                      availability:
+                        await this.availabilityService
+                          .checkVendorAvailability(
+                            vendor._id.toString(),
+                            eventStartDateTime,
+                            eventEndDateTime,
+                            pkg._id.toString(),
+                          ),
+                    }),
+                  ),
+                );
+
+              const availablePackageIds =
+                packageResults
+                  .filter(
+                    ({ availability }) =>
+                      availability.available,
+                  )
+                  .map(
+                    ({ packageId }) =>
+                      packageId,
+                  );
+
+              return {
+                vendor,
+                availablePackageIds,
+              };
+            },
+          ),
+        );
+
+      return availabilityResults
+        .filter(
+          ({ availablePackageIds }) =>
+            availablePackageIds.length > 0,
+        )
+        .map(
+          ({
+            vendor,
+            availablePackageIds,
+          }) => {
+            const result =
+              this.attachBusinessDetails(
+                vendor,
+              );
+
+            return {
+              ...result,
+              packages:
+                Array.isArray(result.packages)
+                  ? result.packages.filter(
+                      (pkg: any) =>
+                        availablePackageIds.includes(
+                          pkg._id.toString(),
+                        ),
+                    )
+                  : [],
+            };
+          },
+        );
+    }
+
+    return visibleVendors.map(
+      this.attachBusinessDetails,
+    );
   }
 
   // =========================================================
