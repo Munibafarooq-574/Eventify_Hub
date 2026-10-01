@@ -25,6 +25,26 @@ export class DiscountController {
     return this.discountService.getVendorCoupons(vendorId);
   }
 
+  @Get('coupon/public/:vendorId')
+getPublicCoupons(
+  @Param('vendorId') vendorId: string,
+  @Query('packageId') packageId?: string,
+) {
+  return this.discountService.getPublicCoupons(
+    vendorId,
+    packageId,
+  );
+}
+
+@Get('coupon/public')
+getPublicDashboardCoupons(
+  @Query('limit') limit?: string,
+) {
+  return this.discountService.getPublicDashboardCoupons(
+    Number(limit) || 10,
+  );
+}
+
   // PATCH /vendor/growth/discount/coupon/:couponId?vendorId=...
   @Patch('coupon/:couponId')
   updateCoupon(
@@ -61,6 +81,32 @@ createDiscountCode(
     return this.discountService.getVendorDiscountCodes(vendorId);
   }
 
+  @Get('discount-code/clients/:vendorId')
+searchVendorClients(
+  @Param('vendorId') vendorId: string,
+  @Query('page') page?: string,
+  @Query('limit') limit?: string,
+  @Query('search') search?: string,
+) {
+  return this.discountService.searchVendorClients(
+    vendorId,
+    Number(page) || 1,
+    Number(limit) || 20,
+    search || '',
+  );
+}
+
+@Post('discount-code/:discountCodeId/notify-selected')
+notifySelectedClients(
+  @Param('discountCodeId') discountCodeId: string,
+  @Query('vendorId') vendorId: string,
+) {
+  return this.discountService.notifySelectedClients(
+    vendorId,
+    discountCodeId,
+  );
+}
+
   // PATCH /vendor/growth/discount/discount-code/:discountCodeId?vendorId=...
   @Patch('discount-code/:discountCodeId')
   updateDiscountCode(
@@ -83,10 +129,19 @@ createDiscountCode(
   // Body: { "code": "WEDDING20", "orderAmount": 20000 }
   // Works for BOTH Coupons and Discount Codes — checkout doesn't need to
   // know which type a code was created as. Read-only, doesn't consume a use.
-  @Post('coupon/validate')
-  validateCoupon(@Query('vendorId') vendorId: string, @Body() dto: ValidateCouponDto) {
-    return this.discountService.validateCoupon(vendorId, dto.code, dto.orderAmount);
-  }
+   @Post('coupon/validate')
+validateCoupon(
+  @Query('vendorId') vendorId: string,
+  @Body() dto: ValidateCouponDto,
+) {
+  return this.discountService.validateCoupon(
+  vendorId,
+  dto.code,
+  dto.orderAmount,
+  dto.clientId,
+  dto.packageId,
+);
+}
 
   // POST /vendor/growth/discount/coupon/redeem?vendorId=...
   // Body: { "code": "WEDDING20" }

@@ -46,7 +46,7 @@ export class VendorDiscount extends Document {
   @Prop({
   type: String,
   enum: DiscountAudience,
-  default: DiscountAudience.ALL,
+  default: DiscountAudience.EVERYONE,
   required: true,
 })
 audience: DiscountAudience;
@@ -56,7 +56,7 @@ audience: DiscountAudience;
   ref: 'User',
   default: [],
 })
-selectedOrganizerIds: MongooseSchema.Types.ObjectId[];
+selectedClientIds: MongooseSchema.Types.ObjectId[];
 
   @Prop({ type: Date, required: true })
   startDate: Date;

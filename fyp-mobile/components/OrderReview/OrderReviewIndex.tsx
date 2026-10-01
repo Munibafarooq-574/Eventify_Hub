@@ -1,16 +1,19 @@
 // fyp-mobile/components/orderreview/OrderReviewIndex.tsx
 import postPlaceOrder from '@/services/postPlaceOrder';
+import axios from 'axios';
 import { deleteSecureData, getSecureData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
+TextInput,
+TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
@@ -27,13 +30,26 @@ const DISCOUNT_RED = '#C44D5C';
 const STEPS = ['Cart', 'Review', 'Payment', 'Confirm'];
 const CURRENT_STEP = 1; // Review is active
 
-const DISCOUNT_PERCENT = 10;
-
 const OrderReviewScreen = () => {
   const [cartData, setCartData] = useState<any>(null);
   const [cateringCategory, setCateringCategory] = useState<any>(null);
   const [guests, setGuests] = useState<number>(0);
   const [placingOrder, setPlacingOrder] = useState(false);
+
+  const [publicCoupons, setPublicCoupons] =
+  useState<Record<string, any[]>>({});
+
+const [appliedPromotions, setAppliedPromotions] =
+  useState<Record<string, any>>({});
+
+const [applyingCouponId, setApplyingCouponId] =
+  useState<string | null>(null);
+
+  const [discountCodes, setDiscountCodes] =
+  useState<Record<string, string>>({});
+
+const [applyingDiscountCodeKey, setApplyingDiscountCodeKey] =
+  useState<string | null>(null);
 
   useEffect(() => {
     const fetchCartData = async () => {
@@ -100,8 +116,43 @@ const OrderReviewScreen = () => {
   };
 
   const totalAmount = calculateTotalAmount();
-  const discount = (totalAmount * DISCOUNT_PERCENT) / 100;
-  const discountedTotal = totalAmount - discount;
+
+const totalPromotionDiscount =
+  Object.values(appliedPromotions).reduce(
+    (sum: number, promotion: any) =>
+      sum +
+      Number(
+        promotion?.discountAmount || 0,
+      ),
+    0,
+  );
+
+const backendPromotionFinalTotal =
+  Object.values(appliedPromotions).reduce(
+    (sum: number, promotion: any) =>
+      sum +
+      Number(
+        promotion?.finalAmount ??
+          promotion?.originalAmount ??
+          0,
+      ),
+    0,
+  );
+
+const promotedOriginalTotal =
+  Object.values(appliedPromotions).reduce(
+    (sum: number, promotion: any) =>
+      sum +
+      Number(
+        promotion?.originalAmount || 0,
+      ),
+    0,
+  );
+
+const finalTotal =
+  totalAmount -
+  promotedOriginalTotal +
+  backendPromotionFinalTotal;
 
   const vendorCount = cartData?.vendors?.length || 0;
   const packageCount =
@@ -112,6 +163,374 @@ const OrderReviewScreen = () => {
 
   const formatCurrency = (amount: number) => Math.round(amount).toLocaleString('en-PK');
 
+  const getPromotionKey = (
+  vendorId: string,
+  packageId: string,
+) => `${vendorId}:${packageId}`;
+
+const getPackageAmount = (
+  vendor: any,
+  pkg: any,
+) => {
+  const isCatering =
+    cateringCategory?._id &&
+    vendor?.vendor?.buisnessCategory ===
+      cateringCategory._id;
+
+  const quantity = Math.max(
+    1,
+    Number(pkg?.quantity || 1),
+  );
+
+  return isCatering
+    ? Number(pkg?.price || 0) *
+        Number(guests || 0) *
+        quantity
+    : Number(pkg?.price || 0) *
+        quantity;
+};
+
+
+const fetchPublicCouponsForPackage = async (
+  vendorId: string,
+  packageId: string,
+) => {
+  const key = getPromotionKey(
+    vendorId,
+    packageId,
+  );
+
+  try {
+    const response = await axios.get(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/public/${vendorId}`,
+      {
+        params: {
+          packageId,
+        },
+      },
+    );
+
+    setPublicCoupons((current) => ({
+      ...current,
+      [key]: Array.isArray(response.data)
+        ? response.data
+        : [],
+    }));
+  } catch (error) {
+    console.error(
+      'Error fetching public coupons:',
+      error,
+    );
+
+    setPublicCoupons((current) => ({
+      ...current,
+      [key]: [],
+    }));
+  }
+};
+
+useEffect(() => {
+  if (!cartData?.vendors?.length) {
+    return;
+  }
+
+  cartData.vendors.forEach(
+    (vendor: any) => {
+      const vendorId =
+        vendor?.vendor?._id;
+
+      if (!vendorId) {
+        return;
+      }
+
+      vendor?.packages?.forEach(
+        (pkg: any) => {
+          const packageId =
+            pkg?.packageId ||
+            pkg?._id;
+
+          if (!packageId) {
+            return;
+          }
+
+          fetchPublicCouponsForPackage(
+            String(vendorId),
+            String(packageId),
+          );
+        },
+      );
+    },
+  );
+}, [cartData]);
+
+const handleApplyPublicCoupon = async (
+  vendor: any,
+  pkg: any,
+  coupon: any,
+) => {
+  const vendorId = String(
+    vendor?.vendor?._id || '',
+  );
+
+  const packageId = String(
+    pkg?.packageId ||
+      pkg?._id ||
+      '',
+  );
+
+  if (!vendorId || !packageId) {
+    return;
+  }
+
+  const key = getPromotionKey(
+    vendorId,
+    packageId,
+  );
+
+  const originalAmount =
+  getPackageAmount(
+    vendor,
+    pkg,
+  );
+
+const currentPromotion =
+  appliedPromotions[key];
+
+if (
+  currentPromotion &&
+  currentPromotion.promotionId !==
+    String(coupon._id)
+) {
+  const shouldReplace =
+    await confirmPromotionReplacement(
+      currentPromotion.promotionCode,
+      coupon.code,
+    );
+
+  if (!shouldReplace) {
+    return;
+  }
+}
+
+try {
+    setApplyingCouponId(
+      String(coupon._id),
+    );
+
+    const user = await getUserData();
+
+    const response = await axios.post(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/validate?vendorId=${vendorId}`,
+      {
+        code: coupon.code,
+        orderAmount: originalAmount,
+        clientId: user?._id,
+        packageId,
+      },
+    );
+
+    const result = response.data;
+
+    setAppliedPromotions(
+      (current) => ({
+        ...current,
+        [key]: {
+          promotionId:
+            result.discountEntryId,
+          promotionType: 'COUPON',
+          promotionCode:
+            result.code,
+          originalAmount,
+          discountAmount: Number(
+            result.discountAmount || 0,
+          ),
+          finalAmount: Number(
+            result.finalAmount,
+          ),
+        },
+      }),
+    );
+
+    Toast.show({
+      type: 'success',
+      text1: 'Offer Applied',
+      text2: `${result.code} applied successfully.`,
+      position: 'bottom',
+    });
+  } catch (error: any) {
+    Toast.show({
+      type: 'error',
+      text1: 'Offer Not Applied',
+      text2:
+        error?.response?.data?.message ||
+        'This offer could not be applied.',
+      position: 'bottom',
+    });
+  } finally {
+    setApplyingCouponId(null);
+  }
+};
+
+const confirmPromotionReplacement = (
+  currentCode: string,
+  newCode: string,
+): Promise<boolean> => {
+  return new Promise((resolve) => {
+    Alert.alert(
+      'Replace Promotion?',
+      `${currentCode} is currently applied. Replace it with ${newCode}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        {
+          text: 'Replace',
+          onPress: () => resolve(true),
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => resolve(false),
+      },
+    );
+  });
+};
+
+const handleApplyDiscountCode = async (
+  vendor: any,
+  pkg: any,
+) => {
+  const vendorId = String(
+    vendor?.vendor?._id || '',
+  );
+
+  const packageId = String(
+    pkg?.packageId ||
+      pkg?._id ||
+      '',
+  );
+
+  if (!vendorId || !packageId) {
+    return;
+  }
+
+  const key = getPromotionKey(
+    vendorId,
+    packageId,
+  );
+
+  const code =
+    discountCodes[key]?.trim();
+
+  if (!code) {
+    Toast.show({
+      type: 'info',
+      text1: 'Enter Discount Code',
+      text2:
+        'Please enter a discount code first.',
+      position: 'bottom',
+    });
+
+    return;
+  }
+
+  const originalAmount =
+  getPackageAmount(
+    vendor,
+    pkg,
+  );
+
+  
+const currentPromotion =
+  appliedPromotions[key];
+
+  if (
+  currentPromotion?.promotionCode === code
+) {
+  Toast.show({
+    type: 'info',
+    text1: 'Already Applied',
+    text2: `${code} is already applied.`,
+    position: 'bottom',
+  });
+
+  return;
+}
+
+if (
+  currentPromotion &&
+  currentPromotion.promotionCode !== code
+) {
+  const shouldReplace =
+    await confirmPromotionReplacement(
+      currentPromotion.promotionCode,
+      code,
+    );
+
+  if (!shouldReplace) {
+    return;
+  }
+}
+
+try {
+    setApplyingDiscountCodeKey(key);
+
+    const user = await getUserData();
+
+    const response = await axios.post(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/validate?vendorId=${vendorId}`,
+      {
+        code,
+        orderAmount: originalAmount,
+        clientId: user?._id,
+        packageId,
+      },
+    );
+
+    const result = response.data;
+
+    setAppliedPromotions(
+      (current) => ({
+        ...current,
+        [key]: {
+          promotionId:
+            result.discountEntryId,
+          promotionType:
+            'DISCOUNT_CODE',
+          promotionCode:
+            result.code,
+          originalAmount,
+          discountAmount: Number(
+            result.discountAmount || 0,
+          ),
+          finalAmount: Number(
+            result.finalAmount,
+          ),
+        },
+      }),
+    );
+
+    Toast.show({
+      type: 'success',
+      text1: 'Discount Code Applied',
+      text2: `${result.code} applied successfully.`,
+      position: 'bottom',
+    });
+  } catch (error: any) {
+    Toast.show({
+      type: 'error',
+      text1: 'Code Not Applied',
+      text2:
+        error?.response?.data?.message ||
+        'This discount code is not available for your account.',
+      position: 'bottom',
+    });
+  } finally {
+    setApplyingDiscountCodeKey(null);
+  }
+};
   // -----------------------------------------
   // Checkout
   // -----------------------------------------
@@ -145,27 +564,59 @@ const OrderReviewScreen = () => {
       const eventDetailsRaw = await getSecureData('eventDetails');
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
 
-      const services = cartData.vendors.flatMap((vendor: any) =>
-  vendor.packages.map((pkg: any) => ({
-    vendorId: vendor.vendor._id,
-    serviceName: pkg.packageName,
-    price: Number(pkg.price),
-    packageId: pkg.packageId,
+  const services = cartData.vendors.flatMap(
+  (vendor: any) =>
+    vendor.packages.map((pkg: any) => {
+      const vendorId = String(
+        vendor?.vendor?._id || '',
+      );
 
-    durationMinutes: Number(
-      pkg.durationMinutes ||
-        eventDetails?.durationMinutes ||
-        60,
-    ),
+      const packageId = String(
+        pkg?.packageId ||
+          pkg?._id ||
+          '',
+      );
 
-    quantity: Math.max(
-      1,
-      Number(pkg.quantity || 1),
-    ),
+      const promotion =
+        appliedPromotions[
+          getPromotionKey(
+            vendorId,
+            packageId,
+          )
+        ];
 
-    requiredServiceWindow:
-      pkg.requiredServiceWindow,
-  })),
+      return {
+        vendorId: vendor.vendor._id,
+        serviceName: pkg.packageName,
+        price: Number(pkg.price),
+        packageId: pkg.packageId,
+
+        promotion: promotion
+          ? {
+              promotionId:
+                promotion.promotionId,
+              promotionType:
+                promotion.promotionType,
+              promotionCode:
+                promotion.promotionCode,
+            }
+          : undefined,
+
+        durationMinutes: Number(
+          pkg.durationMinutes ||
+            eventDetails?.durationMinutes ||
+            60,
+        ),
+
+        quantity: Math.max(
+          1,
+          Number(pkg.quantity || 1),
+        ),
+
+        requiredServiceWindow:
+          pkg.requiredServiceWindow,
+      };
+    }),
 );
 
       setPlacingOrder(true);
@@ -349,6 +800,27 @@ const OrderReviewScreen = () => {
                     const packagePrice = Number(pkg?.price || 0);
                     const finalPrice = isCatering ? packagePrice * Number(guests || 0) : packagePrice;
 
+                    const vendorId = String(
+                    vendor?.vendor?._id || '',
+                  );
+
+                  const packageId = String(
+                    pkg?.packageId ||
+                      pkg?._id ||
+                      '',
+                  );
+
+                  const promotionKey =
+                    getPromotionKey(
+                      vendorId,
+                      packageId,
+                    );
+
+                  const availableCoupons =
+                    publicCoupons[promotionKey] || [];
+
+                  const appliedPromotion =
+                    appliedPromotions[promotionKey];
                     return (
                       <View
                         key={`${packageIndex}-${pkg?.packageName || 'package'}`}
@@ -371,6 +843,239 @@ const OrderReviewScreen = () => {
                           )}
 
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
+                          {availableCoupons.length > 0 && (
+                          <View style={styles.availableOffers}>
+                            <Text style={styles.availableOffersTitle}>
+                              Available Offers
+                            </Text>
+
+                            {availableCoupons.map(
+                              (coupon: any) => {
+                                const discountLabel =
+                                  coupon.discountType ===
+                                  'PERCENTAGE'
+                                    ? `${Number(
+                                        coupon.discountValue ||
+                                          0,
+                                      )}% OFF`
+                                    : `Rs. ${formatCurrency(
+                                        Number(
+                                          coupon.discountValue ||
+                                            0,
+                                        ),
+                                      )} OFF`;
+
+                                const isApplied =
+                                  appliedPromotion?.promotionId ===
+                                  String(coupon._id);
+
+                                return (
+                                  <View
+                                    key={String(coupon._id)}
+                                    style={styles.offerCard}
+                                  >
+                                    <View
+                                      style={
+                                        styles.offerContent
+                                      }
+                                    >
+                                      <Text
+                                        style={
+                                          styles.offerDiscount
+                                        }
+                                      >
+                                        🎟 {discountLabel}
+                                      </Text>
+
+                                      <Text
+                                        style={
+                                          styles.offerCode
+                                        }
+                                      >
+                                        {coupon.code}
+                                      </Text>
+
+                                      {Number(
+                                        coupon.minimumOrderAmount,
+                                      ) > 0 && (
+                                        <Text
+                                          style={
+                                            styles.offerDetail
+                                          }
+                                        >
+                                          Min Rs.{' '}
+                                          {formatCurrency(
+                                            Number(
+                                              coupon.minimumOrderAmount,
+                                            ),
+                                          )}
+                                        </Text>
+                                      )}
+
+                                      {Number(
+                                        coupon.maximumDiscountAmount,
+                                      ) > 0 && (
+                                        <Text
+                                          style={
+                                            styles.offerDetail
+                                          }
+                                        >
+                                          Max Rs.{' '}
+                                          {formatCurrency(
+                                            Number(
+                                              coupon.maximumDiscountAmount,
+                                            ),
+                                          )}
+                                        </Text>
+                                      )}
+                                    </View>
+
+                                    <TouchableOpacity
+                                      style={[
+                                        styles.applyOfferButton,
+                                        isApplied &&
+                                          styles.appliedOfferButton,
+                                      ]}
+                                      disabled={
+                                        isApplied ||
+                                        applyingCouponId ===
+                                          String(coupon._id)
+                                      }
+                                      onPress={() =>
+                                        handleApplyPublicCoupon(
+                                          vendor,
+                                          pkg,
+                                          coupon,
+                                        )
+                                      }
+                                    >
+                                      {applyingCouponId ===
+                                      String(coupon._id) ? (
+                                        <ActivityIndicator
+                                          size="small"
+                                          color="#FFFFFF"
+                                        />
+                                      ) : (
+                                        <Text
+                                          style={
+                                            styles.applyOfferText
+                                          }
+                                        >
+                                          {isApplied
+                                            ? 'Applied'
+                                            : 'Apply'}
+                                        </Text>
+                                      )}
+                                    </TouchableOpacity>
+                                  </View>
+                                );
+                              },
+                            )}
+
+                            {appliedPromotion && (
+                              <View
+                                style={
+                                  styles.appliedPromotionResult
+                                }
+                              >
+                                <Text
+                                  style={
+                                    styles.appliedPromotionText
+                                  }
+                                >
+                                  Original: Rs.{' '}
+                                  {formatCurrency(
+                                    appliedPromotion.originalAmount,
+                                  )}
+                                </Text>
+
+                                <Text
+                                  style={
+                                    styles.appliedPromotionDiscount
+                                  }
+                                >
+                                  Discount: - Rs.{' '}
+                                  {formatCurrency(
+                                    appliedPromotion.discountAmount,
+                                  )}
+                                </Text>
+
+                                <Text
+                                  style={
+                                    styles.appliedPromotionFinal
+                                  }
+                                >
+                                  Final: Rs.{' '}
+                                  {formatCurrency(
+                                    appliedPromotion.finalAmount,
+                                  )}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+
+                        <View style={styles.discountCodeSection}>
+                        <Text style={styles.discountCodeTitle}>
+                          Have a discount code?
+                        </Text>
+
+                        <View style={styles.discountCodeRow}>
+                          <TextInput
+                            style={styles.discountCodeInput}
+                            placeholder="Enter code"
+                            placeholderTextColor={MUTED}
+                            autoCapitalize="characters"
+                            value={
+                              discountCodes[promotionKey] || ''
+                            }
+                            onChangeText={(value) =>
+                              setDiscountCodes(
+                                (current) => ({
+                                  ...current,
+                                  [promotionKey]: value,
+                                }),
+                              )
+                            }
+                            editable={
+                              applyingDiscountCodeKey !==
+                              promotionKey
+                            }
+                          />
+
+                          <TouchableOpacity
+                            style={
+                              styles.discountCodeApplyButton
+                            }
+                            disabled={
+                              applyingDiscountCodeKey ===
+                              promotionKey
+                            }
+                            onPress={() =>
+                              handleApplyDiscountCode(
+                                vendor,
+                                pkg,
+                              )
+                            }
+                          >
+                            {applyingDiscountCodeKey ===
+                            promotionKey ? (
+                              <ActivityIndicator
+                                size="small"
+                                color="#FFFFFF"
+                              />
+                            ) : (
+                              <Text
+                                style={
+                                  styles.discountCodeApplyText
+                                }
+                              >
+                                Apply
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                         </View>
                       </View>
                     );
@@ -389,28 +1094,47 @@ const OrderReviewScreen = () => {
               </View>
 
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Subtotal</Text>
-                <Text style={styles.priceValue}>Rs. {formatCurrency(totalAmount)}</Text>
-              </View>
+  <Text style={styles.priceLabel}>
+    Package Total
+  </Text>
 
-              <View style={styles.priceRow}>
-                <View style={styles.discountLabelRow}>
-                  <Text style={styles.priceLabel}>Eventify Hub Discount</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountBadgeText}>{DISCOUNT_PERCENT}% OFF</Text>
-                  </View>
-                </View>
-                <Text style={styles.discountValue}>- Rs. {formatCurrency(discount)}</Text>
-              </View>
+  <Text style={styles.priceValue}>
+    Rs. {formatCurrency(totalAmount)}
+  </Text>
+</View>
+
+{Object.values(appliedPromotions).map(
+  (promotion: any) => (
+    <View
+      key={promotion.promotionId}
+      style={styles.priceRow}
+    >
+      <Text style={styles.priceLabel}>
+        Discount ({promotion.promotionCode})
+      </Text>
+
+      <Text style={styles.discountValue}>
+        - Rs.{' '}
+        {formatCurrency(
+          Number(
+            promotion.discountAmount || 0,
+          ),
+        )}
+      </Text>
+    </View>
+  ),
+)}
 
               <View style={styles.priceDivider} />
 
               <View style={styles.totalRow}>
                 <View>
-                  <Text style={styles.totalLabel}>Total Amount</Text>
+                 <Text style={styles.totalLabel}>Final</Text>
                   <Text style={styles.totalSubLabel}>Payable at checkout</Text>
                 </View>
-                <Text style={styles.totalAmount}>Rs. {formatCurrency(discountedTotal)}</Text>
+              <Text style={styles.totalAmount}>
+  Rs. {formatCurrency(finalTotal)}
+</Text>
               </View>
             </View>
 
@@ -438,10 +1162,16 @@ const OrderReviewScreen = () => {
             <View>
               <Text style={styles.bottomAmountLabel}>Total Payable</Text>
               <Text style={styles.bottomAmountSubLabel}>
-                {packageCount} item{packageCount !== 1 ? 's' : ''} · {DISCOUNT_PERCENT}% discount applied
-              </Text>
+              {packageCount} item
+              {packageCount !== 1 ? 's' : ''}
+              {totalPromotionDiscount > 0
+                ? ' · offer applied'
+                : ''}
+            </Text>
             </View>
-            <Text style={styles.bottomAmount}>Rs. {formatCurrency(discountedTotal)}</Text>
+            <Text style={styles.bottomAmount}>
+  Rs. {formatCurrency(finalTotal)}
+</Text>
           </View>
 
           <TouchableOpacity
@@ -602,6 +1332,141 @@ const styles = StyleSheet.create({
   packageInfo: { flex: 1, marginLeft: 10 },
   packageName: { fontSize: 13, fontWeight: '700', color: TEXT },
   packagePrice: { fontSize: 13, fontWeight: '800', color: PRIMARY, marginTop: 4 },
+  availableOffers: {
+  marginTop: 10,
+},
+
+availableOffersTitle: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: TEXT,
+  marginBottom: 6,
+},
+
+offerCard: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  backgroundColor: GOLD_LIGHT,
+  borderRadius: 10,
+  padding: 9,
+  marginBottom: 6,
+},
+
+offerContent: {
+  flex: 1,
+  paddingRight: 8,
+},
+
+offerDiscount: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: PRIMARY,
+},
+
+offerCode: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: TEXT,
+  marginTop: 2,
+},
+
+offerDetail: {
+  fontSize: 9.5,
+  color: MUTED,
+  marginTop: 2,
+},
+
+applyOfferButton: {
+  minWidth: 58,
+  backgroundColor: PRIMARY,
+  paddingHorizontal: 10,
+  paddingVertical: 7,
+  borderRadius: 9,
+  alignItems: 'center',
+},
+
+appliedOfferButton: {
+  backgroundColor: '#278A4B',
+},
+
+applyOfferText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#FFFFFF',
+},
+
+appliedPromotionResult: {
+  backgroundColor: '#F1FAF4',
+  borderRadius: 10,
+  padding: 9,
+  marginTop: 4,
+},
+
+appliedPromotionText: {
+  fontSize: 10,
+  color: MUTED,
+},
+
+appliedPromotionDiscount: {
+  fontSize: 10,
+  fontWeight: '700',
+  color: DISCOUNT_RED,
+  marginTop: 2,
+},
+
+appliedPromotionFinal: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: '#278A4B',
+  marginTop: 2,
+},
+
+discountCodeSection: {
+  marginTop: 10,
+},
+
+discountCodeTitle: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: TEXT,
+  marginBottom: 6,
+},
+
+discountCodeRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 7,
+},
+
+discountCodeInput: {
+  flex: 1,
+  height: 38,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: BORDER,
+  borderRadius: 9,
+  paddingHorizontal: 10,
+  fontSize: 11,
+  fontWeight: '700',
+  color: TEXT,
+},
+
+discountCodeApplyButton: {
+  height: 38,
+  minWidth: 62,
+  paddingHorizontal: 12,
+  borderRadius: 9,
+  backgroundColor: PRIMARY,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+discountCodeApplyText: {
+  color: '#FFFFFF',
+  fontSize: 10,
+  fontWeight: '800',
+},
   guestTag: {
     flexDirection: 'row',
     alignItems: 'center',

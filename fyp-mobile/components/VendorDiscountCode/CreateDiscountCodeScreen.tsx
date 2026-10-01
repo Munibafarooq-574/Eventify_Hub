@@ -1,6 +1,6 @@
-// fyp-mobile/components/vendorCoupons/CreateDiscountCodeScreen.tsx
+﻿// fyp-mobile/components/vendorCoupons/CreateDiscountCodeScreen.tsx
 //
-// TODO — UI-only redesign, no service/data or validation logic changes:
+// TODO â€” UI-only redesign, no service/data or validation logic changes:
 //   - Adds the standard back-button + centered title/subtitle header,
 //     replacing the plain in-scroll screen title.
 //   - Uses react-native-safe-area-context for the header (already a peer
@@ -24,7 +24,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Check } from 'lucide-react-native';
 
 import { createVendorDiscountCode } from '../../services/createVendorDiscountCode';
-import { searchOrganizers, Organizer } from '../../services/searchOrganizers';
+import {
+  searchVendorClients,
+  VendorClient,
+} from '../../services/searchVendorClients';
 
 import { DiscountAudience, DiscountKind } from '../../types/discount.types';
 
@@ -77,72 +80,88 @@ export default function CreateDiscountCodeScreen() {
   // Audience
   // -----------------------------
 
-  const [audience, setAudience] = useState<DiscountAudience>(DiscountAudience.ALL);
+  const [audience, setAudience] = useState<DiscountAudience>(DiscountAudience.EVERYONE);
 
-  const [selectedOrganizerIds, setSelectedOrganizerIds] = useState<string[]>([]);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
   // -----------------------------
-  // Organizer search
+  // Client search
   // -----------------------------
 
-  const [organizerSearch, setOrganizerSearch] = useState('');
-  const [organizers, setOrganizers] = useState<Organizer[]>([]);
-  const [loadingOrganizers, setLoadingOrganizers] = useState(false);
-
+const [clientSearch, setClientSearch] = useState('');
+const [clients, setClients] = useState<VendorClient[]>([]);
+const [loadingClients, setLoadingClients] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Search organizers when Selected Organizers is enabled.
-  useEffect(() => {
-    if (audience !== DiscountAudience.SELECTED_ORGANIZERS) {
-      return;
+  // Search clients when Selected Clients is enabled.
+  // Search only clients who have a booking relationship
+// with this vendor.
+useEffect(() => {
+  if (
+    audience !== DiscountAudience.SELECTED_CLIENTS ||
+    !vendorIdValue
+  ) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const timer = setTimeout(async () => {
+    try {
+      setLoadingClients(true);
+
+      const result = await searchVendorClients(
+        vendorIdValue,
+        clientSearch.trim(),
+        1,
+        20,
+      );
+
+      if (!cancelled) {
+        setClients(result.clients || []);
+      }
+    } catch (error) {
+      if (!cancelled) {
+        console.log(
+          'Failed to load vendor clients:',
+          error,
+        );
+        setClients([]);
+      }
+    } finally {
+      if (!cancelled) {
+        setLoadingClients(false);
+      }
+    }
+  }, 350);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+  };
+}, [
+  audience,
+  clientSearch,
+  vendorIdValue,
+]);
+
+ const toggleClient = (clientId: string) => {
+  setSelectedClientIds((current) => {
+    if (current.includes(clientId)) {
+      return current.filter((id) => id !== clientId);
     }
 
-    let cancelled = false;
-
-    const timer = setTimeout(async () => {
-      try {
-        setLoadingOrganizers(true);
-
-        const results = await searchOrganizers(organizerSearch.trim());
-
-        if (!cancelled) {
-          setOrganizers(results);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.log('Failed to load organizers:', error);
-          setOrganizers([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingOrganizers(false);
-        }
-      }
-    }, 350);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [audience, organizerSearch]);
-
-  const toggleOrganizer = (organizerId: string) => {
-    setSelectedOrganizerIds((current) => {
-      if (current.includes(organizerId)) {
-        return current.filter((id) => id !== organizerId);
-      }
-
-      return [...current, organizerId];
-    });
-  };
+    return [...current, clientId];
+  });
+};
 
   const handleAudienceChange = (newAudience: DiscountAudience) => {
     setAudience(newAudience);
 
-    if (newAudience !== DiscountAudience.SELECTED_ORGANIZERS) {
-      setSelectedOrganizerIds([]);
-      setOrganizerSearch('');
-      setOrganizers([]);
+    if (newAudience !== DiscountAudience.SELECTED_CLIENTS) {
+      setSelectedClientIds([]);
+      setClientSearch('');
+      setClients([]);
     }
   };
 
@@ -228,8 +247,8 @@ export default function CreateDiscountCodeScreen() {
     // Audience validation
     // -----------------------------
 
-    if (audience === DiscountAudience.SELECTED_ORGANIZERS && selectedOrganizerIds.length === 0) {
-      Alert.alert('Select organizers', 'Please select at least one organizer for this discount code.');
+    if (audience === DiscountAudience.SELECTED_CLIENTS && selectedClientIds.length === 0) {
+      Alert.alert('Select clients', 'Please select at least one client for this discount code.');
       return;
     }
 
@@ -273,7 +292,7 @@ export default function CreateDiscountCodeScreen() {
 
       audience,
 
-      selectedOrganizerIds: audience === DiscountAudience.SELECTED_ORGANIZERS ? selectedOrganizerIds : [],
+      selectedClientIds: audience === DiscountAudience.SELECTED_CLIENTS ? selectedClientIds : [],
     };
 
     // -----------------------------
@@ -307,8 +326,8 @@ export default function CreateDiscountCodeScreen() {
     }
   };
 
-  // Standard screen header: back button (left) — title + subtitle (center)
-  // — empty placeholder (right) so the title stays visually centered. Sits
+  // Standard screen header: back button (left) â€” title + subtitle (center)
+  // â€” empty placeholder (right) so the title stays visually centered. Sits
   // inside a top-only SafeAreaView so it clears the status bar everywhere.
   const Header = () => (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -392,7 +411,7 @@ export default function CreateDiscountCodeScreen() {
             Minimum Order
         ================================= */}
 
-        <Field label="Minimum Order Amount (Rs.) — optional">
+        <Field label="Minimum Order Amount (Rs.) â€” optional">
           <TextInput style={styles.input} placeholder="e.g. 75000" keyboardType="numeric" value={minimumOrderAmount} onChangeText={setMinimumOrderAmount} />
         </Field>
 
@@ -401,7 +420,7 @@ export default function CreateDiscountCodeScreen() {
         ================================= */}
 
         {discountType === DiscountKind.PERCENTAGE && (
-          <Field label="Maximum Discount (Rs.) — optional">
+          <Field label="Maximum Discount (Rs.) â€” optional">
             <TextInput style={styles.input} placeholder="e.g. 10000" keyboardType="numeric" value={maximumDiscountAmount} onChangeText={setMaximumDiscountAmount} />
           </Field>
         )}
@@ -437,9 +456,9 @@ export default function CreateDiscountCodeScreen() {
         <Field label="Target Audience">
           <View style={styles.audienceContainer}>
             {[
-              { value: DiscountAudience.ALL, title: 'Everyone', description: 'Available to all eligible organizers' },
-              { value: DiscountAudience.NEW_ORGANIZERS, title: 'New Organizers', description: 'For organizers making their first booking' },
-              { value: DiscountAudience.SELECTED_ORGANIZERS, title: 'Selected Organizers', description: 'Only selected organizers can use this code' },
+              { value: DiscountAudience.EVERYONE, title: 'Everyone', description: 'Available to all eligible clients' },
+              { value: DiscountAudience.NEW_CLIENTS, title: 'New Clients', description: 'For clients making their first booking' },
+              { value: DiscountAudience.SELECTED_CLIENTS, title: 'Selected Clients', description: 'Only selected clients can use this code' },
             ].map((option) => (
               <TouchableOpacity
                 key={option.value}
@@ -461,47 +480,47 @@ export default function CreateDiscountCodeScreen() {
         </Field>
 
         {/* ================================
-            Organizer Search & Selection
+            Client Search & Selection
         ================================= */}
 
-        {audience === DiscountAudience.SELECTED_ORGANIZERS && (
-          <Field label="Select Organizers">
+        {audience === DiscountAudience.SELECTED_CLIENTS && (
+          <Field label="Select Clients">
             <TextInput
               style={styles.input}
-              placeholder="Search organizers by name or email"
-              value={organizerSearch}
-              onChangeText={setOrganizerSearch}
+              placeholder="Search clients by name or email"
+              value={clientSearch}
+              onChangeText={setClientSearch}
               autoCapitalize="none"
               autoCorrect={false}
             />
 
-            <View style={styles.organizerList}>
-              {loadingOrganizers ? (
+            <View style={styles.clientList}>
+              {loadingClients ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
 
-                  <Text style={styles.loadingText}>Loading organizers...</Text>
+                  <Text style={styles.loadingText}>Loading clients...</Text>
                 </View>
-              ) : organizers.length === 0 ? (
+              ) : clients.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>{organizerSearch.trim() ? 'No organizers found.' : 'No organizers available.'}</Text>
+                  <Text style={styles.emptyText}>{clientSearch.trim() ? 'No clients found.' : 'No clients available.'}</Text>
                 </View>
               ) : (
-                organizers.map((organizer) => {
-                  const organizerId = organizer._id;
+                clients.map((client) => {
+                  const clientId = client._id;
 
-                  const selected = selectedOrganizerIds.includes(organizerId);
+                  const selected = selectedClientIds.includes(clientId);
 
                   return (
-                    <TouchableOpacity key={organizerId} style={styles.organizerRow} onPress={() => toggleOrganizer(organizerId)}>
+                    <TouchableOpacity key={clientId} style={styles.clientRow} onPress={() => toggleClient(clientId)}>
                       <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
                         {selected && <Check size={13} color="#fff" strokeWidth={3} />}
                       </View>
 
-                      <View style={styles.organizerInfo}>
-                        <Text style={styles.organizerName}>{organizer.name || 'Unnamed Organizer'}</Text>
+                      <View style={styles.clientInfo}>
+                        <Text style={styles.clientName}>{client.name || 'Unnamed Client'}</Text>
 
-                        {!!organizer.email && <Text style={styles.organizerEmail}>{organizer.email}</Text>}
+                        {!!client.email && <Text style={styles.clientEmail}>{client.email}</Text>}
                       </View>
                     </TouchableOpacity>
                   );
@@ -510,7 +529,7 @@ export default function CreateDiscountCodeScreen() {
             </View>
 
             <Text style={styles.selectedCount}>
-              {selectedOrganizerIds.length} organizer{selectedOrganizerIds.length === 1 ? '' : 's'} selected
+              {selectedClientIds.length} client{selectedClientIds.length === 1 ? '' : 's'} selected
             </Text>
           </Field>
         )}
@@ -655,10 +674,10 @@ const styles = StyleSheet.create({
   audienceDescription: { fontSize: 12, color: COLORS.muted, lineHeight: 17 },
 
   /* ================================
-     Organizers
+     Clients
   ================================= */
 
-  organizerList: {
+  clientList: {
     marginTop: 10,
     backgroundColor: COLORS.card,
     borderWidth: 1,
@@ -667,7 +686,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  organizerRow: {
+  clientRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 13,
@@ -689,11 +708,11 @@ const styles = StyleSheet.create({
 
   checkboxSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
 
-  organizerInfo: { flex: 1 },
+  clientInfo: { flex: 1 },
 
-  organizerName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  clientName: { fontSize: 14, fontWeight: '600', color: COLORS.text },
 
-  organizerEmail: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  clientEmail: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
 
   selectedCount: { marginTop: 7, fontSize: 12, color: COLORS.muted, fontWeight: '500' },
 

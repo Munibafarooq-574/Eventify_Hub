@@ -10,6 +10,7 @@ import BottomNavigationFinal from './BottomNavigationFinal';
 import { FeaturedVendorsSection } from '../VendorFeature/FeaturedVendorsSection';
 import { FeaturedPackagesSection } from '../VendorFeature/FeaturedPackagesSection';
 import SponsoredForYou from './SponsoredForYou';
+import PublicCouponOffers from './PublicCouponOffers';
 import RecommendedForYourEvent from './RecommendedForYourEvent';
 
 const COLORS = {
@@ -27,6 +28,8 @@ const DashboardIndex: React.FC = () => {
         <View style={styles.content}>
           <CategoryGrid />
           
+          <PublicCouponOffers />
+
           <SponsoredForYou />
 
         <RecommendedForYourEvent />

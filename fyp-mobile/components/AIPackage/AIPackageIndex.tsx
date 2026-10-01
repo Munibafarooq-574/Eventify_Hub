@@ -218,20 +218,6 @@ const AIPackageScreen = () => {
                         </View>
 
                         <View style={styles.summaryDivider} />
-
-                        <View style={styles.discountRow}>
-                            <View style={styles.discountIcon}>
-                                <Text style={styles.discountIconText}>%</Text>
-                            </View>
-
-                            <Text style={styles.discountText}>
-                                Enjoy a{' '}
-                                <Text style={styles.discountBold}>
-                                    10% discount
-                                </Text>{' '}
-                                when you complete your booking today.
-                            </Text>
-                        </View>
                     </View>
 
                     <View style={styles.actions}>

@@ -18,9 +18,9 @@ export enum DiscountStatus {
 }
 
 export enum DiscountAudience {
-  ALL = 'all',
-  NEW_ORGANIZERS = 'newOrganizers',
-  SELECTED_ORGANIZERS = 'selectedOrganizers',
+  EVERYONE = 'EVERYONE',
+  NEW_CLIENTS = 'NEW_CLIENTS',
+  SELECTED_CLIENTS = 'SELECTED_CLIENTS',
 }
 
 export interface VendorDiscount {
@@ -36,7 +36,7 @@ export interface VendorDiscount {
 
   // Discount Code audience targeting
   audience: DiscountAudience;
-  selectedOrganizerIds: string[];
+  selectedClientIds: string[];
 
   startDate: string;
   endDate: string;
@@ -64,7 +64,7 @@ export interface CreateCouponPayload {
 export interface CreateDiscountCodePayload
   extends CreateCouponPayload {
   audience: DiscountAudience;
-  selectedOrganizerIds?: string[];
+selectedClientIds?: string[];
 }
 
 export interface UpdateCouponPayload {

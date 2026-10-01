@@ -61,9 +61,9 @@ export class CreateDiscountCodeDto {
 
   @ValidateIf(
     (dto) =>
-      dto.audience === DiscountAudience.SELECTED_ORGANIZERS,
+      dto.audience === DiscountAudience.SELECTED_CLIENTS
   )
   @IsArray()
   @IsMongoId({ each: true })
-  selectedOrganizerIds?: string[];
+  selectedClientIds?: string[];
 }

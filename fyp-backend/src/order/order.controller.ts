@@ -42,6 +42,11 @@ async placeOrder(@Body() body: {
         startDateTime: string;
         endDateTime: string;
     };
+    promotion?: {
+    promotionId: string;
+    promotionType: 'COUPON' | 'DISCOUNT_CODE';
+    promotionCode: string;
+};
 }[];
     durationMinutes?: number;
 }) {

@@ -278,8 +278,58 @@ const vStatus =
   {vendor?.vendorId?.contactDetails?.brandName || vendor?.vendorId?.name}
 </Text>
                       <Text style={styles.packageText}>
-                        {vendor.serviceName} · Rs. {vendor.price}
-                      </Text>
+  {vendor.serviceName}
+</Text>
+
+{vendor?.promotionCode &&
+Number(vendor?.discountAmount || 0) > 0 ? (
+  <View style={styles.promotionSnapshot}>
+    <View style={styles.amountRow}>
+      <Text style={styles.amountLabel}>
+        Original Amount
+      </Text>
+      <Text style={styles.amountValue}>
+        Rs. {Number(
+          vendor?.originalAmount ??
+            vendor?.price ??
+            0,
+        ).toLocaleString()}
+      </Text>
+    </View>
+
+    <View style={styles.amountRow}>
+      <Text style={styles.discountLabel}>
+        Discount {vendor.promotionCode}
+      </Text>
+      <Text style={styles.discountValue}>
+        - Rs. {Number(
+          vendor?.discountAmount || 0,
+        ).toLocaleString()}
+      </Text>
+    </View>
+
+    <View style={styles.amountRow}>
+      <Text style={styles.finalAmountLabel}>
+        Final Amount
+      </Text>
+      <Text style={styles.finalAmountValue}>
+        Rs. {Number(
+          vendor?.finalAmount ??
+            vendor?.price ??
+            0,
+        ).toLocaleString()}
+      </Text>
+    </View>
+  </View>
+) : (
+  <Text style={styles.packageText}>
+    Rs. {Number(
+      vendor?.finalAmount ??
+        vendor?.price ??
+        0,
+    ).toLocaleString()}
+  </Text>
+)}
                       <View
   style={[
     styles.statusPill,
@@ -486,6 +536,49 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 1,
   },
+  promotionSnapshot: {
+  marginTop: 6,
+},
+
+amountRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 2,
+},
+
+amountLabel: {
+  fontSize: 12,
+  color: '#777',
+},
+
+amountValue: {
+  fontSize: 12,
+  color: '#555',
+},
+
+discountLabel: {
+  fontSize: 12,
+  color: '#777',
+},
+
+discountValue: {
+  fontSize: 12,
+  color: '#28a745',
+},
+
+finalAmountLabel: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#333',
+},
+
+finalAmountValue: {
+  fontSize: 12,
+  fontWeight: '700',
+  color: '#28a745',
+},
+
   messageButton: {
     flexDirection: 'row',
     alignItems: 'center',

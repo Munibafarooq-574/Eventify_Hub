@@ -1,6 +1,11 @@
 // fyp-backend/src/vendor/growth/discount/dto/validate-coupon.dto.ts
-import { IsNumber, IsPositive, IsString } from 'class-validator';
-
+import {
+  IsMongoId,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 export class ValidateCouponDto {
   @IsString()
   code: string;
@@ -8,4 +13,12 @@ export class ValidateCouponDto {
   @IsNumber()
   @IsPositive()
   orderAmount: number;
+
+  @IsOptional()
+@IsMongoId()
+clientId?: string;
+
+@IsOptional()
+@IsString()
+packageId?: string;
 }

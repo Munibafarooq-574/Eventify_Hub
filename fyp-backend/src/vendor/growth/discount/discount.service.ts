@@ -10,12 +10,22 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { VendorDiscount } from '../../../schemas/vendor-discount.schema';
-import { DiscountCalculation, DiscountEntryType, DiscountKind, DiscountStatus } from './discount.types';
+import {
+  DiscountAudience,
+  DiscountCalculation,
+  DiscountEntryType,
+  DiscountKind,
+  DiscountStatus,
+} from './discount.types';
+import { VendorOrder } from '../../../schemas/vendor-order.schema';
+import { Order } from '../../../schemas/order.schema';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { FeatureAccessService } from '../feature-access.service';
 import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
+import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
+import { NotificationService } from '../../../notifications/notifications.service';
 
 interface DiscountEntryPayload {
   code: string;
@@ -27,14 +37,28 @@ interface DiscountEntryPayload {
   startDate: string;
   endDate: string;
   usageLimit: number;
+  audience?: DiscountAudience;
+  selectedClientIds?: string[];
 }
 
 @Injectable()
 export class DiscountService {
   constructor(
-    @InjectModel(VendorDiscount.name) private readonly discountModel: Model<VendorDiscount>,
-    @InjectModel(User.name) private readonly userModel: Model<User>,
-    private readonly featureAccessService: FeatureAccessService,
+    @InjectModel(VendorDiscount.name)
+private readonly discountModel: Model<VendorDiscount>,
+
+@InjectModel(User.name)
+private readonly userModel: Model<User>,
+
+@InjectModel(VendorOrder.name)
+private readonly vendorOrderModel: Model<VendorOrder>,
+
+@InjectModel(Order.name)
+private readonly orderModel: Model<Order>,
+
+private readonly featureAccessService: FeatureAccessService,
+
+private readonly notificationService: NotificationService,
   ) {}
 
   // ---------------------------------------------------------------
@@ -53,6 +77,98 @@ export class DiscountService {
     return this.getVendorDiscountEntries(vendorId, DiscountEntryType.COUPON);
   }
 
+  async getPublicCoupons(
+  vendorId: string,
+  packageId?: string,
+): Promise<VendorDiscount[]> {
+  this.assertValidId(vendorId);
+
+  const hasAccess =
+    await this.featureAccessService.hasActiveSubscription(
+      vendorId,
+    );
+
+  if (!hasAccess) {
+    return [];
+  }
+
+  const now = new Date();
+
+  const filter: any = {
+    vendorId: new Types.ObjectId(vendorId),
+    type: DiscountEntryType.COUPON,
+    status: DiscountStatus.ACTIVE,
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+    $expr: {
+      $lt: ['$usedCount', '$usageLimit'],
+    },
+  };
+
+  if (packageId) {
+    filter.$and = [
+      {
+        $or: [
+          { packageId: null },
+          { packageId },
+        ],
+      },
+    ];
+  } else {
+    filter.packageId = null;
+  }
+
+  return this.discountModel
+    .find(filter)
+    .sort({ createdAt: -1 })
+    .exec();
+}
+
+async getPublicDashboardCoupons(
+  limit = 10,
+): Promise<VendorDiscount[]> {
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 10, 1),
+    20,
+  );
+
+  const now = new Date();
+
+  const coupons = await this.discountModel
+    .find({
+      type: DiscountEntryType.COUPON,
+      status: DiscountStatus.ACTIVE,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+      $expr: {
+        $lt: ['$usedCount', '$usageLimit'],
+      },
+    })
+    .sort({ createdAt: -1 })
+    .limit(safeLimit * 3)
+    .exec();
+
+  const usableCoupons: VendorDiscount[] = [];
+
+  for (const coupon of coupons) {
+    const hasAccess =
+      await this.featureAccessService.hasActiveSubscription(
+        coupon.vendorId.toString(),
+      );
+
+    if (!hasAccess) {
+      continue;
+    }
+
+    usableCoupons.push(coupon);
+
+    if (usableCoupons.length >= safeLimit) {
+      break;
+    }
+  }
+
+  return usableCoupons;
+}
   async updateCoupon(vendorId: string, couponId: string, dto: UpdateCouponDto): Promise<VendorDiscount> {
     return this.updateDiscountEntry(vendorId, couponId, dto, 'coupon');
   }
@@ -72,7 +188,7 @@ export class DiscountService {
   // free, and vice versa).
   // ---------------------------------------------------------------
 
-  async createDiscountCode(vendorId: string, dto: CreateCouponDto): Promise<VendorDiscount> {
+async createDiscountCode(vendorId: string, dto: CreateDiscountCodeDto): Promise<VendorDiscount> {
     return this.createDiscountEntry(vendorId, DiscountEntryType.DISCOUNT_CODE, dto, {
       featureKey: FeatureKey.DISCOUNT_CODES,
       limitKey: LimitKey.DISCOUNT_CODE_LIMIT,
@@ -83,6 +199,211 @@ export class DiscountService {
   async getVendorDiscountCodes(vendorId: string): Promise<VendorDiscount[]> {
     return this.getVendorDiscountEntries(vendorId, DiscountEntryType.DISCOUNT_CODE);
   }
+
+  async searchVendorClients(
+  vendorId: string,
+  page = 1,
+  limit = 20,
+  search = '',
+) {
+  this.assertValidId(vendorId);
+
+  const safePage = Math.max(Number(page) || 1, 1);
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 20, 1),
+    50,
+  );
+
+  const vendorObjectId = new Types.ObjectId(vendorId);
+
+  const vendorOrders = await this.vendorOrderModel
+    .find({
+      vendorId: vendorObjectId,
+    })
+    .select('orderId')
+    .lean();
+
+  if (vendorOrders.length === 0) {
+    return {
+      clients: [],
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total: 0,
+        totalPages: 0,
+      },
+    };
+  }
+
+  const orderIds = [
+    ...new Set(
+      vendorOrders.map((vendorOrder) =>
+        vendorOrder.orderId.toString(),
+      ),
+    ),
+  ].map((id) => new Types.ObjectId(id));
+
+  const clientIds = await this.orderModel.distinct(
+    'organizerId',
+    {
+      _id: { $in: orderIds },
+    },
+  );
+
+  if (clientIds.length === 0) {
+    return {
+      clients: [],
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total: 0,
+        totalPages: 0,
+      },
+    };
+  }
+
+  const trimmedSearch = search.trim();
+
+  const userFilter: any = {
+    _id: { $in: clientIds },
+  };
+
+  if (trimmedSearch) {
+    const escapedSearch = trimmedSearch.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&',
+    );
+
+    userFilter.$or = [
+      {
+        name: {
+          $regex: escapedSearch,
+          $options: 'i',
+        },
+      },
+      {
+        email: {
+          $regex: escapedSearch,
+          $options: 'i',
+        },
+      },
+    ];
+  }
+
+  const total = await this.userModel.countDocuments(
+    userFilter,
+  );
+
+  const clients = await this.userModel
+    .find(userFilter)
+    .select('_id name email')
+    .sort({ name: 1, _id: 1 })
+    .skip((safePage - 1) * safeLimit)
+    .limit(safeLimit)
+    .lean();
+
+  return {
+    clients: clients.map((client: any) => ({
+      clientId: client._id.toString(),
+      name: client.name ?? '',
+      email: client.email ?? '',
+    })),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+    },
+  };
+}
+
+async notifySelectedClients(
+  vendorId: string,
+  discountCodeId: string,
+) {
+  this.assertValidId(vendorId);
+  this.assertValidId(discountCodeId);
+
+  const discountCode = await this.discountModel
+    .findOne({
+      _id: new Types.ObjectId(discountCodeId),
+      vendorId: new Types.ObjectId(vendorId),
+      type: DiscountEntryType.DISCOUNT_CODE,
+    })
+    .exec();
+
+  if (!discountCode) {
+    throw new NotFoundException(
+      'Discount code not found',
+    );
+  }
+
+  if (
+    discountCode.audience !==
+    DiscountAudience.SELECTED_CLIENTS
+  ) {
+    throw new BadRequestException(
+      'Notifications are only available for selected-client discount codes.',
+    );
+  }
+
+  const selectedClientIds =
+    discountCode.selectedClientIds || [];
+
+  if (!selectedClientIds.length) {
+    throw new BadRequestException(
+      'No selected clients found for this discount code.',
+    );
+  }
+
+  const discountText =
+    discountCode.discountType ===
+    DiscountKind.PERCENTAGE
+      ? `${discountCode.discountValue}% OFF`
+      : `Rs. ${Number(
+          discountCode.discountValue,
+        ).toLocaleString()} OFF`;
+
+  const validTill = new Date(
+    discountCode.endDate,
+  ).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+  });
+
+  const title = 'Exclusive Discount Code';
+
+  const body =
+    `${discountText} on Eventify Hub. ` +
+    `Use code: ${discountCode.code}. ` +
+    `Valid till ${validTill}.`;
+
+  let notifiedCount = 0;
+  let skippedCount = 0;
+
+  for (const clientId of selectedClientIds) {
+    try {
+      await this.notificationService
+        .sendPushNotification(
+          title,
+          body,
+          String(clientId),
+        );
+
+      notifiedCount += 1;
+    } catch {
+      // A client may not have a push token.
+      // Do not stop notifications for other clients.
+      skippedCount += 1;
+    }
+  }
+
+  return {
+    success: true,
+    notifiedCount,
+    skippedCount,
+  };
+}
 
   async updateDiscountCode(vendorId: string, discountCodeId: string, dto: UpdateCouponDto): Promise<VendorDiscount> {
     return this.updateDiscountEntry(vendorId, discountCodeId, dto, 'discount code');
@@ -106,28 +427,74 @@ export class DiscountService {
    * Safe to call repeatedly (e.g. while the customer is still editing
    * their cart) — nothing here mutates usedCount.
    */
-  async validateCoupon(vendorId: string, code: string, orderAmount: number): Promise<DiscountCalculation> {
-    this.assertValidId(vendorId);
+async validateCoupon(
+  vendorId: string,
+  code: string,
+  orderAmount: number,
+  clientId?: string,
+  packageId?: string,
+): Promise<DiscountCalculation> {
+  this.assertValidId(vendorId);
 
-    const entry = await this.findActiveEntryByCode(vendorId, code);
+  const hasAccess =
+    await this.featureAccessService.hasActiveSubscription(
+      vendorId,
+    );
 
-    if (orderAmount < entry.minimumOrderAmount) {
-      throw new BadRequestException(
-        `This code requires a minimum order of Rs. ${entry.minimumOrderAmount}`,
-      );
-    }
-
-    const discountAmount = this.computeDiscountAmount(entry, orderAmount);
-
-    return {
-      valid: true,
-      discountEntryId: entry._id.toString(),
-      code: entry.code,
-      discountType: entry.discountType,
-      discountAmount,
-      finalAmount: Math.max(orderAmount - discountAmount, 0),
-    };
+  if (!hasAccess) {
+    throw new BadRequestException(
+      'This vendor is not currently eligible to offer discounts',
+    );
   }
+
+  const entry = await this.findActiveEntryByCode(
+    vendorId,
+    code,
+  );
+
+  if (
+    entry.packageId &&
+    (!packageId || entry.packageId !== packageId)
+  ) {
+    throw new BadRequestException(
+      'This code is not applicable to this package',
+    );
+  }
+
+  if (
+    entry.type === DiscountEntryType.DISCOUNT_CODE
+  ) {
+    await this.assertDiscountCodeAudienceEligibility(
+      entry,
+      vendorId,
+      clientId,
+    );
+  }
+
+  if (orderAmount < entry.minimumOrderAmount) {
+    throw new BadRequestException(
+      `This code requires a minimum order of Rs. ${entry.minimumOrderAmount}`,
+    );
+  }
+
+  const discountAmount =
+    this.computeDiscountAmount(
+      entry,
+      orderAmount,
+    );
+
+  return {
+    valid: true,
+    discountEntryId: entry._id.toString(),
+    code: entry.code,
+    discountType: entry.discountType,
+    discountAmount,
+    finalAmount: Math.max(
+      orderAmount - discountAmount,
+      0,
+    ),
+  };
+}
 
   /**
    * Consumes one use of a coupon/discount code. Call this from your
@@ -237,6 +604,20 @@ export class DiscountService {
       endDate: new Date(dto.endDate),
       usageLimit: dto.usageLimit,
       usedCount: 0,
+
+      audience:
+        type === DiscountEntryType.DISCOUNT_CODE
+          ? dto.audience ?? DiscountAudience.EVERYONE
+          : DiscountAudience.EVERYONE,
+
+      selectedClientIds:
+        type === DiscountEntryType.DISCOUNT_CODE &&
+        dto.audience === DiscountAudience.SELECTED_CLIENTS
+          ? (dto.selectedClientIds ?? []).map(
+              (id) => new Types.ObjectId(id),
+            )
+          : [],
+
       status: DiscountStatus.ACTIVE,
     });
   }
@@ -299,6 +680,70 @@ export class DiscountService {
     return entry;
   }
 
+  private async assertDiscountCodeAudienceEligibility(
+  entry: VendorDiscount,
+  vendorId: string,
+  clientId?: string,
+): Promise<void> {
+  if (entry.audience === DiscountAudience.EVERYONE) {
+    return;
+  }
+
+  if (!clientId || !Types.ObjectId.isValid(clientId)) {
+    throw new BadRequestException(
+      'A valid clientId is required for this discount code',
+    );
+  }
+
+  if (entry.audience === DiscountAudience.SELECTED_CLIENTS) {
+    const allowed = (entry.selectedClientIds || []).some(
+      (id) => id.toString() === clientId,
+    );
+
+    if (!allowed) {
+      throw new ForbiddenException(
+        'This discount code is not available for this client',
+      );
+    }
+
+    return;
+  }
+
+  if (entry.audience === DiscountAudience.NEW_CLIENTS) {
+    const vendorOrders = await this.vendorOrderModel
+      .find({
+        vendorId: new Types.ObjectId(vendorId),
+        status: {
+          $in: ['accepted', 'completed'],
+        },
+      })
+      .select('_id orderId')
+      .lean();
+
+    if (vendorOrders.length === 0) {
+      return;
+    }
+
+    const orderIds = vendorOrders.map(
+      (vendorOrder) => vendorOrder.orderId,
+    );
+
+    const previousBooking = await this.orderModel
+      .exists({
+        _id: { $in: orderIds },
+        organizerId: new Types.ObjectId(clientId),
+        status: {
+          $in: ['confirmed', 'completed'],
+        },
+      });
+
+    if (previousBooking) {
+      throw new ForbiddenException(
+        'This discount code is only available for new clients of this vendor',
+      );
+    }
+  }
+}
   private computeDiscountAmount(entry: VendorDiscount, orderAmount: number): number {
     if (entry.discountType === DiscountKind.PERCENTAGE) {
       let discount = (orderAmount * entry.discountValue) / 100;

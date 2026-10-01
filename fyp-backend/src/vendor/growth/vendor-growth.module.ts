@@ -14,7 +14,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CityModule } from '../../city/city.module';
 import { VendorAvailabilityModule } from '../../vendor-availability/vendor-availability.module';
-
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 // Subscription
 import {
@@ -84,6 +84,11 @@ import { Review, ReviewSchema } from 'src/schemas/review.schema';
 // Vendor module
 import { VendorModule } from 'src/vendor/vendor.module';
 
+import {
+  Order,
+  OrderSchema,
+} from '../../schemas/order.schema';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -134,6 +139,11 @@ import { VendorModule } from 'src/vendor/vendor.module';
         name: Review.name,
         schema: ReviewSchema,
       },
+
+      {
+        name: Order.name,
+        schema: OrderSchema,
+      },
     ]),
     
     // Provides VendorAnalyticsService used by
@@ -142,6 +152,7 @@ import { VendorModule } from 'src/vendor/vendor.module';
     CityModule,
     forwardRef(() => VendorAvailabilityModule),
     FileUploadModule,
+    NotificationsModule,
         ],
 
   controllers: [

@@ -17,6 +17,7 @@ import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availa
 import { PayoutService } from 'src/payout/payout.service';
 import { CommissionConfig } from 'src/schemas/commission-config.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
+import { DiscountService } from 'src/vendor/growth/discount/discount.service';
 import { CityService } from 'src/city/city.service';
 import { Category } from 'src/schemas/category.schema';
 
@@ -52,6 +53,7 @@ export class OrderService {
     private readonly payoutService: PayoutService,
     private readonly featureAccessService: FeatureAccessService,
     private readonly cityService: CityService,
+    private readonly discountService: DiscountService,
 ) { }
 
 
@@ -68,9 +70,15 @@ export class OrderService {
     durationMinutes?: number;
     quantity?: number;
     requiredServiceWindow?: {
-        startDateTime: string;
-        endDateTime: string;
-    };
+    startDateTime: string;
+    endDateTime: string;
+};
+
+promotion?: {
+    promotionId: string;
+    promotionType: 'COUPON' | 'DISCOUNT_CODE';
+    promotionCode: string;
+};
 }[],
     eventName: string,
     guests: number,
@@ -256,16 +264,66 @@ const unavailable = results.find(
 );
 
         if (unavailable) {
-            throw new ConflictException(
-                'This vendor is no longer available for the selected time.',
-            );
-        }
+    throw new ConflictException(
+        'This vendor is no longer available for the selected time.',
+    );
+}
 
-        // Calculate total
-        const totalAmount = services.reduce(
-            (sum, service) => sum + service.price,
-            0,
+const promotionValidations = new Map<
+    number,
+    {
+        promotionId: string;
+        promotionType: 'COUPON' | 'DISCOUNT_CODE';
+        promotionCode: string;
+        originalAmount: number;
+        discountAmount: number;
+        finalAmount: number;
+    }
+>();
+
+// Step 14:
+// Final authoritative promotion re-validation.
+// Never trust the discount/final amount previously shown by frontend.
+for (const service of services) {
+    if (!service.promotion) {
+        continue;
+    }
+
+    const validation =
+        await this.discountService.validateCoupon(
+            service.vendorId,
+            service.promotion.promotionCode,
+            Number(service.price),
+            organizerId,
+            service.packageId,
         );
+
+    if (
+    validation.discountEntryId !==
+    service.promotion.promotionId
+) {
+    throw new BadRequestException(
+        'The applied promotion is no longer valid.',
+    );
+}
+
+const serviceIndex = services.indexOf(service);
+
+promotionValidations.set(serviceIndex, {
+    promotionId: validation.discountEntryId,
+    promotionType: service.promotion.promotionType,
+    promotionCode: validation.code,
+    originalAmount: Number(service.price),
+    discountAmount: Number(validation.discountAmount),
+    finalAmount: Number(validation.finalAmount),
+});
+}
+
+// Calculate total
+const totalAmount = services.reduce(
+    (sum, service) => sum + service.price,
+    0,
+);
 
         // Create main Order
         const [order] = await this.orderModel.create(
@@ -301,8 +359,10 @@ const unavailable = results.find(
 
         for (const [serviceIndex, service] of services.entries()) {
 
-                const finalAvailability =
-        results[serviceIndex];
+            const promotionSnapshot =
+    promotionValidations.get(serviceIndex);
+
+                const finalAvailability = results[serviceIndex];
 
     if (
         !finalAvailability?.available ||
@@ -331,10 +391,33 @@ const unavailable = results.find(
                                 service.vendorId,
                             ),
                             serviceName: service.serviceName,
-                            price: service.price,
-                            packageId: service.packageId,
-                            status: 'pending',
+                                price: service.price,
 
+                                promotionId: promotionSnapshot
+                                    ? new Types.ObjectId(
+                                        promotionSnapshot.promotionId,
+                                    )
+                                    : null,
+
+                                promotionType:
+                                    promotionSnapshot?.promotionType ?? null,
+
+                                promotionCode:
+                                    promotionSnapshot?.promotionCode ?? null,
+
+                                originalAmount:
+                                    promotionSnapshot?.originalAmount ??
+                                    Number(service.price),
+
+                                discountAmount:
+                                    promotionSnapshot?.discountAmount ?? 0,
+
+                                finalAmount:
+                                    promotionSnapshot?.finalAmount ??
+                                    Number(service.price),
+
+                                packageId: service.packageId,
+                                status: 'pending',
                             eventStartDateTime:
                             finalServiceStartDateTime,
 
@@ -349,11 +432,25 @@ const unavailable = results.find(
         }
 
         // Attach VendorOrders to main Order
-        order.vendorOrders = vendorOrderIds;
+order.vendorOrders = vendorOrderIds;
 
-        await order.save({ session });
+await order.save({ session });
 
-        savedOrder = order;
+// Step 15:
+// Redeem promotions only after the booking has been
+// successfully created inside this transaction.
+for (const service of services) {
+    if (!service.promotion) {
+        continue;
+    }
+
+    await this.discountService.redeemCoupon(
+        service.vendorId,
+        service.promotion.promotionCode,
+    );
+}
+
+savedOrder = order;
     });
 
     // Notifications AFTER successful transaction
@@ -447,10 +544,15 @@ const unavailable = results.find(
                         return vo;
                     }
 
-                    const downPaymentAmount =
-                        downPaymentConfig.type === 'PERCENTAGE'
-                            ? Math.round((vo.price * downPaymentConfig.value) / 100)
-                            : downPaymentConfig.value;
+                    const bookingAmount =
+                    vo.finalAmount ?? vo.price;
+
+                const downPaymentAmount =
+                    downPaymentConfig.type === 'PERCENTAGE'
+                        ? Math.round(
+                            (bookingAmount * downPaymentConfig.value) / 100,
+                        )
+                        : downPaymentConfig.value;
 
                     return {
                         ...vo,
@@ -735,12 +837,14 @@ async getOrderStats(type: string, userId: string) {
         .lean();
 
     const downPaymentConfig = this.getDownPaymentConfig(vendorUser);
+    const bookingAmount =
+    vendorOrder.finalAmount ?? vendorOrder.price;
 
     if (downPaymentConfig) {
         const downPaymentAmount =
             downPaymentConfig.type === 'PERCENTAGE'
                 ? Math.round(
-                    (vendorOrder.price * downPaymentConfig.value) / 100,
+                    (bookingAmount * downPaymentConfig.value) / 100,
                 )
                 : downPaymentConfig.value;
 
@@ -753,14 +857,13 @@ async getOrderStats(type: string, userId: string) {
 
         vendorOrder.downPaymentAmount = downPaymentAmount;
 
-        vendorOrder.remainingAmount =
-            vendorOrder.price - downPaymentAmount;
+        vendorOrder.remainingAmount = bookingAmount - downPaymentAmount;
     } else {
         // No down payment configured:
         // full booking price is treated as the required payment.
         vendorOrder.downPaymentType = 'FIXED';
         vendorOrder.downPaymentPercentage = null;
-        vendorOrder.downPaymentAmount = vendorOrder.price;
+        vendorOrder.downPaymentAmount = bookingAmount;
         vendorOrder.remainingAmount = 0;
     }
 

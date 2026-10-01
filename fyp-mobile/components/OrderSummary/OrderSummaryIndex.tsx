@@ -44,8 +44,6 @@ const SummaryScreen = () => {
     };
 
     const totalAmount = calculateTotalAmount();
-    const discount = (totalAmount * 10) / 100;
-    const discountedTotal = totalAmount - discount;
 
     // Handle saving the receipt as a PDF to file manager
     const handleSaveReceipt = async () => {
@@ -70,8 +68,7 @@ const SummaryScreen = () => {
                             .vendor { font-size: 18px; font-weight: bold; margin-top: 20px; }
                             .package { font-size: 14px; color: #7A7A7A; }
                             .total { font-size: 16px; font-weight: bold; }
-                            .discount { font-size: 14px; color: #FF0000; }
-                            .final-total { font-size: 18px; font-weight: bold; color: #780C60; }
+                            
                         </style>
                     </head>
                     <body>
@@ -83,8 +80,6 @@ const SummaryScreen = () => {
                             `).join('')}
                         `).join('')}
                         <div class="total">Total Amount: Rs. ${totalAmount}</div>
-                        <div class="discount">Discount: Rs. ${discount}</div>
-                        <div class="final-total">Final Amount: Rs. ${discountedTotal}</div>
                     </body>
                 </html>
             `;
@@ -146,21 +141,7 @@ const SummaryScreen = () => {
 
             {/* Receipt Section */}
             <View style={styles.receiptContainer}>
-                {/* <Text style={styles.receiptText}>Receipt Details</Text>
-                {cartData?.vendors?.map((vendor: any, vendorIndex: number) => (
-                    <View key={vendorIndex}>
-                        <Text style={styles.vendorName}>{vendor.vendor.name}</Text>
-                        {vendor.packages.map((pkg: any, packageIndex: number) => (
-                            <Text key={packageIndex} style={styles.packageDetails}>
-                                {pkg.packageName} - Rs.{pkg.price}/-
-                            </Text>
-                        ))}
-                    </View>
-                ))}
-
-                <Text style={styles.totalText}>Total Amount: Rs. {totalAmount}</Text>
-                <Text style={styles.discountText}>Discount: Rs. {discount}</Text>
-                <Text style={styles.discountedTotalText}>Final Amount: Rs. {discountedTotal}</Text> */}
+    
             </View>
 
             {/* Button Section */}
@@ -290,16 +271,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: 'bold',
         color: '#333',
-    },
-    discountText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#FF0000',
-    },
-    discountedTotalText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#780C60',
     },
 });
 

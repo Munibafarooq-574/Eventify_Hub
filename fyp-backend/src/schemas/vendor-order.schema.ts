@@ -20,10 +20,38 @@ export class VendorOrder extends Document {
     serviceName: string;
 
     @Prop({ required: true })
-    price: number;
+price: number;
 
-    @Prop({ type: String, default: null })
-    packageId: string | null;
+// Step 16: Promotion snapshot.
+// These values are frozen at booking creation time.
+@Prop({
+    type: Types.ObjectId,
+    ref: 'VendorDiscount',
+    default: null,
+})
+promotionId?: Types.ObjectId | null;
+
+@Prop({
+    type: String,
+    enum: ['COUPON', 'DISCOUNT_CODE', null],
+    default: null,
+})
+promotionType?: 'COUPON' | 'DISCOUNT_CODE' | null;
+
+@Prop({ type: String, default: null })
+promotionCode?: string | null;
+
+@Prop({ type: Number, required: true })
+originalAmount: number;
+
+@Prop({ type: Number, default: 0 })
+discountAmount: number;
+
+@Prop({ type: Number, required: true })
+finalAmount: number;
+
+@Prop({ type: String, default: null })
+packageId: string | null;
 
     // IMPORTANT: Existing booking lifecycle — DO NOT CHANGE
     @Prop({ default: 'pending' })

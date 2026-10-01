@@ -422,6 +422,8 @@ const phase6AvailablePackageIds = useMemo(() => {
     const [vendorData, setVendorData] =
       useState<any>(null);
 
+      const [publicCoupons, setPublicCoupons] =
+  useState<any[]>([]);
     const [loading, setLoading] =
       useState<boolean>(true);
 
@@ -618,6 +620,38 @@ const [availabilityCheck, setAvailabilityCheck] =
   activePackage,
 ]);
 
+const fetchPublicCoupons = async () => {
+  if (!vendorData?._id) {
+    setPublicCoupons([]);
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/public/${vendorData._id}`,
+    );
+
+    setPublicCoupons(
+      Array.isArray(response.data)
+        ? response.data
+        : [],
+    );
+  } catch (error) {
+    console.error(
+      'Error fetching public coupons:',
+      error,
+    );
+
+    setPublicCoupons([]);
+  }
+};
+
+useEffect(() => {
+  if (vendorData?._id) {
+    fetchPublicCoupons();
+  }
+}, [vendorData?._id]);
+
   type TodayAvailabilitySummary = {
   day: string;
   rangeStart: string;
@@ -752,6 +786,17 @@ const todayAvailabilitySummary =
   vendorData?.packages,
   phase6AvailablePackageIds,
 ]);
+
+const getApplicablePublicCoupon = (
+  packageId: string,
+) => {
+  return publicCoupons.find(
+    (coupon: any) =>
+      !coupon.packageId ||
+      String(coupon.packageId) ===
+        String(packageId),
+  );
+};
 
   const getSelectedPackage = () => {
   if (visiblePackages.length === 0) {
@@ -1213,11 +1258,12 @@ Toast.show({
 
       try {
         await Promise.all([
-          fetchVendorDetails(true),
-          fetchVendorAvailability(),
-          fetchReviewSummary(),
-          fetchReviews(1, false),
-        ]);
+        fetchVendorDetails(true),
+        fetchVendorAvailability(),
+        fetchPublicCoupons(),
+        fetchReviewSummary(),
+        fetchReviews(1, false),
+      ]);
       } finally {
         setRefreshing(false);
       }
@@ -2255,6 +2301,152 @@ if (
                 }
               />
 
+{publicCoupons.length > 0 && (
+  <View style={styles.specialOffersSection}>
+    <View style={styles.specialOffersHeader}>
+      <View style={styles.specialOffersIcon}>
+        <Ionicons
+          name="flame-outline"
+          size={18}
+          color={PRIMARY}
+        />
+      </View>
+
+      <Text style={styles.specialOffersTitle}>
+        Special Offers 🔥
+      </Text>
+    </View>
+
+    {publicCoupons.map((coupon: any) => {
+      const applicablePackage =
+        coupon.packageId
+          ? vendorData?.packages?.find(
+              (pkg: any) =>
+                String(pkg._id) ===
+                String(coupon.packageId),
+            )
+          : null;
+
+      const packageLabel =
+        applicablePackage?.packageName ||
+        'All Packages';
+
+      const discountLabel =
+        coupon.discountType === 'PERCENTAGE'
+          ? `${Number(
+              coupon.discountValue || 0,
+            )}% OFF`
+          : `Rs. ${Number(
+              coupon.discountValue || 0,
+            ).toLocaleString()} OFF`;
+
+      const validUntil =
+        coupon.endDate
+          ? new Date(
+              coupon.endDate,
+            ).toLocaleDateString(
+              'en-GB',
+              {
+                day: 'numeric',
+                month: 'short',
+              },
+            )
+          : null;
+
+      return (
+        <View
+          key={String(coupon._id)}
+          style={styles.specialOfferCard}
+        >
+          <View
+            style={
+              styles.specialOfferTopRow
+            }
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={
+                  styles.specialOfferDiscount
+                }
+              >
+                {discountLabel}{' '}
+                {packageLabel}
+              </Text>
+
+              <Text
+                style={
+                  styles.specialOfferCodeLabel
+                }
+              >
+                Code{' '}
+                <Text
+                  style={
+                    styles.specialOfferCode
+                  }
+                >
+                  {coupon.code}
+                </Text>
+              </Text>
+            </View>
+
+            <Ionicons
+              name="pricetag-outline"
+              size={22}
+              color={PRIMARY}
+            />
+          </View>
+
+          <View
+            style={
+              styles.specialOfferDetails
+            }
+          >
+            {Number(
+              coupon.minimumOrderAmount,
+            ) > 0 && (
+              <Text
+                style={
+                  styles.specialOfferDetailText
+                }
+              >
+                Min Rs.{' '}
+                {Number(
+                  coupon.minimumOrderAmount,
+                ).toLocaleString()}
+              </Text>
+            )}
+
+            {Number(
+              coupon.maximumDiscountAmount,
+            ) > 0 && (
+              <Text
+                style={
+                  styles.specialOfferDetailText
+                }
+              >
+                Max Rs.{' '}
+                {Number(
+                  coupon.maximumDiscountAmount,
+                ).toLocaleString()}{' '}
+                off
+              </Text>
+            )}
+
+            {validUntil && (
+              <Text
+                style={
+                  styles.specialOfferDetailText
+                }
+              >
+                Valid until {validUntil}
+              </Text>
+            )}
+          </View>
+        </View>
+      );
+    })}
+  </View>
+)}
               <View
                 style={[
                   styles.card,
@@ -3573,6 +3765,24 @@ if (
                             pkg._id,
                           );
 
+                          const applicableCoupon =
+                        getApplicablePublicCoupon(
+                          String(pkg._id),
+                        );
+
+                      const couponBadgeText =
+                        applicableCoupon
+                          ? applicableCoupon.discountType ===
+                            'PERCENTAGE'
+                            ? `${Number(
+                                applicableCoupon.discountValue ||
+                                  0,
+                              )}% OFF available`
+                            : `Rs. ${Number(
+                                applicableCoupon.discountValue ||
+                                  0,
+                              ).toLocaleString()} OFF available`
+                          : null;
                         return (
                           <TouchableOpacity
                             key={
@@ -3638,6 +3848,36 @@ if (
                               ).toLocaleString()}
                             </Text>
 
+                            {couponBadgeText && (
+                              <View
+                                style={[
+                                  styles.packageCouponBadge,
+                                  isActive &&
+                                    styles.packageCouponBadgeActive,
+                                ]}
+                              >
+                                <Ionicons
+                                  name="pricetag-outline"
+                                  size={11}
+                                  color={
+                                    isActive
+                                      ? '#FFFFFF'
+                                      : PRIMARY
+                                  }
+                                />
+
+                                <Text
+                                  style={[
+                                    styles.packageCouponBadgeText,
+                                    isActive &&
+                                      styles.packageCouponBadgeTextActive,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {couponBadgeText}
+                                </Text>
+                              </View>
+                            )}
                             {isActive && (
                               <View
                                 style={
@@ -5483,6 +5723,88 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
 
+  specialOffersSection: {
+  backgroundColor: CARD,
+  borderRadius: 16,
+  padding: 16,
+  marginBottom: 14,
+  borderWidth: 1,
+  borderColor: BORDER,
+  shadowColor: '#000',
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  shadowOffset: {
+    width: 0,
+    height: 3,
+  },
+  elevation: 2,
+},
+
+specialOffersHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+
+specialOffersIcon: {
+  width: 30,
+  height: 30,
+  borderRadius: 15,
+  backgroundColor: PRIMARY_SOFT,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 8,
+},
+
+specialOffersTitle: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: TEXT_DARK,
+},
+
+specialOfferCard: {
+  backgroundColor: PRIMARY_SOFT,
+  borderRadius: 14,
+  padding: 14,
+  marginTop: 8,
+  borderWidth: 1,
+  borderColor: BORDER,
+},
+
+specialOfferTopRow: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  gap: 10,
+},
+
+specialOfferDiscount: {
+  fontSize: 16,
+  fontWeight: '800',
+  color: PRIMARY,
+},
+
+specialOfferCodeLabel: {
+  marginTop: 6,
+  fontSize: 13,
+  color: TEXT_MUTED,
+},
+
+specialOfferCode: {
+  color: TEXT_DARK,
+  fontWeight: '800',
+},
+
+specialOfferDetails: {
+  marginTop: 10,
+  gap: 4,
+},
+
+specialOfferDetailText: {
+  fontSize: 12.5,
+  color: TEXT_MUTED,
+  fontWeight: '500',
+},
+
   sectionTitleRow: {
     flexDirection: 'row',
     justifyContent:
@@ -6092,6 +6414,32 @@ const styles = StyleSheet.create({
       'rgba(255,255,255,0.85)',
   },
 
+  packageCouponBadge: {
+  marginTop: 7,
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  backgroundColor: PRIMARY_SOFT,
+  paddingHorizontal: 7,
+  paddingVertical: 4,
+  borderRadius: 8,
+  gap: 4,
+},
+
+packageCouponBadgeActive: {
+  backgroundColor:
+    'rgba(255,255,255,0.18)',
+},
+
+packageCouponBadgeText: {
+  fontSize: 10.5,
+  fontWeight: '700',
+  color: PRIMARY,
+},
+
+packageCouponBadgeTextActive: {
+  color: '#FFFFFF',
+},
   activeDot: {
     position: 'absolute',
     top: 10,

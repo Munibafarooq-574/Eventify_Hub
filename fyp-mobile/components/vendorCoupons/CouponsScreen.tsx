@@ -9,6 +9,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
+Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +22,14 @@ import { getVendorDiscountCodes } from '../../services/getVendorDiscountCodes';
 import { deleteVendorDiscountCode } from '../../services/deleteVendorDiscountCode';
 import { getVendorSubscription } from '../../services/getVendorSubscription';
 import { getSubscriptionPlans } from '../../services/getSubscriptionPlans';
-import { DiscountKind, DiscountStatus, VendorDiscount } from '../../types/discount.types';
+import {
+  DiscountAudience,
+  DiscountKind,
+  DiscountStatus,
+  VendorDiscount,
+} from '../../types/discount.types';
+import * as Clipboard from 'expo-clipboard';
+import axios from 'axios';
 
 // TODO: swap these for EventifyHub's existing theme constants if you have
 // a theme/colors file already (e.g. src/theme/colors.ts).
@@ -66,6 +75,21 @@ function discountSummary(entry: VendorDiscount): string {
     : `Rs. ${entry.discountValue.toLocaleString()} OFF`;
 }
 
+function audienceLabel(
+  audience?: string,
+): string {
+  switch (audience) {
+    case 'NEW_CLIENTS':
+      return 'New Clients';
+
+    case 'SELECTED_CLIENTS':
+      return 'Selected Clients';
+
+    case 'EVERYONE':
+    default:
+      return 'Everyone';
+  }
+}
 export default function CouponsScreen() {
   const router = useRouter();
 const insets = useSafeAreaInsets();
@@ -87,6 +111,11 @@ const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shareEntry, setShareEntry] =
+  useState<VendorDiscount | null>(null);
+
+    const [notifyingId, setNotifyingId] =
+      useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!vendorIdValue) {
@@ -142,6 +171,127 @@ const insets = useSafeAreaInsets();
         },
       },
     ]);
+  };
+
+  const getShareMessage = (
+  entry: VendorDiscount,
+) => {
+  const discount = discountSummary(entry);
+
+  return (
+    `🎉 Get ${discount} on Eventify Hub.\n` +
+    `Use code: ${entry.code}\n` +
+    `Valid till ${formatDate(entry.endDate)}`
+  );
+};
+
+const handleCopyCode = async (
+  entry: VendorDiscount,
+) => {
+  await Clipboard.setStringAsync(entry.code);
+
+  Alert.alert(
+    'Copied',
+    'Discount code copied',
+  );
+};
+
+const handleWhatsAppShare = async (
+  entry: VendorDiscount,
+) => {
+  await Clipboard.setStringAsync(entry.code);
+
+  const message =
+    getShareMessage(entry);
+
+  const url =
+    `https://wa.me/?text=${encodeURIComponent(
+      message,
+    )}`;
+
+  try {
+    await Linking.openURL(url);
+    setShareEntry(null);
+  } catch {
+    Alert.alert(
+      'Could not open WhatsApp',
+      'The discount code has still been copied.',
+    );
+  }
+};
+
+const handleEmailShare = async (
+  entry: VendorDiscount,
+) => {
+  await Clipboard.setStringAsync(entry.code);
+
+  const discount =
+    discountSummary(entry);
+
+  const subject =
+    `${discount} on Eventify Hub`;
+
+  const body =
+    `Use discount code: ${entry.code}\n` +
+    `Valid till ${formatDate(
+      entry.endDate,
+    )}`;
+
+  const url =
+    `mailto:?subject=${encodeURIComponent(
+      subject,
+    )}&body=${encodeURIComponent(body)}`;
+
+  try {
+    await Linking.openURL(url);
+    setShareEntry(null);
+  } catch {
+    Alert.alert(
+      'Could not open Email',
+      'The discount code has still been copied.',
+    );
+  }
+};
+
+const handleNotifySelectedClients =
+  async (entry: VendorDiscount) => {
+    if (!vendorIdValue) {
+      return;
+    }
+
+    try {
+      setNotifyingId(entry._id);
+
+      const response = await axios.post(
+        `https://eventify-hub.onrender.com/vendor/growth/discount/discount-code/${entry._id}/notify-selected?vendorId=${vendorIdValue}`,
+      );
+
+      const notified =
+        Number(
+          response.data?.notifiedCount || 0,
+        );
+
+      const skipped =
+        Number(
+          response.data?.skippedCount || 0,
+        );
+
+      Alert.alert(
+        'Notifications Sent',
+        skipped > 0
+          ? `${notified} client(s) notified. ${skipped} client(s) could not receive push notifications.`
+          : `${notified} selected client(s) notified.`,
+      );
+    } catch (e: any) {
+      Alert.alert(
+        'Could not notify clients',
+        e?.response?.data?.message ||
+          e?.message ||
+          'Something went wrong',
+      );
+    } finally {
+      setNotifyingId(null);
+    }
   };
 
   const handleCreatePress = () => {
@@ -294,6 +444,11 @@ const Header = () => (
                   </View>
                 </View>
                 <Text style={styles.entryDiscount}>{discountSummary(entry)}</Text>
+                {activeTab === 'discountCode' && (
+              <Text style={styles.entryMeta}>
+                Audience: {audienceLabel(entry.audience)}
+              </Text>
+            )}
                 <Text style={styles.entryMeta}>
                   Min order: Rs. {entry.minimumOrderAmount.toLocaleString()}
                   {entry.maximumDiscountAmount != null && ` · Max discount: Rs. ${entry.maximumDiscountAmount.toLocaleString()}`}
@@ -305,6 +460,55 @@ const Header = () => (
                   Used {entry.usedCount}/{entry.usageLimit}
                 </Text>
 
+{activeTab === 'discountCode' &&
+  entry.status === DiscountStatus.ACTIVE && (
+    <View style={styles.discountCodeActions}>
+      {entry.audience ===
+        DiscountAudience.SELECTED_CLIENTS && (
+        <TouchableOpacity
+          style={styles.notifyButton}
+          onPress={() =>
+            handleNotifySelectedClients(
+              entry,
+            )
+          }
+          disabled={
+            notifyingId === entry._id
+          }
+          activeOpacity={0.85}
+        >
+          {notifyingId === entry._id ? (
+            <ActivityIndicator
+              size="small"
+              color={COLORS.primary}
+            />
+          ) : (
+            <Text
+              style={
+                styles.notifyButtonText
+              }
+            >
+              Notify Selected Clients
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+
+      <TouchableOpacity
+        style={styles.shareButton}
+        onPress={() =>
+          setShareEntry(entry)
+        }
+        activeOpacity={0.85}
+      >
+        <Text
+          style={styles.shareButtonText}
+        >
+          Share Code
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )}
                 {entry.status === DiscountStatus.ACTIVE && (
                   <TouchableOpacity style={styles.cancelButton} onPress={() => handleCancel(entry)} disabled={cancellingId === entry._id}>
                     {cancellingId === entry._id ? (
@@ -319,6 +523,99 @@ const Header = () => (
           )}
         </ScrollView>
       )}
+
+      <Modal
+  visible={!!shareEntry}
+  transparent
+  animationType="fade"
+  onRequestClose={() =>
+    setShareEntry(null)
+  }
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.shareModal}>
+      <Text style={styles.shareModalTitle}>
+        Share Discount Code
+      </Text>
+
+      <Text style={styles.shareModalCode}>
+        {shareEntry?.code}
+      </Text>
+
+      {shareEntry && (
+        <>
+          <TouchableOpacity
+            style={styles.shareOption}
+            onPress={() =>
+              handleWhatsAppShare(
+                shareEntry,
+              )
+            }
+          >
+            <Text
+              style={
+                styles.shareOptionText
+              }
+            >
+              WhatsApp
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareOption}
+            onPress={() =>
+              handleEmailShare(
+                shareEntry,
+              )
+            }
+          >
+            <Text
+              style={
+                styles.shareOptionText
+              }
+            >
+              Email
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareOption}
+            onPress={async () => {
+              await handleCopyCode(
+                shareEntry,
+              );
+              setShareEntry(null);
+            }}
+          >
+            <Text
+              style={
+                styles.shareOptionText
+              }
+            >
+              Copy
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      <TouchableOpacity
+        style={styles.closeModalButton}
+        onPress={() =>
+          setShareEntry(null)
+        }
+      >
+        <Text
+          style={
+            styles.closeModalButtonText
+          }
+        >
+          Close
+        </Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
     </View>
   );
 }
@@ -455,4 +752,100 @@ headerSubtitle: {
 
   cancelButton: { marginTop: 12, alignSelf: 'flex-start' },
   cancelButtonText: { color: COLORS.danger, fontSize: 12.5, fontWeight: '700' },
+  discountCodeActions: {
+  marginTop: 12,
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+},
+
+shareButton: {
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderRadius: 10,
+  backgroundColor: COLORS.primary,
+},
+
+shareButtonText: {
+  color: '#FFFFFF',
+  fontSize: 12.5,
+  fontWeight: '700',
+},
+
+notifyButton: {
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  borderRadius: 10,
+  backgroundColor: COLORS.primaryLight,
+  borderWidth: 1,
+  borderColor: COLORS.primary,
+},
+
+notifyButtonText: {
+  color: COLORS.primary,
+  fontSize: 12.5,
+  fontWeight: '700',
+},
+
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 24,
+},
+
+shareModal: {
+  width: '100%',
+  maxWidth: 360,
+  backgroundColor: COLORS.card,
+  borderRadius: 18,
+  padding: 20,
+},
+
+shareModalTitle: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: COLORS.text,
+  textAlign: 'center',
+},
+
+shareModalCode: {
+  marginTop: 8,
+  marginBottom: 18,
+  fontSize: 22,
+  fontWeight: '800',
+  color: COLORS.primary,
+  textAlign: 'center',
+  letterSpacing: 1,
+},
+
+shareOption: {
+  paddingVertical: 13,
+  paddingHorizontal: 14,
+  borderRadius: 10,
+  backgroundColor: COLORS.background,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  marginBottom: 9,
+  alignItems: 'center',
+},
+
+shareOptionText: {
+  color: COLORS.text,
+  fontSize: 14,
+  fontWeight: '700',
+},
+
+closeModalButton: {
+  marginTop: 5,
+  paddingVertical: 10,
+  alignItems: 'center',
+},
+
+closeModalButtonText: {
+  color: COLORS.muted,
+  fontSize: 13,
+  fontWeight: '600',
+},
 });

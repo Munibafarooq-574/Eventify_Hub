@@ -33,7 +33,7 @@ export interface DiscountCalculation {
 }
 
 export enum DiscountAudience {
-  ALL = 'all',
-  NEW_ORGANIZERS = 'newOrganizers',
-  SELECTED_ORGANIZERS = 'selectedOrganizers',
+  EVERYONE = 'EVERYONE',
+  NEW_CLIENTS = 'NEW_CLIENTS',
+  SELECTED_CLIENTS = 'SELECTED_CLIENTS',
 }
