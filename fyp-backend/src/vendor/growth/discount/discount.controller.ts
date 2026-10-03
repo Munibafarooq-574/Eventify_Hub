@@ -5,6 +5,13 @@ import { CreateCouponDto } from './dto/create-coupon.dto';
 import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
+import { Res } from '@nestjs/common';
+import type { Response } from 'express';
+import sharp from 'sharp';
+import {
+  buildShareBannerSvg,
+  buildSharePageHtml,
+} from './discount-share.template';
 
 // Mounted at: /vendor/growth/discount
 @Controller('vendor/growth/discount')
@@ -96,6 +103,51 @@ searchVendorClients(
   );
 }
 
+// Mobile app yahan se ready-made WhatsApp message leti hai
+@Get('discount-code/share/:discountCodeId/data')
+getShareData(@Param('discountCodeId') id: string) {
+  return this.discountService.getShareData(id);
+}
+
+// Banner image (WhatsApp preview ke liye)
+@Get('discount-code/share/:discountCodeId/banner.png')
+async shareBanner(
+  @Param('discountCodeId') id: string,
+  @Res() res: Response,
+) {
+  const d = await this.discountService.getShareData(id);
+  const png = await sharp(
+    Buffer.from(buildShareBannerSvg(d.discountText, d.code)),
+  )
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+
+  res.set({
+    'Content-Type': 'image/png',
+    'Cache-Control': 'public, max-age=3600',
+  });
+  res.send(png);
+}
+
+// Link preview page (og tags)
+@Get('discount-code/share/:discountCodeId')
+async sharePage(
+  @Param('discountCodeId') id: string,
+  @Res() res: Response,
+) {
+  const d = await this.discountService.getShareData(id);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(
+    buildSharePageHtml({
+      vendorName: d.vendorName,
+      code: d.code,
+      discountText: d.discountText,
+      imageUrl: d.imageUrl,
+      pageUrl: d.pageUrl,
+    }),
+  );
+}
+
 @Post('discount-code/:discountCodeId/send-email')
 sendDiscountEmail(
   @Param('discountCodeId')
@@ -160,6 +212,8 @@ validateCoupon(
   dto.packageId,
 );
 }
+
+
 
   // POST /vendor/growth/discount/coupon/redeem?vendorId=...
   // Body: { "code": "WEDDING20" }

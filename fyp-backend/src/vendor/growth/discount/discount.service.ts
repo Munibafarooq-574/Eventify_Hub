@@ -577,6 +577,7 @@ const vendor = await this.userModel
     message: 'Discount email sent successfully',
   };
 }
+
   async updateDiscountCode(vendorId: string, discountCodeId: string, dto: UpdateCouponDto): Promise<VendorDiscount> {
     return this.updateDiscountEntry(vendorId, discountCodeId, dto, 'discount code');
   }
@@ -702,6 +703,67 @@ async validateCoupon(
 
     return updated;
   }
+
+  async getShareData(discountCodeId: string) {
+  this.assertValidId(discountCodeId);
+
+  const entry = await this.discountModel
+    .findById(new Types.ObjectId(discountCodeId))
+    .exec();
+
+  if (!entry || entry.status !== DiscountStatus.ACTIVE) {
+    throw new NotFoundException('Offer not available');
+  }
+
+  const vendor = await this.userModel
+    .findById(entry.vendorId)
+    .select('contactDetails.brandName')
+    .lean();
+
+  const vendorName =
+    vendor?.contactDetails?.brandName || 'Eventify Hub Vendor';
+
+  const discountText =
+    entry.discountType === DiscountKind.PERCENTAGE
+      ? `${entry.discountValue}% OFF`
+      : `Rs. ${Number(entry.discountValue).toLocaleString()} OFF`;
+
+  const minimumOrder = Number(entry.minimumOrderAmount || 0);
+
+  const baseUrl =
+    process.env.PUBLIC_API_URL || 'https://eventify-hub.onrender.com';
+
+  const pageUrl = `${baseUrl}/vendor/growth/discount/discount-code/share/${discountCodeId}`;
+
+  const startDate = this.formatEmailDate(entry.startDate);
+  const endDate = this.formatEmailDate(entry.endDate);
+
+  const firstLine =
+    entry.audience === DiscountAudience.NEW_CLIENTS
+      ? `Get ${discountText} on your first booking on Eventify Hub.`
+      : `Get ${discountText} on your next booking on Eventify Hub.`;
+
+  const message =
+    `🎉 Exclusive offer from ${vendorName}\n\n` +
+    `${firstLine}\n\n` +
+    `🎟️ Code: ${entry.code}\n` +
+    (minimumOrder > 0
+      ? `🛒 Minimum order: Rs ${minimumOrder.toLocaleString()}\n`
+      : '') +
+    `📅 Valid: ${startDate} to ${endDate}\n\n` +
+    `Enter the code at checkout to apply your discount.\n\n` +
+    `Eventify Hub, seamless event planning.\n` +
+    `${pageUrl}`;
+
+  return {
+    code: entry.code,
+    vendorName,
+    discountText,
+    pageUrl,
+    imageUrl: `${pageUrl}/banner.png`,
+    message,
+  };
+}
 
   // ---------------------------------------------------------------
   // Generic core — shared by Coupons and Discount Codes
