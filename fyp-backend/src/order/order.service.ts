@@ -445,9 +445,11 @@ for (const service of services) {
     }
 
     await this.discountService.redeemCoupon(
-        service.vendorId,
-        service.promotion.promotionCode,
-    );
+  service.vendorId,
+  service.promotion.promotionCode,
+  String(order.organizerId),
+  String(order._id),
+);
 }
 
 savedOrder = order;
