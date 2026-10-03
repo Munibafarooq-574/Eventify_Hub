@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
 Linking,
+TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -113,6 +114,15 @@ const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const [shareEntry, setShareEntry] =
   useState<VendorDiscount | null>(null);
+
+  const [showEmailInput, setShowEmailInput] =
+  useState(false);
+
+const [recipientEmail, setRecipientEmail] =
+  useState('');
+
+const [sendingEmail, setSendingEmail] =
+  useState(false);
 
     const [notifyingId, setNotifyingId] =
       useState<string | null>(null);
@@ -219,37 +229,68 @@ const handleWhatsAppShare = async (
     );
   }
 };
-
-const handleEmailShare = async (
+const handleEmailShare = (
   entry: VendorDiscount,
 ) => {
-  await Clipboard.setStringAsync(entry.code);
+  setRecipientEmail('');
+  setShowEmailInput(true);
+};
 
-  const discount =
-    discountSummary(entry);
+const handleSendDiscountEmail = async () => {
+  if (!shareEntry || !vendorIdValue) {
+    return;
+  }
 
-  const subject =
-    `${discount} on Eventify Hub`;
+  const email = recipientEmail
+    .trim()
+    .toLowerCase();
 
-  const body =
-    `Use discount code: ${entry.code}\n` +
-    `Valid till ${formatDate(
-      entry.endDate,
-    )}`;
+  if (!email) {
+    Alert.alert(
+      'Email required',
+      'Please enter the recipient email address.',
+    );
+    return;
+  }
 
-  const url =
-    `mailto:?subject=${encodeURIComponent(
-      subject,
-    )}&body=${encodeURIComponent(body)}`;
+  const emailPattern =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(email)) {
+    Alert.alert(
+      'Invalid email',
+      'Please enter a valid email address.',
+    );
+    return;
+  }
 
   try {
-    await Linking.openURL(url);
-    setShareEntry(null);
-  } catch {
-    Alert.alert(
-      'Could not open Email',
-      'The discount code has still been copied.',
+    setSendingEmail(true);
+
+    await axios.post(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/discount-code/${shareEntry._id}/send-email?vendorId=${vendorIdValue}`,
+      {
+        email,
+      },
     );
+
+    Alert.alert(
+      'Email Sent',
+      'The branded discount offer has been emailed successfully.',
+    );
+
+    setRecipientEmail('');
+    setShowEmailInput(false);
+    setShareEntry(null);
+  } catch (e: any) {
+    Alert.alert(
+      'Could not send email',
+      e?.response?.data?.message ||
+        e?.message ||
+        'Something went wrong',
+    );
+  } finally {
+    setSendingEmail(false);
   }
 };
 
@@ -528,9 +569,11 @@ const Header = () => (
   visible={!!shareEntry}
   transparent
   animationType="fade"
-  onRequestClose={() =>
-    setShareEntry(null)
-  }
+  onRequestClose={() => {
+  setShareEntry(null);
+  setShowEmailInput(false);
+  setRecipientEmail('');
+}}
 >
   <View style={styles.modalOverlay}>
     <View style={styles.shareModal}>
@@ -561,22 +604,73 @@ const Header = () => (
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.shareOption}
-            onPress={() =>
-              handleEmailShare(
-                shareEntry,
-              )
-            }
-          >
-            <Text
-              style={
-                styles.shareOptionText
-              }
-            >
-              Email
-            </Text>
-          </TouchableOpacity>
+         <TouchableOpacity
+  style={styles.shareOption}
+  onPress={() =>
+    handleEmailShare(shareEntry)
+  }
+>
+  <Text style={styles.shareOptionText}>
+    Email
+  </Text>
+</TouchableOpacity>
+
+{showEmailInput && (
+  <View style={styles.emailShareBox}>
+    <Text style={styles.emailShareLabel}>
+      Recipient Email
+    </Text>
+
+    <TextInput
+      style={styles.emailInput}
+      value={recipientEmail}
+      onChangeText={setRecipientEmail}
+      placeholder="client@example.com"
+      placeholderTextColor={COLORS.muted}
+      keyboardType="email-address"
+      autoCapitalize="none"
+      autoCorrect={false}
+      editable={!sendingEmail}
+    />
+
+    <View style={styles.emailButtonRow}>
+      <TouchableOpacity
+        style={styles.emailCancelButton}
+        onPress={() => {
+          setShowEmailInput(false);
+          setRecipientEmail('');
+        }}
+        disabled={sendingEmail}
+      >
+        <Text style={styles.emailCancelText}>
+          Cancel
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.emailSendButton,
+          sendingEmail &&
+            styles.emailSendButtonDisabled,
+        ]}
+        onPress={handleSendDiscountEmail}
+        disabled={sendingEmail}
+        activeOpacity={0.85}
+      >
+        {sendingEmail ? (
+          <ActivityIndicator
+            size="small"
+            color="#FFFFFF"
+          />
+        ) : (
+          <Text style={styles.emailSendText}>
+            Send Email
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
 
           <TouchableOpacity
             style={styles.shareOption}
@@ -600,9 +694,11 @@ const Header = () => (
 
       <TouchableOpacity
         style={styles.closeModalButton}
-        onPress={() =>
-          setShareEntry(null)
-        }
+        onPress={() => {
+  setShareEntry(null);
+  setShowEmailInput(false);
+  setRecipientEmail('');
+}}
       >
         <Text
           style={
@@ -842,7 +938,78 @@ closeModalButton: {
   paddingVertical: 10,
   alignItems: 'center',
 },
+emailShareBox: {
+  marginTop: 2,
+  marginBottom: 12,
+  padding: 14,
+  borderRadius: 12,
+  backgroundColor: COLORS.primaryLight,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+},
 
+emailShareLabel: {
+  fontSize: 12.5,
+  fontWeight: '700',
+  color: COLORS.text,
+  marginBottom: 8,
+},
+
+emailInput: {
+  width: '100%',
+  backgroundColor: COLORS.card,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 11,
+  fontSize: 14,
+  color: COLORS.text,
+},
+
+emailButtonRow: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 10,
+},
+
+emailCancelButton: {
+  paddingHorizontal: 14,
+  paddingVertical: 10,
+  borderRadius: 9,
+  backgroundColor: COLORS.card,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+},
+
+emailCancelText: {
+  color: COLORS.muted,
+  fontSize: 12.5,
+  fontWeight: '700',
+},
+
+emailSendButton: {
+  minWidth: 105,
+  minHeight: 38,
+  paddingHorizontal: 15,
+  paddingVertical: 10,
+  borderRadius: 9,
+  backgroundColor: COLORS.primary,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+emailSendButtonDisabled: {
+  opacity: 0.65,
+},
+
+emailSendText: {
+  color: '#FFFFFF',
+  fontSize: 12.5,
+  fontWeight: '700',
+},
 closeModalButtonText: {
   color: COLORS.muted,
   fontSize: 13,

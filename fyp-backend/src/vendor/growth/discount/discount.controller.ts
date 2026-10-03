@@ -96,6 +96,24 @@ searchVendorClients(
   );
 }
 
+@Post('discount-code/:discountCodeId/send-email')
+sendDiscountEmail(
+  @Param('discountCodeId')
+  discountCodeId: string,
+
+  @Query('vendorId')
+  vendorId: string,
+
+  @Body()
+  body: { email: string },
+) {
+  return this.discountService.sendDiscountEmail(
+    vendorId,
+    discountCodeId,
+    body.email,
+  );
+}
+
 @Post('discount-code/:discountCodeId/notify-selected')
 notifySelectedClients(
   @Param('discountCodeId') discountCodeId: string,

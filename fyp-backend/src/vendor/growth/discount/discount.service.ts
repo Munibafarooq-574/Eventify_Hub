@@ -1,11 +1,4 @@
 // fyp-backend/src/vendor/growth/discount/discount.service.ts
-// fyp-backend/src/vendor/growth/discount/discount.service.ts
-//
-// Phase 6 (Coupons) built this generically enough that Phase 7 (Discount
-// Codes) is just: a second FeatureKey/LimitKey pair and two thin public
-// methods (createDiscountCode / getVendorDiscountCodes) wrapping the same
-// generic core — createCoupon/getVendorCoupons/updateCoupon/cancelCoupon
-// from Phase 6 keep their exact same signatures and behavior.
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -26,6 +19,8 @@ import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
 import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { NotificationService } from '../../../notifications/notifications.service';
+import * as nodemailer from 'nodemailer';
+import { buildDiscountOfferEmail } from './discount-email.template';
 
 interface DiscountEntryPayload {
   code: string;
@@ -378,10 +373,37 @@ async notifySelectedClients(
     `Use code: ${discountCode.code}. ` +
     `Valid till ${validTill}.`;
 
-  let notifiedCount = 0;
-  let skippedCount = 0;
+  const vendor = await this.userModel
+  .findById(vendorId)
+  .select('contactDetails.brandName')
+  .lean();
 
-  for (const clientId of selectedClientIds) {
+const vendorBrandName =
+  vendor?.contactDetails?.brandName ||
+  'Eventify Hub Vendor';
+
+const selectedClients = await this.userModel
+  .find({
+    _id: {
+      $in: selectedClientIds,
+    },
+  })
+  .select('_id email')
+  .lean();
+
+const clientEmailMap = new Map(
+  selectedClients.map((client) => [
+    String(client._id),
+    client.email,
+  ]),
+);
+
+let notifiedCount = 0;
+let skippedCount = 0;
+let emailedCount = 0;
+let emailSkippedCount = 0;
+
+for (const clientId of selectedClientIds) {
     try {
       await this.notificationService
         .sendPushNotification(
@@ -396,15 +418,165 @@ async notifySelectedClients(
       // Do not stop notifications for other clients.
       skippedCount += 1;
     }
+
+    const clientEmail =
+  clientEmailMap.get(String(clientId));
+
+if (clientEmail) {
+  try {
+    await this.sendDiscountOfferEmail(
+      clientEmail,
+      vendorBrandName,
+      discountCode,
+    );
+
+    emailedCount += 1;
+  } catch {
+    emailSkippedCount += 1;
+  }
+} else {
+  emailSkippedCount += 1;
+}
   }
 
   return {
-    success: true,
-    notifiedCount,
-    skippedCount,
-  };
+  success: true,
+  notifiedCount,
+  skippedCount,
+  emailedCount,
+  emailSkippedCount,
+};
 }
 
+private escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+private formatEmailDate(value: Date | string): string {
+  return new Date(value).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+private async sendDiscountOfferEmail(
+  recipientEmail: string,
+  vendorName: string,
+  discountCode: VendorDiscount,
+): Promise<void> {
+  const discountText =
+    discountCode.discountType === DiscountKind.PERCENTAGE
+      ? `${discountCode.discountValue}% OFF`
+      : `Rs. ${Number(
+          discountCode.discountValue,
+        ).toLocaleString()} OFF`;
+
+  const minimumOrder =
+    Number(discountCode.minimumOrderAmount || 0);
+
+  const startDate =
+    this.formatEmailDate(discountCode.startDate);
+
+  const endDate =
+    this.formatEmailDate(discountCode.endDate);
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '0'),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+ const html = buildDiscountOfferEmail({
+  vendorBrandName: vendorName,
+  code: discountCode.code,
+  discountText,
+  minimumOrder,
+  startDate,
+  endDate,
+});
+
+  await transporter.sendMail({
+    from:
+      process.env.SMTP_FROM ||
+      process.env.SMTP_USER,
+    to: recipientEmail,
+    subject: `${discountText} from ${vendorName} | Eventify Hub`,
+    html,
+  });
+}
+
+async sendDiscountEmail(
+  vendorId: string,
+  discountCodeId: string,
+  recipientEmail: string,
+) {
+  this.assertValidId(vendorId);
+  this.assertValidId(discountCodeId);
+
+  const email = recipientEmail
+    .trim()
+    .toLowerCase();
+
+  if (
+    !email ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    throw new BadRequestException(
+      'A valid recipient email is required',
+    );
+  }
+
+  const discountCode = await this.discountModel
+    .findOne({
+      _id: new Types.ObjectId(discountCodeId),
+      vendorId: new Types.ObjectId(vendorId),
+      type: DiscountEntryType.DISCOUNT_CODE,
+    })
+    .exec();
+
+  if (!discountCode) {
+    throw new NotFoundException(
+      'Discount code not found',
+    );
+  }
+
+  if (discountCode.status !== DiscountStatus.ACTIVE) {
+    throw new BadRequestException(
+      'Only active discount codes can be emailed',
+    );
+  }
+
+const vendor = await this.userModel
+  .findById(vendorId)
+  .select('contactDetails.brandName')
+  .lean();
+  if (!vendor) {
+    throw new NotFoundException(
+      'Vendor not found',
+    );
+  }
+
+  await this.sendDiscountOfferEmail(
+    email,
+    vendor?.contactDetails?.brandName ||
+  'Eventify Hub Vendor',
+    discountCode,
+  );
+
+  return {
+    success: true,
+    message: 'Discount email sent successfully',
+  };
+}
   async updateDiscountCode(vendorId: string, discountCodeId: string, dto: UpdateCouponDto): Promise<VendorDiscount> {
     return this.updateDiscountEntry(vendorId, discountCodeId, dto, 'discount code');
   }
