@@ -20,6 +20,7 @@ import { User } from 'src/schemas/user.schema';
 import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { NotificationService } from '../../../notifications/notifications.service';
 import * as nodemailer from 'nodemailer';
+import axios from 'axios';
 import { buildDiscountOfferEmail } from './discount-email.template';
 import { DiscountRedemption } from '../../../schemas/discount-redemption.schema';
 
@@ -490,14 +491,6 @@ private async sendDiscountOfferEmail(
   const endDate =
     this.formatEmailDate(discountCode.endDate);
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '0'),
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
 
  const html = buildDiscountOfferEmail({
   vendorBrandName: vendorName,
@@ -508,15 +501,32 @@ private async sendDiscountOfferEmail(
   endDate,
 });
 
-    await transporter.sendMail({
-    from: {
-      name: vendorName,
-      address: process.env.SMTP_USER as string,
-    },
-    to: recipientEmail,
-    subject: 'A special discount is waiting for you',
-    html,
-  });
+   try {
+    await axios.post(
+      'https://api.brevo.com/v3/smtp/email',
+      {
+        sender: {
+          name: vendorName,
+          email: process.env.MAIL_FROM_EMAIL,
+        },
+        to: [{ email: recipientEmail }],
+        subject: 'A special discount is waiting for you',
+        htmlContent: html,
+      },
+      {
+        headers: {
+          'api-key': process.env.BREVO_API_KEY as string,
+          'Content-Type': 'application/json',
+          accept: 'application/json',
+        },
+        timeout: 20000,
+      },
+    );
+  } catch (e: any) {
+    throw new Error(
+      e?.response?.data?.message || e?.message || 'Email send failed',
+    );
+  }
 }
 
 async sendDiscountEmail(
