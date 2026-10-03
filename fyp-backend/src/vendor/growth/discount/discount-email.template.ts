@@ -23,11 +23,6 @@ const BORDER = '#EAD5E6';
 const MUTED = '#766B73';
 const TEXT = '#332633';
 
-// Apni app/website ka link yahan set karein (env se bhi le sakte hain)
-const APP_URL = process.env.APP_URL || 'https://eventify-hub.onrender.com';
-const HELP_URL = process.env.HELP_URL || APP_URL;
-const TERMS_URL = process.env.TERMS_URL || APP_URL;
-const UNSUBSCRIBE_URL = process.env.UNSUBSCRIBE_URL || APP_URL;
 
 export function buildDiscountOfferEmail(
   data: DiscountEmailTemplateData,
@@ -246,11 +241,11 @@ export function buildDiscountOfferEmail(
           <!-- CTA BUTTON -->
           <tr>
             <td style="padding:18px 22px 22px;">
-              <a href="${APP_URL}" target="_blank" style="
-                display:block;background:${BRAND};color:#ffffff;text-decoration:none;
+                            <div style="
+                display:block;background:${BRAND};color:#ffffff;
                 padding:22px 20px;border-radius:16px;text-align:center;
-                font-size:20px;font-weight:600;
-              ">Claim offer now &rarr;</a>
+                font-size:18px;font-weight:600;
+              ">Open the Eventify Hub app to claim this offer</div>
             </td>
           </tr>
 
@@ -260,14 +255,6 @@ export function buildDiscountOfferEmail(
               <div style="font-size:14px;line-height:22px;">
                 Offer valid only on orders from this vendor between ${startDate} and ${endDate}.
                 Cannot be combined with other offers.
-              </div>
-
-              <div style="margin-top:18px;font-size:15px;">
-                <a href="${HELP_URL}" style="color:${BRAND};text-decoration:none;">Help center</a>
-                &nbsp;|&nbsp;
-                <a href="${TERMS_URL}" style="color:${BRAND};text-decoration:none;">Terms</a>
-                &nbsp;|&nbsp;
-                <a href="${UNSUBSCRIBE_URL}" style="color:${BRAND};text-decoration:none;">Unsubscribe</a>
               </div>
 
               <div style="margin-top:12px;font-size:14px;">

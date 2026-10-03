@@ -504,12 +504,13 @@ private async sendDiscountOfferEmail(
   endDate,
 });
 
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      process.env.SMTP_USER,
+    await transporter.sendMail({
+    from: {
+      name: vendorName,
+      address: process.env.SMTP_USER as string,
+    },
     to: recipientEmail,
-    subject: `${discountText} from ${vendorName} | Eventify Hub`,
+    subject: 'A special discount is waiting for you',
     html,
   });
 }
