@@ -54,7 +54,13 @@ export function buildSharePageHtml(opts: {
 <html>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="only light" />
+  <meta name="supported-color-schemes" content="light only" />
+  <style>
+    :root { color-scheme: only light; }
+    html, body { background:#F8E9F6 !important; color:#332633 !important; }
+  </style>
   <title>${esc(title)}</title>
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Eventify Hub" />
