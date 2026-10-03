@@ -15,462 +15,268 @@ const escapeHtml = (value: unknown): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
+// Email clients me emoji/icon fonts unreliable hote hain (image me boxes
+// aa rahe the), isliye icons ki jagah simple text/CSS use kiya hai.
+const BRAND = '#7D0C72';
+const BRAND_LIGHT = '#F8E9F6';
+const BORDER = '#EAD5E6';
+const MUTED = '#766B73';
+const TEXT = '#332633';
+
+// Apni app/website ka link yahan set karein (env se bhi le sakte hain)
+const APP_URL = process.env.APP_URL || 'https://eventify-hub.onrender.com';
+const HELP_URL = process.env.HELP_URL || APP_URL;
+const TERMS_URL = process.env.TERMS_URL || APP_URL;
+const UNSUBSCRIBE_URL = process.env.UNSUBSCRIBE_URL || APP_URL;
+
 export function buildDiscountOfferEmail(
   data: DiscountEmailTemplateData,
 ): string {
-  const vendorBrandName =
-    escapeHtml(data.vendorBrandName);
-
+  const vendorBrandName = escapeHtml(data.vendorBrandName);
   const code = escapeHtml(data.code);
-  const discountText =
-    escapeHtml(data.discountText);
+  const startDate = escapeHtml(data.startDate);
+  const endDate = escapeHtml(data.endDate);
 
-  const startDate =
-    escapeHtml(data.startDate);
-
-  const endDate =
-    escapeHtml(data.endDate);
+  // discountText example: "15% OFF" ya "Rs. 500 OFF"
+  // Isko big value + chhote "OFF" me todte hain
+  const rawDiscount = String(data.discountText ?? '');
+  const discountMatch = rawDiscount.match(/^(.*?)\s*OFF$/i);
+  const discountValue = escapeHtml(
+    (discountMatch ? discountMatch[1] : rawDiscount).trim(),
+  );
 
   const minimumOrderText =
     data.minimumOrder > 0
       ? `Rs ${data.minimumOrder.toLocaleString()}`
       : 'No minimum';
 
+  const vendorInitials = escapeHtml(
+    (data.vendorBrandName || 'V')
+      .trim()
+      .split(/\s+/)
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'V',
+  );
+
+  const step2 =
+    data.minimumOrder > 0
+      ? `Add items worth ${minimumOrderText} or more to your order`
+      : 'Choose an eligible service or package';
+
+  const stepRow = (num: number, content: string) => `
+    <tr>
+      <td width="34" valign="top" style="padding:6px 0;">
+        <div style="
+          width:28px;height:28px;line-height:28px;
+          background:${BRAND};color:#ffffff;
+          border-radius:14px;text-align:center;
+          font-size:13px;font-weight:700;
+        ">${num}</div>
+      </td>
+      <td valign="middle" style="
+        padding:6px 0 6px 12px;
+        font-size:15px;color:${TEXT};
+      ">${content}</td>
+    </tr>`;
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
 
-<body style="
-  margin:0;
-  padding:0;
-  background:#f5f5f5;
-  font-family:Arial,Helvetica,sans-serif;
-  color:#332633;
-">
-  <table
-    role="presentation"
-    width="100%"
-    cellspacing="0"
-    cellpadding="0"
-    border="0"
-    style="padding:30px 12px;background:#f5f5f5;"
-  >
+<body style="margin:0;padding:0;background:#fafafa;font-family:Arial,Helvetica,sans-serif;color:${TEXT};">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+    style="padding:24px 12px;background:#fafafa;">
     <tr>
       <td align="center">
 
-        <table
-          role="presentation"
-          width="100%"
-          cellspacing="0"
-          cellpadding="0"
-          border="0"
-          style="
-            max-width:700px;
-            background:#faeefa;
-            border-radius:18px;
-            overflow:hidden;
-            border:1px solid #ead5e6;
-          "
-        >
+        <!-- OUTER CARD -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+          style="max-width:640px;background:${BRAND_LIGHT};border-radius:16px;overflow:hidden;border:1px solid ${BORDER};">
 
           <!-- HEADER -->
           <tr>
-            <td style="
-              background:#850665;
-              padding:28px 28px 38px;
-              color:#ffffff;
-            ">
-              <table
-                role="presentation"
-                width="100%"
-                cellspacing="0"
-                cellpadding="0"
-              >
+            <td style="background:${BRAND};padding:28px 32px 70px;color:#ffffff;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
-                  <td style="
-                    font-size:22px;
-                    font-weight:700;
-                  ">
+                  <td style="font-size:22px;font-weight:600;color:#ffffff;">
                     Eventify Hub
                   </td>
-
-                  <td
-                    align="right"
-                    style="font-size:13px;"
-                  >
+                  <td align="right">
                     <span style="
-                      display:inline-block;
-                      background:#ffd166;
-                      color:#7a3e00;
-                      padding:8px 16px;
-                      border-radius:20px;
-                      font-weight:700;
-                    ">
-                      Limited time
-                    </span>
+                      display:inline-block;background:#FFD166;color:#7A3E00;
+                      padding:8px 18px;border-radius:20px;
+                      font-size:14px;font-weight:600;
+                    ">Limited time</span>
                   </td>
                 </tr>
               </table>
 
-              <div style="
-                margin-top:30px;
-                font-size:14px;
-                opacity:0.92;
-              ">
+              <div style="margin-top:34px;font-size:16px;color:#f3dcef;">
                 Exclusive vendor offer
               </div>
-
-              <div style="
-                margin-top:6px;
-                font-size:27px;
-                line-height:34px;
-                font-weight:700;
-              ">
+              <div style="margin-top:6px;font-size:29px;line-height:36px;font-weight:600;color:#ffffff;">
                 A special discount is waiting for you
               </div>
             </td>
           </tr>
 
-          <!-- VENDOR -->
+          <!-- VENDOR CARD (overlaps header) -->
           <tr>
-            <td style="padding:0 20px;">
-              <table
-                role="presentation"
-                width="100%"
-                cellspacing="0"
-                cellpadding="0"
-                style="
-                  margin-top:-20px;
-                  background:#ffffff;
-                  border:1px solid #ead5e6;
-                  border-radius:16px;
-                "
-              >
+            <td style="padding:0 22px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="margin-top:-48px;background:#ffffff;border:1px solid ${BORDER};border-radius:18px;">
                 <tr>
-                  <td style="padding:20px;">
-
-                    <div style="
-                      font-size:13px;
-                      color:#766b73;
-                    ">
-                      Offered by
-                    </div>
-
-                    <div style="
-                      margin-top:4px;
-                      font-size:18px;
-                      font-weight:700;
-                      color:#332633;
-                    ">
-                      ${vendorBrandName}
-                    </div>
-
-                    <div style="
-                      margin-top:6px;
-                      font-size:13px;
-                      color:#850665;
-                    ">
-                      Vendor on Eventify Hub
-                    </div>
-
+                  <td style="padding:22px;">
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td width="76" valign="middle">
+                          <div style="
+                            width:72px;height:72px;line-height:72px;
+                            border:2px solid ${BRAND};border-radius:36px;
+                            text-align:center;font-size:24px;color:${BRAND};
+                            background:#ffffff;
+                          ">${vendorInitials}</div>
+                        </td>
+                        <td valign="middle" style="padding-left:16px;">
+                          <div style="font-size:14px;color:${MUTED};">Offered by</div>
+                          <div style="margin-top:3px;font-size:21px;color:${TEXT};">
+                            ${vendorBrandName}
+                          </div>
+                          <div style="margin-top:5px;font-size:14px;color:${BRAND};">
+                            &#10003; Verified vendor on Eventify Hub
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- DISCOUNT -->
+          <!-- DISCOUNT + PROMO CODE CARD -->
           <tr>
-            <td style="padding:18px 20px 0;">
-              <table
-                role="presentation"
-                width="100%"
-                cellspacing="0"
-                cellpadding="0"
-                style="
-                  background:#ffffff;
-                  border:1px solid #ead5e6;
-                  border-radius:16px;
-                "
-              >
+            <td style="padding:20px 22px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background:#ffffff;border:1px solid ${BORDER};border-radius:18px;">
                 <tr>
-                  <td
-                    align="center"
-                    style="padding:28px 20px 18px;"
-                  >
-                    <div style="
-                      font-size:13px;
-                      letter-spacing:2px;
-                      color:#766b73;
-                    ">
-                      YOU SAVE
+                  <td align="center" style="padding:32px 20px 22px;">
+                    <div style="font-size:15px;letter-spacing:3px;color:${MUTED};">YOU SAVE</div>
+                    <div style="margin-top:10px;color:${BRAND};">
+                      <span style="font-size:64px;line-height:70px;font-weight:600;">${discountValue}</span>
+                      <span style="font-size:30px;font-weight:500;">&nbsp;OFF</span>
                     </div>
-
-                    <div style="
-                      margin-top:8px;
-                      font-size:42px;
-                      line-height:50px;
-                      font-weight:700;
-                      color:#850665;
-                    ">
-                      ${discountText}
-                    </div>
-
-                    <div style="
-                      margin-top:4px;
-                      font-size:14px;
-                      color:#766b73;
-                    ">
-                      on your next eligible booking
-                      with this vendor
+                    <div style="margin-top:6px;font-size:16px;color:${MUTED};">
+                      on your next booking with this vendor
                     </div>
                   </td>
                 </tr>
 
                 <tr>
-                  <td style="padding:0 20px;">
-                    <div style="
-                      border-top:1px dashed #dfbed7;
-                    "></div>
+                  <td style="padding:0 30px;">
+                    <div style="border-top:1px dashed #E3C3DD;"></div>
                   </td>
                 </tr>
 
                 <tr>
-                  <td
-                    align="center"
-                    style="padding:20px;"
-                  >
+                  <td align="center" style="padding:24px 24px 28px;">
+                    <div style="font-size:15px;letter-spacing:2.5px;color:${MUTED};">YOUR PROMO CODE</div>
                     <div style="
-                      font-size:13px;
-                      letter-spacing:1.5px;
-                      color:#766b73;
-                    ">
-                      YOUR PROMO CODE
+                      margin-top:14px;background:${BRAND_LIGHT};
+                      border:2px dashed ${BRAND};border-radius:14px;
+                      padding:22px 12px;
+                      font-size:40px;letter-spacing:8px;font-weight:600;color:${BRAND};
+                    ">${code}</div>
+                    <div style="margin-top:10px;font-size:13px;color:${BRAND};">
+                      Long-press / select the code to copy it
                     </div>
-
-                    <div style="
-                      margin-top:10px;
-                      background:#faeefa;
-                      border:1px dashed #850665;
-                      border-radius:12px;
-                      padding:17px;
-                      font-size:27px;
-                      letter-spacing:5px;
-                      font-weight:700;
-                      color:#850665;
-                    ">
-                      ${code}
-                    </div>
-
-                    <div style="
-                      margin-top:8px;
-                      font-size:12px;
-                      color:#850665;
-                    ">
-                      Copy this code and enter it at checkout
-                    </div>
-                  </td>
-                </tr>
-
-              </table>
-            </td>
-          </tr>
-
-          <!-- DETAILS -->
-          <tr>
-            <td style="padding:16px 20px 0;">
-              <table
-                role="presentation"
-                width="100%"
-                cellspacing="0"
-                cellpadding="0"
-              >
-                <tr>
-
-                  <td
-                    width="48%"
-                    style="
-                      background:#ffffff;
-                      border:1px solid #ead5e6;
-                      border-radius:14px;
-                      padding:18px;
-                    "
-                  >
-                    <div style="
-                      font-size:12px;
-                      color:#766b73;
-                    ">
-                      Minimum order
-                    </div>
-
-                    <div style="
-                      margin-top:5px;
-                      font-size:17px;
-                      font-weight:700;
-                    ">
-                      ${minimumOrderText}
-                    </div>
-                  </td>
-
-                  <td width="4%"></td>
-
-                  <td
-                    width="48%"
-                    style="
-                      background:#ffffff;
-                      border:1px solid #ead5e6;
-                      border-radius:14px;
-                      padding:18px;
-                    "
-                  >
-                    <div style="
-                      font-size:12px;
-                      color:#766b73;
-                    ">
-                      Valid period
-                    </div>
-
-                    <div style="
-                      margin-top:5px;
-                      font-size:15px;
-                      font-weight:700;
-                    ">
-                      ${startDate} to ${endDate}
-                    </div>
-                  </td>
-
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- REDEEM -->
-          <tr>
-            <td style="padding:16px 20px 0;">
-              <table
-                role="presentation"
-                width="100%"
-                cellspacing="0"
-                cellpadding="0"
-                style="
-                  background:#ffffff;
-                  border:1px solid #ead5e6;
-                  border-radius:14px;
-                "
-              >
-                <tr>
-                  <td style="padding:20px;">
-
-                    <div style="
-                      font-size:18px;
-                      font-weight:700;
-                      margin-bottom:16px;
-                    ">
-                      How to redeem
-                    </div>
-
-                    <div style="
-                      font-size:14px;
-                      line-height:28px;
-                    ">
-                      <strong style="color:#850665;">
-                        1.
-                      </strong>
-                      Open Eventify Hub and choose
-                      this vendor's service.
-                      <br />
-
-                      <strong style="color:#850665;">
-                        2.
-                      </strong>
-                      ${
-                        data.minimumOrder > 0
-                          ? `Add services worth ${minimumOrderText} or more to your order.`
-                          : 'Choose an eligible service or package.'
-                      }
-                      <br />
-
-                      <strong style="color:#850665;">
-                        3.
-                      </strong>
-                      Enter
-                      <strong style="color:#850665;">
-                        ${code}
-                      </strong>
-                      at checkout to apply your discount.
-                    </div>
-
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- CTA -->
+          <!-- MINIMUM ORDER + VALID PERIOD -->
           <tr>
-            <td style="padding:18px 20px;">
-              <div style="
-                background:#850665;
-                color:#ffffff;
-                padding:17px 20px;
-                border-radius:12px;
-                text-align:center;
-                font-size:16px;
-                font-weight:700;
-              ">
-                Claim offer on Eventify Hub
-              </div>
+            <td style="padding:16px 22px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td width="49%" valign="top" style="background:#ffffff;border:1px solid ${BORDER};border-radius:16px;padding:20px;">
+                    <div style="font-size:14px;color:${MUTED};">Minimum order</div>
+                    <div style="margin-top:6px;font-size:21px;color:${TEXT};">${minimumOrderText}</div>
+                  </td>
+                  <td width="2%"></td>
+                  <td width="49%" valign="top" style="background:#ffffff;border:1px solid ${BORDER};border-radius:16px;padding:20px;">
+                    <div style="font-size:14px;color:${MUTED};">Valid period</div>
+                    <div style="margin-top:6px;font-size:19px;color:${TEXT};">${startDate} to ${endDate}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- HOW TO REDEEM -->
+          <tr>
+            <td style="padding:16px 22px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+                style="background:#ffffff;border:1px solid ${BORDER};border-radius:16px;">
+                <tr>
+                  <td style="padding:22px 26px;">
+                    <div style="font-size:20px;color:${TEXT};margin-bottom:14px;">How to redeem</div>
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      ${stepRow(1, "Open Eventify Hub and choose this vendor's service")}
+                      ${stepRow(2, step2)}
+                      ${stepRow(
+                        3,
+                        `Enter <span style="color:${BRAND};">${code}</span> at checkout to apply your discount`,
+                      )}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA BUTTON -->
+          <tr>
+            <td style="padding:18px 22px 22px;">
+              <a href="${APP_URL}" target="_blank" style="
+                display:block;background:${BRAND};color:#ffffff;text-decoration:none;
+                padding:22px 20px;border-radius:16px;text-align:center;
+                font-size:20px;font-weight:600;
+              ">Claim offer now &rarr;</a>
             </td>
           </tr>
 
           <!-- FOOTER -->
           <tr>
-            <td
-              align="center"
-              style="
-                border-top:1px solid #ead5e6;
-                padding:22px 25px 26px;
-                color:#766b73;
-              "
-            >
-              <div style="
-                font-size:12px;
-                line-height:20px;
-              ">
-                Offer valid only on eligible bookings
-                from ${vendorBrandName} between
-                ${startDate} and ${endDate}.
-                Discount eligibility is verified
-                at checkout.
+            <td align="center" style="border-top:1px solid ${BORDER};padding:26px 28px 30px;color:${MUTED};">
+              <div style="font-size:14px;line-height:22px;">
+                Offer valid only on orders from this vendor between ${startDate} and ${endDate}.
+                Cannot be combined with other offers.
               </div>
 
-              <div style="
-                margin-top:14px;
-                font-size:13px;
-                font-weight:700;
-                color:#850665;
-              ">
-                Eventify Hub
+              <div style="margin-top:18px;font-size:15px;">
+                <a href="${HELP_URL}" style="color:${BRAND};text-decoration:none;">Help center</a>
+                &nbsp;|&nbsp;
+                <a href="${TERMS_URL}" style="color:${BRAND};text-decoration:none;">Terms</a>
+                &nbsp;|&nbsp;
+                <a href="${UNSUBSCRIBE_URL}" style="color:${BRAND};text-decoration:none;">Unsubscribe</a>
               </div>
 
-              <div style="
-                margin-top:5px;
-                font-size:12px;
-              ">
-                Seamless event planning.
+              <div style="margin-top:12px;font-size:14px;">
+                Eventify Hub, seamless event planning.
               </div>
             </td>
           </tr>
 
         </table>
-
       </td>
     </tr>
   </table>
