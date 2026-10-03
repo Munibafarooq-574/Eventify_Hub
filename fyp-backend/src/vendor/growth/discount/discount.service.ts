@@ -743,26 +743,24 @@ async validateCoupon(
       ? `Get ${discountText} on your first booking on Eventify Hub.`
       : `Get ${discountText} on your next booking on Eventify Hub.`;
 
-  const message =
-    `🎉 Exclusive offer from ${vendorName}\n\n` +
-    `${firstLine}\n\n` +
-    `🎟️ Code: ${entry.code}\n` +
-    (minimumOrder > 0
-      ? `🛒 Minimum order: Rs ${minimumOrder.toLocaleString()}\n`
-      : '') +
-    `📅 Valid: ${startDate} to ${endDate}\n\n` +
-    `Enter the code at checkout to apply your discount.\n\n` +
-    `Eventify Hub, seamless event planning.\n` +
-    `${pageUrl}`;
+  const minimumText =
+  minimumOrder > 0 ? `Rs ${minimumOrder.toLocaleString()}` : 'No minimum';
 
-  return {
-    code: entry.code,
-    vendorName,
-    discountText,
-    pageUrl,
-    imageUrl: `${pageUrl}/banner.png`,
-    message,
-  };
+const validText = `${startDate} to ${endDate}`;
+
+const message = `🎉 Exclusive offer from ${vendorName}\n\n${pageUrl}`;
+
+return {
+  code: entry.code,
+  vendorName,
+  discountText,
+  firstLine,
+  minimumText,
+  validText,
+  pageUrl,
+  imageUrl: `${pageUrl}/banner.png`,
+  message,
+};
 }
 
   // ---------------------------------------------------------------

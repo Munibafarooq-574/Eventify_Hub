@@ -137,15 +137,20 @@ async sharePage(
 ) {
   const d = await this.discountService.getShareData(id);
   res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(
-    buildSharePageHtml({
-      vendorName: d.vendorName,
-      code: d.code,
-      discountText: d.discountText,
-      imageUrl: d.imageUrl,
-      pageUrl: d.pageUrl,
-    }),
-  );
+   res.send(
+  buildSharePageHtml({
+    vendorName: d.vendorName,
+    code: d.code,
+    discountText: d.discountText,
+    firstLine: d.firstLine,
+    minimumText: d.minimumText,
+    validText: d.validText,
+    imageUrl: d.imageUrl,
+    pageUrl: d.pageUrl,
+    appUrl: process.env.APP_URL || 'https://eventify-hub.onrender.com',
+    appScheme: 'fypfrontendv3://',
+  }),
+);
 }
 
 @Post('discount-code/:discountCodeId/send-email')
