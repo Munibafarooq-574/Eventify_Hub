@@ -89,6 +89,11 @@ import {
   OrderSchema,
 } from '../../schemas/order.schema';
 
+import {
+  DiscountRedemption,
+  DiscountRedemptionSchema,
+} from '../../schemas/discount-redemption.schema';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -143,6 +148,9 @@ import {
       {
         name: Order.name,
         schema: OrderSchema,
+      },
+      { name: DiscountRedemption.name, 
+        schema: DiscountRedemptionSchema 
       },
     ]),
     
