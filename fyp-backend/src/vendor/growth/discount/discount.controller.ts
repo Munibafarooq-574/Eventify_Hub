@@ -225,8 +225,13 @@ validateCoupon(
   // Call this from your EXISTING order/booking creation flow once the
   // booking is actually confirmed — this is what increments usedCount.
   // Also works for both types.
-  @Post('coupon/redeem')
-  redeemCoupon(@Query('vendorId') vendorId: string, @Body('code') code: string) {
-    return this.discountService.redeemCoupon(vendorId, code);
+    @Post('coupon/redeem')
+  redeemCoupon(
+    @Query('vendorId') vendorId: string,
+    @Body('code') code: string,
+    @Body('clientId') clientId: string,
+    @Body('orderId') orderId?: string,
+  ) {
+    return this.discountService.redeemCoupon(vendorId, code, clientId, orderId);
   }
 }

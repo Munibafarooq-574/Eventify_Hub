@@ -21,6 +21,7 @@ import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { NotificationService } from '../../../notifications/notifications.service';
 import * as nodemailer from 'nodemailer';
 import { buildDiscountOfferEmail } from './discount-email.template';
+import { DiscountRedemption } from '../../../schemas/discount-redemption.schema';
 
 interface DiscountEntryPayload {
   code: string;
@@ -50,6 +51,9 @@ private readonly vendorOrderModel: Model<VendorOrder>,
 
 @InjectModel(Order.name)
 private readonly orderModel: Model<Order>,
+
+@InjectModel(DiscountRedemption.name)
+private readonly redemptionModel: Model<DiscountRedemption>,
 
 private readonly featureAccessService: FeatureAccessService,
 
@@ -621,10 +625,28 @@ async validateCoupon(
     );
   }
 
-  const entry = await this.findActiveEntryByCode(
+    const entry = await this.findActiveEntryByCode(
     vendorId,
     code,
   );
+
+  // Ek client, ek code, sirf ek baar
+  if (!clientId || !Types.ObjectId.isValid(clientId)) {
+    throw new BadRequestException(
+      'A valid clientId is required to use this code',
+    );
+  }
+
+  const alreadyUsed = await this.redemptionModel.exists({
+    discountId: entry._id,
+    clientId: new Types.ObjectId(clientId),
+  });
+
+  if (alreadyUsed) {
+    throw new BadRequestException(
+      'You have already used this code',
+    );
+  }
 
   if (
     entry.packageId &&
@@ -680,15 +702,54 @@ async validateCoupon(
    * concurrent redemptions can't both slip through and overshoot the
    * usage limit (a plain read-then-write would have that race).
    */
-  async redeemCoupon(vendorId: string, code: string): Promise<VendorDiscount> {
+    async redeemCoupon(
+    vendorId: string,
+    code: string,
+    clientId: string,
+    orderId?: string,
+  ): Promise<VendorDiscount> {
     this.assertValidId(vendorId);
+
+    if (!clientId || !Types.ObjectId.isValid(clientId)) {
+      throw new BadRequestException('A valid clientId is required');
+    }
+
     const normalizedCode = code.trim().toUpperCase();
     const now = new Date();
 
+    const entry = await this.discountModel.findOne({
+      vendorId: new Types.ObjectId(vendorId),
+      code: normalizedCode,
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Code not found for this vendor');
+    }
+
+    // Step A: client ka record pehle likho. Unique index duplicate rok deta hai,
+    // is liye do requests ek saath aayen tab bhi sirf ek chalegi.
+    let redemption: DiscountRedemption;
+    try {
+      redemption = await this.redemptionModel.create({
+        discountId: entry._id,
+        clientId: new Types.ObjectId(clientId),
+        vendorId: new Types.ObjectId(vendorId),
+        orderId:
+          orderId && Types.ObjectId.isValid(orderId)
+            ? new Types.ObjectId(orderId)
+            : null,
+      });
+    } catch (e: any) {
+      if (e?.code === 11000) {
+        throw new BadRequestException('You have already used this code');
+      }
+      throw e;
+    }
+
+    // Step B: usedCount barhao (usage limit guard ke saath)
     const updated = await this.discountModel.findOneAndUpdate(
       {
-        vendorId: new Types.ObjectId(vendorId),
-        code: normalizedCode,
+        _id: entry._id,
         status: DiscountStatus.ACTIVE,
         startDate: { $lte: now },
         endDate: { $gte: now },
@@ -698,8 +759,12 @@ async validateCoupon(
       { new: true },
     );
 
+    // Agar code expire/full ho gaya, to Step A wala record wapas hata do
     if (!updated) {
-      throw new BadRequestException('Code is invalid, expired, or has reached its usage limit');
+      await this.redemptionModel.deleteOne({ _id: redemption._id });
+      throw new BadRequestException(
+        'Code is invalid, expired, or has reached its usage limit',
+      );
     }
 
     return updated;
