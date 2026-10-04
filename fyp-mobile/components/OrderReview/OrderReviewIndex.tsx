@@ -17,6 +17,7 @@ TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+import getActiveCities from '@/services/getActiveCities';
 
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8EAF2';
@@ -51,17 +52,90 @@ const [applyingCouponId, setApplyingCouponId] =
 const [applyingDiscountCodeKey, setApplyingDiscountCodeKey] =
   useState<string | null>(null);
 
+  const [eventDetails, setEventDetails] =
+  useState<any>(null);
+
+const [eventCityName, setEventCityName] =
+  useState('');
+
+const [eventExpanded, setEventExpanded] =
+  useState(false);
+
+const [expandedVendors, setExpandedVendors] =
+  useState<Record<string, boolean>>({});
+
+  const [categoryOptions, setCategoryOptions] =
+  useState<any[]>([]);
+
+const [cityOptions, setCityOptions] =
+  useState<any[]>([]);
+
   useEffect(() => {
     const fetchCartData = async () => {
       try {
         const storedCart = await getSecureData('cartData');
 
-        const eventDetailsRaw = await getSecureData('eventDetails');
-        const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
-        setGuests(eventDetails?.guests ? parseInt(eventDetails.guests.toString(), 10) : 0);
+        const eventDetailsRaw =
+  await getSecureData('eventDetails');
+
+const savedEventDetails =
+  eventDetailsRaw
+    ? JSON.parse(eventDetailsRaw)
+    : null;
+
+setEventDetails(savedEventDetails);
+
+setGuests(
+  savedEventDetails?.guests
+    ? parseInt(
+        savedEventDetails.guests.toString(),
+        10,
+      )
+    : 0,
+);
+
+try {
+  const activeCities =
+    await getActiveCities();
+
+  const safeCities =
+    Array.isArray(activeCities)
+      ? activeCities
+      : [];
+
+  setCityOptions(safeCities);
+
+  const selectedCity =
+    savedEventDetails?.eventCityId
+      ? safeCities.find(
+          (city: any) =>
+            String(city?._id) ===
+            String(
+              savedEventDetails.eventCityId,
+            ),
+        )
+      : undefined;
+
+  setEventCityName(
+    selectedCity?.name || '',
+  );
+} catch (error) {
+  console.error(
+    'Error loading cities:',
+    error,
+  );
+
+  setCityOptions([]);
+  setEventCityName('');
+}
 
         const categoriesRaw = await getSecureData('categories');
         const categories = categoriesRaw ? JSON.parse(categoriesRaw) : [];
+        setCategoryOptions(
+  Array.isArray(categories)
+    ? categories
+    : [],
+);
         const catering = categories.find(
           (x: any) => x?.name?.toLowerCase() === 'caterings',
         );
@@ -162,6 +236,365 @@ const finalTotal =
     ) || 0;
 
   const formatCurrency = (amount: number) => Math.round(amount).toLocaleString('en-PK');
+
+  const toggleVendorDetails = (
+  vendorId: string,
+) => {
+  setExpandedVendors((current) => ({
+    ...current,
+    [vendorId]: !current[vendorId],
+  }));
+};
+
+const formatEventDate = (
+  value?: string,
+) => {
+  if (!value) return 'N/A';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString(
+    'en-GB',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    },
+  );
+};
+
+const formatDuration = (
+  
+  minutes?: number,
+) => {
+  const total =
+    Number(minutes || 0);
+
+  if (!total) return 'N/A';
+
+  const hours = Math.floor(
+    total / 60,
+  );
+
+  const mins = total % 60;
+
+  if (hours && mins) {
+    return `${hours} hr ${mins} min`;
+  }
+
+  if (hours) {
+    return `${hours} hr`;
+  }
+
+  return `${mins} min`;
+};
+
+const formatEventTime = (
+  value?: string,
+) => {
+  if (!value) return 'N/A';
+
+  const [hourPart, minutePart] =
+    String(value).split(':');
+
+  const hour = Number(hourPart);
+  const minute = Number(
+    minutePart || 0,
+  );
+
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute)
+  ) {
+    return value;
+  }
+
+  const period =
+    hour >= 12 ? 'PM' : 'AM';
+
+  const displayHour =
+    hour % 12 || 12;
+
+  return `${displayHour}:${String(
+    minute,
+  ).padStart(2, '0')} ${period}`;
+};
+
+
+const getVendorCategoryName = (
+  vendorData: any,
+  vendorCartData?: any,
+) => {
+  const category =
+    vendorData?.buisnessCategory ||
+    vendorCartData?.buisnessCategory;
+
+  if (
+    category &&
+    typeof category === 'object'
+  ) {
+    return (
+      category?.name ||
+      category?.categoryName ||
+      'N/A'
+    );
+  }
+
+  const categoryId =
+    typeof category === 'string'
+      ? category
+      : category?._id;
+
+  if (categoryId) {
+    const matchedCategory =
+      categoryOptions.find(
+        (item: any) =>
+          String(item?._id) ===
+          String(categoryId),
+      );
+
+    if (matchedCategory?.name) {
+      return matchedCategory.name;
+    }
+  }
+
+  return (
+    vendorData?.categoryName ||
+    vendorCartData?.categoryName ||
+    vendorData?.businessCategoryName ||
+    vendorCartData?.businessCategoryName ||
+    'N/A'
+  );
+};
+
+const getVendorServiceCities = (
+  vendorData: any,
+  vendorCartData?: any,
+) => {
+  const rawServiceCities =
+    vendorData?.serviceLocationCityIds ||
+    vendorCartData?.serviceLocationCityIds ||
+    [];
+
+  if (!Array.isArray(rawServiceCities)) {
+    return 'N/A';
+  }
+
+  const names =
+    rawServiceCities
+      .map((city: any) => {
+        if (
+          city &&
+          typeof city === 'object' &&
+          city?.name
+        ) {
+          return city.name;
+        }
+
+        const cityId =
+          typeof city === 'string'
+            ? city
+            : city?._id;
+
+        if (!cityId) {
+          return null;
+        }
+
+        const matchedCity =
+          cityOptions.find(
+            (option: any) =>
+              String(option?._id) ===
+              String(cityId),
+          );
+
+        return matchedCity?.name || null;
+      })
+      .filter(Boolean);
+
+  return names.length > 0
+    ? names.join(', ')
+    : 'N/A';
+};
+
+const getResolvedServiceWindow = (
+  pkg: any,
+) => {
+  const bookingType = String(
+    pkg?.bookingType ||
+      'DURATION_BASED',
+  ).toUpperCase();
+
+  const eventDate =
+    eventDetails?.eventDate;
+
+  const eventStartTime =
+    eventDetails?.startTime;
+
+  const eventEndTime =
+    eventDetails?.endTime;
+
+  if (
+    !eventDate ||
+    !eventStartTime
+  ) {
+    return null;
+  }
+
+  const dateOnly =
+    String(eventDate).split('T')[0];
+
+  const eventStart =
+    new Date(
+      `${dateOnly}T${eventStartTime}:00`,
+    );
+
+  if (
+    Number.isNaN(
+      eventStart.getTime(),
+    )
+  ) {
+    return null;
+  }
+
+  // ---------------------------------
+  // DURATION_BASED
+  // actual event start -> event end
+  // ---------------------------------
+  if (
+    bookingType ===
+    'DURATION_BASED'
+  ) {
+    if (!eventEndTime) {
+      return null;
+    }
+
+    const eventEnd =
+      new Date(
+        `${dateOnly}T${eventEndTime}:00`,
+      );
+
+    if (
+      Number.isNaN(
+        eventEnd.getTime(),
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      startDateTime:
+        eventStart.toISOString(),
+
+      endDateTime:
+        eventEnd.toISOString(),
+    };
+  }
+
+  // ---------------------------------
+  // TIME_SLOT_BASED
+  // event start + required duration
+  // ---------------------------------
+  if (
+    bookingType ===
+    'TIME_SLOT_BASED'
+  ) {
+    const requiredDuration =
+      Number(
+        pkg?.requiredServiceDurationMinutes,
+      );
+
+    if (
+      !Number.isFinite(
+        requiredDuration,
+      ) ||
+      requiredDuration <= 0
+    ) {
+      return null;
+    }
+
+    const end =
+      new Date(
+        eventStart.getTime() +
+          requiredDuration *
+            60 *
+            1000,
+      );
+
+    return {
+      startDateTime:
+        eventStart.toISOString(),
+
+      endDateTime:
+        end.toISOString(),
+    };
+  }
+
+  // ---------------------------------
+  // DELIVERY / SETUP / CUSTOM
+  // event start + configured offsets
+  // ---------------------------------
+  if (
+    bookingType ===
+      'DELIVERY_BASED' ||
+    bookingType ===
+      'SETUP_BASED' ||
+    bookingType ===
+      'CUSTOM'
+  ) {
+    const startOffset =
+      Number(
+        pkg?.serviceWindowStartOffsetMinutes,
+      );
+
+    const endOffset =
+      Number(
+        pkg?.serviceWindowEndOffsetMinutes,
+      );
+
+    if (
+      !Number.isFinite(
+        startOffset,
+      ) ||
+      !Number.isFinite(
+        endOffset,
+      ) ||
+      startOffset >
+        endOffset
+    ) {
+      return null;
+    }
+
+    const start =
+      new Date(
+        eventStart.getTime() +
+          startOffset *
+            60 *
+            1000,
+      );
+
+    const end =
+      new Date(
+        eventStart.getTime() +
+          endOffset *
+            60 *
+            1000,
+      );
+
+    return {
+      startDateTime:
+        start.toISOString(),
+
+      endDateTime:
+        end.toISOString(),
+    };
+  }
+
+  return null;
+};
 
   const getPromotionKey = (
   vendorId: string,
@@ -293,6 +726,26 @@ const handleApplyPublicCoupon = async (
     pkg,
   );
 
+  const minimumOrderAmount =
+  Number(coupon?.minimumOrderAmount || 0);
+
+if (
+  minimumOrderAmount > 0 &&
+  originalAmount < minimumOrderAmount
+) {
+  Alert.alert(
+    'Offer Requirements Not Met',
+    `Minimum order amount for this offer is Rs. ${formatCurrency(
+      minimumOrderAmount,
+    )}. Your package total is Rs. ${formatCurrency(
+      originalAmount,
+    )}.`,
+    [{ text: 'OK' }],
+  );
+
+  return;
+}
+
 const currentPromotion =
   appliedPromotions[key];
 
@@ -358,15 +811,16 @@ try {
       position: 'bottom',
     });
   } catch (error: any) {
-    Toast.show({
-      type: 'error',
-      text1: 'Offer Not Applied',
-      text2:
-        error?.response?.data?.message ||
-        'This offer could not be applied.',
-      position: 'bottom',
-    });
-  } finally {
+  const backendMessage =
+    error?.response?.data?.message ||
+    'This offer could not be applied.';
+
+  Alert.alert(
+    'Offer Requirements Not Met',
+    backendMessage,
+    [{ text: 'OK' }],
+  );
+} finally {
     setApplyingCouponId(null);
   }
 };
@@ -395,6 +849,28 @@ const confirmPromotionReplacement = (
         onDismiss: () => resolve(false),
       },
     );
+  });
+};
+
+const handleRemovePromotion = (
+  promotionKey: string,
+) => {
+  setAppliedPromotions((current) => {
+    const next = { ...current };
+    delete next[promotionKey];
+    return next;
+  });
+
+  setDiscountCodes((current) => ({
+    ...current,
+    [promotionKey]: '',
+  }));
+
+  Toast.show({
+    type: 'info',
+    text1: 'Discount Removed',
+    text2: 'The applied discount has been removed.',
+    position: 'bottom',
   });
 };
 
@@ -443,7 +919,6 @@ const handleApplyDiscountCode = async (
     vendor,
     pkg,
   );
-
   
 const currentPromotion =
   appliedPromotions[key];
@@ -513,6 +988,11 @@ try {
         },
       }),
     );
+
+    setDiscountCodes((current) => ({
+  ...current,
+  [key]: '',
+}));
 
     Toast.show({
       type: 'success',
@@ -622,7 +1102,7 @@ try {
         ),
 
         requiredServiceWindow:
-          pkg.requiredServiceWindow,
+  getResolvedServiceWindow(pkg),
       };
     }),
 );
@@ -772,31 +1252,537 @@ try {
             <Text style={styles.sectionSubtitle}>
               Double-check services and pricing before you book.
             </Text>
+                 <View style={styles.eventReviewCard}>
+  <TouchableOpacity
+    style={styles.eventReviewHeader}
+    onPress={() =>
+      setEventExpanded(
+        (current) => !current,
+      )
+    }
+    activeOpacity={0.8}
+  >
+    <View style={styles.eventReviewTitleRow}>
+      <View style={styles.eventReviewIcon}>
+        <Ionicons
+          name="calendar-outline"
+          size={20}
+          color={PRIMARY}
+        />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={styles.eventReviewLabel}>
+          EVENT DETAILS
+        </Text>
+
+        <Text
+          style={styles.eventReviewTitle}
+          numberOfLines={1}
+        >
+          {eventDetails?.eventName ||
+            'Your Event'}
+        </Text>
+      </View>
+    </View>
+
+    <Ionicons
+      name={
+        eventExpanded
+          ? 'chevron-up'
+          : 'chevron-down'
+      }
+      size={20}
+      color={PRIMARY}
+    />
+  </TouchableOpacity>
+
+  {eventExpanded && (
+    <View style={styles.eventExpandedBody}>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Event Name
+        </Text>
+        <Text style={styles.detailValue}>
+          {eventDetails?.eventName ||
+            'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Event Type
+        </Text>
+        <Text style={styles.detailValue}>
+          {eventDetails?.eventType ||
+            'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Date
+        </Text>
+        <Text style={styles.detailValue}>
+          {formatEventDate(
+            eventDetails?.eventDate,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Start Time
+        </Text>
+        <Text style={styles.detailValue}>
+          {formatEventTime(
+  eventDetails?.startTime,
+)}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          End Time
+        </Text>
+        <Text style={styles.detailValue}>
+          {formatEventTime(
+            eventDetails?.endTime,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Duration
+        </Text>
+        <Text style={styles.detailValue}>
+          {formatDuration(
+            eventDetails?.durationMinutes,
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Guests
+        </Text>
+        <Text style={styles.detailValue}>
+          {eventDetails?.guests ??
+            'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          City
+        </Text>
+        <Text style={styles.detailValue}>
+          {eventCityName || 'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Event Address
+        </Text>
+        <Text
+          style={styles.detailValue}
+          numberOfLines={3}
+        >
+          {eventDetails?.eventAddress ||
+            'N/A'}
+        </Text>
+      </View>
+
+      <View style={styles.detailColumn}>
+        <Text style={styles.detailLabel}>
+          Services
+        </Text>
+
+        <Text style={styles.detailValueLeft}>
+          {Array.isArray(
+            eventDetails?.selectedServices,
+          ) &&
+          eventDetails.selectedServices
+            .length > 0
+            ? eventDetails.selectedServices.join(
+                ', ',
+              )
+            : 'N/A'}
+        </Text>
+      </View>
+    </View>
+  )}
+</View>
+            
+
 
             {cartData.vendors.map((vendor: any, vendorIndex: number) => {
-              const vendorName = vendor?.vendor?.name || vendor?.vendor?.brandName || 'Vendor';
-              const packages = vendor?.packages || [];
+              const vendorData =
+  vendor?.vendor || {};
 
-              return (
-                <View key={`${vendorIndex}-${vendorName}`} style={styles.vendorCard}>
-                  <View style={styles.vendorHeader}>
-                    <View style={styles.vendorIcon}>
-                      <Ionicons name="storefront-outline" size={21} color={PRIMARY} />
-                    </View>
+const vendorName =
+  vendorData?.contactDetails
+    ?.brandName ||
+  vendorData?.brandName ||
+  vendor?.vendorName ||
+  vendorData?.name ||
+  'Vendor';
 
-                    <View style={styles.vendorInfo}>
-                      <Text style={styles.vendorLabel}>VENDOR</Text>
-                      <Text style={styles.vendorName} numberOfLines={1}>
-                        {vendorName}
-                      </Text>
-                    </View>
+const vendorAccountName =
+  vendorData?.name || 'N/A';
 
-                    <View style={styles.packageCountBadge}>
-                      <Text style={styles.packageCountText}>
-                        {packages.length} {packages.length === 1 ? 'Package' : 'Packages'}
-                      </Text>
-                    </View>
-                  </View>
+const vendorId =
+  String(
+    vendorData?._id ||
+      vendor?.vendorId ||
+      '',
+  );
+
+const vendorExpanded =
+  !!expandedVendors[vendorId];
+
+const vendorCategory =
+  getVendorCategoryName(
+    vendorData,
+    vendor,
+  );
+
+const vendorPhone =
+  vendorData?.contactDetails
+    ?.contactNumber ||
+  vendorData?.phone_number ||
+  'N/A';
+
+const vendorSecondaryPhone =
+  vendorData?.contactDetails
+    ?.contactNumberSecondary ||
+  '';
+const vendorServiceCities =
+  getVendorServiceCities(
+    vendorData,
+    vendor,
+  );
+
+const vendorOfficeAddress =
+  vendorData?.contactDetails
+    ?.officialAddress ||
+  vendorData?.businessAddress ||
+  vendorData?.address ||
+  'N/A';
+
+const packages =
+  vendor?.packages || [];
+
+ const vendorServiceWindows =
+  packages
+    .map((pkg: any) => {
+      const window =
+  getResolvedServiceWindow(pkg);
+
+      if (!window) {
+        return null;
+      }
+
+      const start =
+        window?.startDateTime
+          ? new Date(
+              window.startDateTime,
+            )
+          : null;
+
+      const end =
+        window?.endDateTime
+          ? new Date(
+              window.endDateTime,
+            )
+          : null;
+
+      if (
+        !start ||
+        Number.isNaN(start.getTime())
+      ) {
+        return null;
+      }
+
+      const bookingType =
+        String(
+          pkg?.bookingType ||
+            'DURATION_BASED',
+        ).toUpperCase();
+
+      const startDate =
+        start.toLocaleDateString(
+          'en-GB',
+          {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          },
+        );
+
+      const startTime =
+        start.toLocaleTimeString(
+          'en-US',
+          {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+          },
+        );
+
+      const endTime =
+        end &&
+        !Number.isNaN(end.getTime())
+          ? end.toLocaleTimeString(
+              'en-US',
+              {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              },
+            )
+          : null;
+
+      let title =
+        'Required Service Window';
+
+      let label =
+        endTime
+          ? `${startDate} • ${startTime} - ${endTime}`
+          : `${startDate} • ${startTime}`;
+
+      if (
+        bookingType ===
+        'DELIVERY_BASED'
+      ) {
+        label =
+          `Delivered At: ${startDate} • ${startTime}`;
+      } else if (
+        bookingType ===
+        'SETUP_BASED'
+      ) {
+        title = 'Setup Window';
+      } else if (
+        bookingType ===
+        'TIME_SLOT_BASED'
+      ) {
+        title = 'Appointment Time';
+      } else if (
+        bookingType ===
+        'DURATION_BASED'
+      ) {
+        title = 'Service Window';
+      }
+
+      return {
+        packageName:
+          pkg?.packageName ||
+          'Package',
+        title,
+        label,
+      };
+    })
+    .filter(Boolean);
+
+   return (
+ <View key={`${vendorIndex}-${vendorName}`} style={styles.vendorCard}>
+  <TouchableOpacity
+  style={styles.vendorHeader}
+  onPress={() =>
+    toggleVendorDetails(vendorId)
+  }
+  activeOpacity={0.8}
+>
+  <View style={styles.vendorIcon}>
+    <Ionicons
+      name="storefront-outline"
+      size={21}
+      color={PRIMARY}
+    />
+  </View>
+
+  <View style={styles.vendorInfo}>
+    <Text style={styles.vendorLabel}>
+      VENDOR
+    </Text>
+
+    <Text
+      style={styles.vendorName}
+      numberOfLines={1}
+    >
+      {vendorName}
+    </Text>
+  </View>
+
+  <View style={styles.vendorHeaderRight}>
+    <View
+      style={styles.packageCountBadge}
+    >
+      <Text
+        style={styles.packageCountText}
+      >
+        {packages.length}{' '}
+        {packages.length === 1
+          ? 'Package'
+          : 'Packages'}
+      </Text>
+    </View>
+
+    <Ionicons
+      name={
+        vendorExpanded
+          ? 'chevron-up'
+          : 'chevron-down'
+      }
+      size={19}
+      color={PRIMARY}
+      style={{ marginLeft: 8 }}
+    />
+  </View>
+</TouchableOpacity>
+
+{vendorExpanded && (
+  <View style={styles.vendorExpandedBody}>
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Brand Name
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorName}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Vendor Name
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorAccountName}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Category
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorCategory}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+  <Text style={styles.detailLabel}>
+    Service Cities
+  </Text>
+
+  <Text
+    style={styles.detailValue}
+    numberOfLines={3}
+  >
+    {vendorServiceCities}
+  </Text>
+</View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Phone
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorPhone}
+      </Text>
+    </View>
+
+    {!!vendorSecondaryPhone && (
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Alternate Phone
+        </Text>
+
+        <Text style={styles.detailValue}>
+          {vendorSecondaryPhone}
+        </Text>
+      </View>
+    )}
+
+    <View style={styles.detailColumn}>
+      <Text style={styles.detailLabel}>
+        Official Office Address
+      </Text>
+      <Text style={styles.detailValueLeft}>
+        {vendorOfficeAddress}
+      </Text>
+    </View>
+    {vendorServiceWindows.length > 0 && (
+  <View style={styles.detailColumn}>
+    <Text style={styles.detailLabel}>
+  Service Schedule
+</Text>
+
+    <View
+      style={
+        styles.serviceWindowContainer
+      }
+    >
+      {vendorServiceWindows.map(
+        (
+          item: any,
+          index: number,
+        ) => (
+          <View
+            key={`${item.packageName}-${index}`}
+            style={
+              styles.serviceWindowItem
+            }
+          >
+            <Ionicons
+              name="time-outline"
+              size={14}
+              color={PRIMARY}
+            />
+
+            <View
+              style={
+                styles.serviceWindowTextWrap
+              }
+            >
+              <Text
+                style={
+                  styles.serviceWindowPackage
+                }
+              >
+                {item.packageName}
+              </Text>
+
+              <Text
+              style={
+                styles.serviceWindowPackage
+              }
+            >
+              {item.title}
+            </Text>
+
+            <Text
+              style={
+                styles.serviceWindowValue
+              }
+            >
+              {item.label}
+            </Text>
+            </View>
+          </View>
+        ),
+      )}
+    </View>
+  </View>
+)}
+  </View>
+)}
 
                   <View style={styles.vendorDivider} />
 
@@ -851,6 +1837,38 @@ try {
                           )}
 
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
+                          <View style={styles.packageMetaRow}>
+  <Ionicons
+    name="time-outline"
+    size={12}
+    color={MUTED}
+  />
+
+  <Text style={styles.packageMetaText}>
+    {formatDuration(
+      Number(
+        pkg?.durationMinutes ||
+          eventDetails
+            ?.durationMinutes ||
+          0,
+      ),
+    )}
+  </Text>
+</View>
+
+{!!pkg?.requiredServiceWindow && (
+  <View style={styles.packageMetaRow}>
+    <Ionicons
+      name="calendar-outline"
+      size={12}
+      color={MUTED}
+    />
+
+    <Text style={styles.packageMetaText}>
+      Service window confirmed
+    </Text>
+  </View>
+)}
                           {availableCoupons.length > 0 && (
                           <View style={styles.availableOffers}>
                             <Text style={styles.availableOffersTitle}>
@@ -860,8 +1878,9 @@ try {
                             {availableCoupons.map(
                               (coupon: any) => {
                                 const discountLabel =
-                                  coupon.discountType ===
-                                  'PERCENTAGE'
+                                  String(
+                                coupon.discountType,
+                              ).toLowerCase() === 'percentage'
                                     ? `${Number(
                                         coupon.discountValue ||
                                           0,
@@ -1082,11 +2101,62 @@ try {
                               </Text>
                             )}
                           </TouchableOpacity>
+                        
                         </View>
+                        {appliedPromotion?.promotionType ===
+  'DISCOUNT_CODE' && (
+  <View style={styles.appliedCodeChip}>
+    <View style={styles.appliedCodeLeft}>
+      <View style={styles.appliedCodeCheck}>
+        <Ionicons
+          name="checkmark"
+          size={13}
+          color="#FFFFFF"
+        />
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text
+          style={styles.appliedCodeText}
+          numberOfLines={1}
+        >
+          {appliedPromotion.promotionCode} Applied
+        </Text>
+
+        <Text style={styles.appliedCodeSaving}>
+          You saved Rs.{' '}
+          {formatCurrency(
+            Number(
+              appliedPromotion.discountAmount ||
+                0,
+            ),
+          )}
+        </Text>
+      </View>
+    </View>
+
+    <TouchableOpacity
+      style={styles.removeCodeButton}
+      onPress={() =>
+        handleRemovePromotion(
+          promotionKey,
+        )
+      }
+      activeOpacity={0.7}
+    >
+      <Ionicons
+        name="close"
+        size={18}
+        color="#C44D5C"
+      />
+    </TouchableOpacity>
+  </View>
+)}
                       </View>
                         </View>
                       </View>
                     );
+                    
                   })}
                 </View>
               );
@@ -1302,6 +2372,157 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   vendorHeader: { flexDirection: 'row', alignItems: 'center' },
+  vendorHeaderRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+vendorExpandedBody: {
+  marginTop: 12,
+  backgroundColor: '#FCF8FA',
+  borderRadius: 12,
+  padding: 12,
+  borderWidth: 1,
+  borderColor: BORDER,
+},
+
+eventReviewCard: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 18,
+  padding: 14,
+  marginBottom: 14,
+  borderWidth: 1,
+  borderColor: BORDER,
+  elevation: 2,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.05,
+  shadowRadius: 6,
+},
+
+eventReviewHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+eventReviewTitleRow: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+eventReviewIcon: {
+  width: 44,
+  height: 44,
+  borderRadius: 13,
+  backgroundColor: PRIMARY_LIGHT,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 11,
+},
+
+eventReviewLabel: {
+  fontSize: 9,
+  color: GOLD,
+  fontWeight: '800',
+  letterSpacing: 1,
+},
+
+eventReviewTitle: {
+  fontSize: 15,
+  fontWeight: '800',
+  color: TEXT,
+  marginTop: 2,
+},
+
+eventExpandedBody: {
+  marginTop: 14,
+  paddingTop: 12,
+  borderTopWidth: 1,
+  borderTopColor: '#F3E8EE',
+},
+
+detailRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: 9,
+  gap: 12,
+},
+
+detailColumn: {
+  marginBottom: 9,
+},
+
+detailLabel: {
+  fontSize: 10.5,
+  fontWeight: '700',
+  color: MUTED,
+},
+
+detailValue: {
+  flex: 1,
+  fontSize: 11,
+  fontWeight: '700',
+  color: TEXT,
+  textAlign: 'right',
+},
+
+detailValueLeft: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: TEXT,
+  marginTop: 4,
+  lineHeight: 16,
+},
+
+serviceWindowContainer: {
+  marginTop: 6,
+  gap: 8,
+},
+
+serviceWindowItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  backgroundColor: '#FFFFFF',
+  borderRadius: 10,
+  paddingVertical: 8,
+  paddingHorizontal: 9,
+  borderWidth: 1,
+  borderColor: '#F0DCE7',
+},
+
+serviceWindowTextWrap: {
+  flex: 1,
+  marginLeft: 7,
+},
+
+serviceWindowPackage: {
+  fontSize: 10.5,
+  fontWeight: '800',
+  color: TEXT,
+},
+
+serviceWindowValue: {
+  fontSize: 10,
+  color: MUTED,
+  marginTop: 2,
+},
+packageMetaRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 4,
+},
+
+packageMetaText: {
+  fontSize: 9.5,
+  color: MUTED,
+  marginLeft: 4,
+},
   vendorIcon: {
     width: 44,
     height: 44,
@@ -1474,6 +2695,57 @@ discountCodeApplyText: {
   color: '#FFFFFF',
   fontSize: 10,
   fontWeight: '800',
+},
+appliedCodeChip: {
+  marginTop: 9,
+  backgroundColor: '#F1FAF4',
+  borderWidth: 1,
+  borderColor: '#D4EEDC',
+  borderRadius: 10,
+  paddingVertical: 9,
+  paddingLeft: 10,
+  paddingRight: 7,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+
+appliedCodeLeft: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+appliedCodeCheck: {
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  backgroundColor: '#278A4B',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: 8,
+},
+
+appliedCodeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: '#278A4B',
+},
+
+appliedCodeSaving: {
+  fontSize: 9.5,
+  color: '#6E8B76',
+  marginTop: 2,
+},
+
+removeCodeButton: {
+  width: 30,
+  height: 30,
+  borderRadius: 15,
+  backgroundColor: '#FFF0F2',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginLeft: 8,
 },
   guestTag: {
     flexDirection: 'row',

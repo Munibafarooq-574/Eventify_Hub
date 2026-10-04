@@ -1,7 +1,10 @@
 import searchVendors from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
-import { getUserData } from '@/store';
+import {
+  getSecureData,
+  getUserData,
+} from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -36,6 +39,8 @@ const Header: React.FC = () => {
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [badgeMap, setBadgeMap] = useState<Record<string, VendorBadgeSummary>>({});
+  const [cartPackageCount, setCartPackageCount] =
+  useState(0);
 
   const handleSearch = async (text: string) => {
     if (text.trim().length < 2) {
@@ -84,10 +89,11 @@ const Header: React.FC = () => {
   // screen becomes focused, so it always reflects the latest AsyncStorage
   // user data (fresh signup, login, or profile edit).
   useFocusEffect(
-    useCallback(() => {
-      fetchUsername();
-    }, [])
-  );
+  useCallback(() => {
+    fetchUsername();
+    fetchCartPackageCount();
+  }, [])
+);
 
   const fetchUsername = async () => {
     try {
@@ -109,6 +115,47 @@ const Header: React.FC = () => {
     }
   };
 
+  const fetchCartPackageCount = async () => {
+  try {
+    const storedCart =
+      await getSecureData('cartData');
+
+    if (!storedCart) {
+      setCartPackageCount(0);
+      return;
+    }
+
+    const parsedCart =
+      JSON.parse(storedCart);
+
+    const count =
+      Array.isArray(parsedCart?.vendors)
+        ? parsedCart.vendors.reduce(
+            (
+              total: number,
+              vendor: any,
+            ) =>
+              total +
+              (Array.isArray(
+                vendor?.packages,
+              )
+                ? vendor.packages.length
+                : 0),
+            0,
+          )
+        : 0;
+
+    setCartPackageCount(count);
+  } catch (error) {
+    console.error(
+      'Cart count error:',
+      error,
+    );
+
+    setCartPackageCount(0);
+  }
+};
+
   return (
     <View style={styles.container}>
       {/* Location and Notification */}
@@ -120,12 +167,28 @@ const Header: React.FC = () => {
 
         <View style={styles.iconGroup}>
           <TouchableOpacity
-            //onPress={() => router.push('/cartmanagement')}
-            style={styles.iconButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="cart-outline" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
+  onPress={() =>
+    router.push('/cartmanagement')
+  }
+  style={styles.iconButton}
+  activeOpacity={0.7}
+>
+  <Ionicons
+    name="cart-outline"
+    size={22}
+    color={COLORS.primary}
+  />
+
+  {cartPackageCount > 0 && (
+    <View style={styles.cartBadge}>
+      <Text style={styles.cartBadgeText}>
+        {cartPackageCount > 99
+          ? '99+'
+          : cartPackageCount}
+      </Text>
+    </View>
+  )}
+</TouchableOpacity>
 
           <TouchableOpacity
             style={styles.iconButton}
@@ -404,6 +467,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+
+  cartBadge: {
+  position: 'absolute',
+  top: -5,
+  right: -5,
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+  backgroundColor: '#D6A943',
+  paddingHorizontal: 4,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1.5,
+  borderColor: '#FFFFFF',
+},
+
+cartBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 9,
+  fontWeight: '800',
+},
   notificationDot: {
     position: 'absolute',
     top: 8,

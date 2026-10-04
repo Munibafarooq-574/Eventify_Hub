@@ -166,10 +166,11 @@ const vendor = await this.userModel
     role: 'Vendor',
   })
   .select(
-    'name contactDetails buisnessCategory businessCityId city',
-  )
+  'name contactDetails buisnessCategory businessCityId serviceLocationCityIds city',
+)
   .populate('buisnessCategory', 'name')
   .populate('businessCityId', 'name')
+  .populate('serviceLocationCityIds', 'name')
   .lean();
 
 if (!vendor) {
@@ -185,27 +186,37 @@ usableCoupons.push({
   ...couponObject,
 
   vendorId: {
-    _id: String((vendor as any)._id),
+  _id: String((vendor as any)._id),
 
-    name:
-      (vendor as any).name ||
-      '',
+  name:
+    (vendor as any).name ||
+    '',
 
-    brandName:
-      (vendor as any).contactDetails?.brandName ||
-      (vendor as any).name ||
-      '',
+  brandName:
+    (vendor as any).contactDetails?.brandName ||
+    (vendor as any).name ||
+    '',
 
-    categoryName:
-      (vendor as any).buisnessCategory?.name ||
-      '',
+  categoryName:
+    (vendor as any).buisnessCategory?.name ||
+    '',
 
-    city:
-      (vendor as any).businessCityId?.name ||
-      (vendor as any).city ||
-      (vendor as any).contactDetails?.city ||
-      '',
-  },
+  businessCity:
+    (vendor as any).businessCityId?.name ||
+    '',
+
+  serviceLocationCityIds:
+    Array.isArray(
+      (vendor as any).serviceLocationCityIds,
+    )
+      ? (vendor as any).serviceLocationCityIds.map(
+          (city: any) => ({
+            _id: String(city?._id || ''),
+            name: city?.name || '',
+          }),
+        )
+      : [],
+},
 });
 
     if (usableCoupons.length >= safeLimit) {

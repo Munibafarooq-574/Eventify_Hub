@@ -1,10 +1,10 @@
 import { getPublicDashboardCoupons } from '@/services/getPublicDashboardCoupons';
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  LayoutChangeEvent,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -13,20 +13,36 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
-/* Apni screen ka background color yahan likho (ticket notches isi color ke hain) */
 const PAGE_BG = '#FDF0F7';
 
-const CARD_WIDTH = 290;
-const CARD_GAP = 12;
-const LEFT_WIDTH = 100;
-const STEP = CARD_WIDTH + CARD_GAP;
+/* Ticket colors */
+const TICKET_BG = '#F8D7E6'; 
+const INK = '#1A1A1A'; 
+const PLUM = '#6B1E4F'; // brand color
 
-const AUTO_SCROLL_MS = 5000; 
-const HOME_LIMIT = 10; 
-const ALL_LIMIT = 300; 
+const STUB_BG = '#6B1E4F'; 
+const STUB_PERCENT = '#FFFFFF'; 
+const STUB_OFF = '#D4A85A'; 
+const STUB_BAR = '#F6E3EE'; 
+
+const CARD_HEIGHT = 128;
+const CARD_GAP = 10;
+const LEFT_WIDTH = 80;
+const PEEK = 36;
+
+const AUTO_SCROLL_MS = 5000;
+const HOME_LIMIT = 10;
+const ALL_LIMIT = 300;
+
+const BARCODE_PATTERN = [
+  3, 1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1, 2, 1, 3, 1, 2,
+];
+const DASH_COUNT = 13;
+const MAX_CITIES_SHOWN = 2;
 
 const getValidTill = (coupon: any) =>
   coupon.endDate
@@ -38,165 +54,196 @@ const getValidTill = (coupon: any) =>
 
 const getVendorName = (coupon: any) => {
   const v = coupon.vendorId;
-
   if (!v || typeof v === 'string') return '';
-
-  return (
-    v.brandName ||
-    v.businessName ||
-    v.name ||
-    ''
-  );
+  return v.brandName || v.businessName || v.name || '';
 };
 
 const getVendorCategory = (coupon: any) => {
   const v = coupon.vendorId;
-
   if (!v || typeof v === 'string') return '';
-
   return v.categoryName || '';
 };
 
-const getVendorLocation = (coupon: any) => {
+/* Vendor jin jin cities mein service deta hai wo sab nikalta hai */
+const getServiceCities = (
+  coupon: any,
+): string[] => {
   const v = coupon.vendorId;
 
-  if (!v || typeof v === 'string') return '';
+  if (
+    !v ||
+    typeof v === 'string'
+  ) {
+    return [];
+  }
 
-  return v.city || '';
+  const raw =
+    v.serviceLocationCityIds || [];
+
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const names = raw
+    .map((city: any) => {
+      if (
+        city &&
+        typeof city === 'object'
+      ) {
+        return (
+          city?.name ||
+          city?.cityName ||
+          ''
+        );
+      }
+
+      return '';
+    })
+    .map((name: string) =>
+      String(name).trim(),
+    )
+    .filter(Boolean);
+
+  const seen =
+    new Set<string>();
+
+  return names.filter(
+    (name: string) => {
+      const key =
+        name.toLowerCase();
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+
+      return true;
+    },
+  );
 };
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /* ---------- Single coupon card ---------- */
 type CouponCardProps = {
   coupon: any;
+  width?: number;
   fullWidth?: boolean;
   onBeforeNavigate?: () => void;
 };
 
 const CouponCard: React.FC<CouponCardProps> = ({
   coupon,
+  width,
   fullWidth = false,
   onBeforeNavigate,
 }) => {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
   const isPercentage = coupon.discountType === 'percentage';
   const validTill = getValidTill(coupon);
   const vendorName = getVendorName(coupon);
-const vendorCategory = getVendorCategory(coupon);
-const vendorLocation = getVendorLocation(coupon);
+  const vendorCategory = getVendorCategory(coupon);
 
-  const handleCopy = async () => {
-    try {
-      await Clipboard.setStringAsync(String(coupon.code));
-      setCopied(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
-      console.error('Copy failed:', e);
-    }
-  }
+  const cities = getServiceCities(coupon).map(capitalize);
+  const shownCities = cities.slice(0, MAX_CITIES_SHOWN).join(', ');
+  const extraCities = cities.length - MAX_CITIES_SHOWN;
+  const cityText = cities.length
+    ? `${shownCities}${extraCities > 0 ? ` +${extraCities} more` : ''}`
+    : '';
+
+  const discountLabel = isPercentage
+    ? `${coupon.discountValue}%`
+    : `Rs.${coupon.discountValue}`;
 
   const openVendor = () => {
-  if (!coupon.vendorId) return;
+    if (!coupon.vendorId) return;
 
-  const vendorId =
-    typeof coupon.vendorId === 'string'
-      ? coupon.vendorId
-      : coupon.vendorId._id;
+    const vendorId =
+      typeof coupon.vendorId === 'string'
+        ? coupon.vendorId
+        : coupon.vendorId._id;
 
-  if (!vendorId) return;
+    if (!vendorId) return;
 
-  onBeforeNavigate?.();
+    onBeforeNavigate?.();
 
-  router.push({
-    pathname: '/vendorprofiledetails',
-    params: {
-      id: vendorId,
-    },
-  });
-};
+    router.push({
+      pathname: '/vendorprofiledetails',
+      params: { id: vendorId },
+    });
+  };
 
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={openVendor}
-      style={[styles.card, fullWidth && styles.cardFull]}
+      style={[styles.card, fullWidth ? styles.cardFull : { width }]}
     >
-      {/* Left: discount */}
+            {/* Left stub: vertical discount text (left) + barcode (right) */}
       <View style={styles.left}>
-        {isPercentage ? (
-          <Text style={styles.discountBig}>{coupon.discountValue}%</Text>
-        ) : (
-          <>
-            <Text style={styles.discountRs}>Rs.</Text>
-            <Text style={styles.discountBig}>{coupon.discountValue}</Text>
-          </>
-        )}
-        <Text style={styles.discountOff}>OFF</Text>
+        <View style={styles.rotatedWrap}>
+           <Text style={styles.rotatedText} numberOfLines={1}>
+            {discountLabel} <Text style={styles.rotatedOff}>OFF</Text>
+          </Text>
+        </View>
+
+        <View style={styles.barcode}>
+          {BARCODE_PATTERN.map((h, i) => (
+            <View key={i} style={[styles.bar, { height: h }]} />
+          ))}
+        </View>
       </View>
 
-      {/* Ticket cut: dashed line + notches */}
+      {/* Ticket cut: dark dashed line + notches */}
       <View style={styles.dividerWrap}>
-        <View style={styles.dashedClip}>
-          <View style={styles.dashedLine} />
-        </View>
+        {Array.from({ length: DASH_COUNT }).map((_, i) => (
+          <View key={i} style={styles.dash} />
+        ))}
       </View>
       <View style={[styles.notch, styles.notchTop]} />
       <View style={[styles.notch, styles.notchBottom]} />
 
       {/* Right: details */}
       <View style={styles.right}>
+        {/* Vendor name + proper dark line */}
         <View>
-  {!!vendorName && (
-    <Text
-      style={styles.vendor}
-      numberOfLines={1}
-    >
-      {vendorName}
-    </Text>
-  )}
+          {!!vendorName && (
+            <Text style={styles.vendor} numberOfLines={1}>
+              {vendorName}
+            </Text>
+          )}
+          <View style={styles.titleLine} />
+          {!!vendorCategory && (
+            <Text style={styles.vendorMeta} numberOfLines={1}>
+              {vendorCategory}
+            </Text>
+          )}
+          {!!cityText && (
+          <View style={styles.serviceCitiesRow}>
+            <Text style={styles.serviceCitiesLabel}>
+              Service Cities
+            </Text>
 
-  {(vendorCategory || vendorLocation) && (
-    <Text
-      style={styles.vendorMeta}
-      numberOfLines={1}
-    >
-      {[vendorCategory, vendorLocation]
-        .filter(Boolean)
-        .join(' • ')}
-    </Text>
-  )}
-</View>
-
-<Text style={styles.useCodeLabel}>USE CODE</Text>
-
-        <View style={styles.codeBox}>
-          <Text style={styles.codeText} numberOfLines={1}>
-            {coupon.code}
-          </Text>
+            <Text
+              style={styles.cities}
+              numberOfLines={1}
+            >
+              {cityText}
+            </Text>
+          </View>
+        )}
         </View>
 
+        {/* Code + validity (same row, compact) */}
         <View style={styles.bottomRow}>
+          <View style={styles.codeBox}>
+            <Text style={styles.codeText} numberOfLines={1}>
+              {coupon.code}
+            </Text>
+          </View>
           <Text style={styles.validity} numberOfLines={1}>
             {validTill ? `Till ${validTill}` : 'Limited time'}
           </Text>
-
-          <TouchableOpacity
-            onPress={handleCopy}
-            activeOpacity={0.8}
-            style={[styles.copyBtn, copied && styles.copyBtnDone]}
-          >
-            <Text style={[styles.copyText, copied && styles.copyTextDone]}>
-              {copied ? 'Copied ✓' : 'Copy'}
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
@@ -205,18 +252,30 @@ const vendorLocation = getVendorLocation(coupon);
 
 /* ---------- Main component ---------- */
 const PublicCouponOffers: React.FC = () => {
+  const { width: winW } = useWindowDimensions();
+
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // View All modal
+  const [sectionW, setSectionW] = useState(winW - 40);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [allCoupons, setAllCoupons] = useState<any[]>([]);
   const [allLoading, setAllLoading] = useState(false);
 
-  // Auto scroll
   const listRef = useRef<FlatList<any>>(null);
   const indexRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const bleed = Math.max(0, (winW - sectionW) / 2);
+  const cardWidth = Math.round(sectionW - PEEK);
+  const STEP = cardWidth + CARD_GAP;
+  const padRight = Math.max(bleed, winW - cardWidth - bleed);
+
+  const handleSectionLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && Math.abs(w - sectionW) > 0.5) setSectionW(w);
+  };
 
   useEffect(() => {
     const loadCoupons = async () => {
@@ -254,9 +313,8 @@ const PublicCouponOffers: React.FC = () => {
         animated: true,
       });
     }, AUTO_SCROLL_MS);
-  }, [coupons.length, stopAutoScroll]);
+  }, [coupons.length, stopAutoScroll, STEP]);
 
-  // Coupons aate hi auto scroll start, modal khula ho to pause
   useEffect(() => {
     if (modalVisible) {
       stopAutoScroll();
@@ -302,7 +360,7 @@ const PublicCouponOffers: React.FC = () => {
   }
 
   return (
-    <View style={styles.section}>
+    <View style={styles.section} onLayout={handleSectionLayout}>
       {/* Section header */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
@@ -315,7 +373,6 @@ const PublicCouponOffers: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Horizontal auto-scrolling coupon carousel */}
       <FlatList
         ref={listRef}
         data={coupons}
@@ -323,12 +380,19 @@ const PublicCouponOffers: React.FC = () => {
         horizontal
         showsHorizontalScrollIndicator={false}
         snapToInterval={STEP}
+        snapToAlignment="start"
         decelerationRate="fast"
-        contentContainerStyle={styles.listContent}
+        style={{ marginHorizontal: -bleed }}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingLeft: bleed, paddingRight: padRight },
+        ]}
         ItemSeparatorComponent={() => <View style={{ width: CARD_GAP }} />}
         onScrollBeginDrag={stopAutoScroll}
         onMomentumScrollEnd={handleMomentumEnd}
-        renderItem={({ item }) => <CouponCard coupon={item} />}
+        renderItem={({ item }) => (
+          <CouponCard coupon={item} width={cardWidth} />
+        )}
       />
 
       {/* View All modal */}
@@ -337,37 +401,34 @@ const PublicCouponOffers: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setModalVisible(false)}
       >
-       <View style={styles.modalContainer}>
-  <View style={styles.modalHeader}>
-    {/* Left spacer: title ko exact center rakhne ke liye */}
-    <View style={styles.headerSide} />
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <View style={styles.headerSide} />
 
-    {/* Center title */}
-    <View style={styles.modalTitleWrap}>
-      <Text style={styles.modalTitle}>All Offers</Text>
-      <View style={styles.titleUnderline} />
-      <Text style={styles.modalSubtitle}>
-        {allLoading
-          ? 'Loading deals...'
-          : `${allCoupons.length} deals available`}
-      </Text>
-    </View>
+            <View style={styles.modalTitleWrap}>
+              <Text style={styles.modalTitle}>All Offers</Text>
+              <View style={styles.titleUnderline} />
+              <Text style={styles.modalSubtitle}>
+                {allLoading
+                  ? 'Loading deals...'
+                  : `${allCoupons.length} deals available`}
+              </Text>
+            </View>
 
-    {/* Right close button */}
-    <View style={[styles.headerSide, styles.headerSideRight]}>
-      <TouchableOpacity
-        onPress={() => setModalVisible(false)}
-        activeOpacity={0.7}
-        style={styles.closeBtn}
-      >
-        <Text style={styles.closeText}>✕</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
+            <View style={[styles.headerSide, styles.headerSideRight]}>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                activeOpacity={0.7}
+                style={styles.closeBtn}
+              >
+                <Text style={styles.closeText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {allLoading ? (
             <View style={styles.modalLoading}>
-              <ActivityIndicator size="large" color="#6B1E4F" />
+              <ActivityIndicator size="large" color={PLUM} />
             </View>
           ) : (
             <FlatList
@@ -396,8 +457,8 @@ const PublicCouponOffers: React.FC = () => {
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: 20,
-    marginBottom: 8,
+    marginTop: 24,
+    marginBottom: 14,
   },
 
   /* Header */
@@ -405,7 +466,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -415,7 +476,7 @@ const styles = StyleSheet.create({
     width: 5,
     height: 24,
     borderRadius: 3,
-    backgroundColor: '#6B1E4F',
+    backgroundColor: PLUM,
     marginRight: 10,
   },
   sectionTitle: {
@@ -427,166 +488,183 @@ const styles = StyleSheet.create({
   viewAll: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6B1E4F',
+    color: PLUM,
     paddingRight: 8,
   },
 
+  // vertical padding: notches clip na hon
   listContent: {
-    paddingRight: 8,
-    paddingVertical: 4,
+    paddingVertical: 12,
   },
 
-  /* Card */
+  /* Card (poora ticket ek color) */
   card: {
-    width: CARD_WIDTH,
-    height: 132,
+    height: CARD_HEIGHT,
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F3DCE8',
+    backgroundColor: TICKET_BG,
+    borderRadius: 14,
     overflow: 'visible',
     elevation: 2,
-    shadowColor: '#6B1E4F',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowColor: PLUM,
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
   cardFull: {
     width: '100%',
   },
 
-  /* Left (discount) */
-  left: {
+  /* Left stub */
+   left: {
     width: LEFT_WIDTH,
-    backgroundColor: '#6B1E4F',
-    borderTopLeftRadius: 15,
-    borderBottomLeftRadius: 15,
+    backgroundColor: STUB_BG,
+    borderTopLeftRadius: 14,
+    borderBottomLeftRadius: 14,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingLeft: 10,
+    paddingRight: 8,
   },
-  discountRs: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#E9C7DA',
-  },
-  discountBig: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    lineHeight: 34,
-  },
-  discountOff: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#D4A85A',
-    letterSpacing: 2,
-    marginTop: 2,
-  },
-
-  /* Ticket cut */
-  dividerWrap: {
-    width: 1,
+  barcode: {
+    width: 26,
+    height: 96,
+    marginLeft: 6,
+    flexDirection: 'column',
     justifyContent: 'center',
-  },
-  dashedClip: {
-    height: '78%',
-    width: 1,
     overflow: 'hidden',
   },
-  dashedLine: {
+  bar: {
+    width: '100%',
+    backgroundColor: STUB_BAR,
+    marginBottom: 1.5,
+  },
+  rotatedWrap: {
+    width: 30,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rotatedText: {
+    width: 100,
+    height: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    lineHeight: 30,
+     fontSize: 18,
+    fontWeight: '900',
+    color: STUB_PERCENT,
+    letterSpacing: 1,
+    transform: [{ rotate: '-90deg' }],
+  },
+  rotatedOff: {
+    color: STUB_OFF,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+
+  /* Ticket cut: dark dashed line */
+  dividerWrap: {
     width: 2,
-    height: '100%',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#E5C4D6',
+    marginVertical: 14,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dash: {
+    width: 1.5,
+    height: 4,
+    backgroundColor: INK,
+    borderRadius: 1,
   },
   notch: {
     position: 'absolute',
-    left: LEFT_WIDTH - 8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    left: LEFT_WIDTH - 6,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: PAGE_BG,
-    borderWidth: 1,
-    borderColor: '#F3DCE8',
   },
   notchTop: {
-    top: -9,
+    top: -7,
   },
   notchBottom: {
-    bottom: -9,
+    bottom: -7,
   },
 
   /* Right (details) */
   right: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingLeft: 14,
+    paddingRight: 12,
     justifyContent: 'space-between',
   },
   vendor: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2B1B26',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: INK,
+    letterSpacing: 0.2,
   },
-
+  // proper dark line (pehle white thi)
+  titleLine: {
+    height: 1.5,
+    backgroundColor: INK,
+    marginTop: 4,
+    marginBottom: 5,
+    width: '100%',
+    opacity: 0.85,
+  },
   vendorMeta: {
-  fontSize: 10.5,
-  color: '#8B7688',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '600',
+    color: '#3A2A35',
+  },
+ serviceCitiesRow: {
   marginTop: 2,
 },
-  useCodeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#8B7688',
-    letterSpacing: 1,
-  },
-  codeBox: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#6B1E4F',
-    backgroundColor: '#FBF2F8',
-    borderRadius: 8,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
-  },
-  codeText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#6B1E4F',
-    letterSpacing: 1,
-  },
+
+serviceCitiesLabel: {
+  fontSize: 9.5,
+  lineHeight: 12,
+  fontWeight: '700',
+  color: '#8B7688',
+  marginBottom: 1,
+},
+
+cities: {
+  fontSize: 11,
+  lineHeight: 15,
+  fontWeight: '600',
+  color: '#3A2A35',
+},
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  codeBox: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: INK,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    flexShrink: 1,
+  },
+  codeText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: PLUM,
+    letterSpacing: 1,
+  },
   validity: {
-    fontSize: 12,
-    color: '#8B7688',
-    flex: 1,
-    marginRight: 8,
-  },
-  copyBtn: {
-    backgroundColor: '#6B1E4F',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-  },
-  copyBtnDone: {
-    backgroundColor: '#E6F4EA',
-  },
-  copyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  copyTextDone: {
-    color: '#1E7B3A',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3A2A35',
+    marginLeft: 8,
   },
 
   loadingContainer: {
@@ -600,7 +678,7 @@ const styles = StyleSheet.create({
     paddingTop:
       Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 8,
   },
-   modalHeader: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -613,7 +691,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     elevation: 3,
-    shadowColor: '#6B1E4F',
+    shadowColor: PLUM,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
@@ -631,7 +709,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#6B1E4F',
+    color: PLUM,
     letterSpacing: 0.5,
     textAlign: 'center',
   },
@@ -661,11 +739,11 @@ const styles = StyleSheet.create({
   closeText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#6B1E4F',
+    color: PLUM,
   },
   modalList: {
     paddingHorizontal: 20,
-    paddingTop: 6,
+    paddingTop: 14,
     paddingBottom: 40,
   },
   modalLoading: {

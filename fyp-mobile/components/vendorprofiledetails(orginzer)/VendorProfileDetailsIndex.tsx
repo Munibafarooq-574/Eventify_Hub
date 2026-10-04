@@ -2332,13 +2332,14 @@ if (
         'All Packages';
 
       const discountLabel =
-        coupon.discountType === 'PERCENTAGE'
-          ? `${Number(
-              coupon.discountValue || 0,
-            )}% OFF`
-          : `Rs. ${Number(
-              coupon.discountValue || 0,
-            ).toLocaleString()} OFF`;
+  String(coupon.discountType).toLowerCase() ===
+  'percentage'
+    ? `${Number(
+        coupon.discountValue || 0,
+      )}% OFF`
+    : `Rs. ${Number(
+        coupon.discountValue || 0,
+      ).toLocaleString()} OFF`;
 
       const validUntil =
         coupon.endDate
