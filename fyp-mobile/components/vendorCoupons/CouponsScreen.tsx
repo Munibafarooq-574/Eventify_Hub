@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
 Linking,
+TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,8 +115,13 @@ const insets = useSafeAreaInsets();
   const [shareEntry, setShareEntry] =
   useState<VendorDiscount | null>(null);
 
-    const [notifyingId, setNotifyingId] =
+        const [notifyingId, setNotifyingId] =
       useState<string | null>(null);
+
+  const [emailModalEntry, setEmailModalEntry] =
+    useState<VendorDiscount | null>(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!vendorIdValue) {
@@ -219,32 +225,40 @@ const handleWhatsAppShare = async (entry: VendorDiscount) => {
 };
 
 
-const handleEmailShare = async (
-  entry: VendorDiscount,
-) => {
-  await Clipboard.setStringAsync(entry.code);
+const handleEmailShare = (entry: VendorDiscount) => {
+  setShareEntry(null);
+  setRecipientEmail('');
+  setEmailModalEntry(entry);
+};
 
-  const discount = discountSummary(entry);
+const handleSendDesignedEmail = async () => {
+  if (!emailModalEntry || !vendorIdValue) return;
 
-  const subject =
-    `${discount} on Eventify Hub`;
+  const email = recipientEmail.trim().toLowerCase();
 
-  const body =
-    `Use discount code: ${entry.code}\n` +
-    `Valid till ${formatDate(entry.endDate)}`;
-
-  const url =
-    `mailto:?subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    Alert.alert('Invalid email', 'Please enter a valid email address.');
+    return;
+  }
 
   try {
-    await Linking.openURL(url);
-    setShareEntry(null);
-  } catch {
-    Alert.alert(
-      'Could not open Email',
-      'The discount code has still been copied.',
+    setSendingEmail(true);
+
+    await axios.post(
+      `https://eventify-hub.onrender.com/vendor/growth/discount/discount-code/${emailModalEntry._id}/send-email?vendorId=${vendorIdValue}`,
+      { email },
     );
+
+    Alert.alert('Sent', `Offer email sent to ${email}`);
+    setEmailModalEntry(null);
+    setRecipientEmail('');
+  } catch (e: any) {
+    Alert.alert(
+      'Could not send email',
+      e?.response?.data?.message || e?.message || 'Something went wrong',
+    );
+  } finally {
+    setSendingEmail(false);
   }
 };
 
@@ -601,9 +615,54 @@ const Header = () => (
           Close
         </Text>
       </TouchableOpacity>
-    </View>
+        </View>
   </View>
 </Modal>
+
+      <Modal
+        visible={!!emailModalEntry}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEmailModalEntry(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.shareModal}>
+            <Text style={styles.shareModalTitle}>Send Offer Email</Text>
+
+            <Text style={styles.shareModalCode}>{emailModalEntry?.code}</Text>
+
+            <TextInput
+              style={styles.emailInput}
+              placeholder="Recipient email"
+              placeholderTextColor={COLORS.muted}
+              value={recipientEmail}
+              onChangeText={setRecipientEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TouchableOpacity
+              style={[styles.shareOption, styles.sendEmailButton]}
+              onPress={handleSendDesignedEmail}
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={[styles.shareOptionText, { color: '#fff' }]}>Send</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setEmailModalEntry(null)}
+            >
+              <Text style={styles.closeModalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -835,5 +894,21 @@ closeModalButtonText: {
   color: COLORS.muted,
   fontSize: 13,
   fontWeight: '600',
+},
+
+emailInput: {
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  borderRadius: 10,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  fontSize: 14,
+  color: COLORS.text,
+  backgroundColor: COLORS.background,
+  marginBottom: 12,
+},
+sendEmailButton: {
+  backgroundColor: COLORS.primary,
+  borderColor: COLORS.primary,
 },
 });

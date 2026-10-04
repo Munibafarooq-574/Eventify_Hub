@@ -179,87 +179,295 @@ export class ReviewsService {
     }
 
     async getTopVendorsByRating(limit = 5) {
-        const pipeline: PipelineStage[] = [
-            {
-    $match: {
-        $or: [
-            { status: ReviewModerationStatus.VISIBLE },
-            { status: { $exists: false } },
-        ],
-    },
-},
-            {
-                $group: {
-                    _id: '$vendorId',
-                    averageRating: { $avg: '$rating' },
-                    totalReviews: { $sum: 1 },
-                },
-            },
-            {
-                $sort: {
-                    averageRating: -1,
-                    totalReviews: -1,
-                },
-            },
+    const safeLimit = Math.min(
+        Math.max(Number(limit) || 5, 1),
+        20,
+    );
 
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'vendor',
-                },
+    const pipeline: PipelineStage[] = [
+        // Only public/visible reviews participate
+        {
+            $match: {
+                $or: [
+                    { status: ReviewModerationStatus.VISIBLE },
+                    { status: { $exists: false } },
+                ],
             },
-            {
-                $unwind: {
-                    path: '$vendor',
-                    preserveNullAndEmptyArrays: false,
-                },
+        },
+
+        // Review statistics per vendor
+        {
+            $group: {
+                _id: '$vendorId',
+                averageRating: { $avg: '$rating' },
+                totalReviews: { $sum: 1 },
             },
-            {
-                $match: {
-                    'vendor.role': 'Vendor',
-                },
-            },
-            {
-                $project: {
-                    _id: 0,
-                    vendorId: '$_id',
-                    averageRating: 1,
-                    totalReviews: 1,
-                    vendor: {
-                        _id: 1,
-                        name: 1,
-                        email: 1,
-                        role: 1,
-                        coverImage: 1,
-                        images: 1,
-                        packages: 1,
-                        contactDetails: 1,
-                        photographerBusinessDetails: 1,
-                        cateringBusinessDetails: 1,
+        },
+
+        // Get vendor's own VendorOrders
+        {
+            $lookup: {
+                from: 'vendororders',
+                let: { vendorId: '$_id' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ['$vendorId', '$$vendorId'],
+                            },
+                        },
                     },
+                    {
+                        $group: {
+                            _id: null,
+
+                            completedOrders: {
+                                $sum: {
+                                    $cond: [
+                                        { $eq: ['$status', 'completed'] },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+
+                            vendorCancelledOrders: {
+                                $sum: {
+                                    $cond: [
+                                        {
+                                            $eq: [
+                                                '$status',
+                                                'cancelled_by_vendor',
+                                            ],
+                                        },
+                                        1,
+                                        0,
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                ],
+                as: 'orderStats',
+            },
+        },
+
+        {
+            $addFields: {
+                completedOrders: {
+                    $ifNull: [
+                        { $arrayElemAt: ['$orderStats.completedOrders', 0] },
+                        0,
+                    ],
+                },
+
+                vendorCancelledOrders: {
+                    $ifNull: [
+                        {
+                            $arrayElemAt: [
+                                '$orderStats.vendorCancelledOrders',
+                                0,
+                            ],
+                        },
+                        0,
+                    ],
                 },
             },
-        ];
+        },
 
-        const rankedVendors = await this.reviewModel.aggregate(pipeline).exec();
+        // Same reliability concept already used by vendor analytics
+        {
+            $addFields: {
+                relevantBookings: {
+                    $add: [
+                        '$completedOrders',
+                        '$vendorCancelledOrders',
+                    ],
+                },
+            },
+        },
 
-const accessResults = await Promise.all(
-    rankedVendors.map(async (item) => ({
-        item,
-        eligible: await this.featureAccessService.hasActiveSubscription(
-            item.vendorId.toString(),
-        ),
-    })),
-);
+        {
+            $addFields: {
+                cancellationRate: {
+                    $cond: [
+                        { $gt: ['$relevantBookings', 0] },
+                        {
+                            $multiply: [
+                                {
+                                    $divide: [
+                                        '$vendorCancelledOrders',
+                                        '$relevantBookings',
+                                    ],
+                                },
+                                100,
+                            ],
+                        },
+                        0,
+                    ],
+                },
+            },
+        },
 
-return accessResults
-    .filter(({ eligible }) => eligible)
-    .slice(0, limit)
-    .map(({ item }) => item);
-    }
+        {
+            $addFields: {
+                reliabilityScore: {
+                    $max: [
+                        0,
+                        {
+                            $subtract: [
+                                100,
+                                {
+                                    $multiply: [
+                                        '$cancellationRate',
+                                        2,
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
 
+        // Final popularity score:
+        // rating 40 + reviews 20 + completed orders 25 + reliability 15
+        {
+            $addFields: {
+                popularityScore: {
+                    $add: [
+                        // Rating: max 40
+                        {
+                            $multiply: [
+                                {
+                                    $divide: [
+                                        '$averageRating',
+                                        5,
+                                    ],
+                                },
+                                40,
+                            ],
+                        },
+
+                        // Reviews: max 20, capped at 50 reviews
+                        {
+                            $multiply: [
+                                {
+                                    $divide: [
+                                        {
+                                            $min: [
+                                                '$totalReviews',
+                                                50,
+                                            ],
+                                        },
+                                        50,
+                                    ],
+                                },
+                                20,
+                            ],
+                        },
+
+                        // Completed orders: max 25, capped at 50
+                        {
+                            $multiply: [
+                                {
+                                    $divide: [
+                                        {
+                                            $min: [
+                                                '$completedOrders',
+                                                50,
+                                            ],
+                                        },
+                                        50,
+                                    ],
+                                },
+                                25,
+                            ],
+                        },
+
+                        // Reliability: max 15
+                        {
+                            $multiply: [
+                                {
+                                    $divide: [
+                                        '$reliabilityScore',
+                                        100,
+                                    ],
+                                },
+                                15,
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+
+        // Highest popularity first
+        {
+            $sort: {
+                popularityScore: -1,
+                averageRating: -1,
+                totalReviews: -1,
+                completedOrders: -1,
+            },
+        },
+
+        // Vendor details
+        {
+            $lookup: {
+                from: 'users',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'vendor',
+            },
+        },
+
+        {
+            $unwind: {
+                path: '$vendor',
+                preserveNullAndEmptyArrays: false,
+            },
+        },
+
+        {
+            $match: {
+                'vendor.role': 'Vendor',
+            },
+        },
+
+        {
+            $limit: safeLimit,
+        },
+
+        {
+            $project: {
+                _id: 0,
+
+                vendorId: '$_id',
+
+                averageRating: {
+                    $round: ['$averageRating', 1],
+                },
+
+                totalReviews: 1,
+
+                completedOrders: 1,
+
+                reliabilityScore: {
+                    $round: ['$reliabilityScore', 0],
+                },
+
+                popularityScore: {
+                    $round: ['$popularityScore', 1],
+                },
+
+                vendor: 1,
+            },
+        },
+    ];
+
+    return this.reviewModel.aggregate(pipeline).exec();
+}
     async getVendorReviewSummary(vendorId: string) {
         if (!Types.ObjectId.isValid(vendorId)) {
             throw new BadRequestException('Invalid vendorId');

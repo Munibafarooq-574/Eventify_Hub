@@ -29,6 +29,8 @@ export interface FeaturedVendorPublicEntry {
   rating: number | null;
   totalReviews: number;
   customerCount: number;
+  reliabilityScore: number;
+  featuredScore: number;
   featuredUntil: Date;
 }
 
@@ -40,9 +42,11 @@ export interface FeaturedPackagePublicEntry {
   packageId: string;
   packageName: string;
   price: number;
-  rating: number | null;        // NEW
-  totalReviews: number;         // NEW
-  orderCount: number;           // NEW
+  rating: number | null;
+  totalReviews: number;
+  orderCount: number;
+  reliabilityScore: number;
+  featuredScore: number;
 }
 
 interface FeaturedVendorDiscoveryContext {
@@ -79,6 +83,100 @@ private readonly vendorOrderModel: Model<VendorOrder>,
 private readonly featureAccessService: FeatureAccessService,
 private readonly availabilityService: VendorAvailabilityService,
 ) {}
+
+private async getFeaturedReliabilityScore(
+  vendorId: Types.ObjectId,
+): Promise<number> {
+  const [completed, cancelledByVendor] = await Promise.all([
+    this.vendorOrderModel.countDocuments({
+      vendorId,
+      status: 'completed',
+    }),
+
+    this.vendorOrderModel.countDocuments({
+      vendorId,
+      status: 'cancelled_by_vendor',
+    }),
+  ]);
+
+  const relevantBookings =
+    completed + cancelledByVendor;
+
+  if (relevantBookings <= 0) {
+    return 100;
+  }
+
+  const cancellationRate =
+    (cancelledByVendor / relevantBookings) * 100;
+
+  return Math.max(
+    0,
+    Math.round(
+      100 - cancellationRate * 2,
+    ),
+  );
+}
+
+private calculateFeaturedScore(params: {
+  rating: number | null;
+  totalReviews: number;
+  orderCount: number;
+  reliabilityScore: number;
+  promotionStartDate: Date;
+}): number {
+  const {
+    rating,
+    totalReviews,
+    orderCount,
+    reliabilityScore,
+    promotionStartDate,
+  } = params;
+
+  const ratingScore =
+    (Math.max(0, Math.min(Number(rating || 0), 5)) / 5) * 25;
+
+  const reviewScore =
+    (Math.min(Math.max(totalReviews, 0), 50) / 50) * 15;
+
+  const orderScore =
+    (Math.min(Math.max(orderCount, 0), 50) / 50) * 20;
+
+  const reliabilityPoints =
+    (Math.max(
+      0,
+      Math.min(reliabilityScore, 100),
+    ) /
+      100) *
+    20;
+
+  const ageMs =
+    Date.now() -
+    new Date(promotionStartDate).getTime();
+
+  const ageDays =
+    Math.max(
+      0,
+      ageMs / (1000 * 60 * 60 * 24),
+    );
+
+  const freshnessPercent =
+    Math.max(
+      0,
+      100 -
+        (Math.min(ageDays, 30) / 30) * 100,
+    );
+
+  const freshnessScore =
+    (freshnessPercent / 100) * 20;
+
+  return (
+    ratingScore +
+    reviewScore +
+    orderScore +
+    reliabilityPoints +
+    freshnessScore
+  );
+}
 
   // ---------------------------------------------------------------
   // Featured Vendor — vendor-facing
@@ -332,16 +430,17 @@ return this.promotionModel.create({
   // Customer-facing
   // Used by Home / Vendor Search / Package Discovery.
   // ---------------------------------------------------------------
-async getActiveFeaturedVendors(
-  limit = 10,
+
+  async getActiveFeaturedVendors(
+  limit = 5,
   context: FeaturedVendorDiscoveryContext = {},
 ): Promise<FeaturedVendorPublicEntry[]> {
   const now = new Date();
 
   const safeLimit = Math.min(
-    Math.max(Number(limit) || 10, 1),
-    20,
-  );
+  Math.max(Number(limit) || 5, 1),
+  50,
+);
 
   const eventCityId =
     context.eventCityId?.trim() || undefined;
@@ -507,6 +606,24 @@ const reviews = await this.reviewModel
         status: 'completed',
       });
 
+      const vendorObjectId =
+  new Types.ObjectId(vendorId);
+
+const reliabilityScore =
+  await this.getFeaturedReliabilityScore(
+    vendorObjectId,
+  );
+
+const featuredScore =
+  this.calculateFeaturedScore({
+    rating,
+    totalReviews,
+    orderCount: customerCount,
+    reliabilityScore,
+    promotionStartDate:
+      promotion.startDate as Date,
+  });
+
     results.push({
       promotionId: String(promotion._id),
       vendorId,
@@ -523,28 +640,58 @@ const reviews = await this.reviewModel
       rating,
       totalReviews,
       customerCount,
+      reliabilityScore,
+      featuredScore,
       featuredUntil: promotion.endDate as Date,
     });
-
-    // Limit AFTER mandatory entitlement/city/category eligibility.
-    if (results.length >= safeLimit) {
-      break;
-    }
   }
+  return results
+  .sort((a, b) => {
+    if (b.featuredScore !== a.featuredScore) {
+      return (
+        b.featuredScore -
+        a.featuredScore
+      );
+    }
 
-  return results;
+    if (
+      Number(b.rating || 0) !==
+      Number(a.rating || 0)
+    ) {
+      return (
+        Number(b.rating || 0) -
+        Number(a.rating || 0)
+      );
+    }
+
+    if (
+      b.totalReviews !==
+      a.totalReviews
+    ) {
+      return (
+        b.totalReviews -
+        a.totalReviews
+      );
+    }
+
+    return (
+      b.customerCount -
+      a.customerCount
+    );
+  })
+  .slice(0, safeLimit);
 }
 
 async getActiveFeaturedPackages(
-  limit = 20,
+  limit = 5,
   context: FeaturedPackageDiscoveryContext = {},
 ): Promise<FeaturedPackagePublicEntry[]> {
   const now = new Date();
 
   const safeLimit = Math.min(
-    Math.max(Number(limit) || 20, 1),
-    20,
-  );
+  Math.max(Number(limit) || 5, 1),
+  50,
+);
 
   const eventCityId =
     context.eventCityId?.trim() || undefined;
@@ -819,6 +966,38 @@ const ratingInfo =
     promotionPackageId,
   );
 
+  const packageOrderCount =
+  Number(
+    orderCountByPackage.get(
+      promotionPackageId,
+    ) || 0,
+  );
+
+const reliabilityScore =
+  await this.getFeaturedReliabilityScore(
+    new Types.ObjectId(vendorId),
+  );
+
+const packageRating =
+  ratingInfo
+    ? Number(ratingInfo.averageRating || 0)
+    : null;
+
+const packageTotalReviews =
+  ratingInfo
+    ? Number(ratingInfo.totalReviews || 0)
+    : 0;
+
+const featuredScore =
+  this.calculateFeaturedScore({
+    rating: packageRating,
+    totalReviews: packageTotalReviews,
+    orderCount: packageOrderCount,
+    reliabilityScore,
+    promotionStartDate:
+      promotion.startDate as Date,
+  });
+
     results.push({
       promotionId:
         promotion._id.toString(),
@@ -844,39 +1023,48 @@ const ratingInfo =
       price:
         Number(pkg.price || 0),
 
-      rating:
-        ratingInfo
-          ? Math.round(
-              Number(
-                ratingInfo.averageRating ||
-                  0,
-              ) * 10,
-            ) / 10
-          : null,
-
-      totalReviews:
-        ratingInfo
-          ? Number(
-              ratingInfo.totalReviews || 0,
-            )
-          : 0,
-
-      orderCount:
-        Number(
-          orderCountByPackage.get(
-            promotionPackageId,
-          ) || 0,
-        ),
+      rating: packageRating,
+      totalReviews: packageTotalReviews,
+      orderCount: packageOrderCount,
+      reliabilityScore,
+      featuredScore,
     });
-
-    // Limit only after entitlement +
-    // city + category + package eligibility.
-    if (results.length >= safeLimit) {
-      break;
-    }
   }
+return results
+  .sort((a, b) => {
+    if (b.featuredScore !== a.featuredScore) {
+      return (
+        b.featuredScore -
+        a.featuredScore
+      );
+    }
 
-  return results;
+    if (
+      Number(b.rating || 0) !==
+      Number(a.rating || 0)
+    ) {
+      return (
+        Number(b.rating || 0) -
+        Number(a.rating || 0)
+      );
+    }
+
+    if (
+      b.totalReviews !==
+      a.totalReviews
+    ) {
+      return (
+        b.totalReviews -
+        a.totalReviews
+      );
+    }
+
+    return (
+      b.orderCount -
+      a.orderCount
+    );
+  })
+  .slice(0, safeLimit);
 }
   // ---------------------------------------------------------------
   // Bulk lookups — Phase 9 DiscoveryService

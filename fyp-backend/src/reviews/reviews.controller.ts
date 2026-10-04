@@ -107,10 +107,18 @@ async uploadReviewMedia(
     }
 
     // GET /reviews/top-vendors
-    @Get('top-vendors')
-    async getTopVendors() {
-        return this.reviewsService.getTopVendorsByRating();
-    }
+  @Get('top-vendors')
+async getTopVendors(
+    @Query('limit') limit?: string,
+) {
+    const parsedLimit = Number(limit);
+
+    return this.reviewsService.getTopVendorsByRating(
+        Number.isFinite(parsedLimit) && parsedLimit > 0
+            ? parsedLimit
+            : 5,
+    );
+}
 
     // POST /reviews/:reviewId/reply
     @UseGuards(JwtAuthGuard)

@@ -81,7 +81,10 @@ export function buildDiscountOfferEmail(
 <html>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light only" />
+  <style>:root{color-scheme:light only;supported-color-schemes:light only;}</style>
 </head>
 
 <body style="margin:0;padding:0;background:#fafafa;font-family:Arial,Helvetica,sans-serif;color:${TEXT};">
@@ -96,7 +99,7 @@ export function buildDiscountOfferEmail(
 
           <!-- HEADER -->
           <tr>
-            <td style="background:${BRAND};padding:28px 32px 70px;color:#ffffff;">
+                        <td bgcolor="${BRAND}" style="background-color:${BRAND};background-image:linear-gradient(${BRAND},${BRAND});padding:28px 32px 70px;color:#ffffff;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td style="font-size:22px;font-weight:600;color:#ffffff;">
@@ -241,11 +244,13 @@ export function buildDiscountOfferEmail(
           <!-- CTA BUTTON -->
           <tr>
             <td style="padding:18px 22px 22px;">
-                            <div style="
-                display:block;background:${BRAND};color:#ffffff;
-                padding:22px 20px;border-radius:16px;text-align:center;
-                font-size:18px;font-weight:600;
-              ">Open the Eventify Hub app to claim this offer</div>
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" bgcolor="${BRAND}" style="background-color:${BRAND};background-image:linear-gradient(${BRAND},${BRAND});border-radius:16px;padding:22px 20px;color:#ffffff;font-size:18px;font-weight:600;">
+                    <span style="color:#ffffff;">Open the Eventify Hub app to claim this offer</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 

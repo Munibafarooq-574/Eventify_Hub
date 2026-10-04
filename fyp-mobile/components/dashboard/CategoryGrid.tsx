@@ -1,6 +1,5 @@
 import getAllCategories from '@/services/getAllCategories';
 import { saveSecureData } from '@/store';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -78,17 +77,16 @@ const CategoryGrid: React.FC = () => {
   }
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Vendor Categories</Text>
-          <View style={styles.titleAccent} />
+            <View style={styles.hdrRow}>
+        <View style={styles.hdrLeft}>
+          <View style={styles.hdrAccent} />
+          <Text style={styles.hdrTitle}>Vendor Categories</Text>
         </View>
+
         <TouchableOpacity
-          style={styles.seeAllButton}
           activeOpacity={0.7}
           onPress={() => { router.push("/vendorcategories") }}>
-          <Text style={styles.seeAll}>See all</Text>
-          <Ionicons name="chevron-forward" size={14} color={COLORS.primary} />
+          <Text style={styles.hdrViewAll}>View All</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -106,6 +104,35 @@ const CategoryGrid: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 22,
+  },
+    hdrRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  hdrLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hdrAccent: {
+    width: 5,
+    height: 24,
+    borderRadius: 3,
+    backgroundColor: '#6B1E4F',
+    marginRight: 10,
+  },
+  hdrTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#2B1B26',
+    letterSpacing: 0.3,
+  },
+  hdrViewAll: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B1E4F',
+    paddingRight: 8,
   },
   header: {
     flexDirection: 'row',
@@ -136,8 +163,8 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     marginRight: 2,
   },
-  row: {
-    paddingHorizontal: 16,
+    row: {
+    paddingRight: 16,
   },
   categoryItem: {
     alignItems: 'center',

@@ -21,8 +21,11 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -74,24 +77,12 @@ const CARD_WIDTH = 300;
 const CARD_MARGIN = 12;
 const ITEM_SIZE = CARD_WIDTH + CARD_MARGIN;
 
-/*
- * How long (ms) each ad stays centered on screen before the
- * carousel auto-advances to the next one.
- */
-const AUTO_SCROLL_INTERVAL_MS = 2000;
+const AUTO_SCROLL_INTERVAL_MS = 3000; // 3 sec
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-
-/*
- * Horizontal padding on both sides of the list so that a
- * CARD_WIDTH-wide card lands exactly in the horizontal center
- * of the screen when it is scrolled to. Falls back to a sane
- * minimum on very wide screens/tablets.
- */
-const SIDE_SPACING = Math.max(
-  (SCREEN_WIDTH - CARD_WIDTH) / 2,
-  16,
-);
+const SECTION_TITLE = "Promoted Picks";
+const MODAL_TITLE = "All Promotions";
+const PAGE_BG = "#FDF0F7";
+const ALL_LIMIT = 100; // View All mein max kitne campaigns
 
 const SponsoredForYou: React.FC = () => {
   const [campaigns, setCampaigns] = useState<
@@ -100,6 +91,10 @@ const SponsoredForYou: React.FC = () => {
 
   const [loading, setLoading] =
     useState<boolean>(true);
+
+ const [modalVisible, setModalVisible] = useState(false);
+const [allCampaigns, setAllCampaigns] = useState<SponsoredCampaign[]>([]);
+const [allLoading, setAllLoading] = useState(false);
 
   const flatListRef =
     useRef<FlatList<SponsoredCampaign> | null>(
@@ -190,6 +185,7 @@ const SponsoredForYou: React.FC = () => {
   useEffect(() => {
     loadCampaigns();
   }, [loadCampaigns]);
+
 
   /*
    * Record one impression for the whole current app session.
@@ -525,6 +521,14 @@ const SponsoredForYou: React.FC = () => {
     stopAutoScroll,
   ]);
 
+  useEffect(() => {
+  if (modalVisible) {
+    stopAutoScroll();
+  } else {
+    startAutoScroll();
+  }
+}, [modalVisible, startAutoScroll, stopAutoScroll]);
+
   /*
    * User has touched the list — pause auto-scroll so it
    * doesn't fight with their manual swipe.
@@ -612,39 +616,54 @@ const SponsoredForYou: React.FC = () => {
     [],
   );
 
-  const openCampaign = (
-    campaign: SponsoredCampaign,
-  ) => {
-    /*
-     * A click is independent from an impression.
-     * Do not await analytics because navigation should
-     * remain instant even if the API is slow.
-     *
-     * Debounce guards only the analytics call — navigation
-     * always happens on every tap, so the app never feels
-     * unresponsive even if a tap is skipped for counting.
-     */
-    if (shouldRecordClick(campaign._id)) {
-      recordCampaignClick(
-        campaign._id,
-      ).catch(() => {});
-    }
+ const openCampaign = (
+  campaign: SponsoredCampaign,
+  fromModal: boolean = false,
+) => {
+  if (fromModal) setModalVisible(false);
 
-    // Pause the carousel once the user is navigating away.
-    stopAutoScroll();
+  if (shouldRecordClick(campaign._id)) {
+    recordCampaignClick(campaign._id).catch(() => {});
+  }
 
-    router.push({
-      pathname: "/vendorprofiledetails",
-      params: {
-        id: campaign.vendorId,
-        openTab: "Packages",
-        packageId: campaign.packageId,
-        campaignId: campaign._id,
-        source: "sponsored",
-        bookingMode: "browse",
-      },
+  stopAutoScroll();
+
+  router.push({
+    pathname: "/vendorprofiledetails",
+    params: {
+      id: campaign.vendorId,
+      openTab: "Packages",
+      packageId: campaign.packageId,
+      campaignId: campaign._id,
+      source: "sponsored",
+      bookingMode: "browse",
+    },
+  });
+};
+
+const openViewAll = async () => {
+  stopAutoScroll();
+  setModalVisible(true);
+  setAllLoading(true);
+
+  try {
+    const { discoveryCityId, categoryIds } =
+      await getMarketplaceEventContext();
+
+    const result = await getSponsoredCampaigns({
+      eventCityId: discoveryCityId,
+      categoryIds,
+      limit: ALL_LIMIT,
     });
-  };
+
+    setAllCampaigns(Array.isArray(result) ? result : campaigns);
+  } catch (error) {
+    console.error("Failed to load all campaigns:", error);
+    setAllCampaigns(campaigns);
+  } finally {
+    setAllLoading(false);
+  }
+};
 
   /*
    * While loading, render nothing visible rather than a
@@ -673,220 +692,173 @@ const SponsoredForYou: React.FC = () => {
     return null;
   }
 
-  const renderCampaign = ({
-    item,
-  }: {
-    item: SponsoredCampaign;
-  }) => {
-    const packageName =
-      item.package?.packageName ||
-      "Package";
-
-    const price = Number(
-      item.package?.price || 0,
-    );
-
-    return (
-      <View
-        ref={(ref) => {
-          campaignCardRefs.current[
-            item._id
-          ] = ref;
-        }}
-        collapsable={false}
-        onLayout={() => {
-          /*
-           * onLayout confirms that the native card exists.
-           * Small delay lets its final window position settle.
-           */
-          setTimeout(() => {
-            checkCampaignVisibility(
-              item._id,
-            );
-          }, 100);
-        }}
-      >
-        <TouchableOpacity
-          style={styles.card}
-          activeOpacity={0.9}
-          onPress={() =>
-            openCampaign(item)
-          }
-        >
-          {/*
-            Image fills the whole card. Only small chips and
-            the translucent bottom panel sit on top of it, so
-            the picture itself stays visible.
-          */}
-          <View style={styles.imageWrapper}>
-            <Image
-              source={{
-                uri:
-                  item.image ||
-                  item.package
-                    ?.images?.[0],
-              }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-
-            {/*
-              Small, unobtrusive "Ad" tag — same idea as
-              Daraz/Amazon: it discloses that this is a
-              paid placement without shouting about it.
-            */}
-            <View style={styles.adTag}>
-              <Text
-                style={styles.adTagText}
-              >
-                Ad
-              </Text>
-            </View>
-
-            {!!item.offerLabel && (
-              <View
-                style={styles.offerBadge}
-              >
-                <Text
-                  style={styles.offerText}
-                  numberOfLines={1}
-                >
-                  {item.offerLabel}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/*
-            Details panel — translucent black over the bottom
-            of the image, so text stays readable while the
-            artwork still shows through.
-          */}
-          <View style={styles.details}>
-            {/*
-              A long campaign title is allowed to wrap onto a
-              second line before it gets truncated. The panel is
-              anchored to the bottom, so it simply grows upward.
-            */}
-            <Text
-              style={styles.title}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              {item.title}
-            </Text>
-
-            <View style={styles.metaRow}>
-              <Ionicons
-                name="storefront-outline"
-                size={11}
-                color="rgba(255,255,255,0.78)"
-              />
-
-              <Text
-                style={styles.vendorName}
-                numberOfLines={1}
-              >
-                {item.brandName ||
-                  item.vendorName}
-              </Text>
-            </View>
-
-            <View
-              style={styles.bottomRow}
-            >
-              <Text
-                style={styles.price}
-                numberOfLines={1}
-              >
-                {price > 0
-                  ? `Rs ${price.toLocaleString()}`
-                  : packageName}
-              </Text>
-
-              {/*
-                "View" is only a visual cue — the whole
-                card is one tap target, so analytics stay
-                exactly as before.
-              */}
-              <View
-                style={styles.viewButton}
-              >
-                <Text
-                  style={
-                    styles.viewButtonText
-                  }
-                >
-                  View
-                </Text>
-
-                <Ionicons
-                  name="chevron-forward"
-                  size={12}
-                  color="#FFFFFF"
-                />
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
+  const packageName = item.package?.packageName || "Package";
+  const price = Number(item.package?.price || 0);
 
   return (
-  <View style={styles.container}>
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>
-        Sponsored For You
-      </Text>
+    <TouchableOpacity
+      style={[styles.card, fullWidth && styles.cardFull]}
+      activeOpacity={0.9}
+      onPress={() => openCampaign(item, fullWidth)}
+    >
+      <View style={styles.imageWrapper}>
+        <Image
+          source={{ uri: item.image || item.package?.images?.[0] }}
+          style={styles.image}
+          resizeMode="cover"
+        />
 
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() =>
-          router.push("/sponsoredcampaigns")
-        }
-      >
-        <Text style={styles.viewAllText}>
-          View All
+        <View style={styles.adTag}>
+          <Text style={styles.adTagText}>Ad</Text>
+        </View>
+
+        {!!item.offerLabel && (
+          <View style={styles.offerBadge}>
+            <Text style={styles.offerText} numberOfLines={1}>
+              {item.offerLabel}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.details}>
+        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
+          {item.title}
         </Text>
+
+        <View style={styles.metaRow}>
+          <Ionicons
+            name="storefront-outline"
+            size={11}
+            color="rgba(255,255,255,0.78)"
+          />
+          <Text style={styles.vendorName} numberOfLines={1}>
+            {item.brandName || item.vendorName}
+          </Text>
+        </View>
+
+        <View style={styles.bottomRow}>
+          <Text style={styles.price} numberOfLines={1}>
+            {price > 0 ? `Rs ${price.toLocaleString()}` : packageName}
+          </Text>
+
+          <View style={styles.viewButton}>
+            <Text style={styles.viewButtonText}>View</Text>
+            <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const renderCampaign = ({ item }: { item: SponsoredCampaign }) => (
+  <View
+    ref={(ref) => {
+      campaignCardRefs.current[item._id] = ref;
+    }}
+    collapsable={false}
+    onLayout={() => {
+      setTimeout(() => {
+        checkCampaignVisibility(item._id);
+      }, 100);
+    }}
+  >
+    {renderCardBody(item, false)}
+  </View>
+);
+
+const renderModalCampaign = ({ item }: { item: SponsoredCampaign }) =>
+  renderCardBody(item, true);
+
+return (
+  <View style={styles.container}>
+    {/* Header: Special Offers jaisa */}
+    <View style={styles.sectionHeader}>
+      <View style={styles.headerLeft}>
+        <View style={styles.headerAccent} />
+        <Text style={styles.sectionTitle}>{SECTION_TITLE}</Text>
+      </View>
+
+      <TouchableOpacity activeOpacity={0.7} onPress={openViewAll}>
+        <Text style={styles.viewAllText}>View All</Text>
       </TouchableOpacity>
     </View>
 
     <FlatList
-        ref={flatListRef}
-        data={campaigns}
-        horizontal
-        keyExtractor={(item) =>
-          item._id
-        }
-        renderItem={renderCampaign}
-        showsHorizontalScrollIndicator={
-          false
-        }
-        contentContainerStyle={[
-          styles.list,
-          { paddingHorizontal: SIDE_SPACING },
-        ]}
-        snapToInterval={ITEM_SIZE}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        getItemLayout={(_, index) => ({
-          length: ITEM_SIZE,
-          offset: ITEM_SIZE * index,
-          index,
-        })}
-        onScrollBeginDrag={
-          handleScrollBeginDrag
-        }
-        onMomentumScrollEnd={
-          handleListScrollEnd
-        }
-        onScrollEndDrag={
-          handleListScrollEnd
-        }
-      />
-    </View>
-  );
+      ref={flatListRef}
+      data={campaigns}
+      horizontal
+      keyExtractor={(item) => item._id}
+      renderItem={renderCampaign}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.list}
+      snapToInterval={ITEM_SIZE}
+      snapToAlignment="start"
+      decelerationRate="fast"
+      getItemLayout={(_, index) => ({
+        length: ITEM_SIZE,
+        offset: ITEM_SIZE * index,
+        index,
+      })}
+      onScrollBeginDrag={handleScrollBeginDrag}
+      onMomentumScrollEnd={handleListScrollEnd}
+      onScrollEndDrag={handleListScrollEnd}
+    />
+
+    {/* View All: All Offers jaisi screen */}
+    <Modal
+      visible={modalVisible}
+      animationType="slide"
+      onRequestClose={() => setModalVisible(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <View style={styles.headerSide} />
+
+          <View style={styles.modalTitleWrap}>
+            <Text style={styles.modalTitle}>{MODAL_TITLE}</Text>
+            <View style={styles.titleUnderline} />
+            <Text style={styles.modalSubtitle}>
+              {allLoading
+                ? "Loading promotions..."
+                : `${allCampaigns.length} promotions available`}
+            </Text>
+          </View>
+
+          <View style={[styles.headerSide, styles.headerSideRight]}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.7}
+              style={styles.closeBtn}
+            >
+              <Text style={styles.closeText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {allLoading ? (
+          <View style={styles.modalLoading}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={allCampaigns}
+            keyExtractor={(item) => item._id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.modalList}
+            ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>No promotions available</Text>
+            }
+            renderItem={renderModalCampaign}
+          />
+        )}
+      </View>
+    </Modal>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -894,37 +866,138 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
 
-  loadingBanner: {
+    loadingBanner: {
     height: 200,
     borderRadius: 16,
     backgroundColor: COLORS.soft,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 16,
   },
 
   list: {
-    // paddingHorizontal is applied dynamically above
-    // (SIDE_SPACING) so each card centers on screen.
+    paddingVertical: 4,
   },
-sectionHeader: {
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: COLORS.textDark,
+    letterSpacing: 0.3,
+  },
+
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.primary,
+    paddingRight: 8,
+  },
+headerLeft: {
   flexDirection: "row",
   alignItems: "center",
-  justifyContent: "space-between",
+},
+headerAccent: {
+  width: 5,
+  height: 24,
+  borderRadius: 3,
+  backgroundColor: COLORS.primary,
+  marginRight: 10,
+},
+cardFull: {
+  width: "100%",
+  marginRight: 0,
+},
+
+/* View All modal */
+modalContainer: {
+  flex: 1,
+  backgroundColor: PAGE_BG,
+  paddingTop: Platform.OS === "ios" ? 54 : (StatusBar.currentHeight ?? 24) + 8,
+},
+modalHeader: {
+  flexDirection: "row",
+  alignItems: "center",
   paddingHorizontal: 16,
-  marginBottom: 10,
+  paddingTop: 6,
+  paddingBottom: 14,
+  marginBottom: 6,
+  backgroundColor: "#FFFFFF",
+  borderBottomWidth: 1,
+  borderBottomColor: "#F3DCE8",
+  borderBottomLeftRadius: 24,
+  borderBottomRightRadius: 24,
+  elevation: 3,
+  shadowColor: "#6B1E4F",
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 3 },
 },
-
-sectionTitle: {
-  fontSize: 17,
+headerSide: {
+  width: 44,
+},
+headerSideRight: {
+  alignItems: "flex-end",
+},
+modalTitleWrap: {
+  flex: 1,
+  alignItems: "center",
+},
+modalTitle: {
+  fontSize: 22,
   fontWeight: "800",
-  color: COLORS.textDark,
+  color: "#6B1E4F",
+  letterSpacing: 0.5,
+  textAlign: "center",
 },
-
-viewAllText: {
-  fontSize: 13,
+titleUnderline: {
+  width: 36,
+  height: 3,
+  borderRadius: 2,
+  backgroundColor: "#D4A85A",
+  marginTop: 4,
+},
+modalSubtitle: {
+  fontSize: 12,
+  color: "#8B7688",
+  marginTop: 4,
+  textAlign: "center",
+},
+closeBtn: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: "#FBF2F8",
+  borderWidth: 1,
+  borderColor: "#F3DCE8",
+  alignItems: "center",
+  justifyContent: "center",
+},
+closeText: {
+  fontSize: 16,
   fontWeight: "700",
-  color: COLORS.primary,
+  color: "#6B1E4F",
+},
+modalList: {
+  paddingHorizontal: 20,
+  paddingTop: 6,
+  paddingBottom: 40,
+},
+modalLoading: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+},
+emptyText: {
+  textAlign: "center",
+  color: "#8B7688",
+  marginTop: 40,
+  fontSize: 14,
 },
   card: {
     width: CARD_WIDTH,

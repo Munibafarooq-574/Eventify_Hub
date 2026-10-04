@@ -1,4 +1,4 @@
-import {FeaturedPackagesSection} from '@/components/VendorFeature/FeaturedPackagesSection';
+import {FeaturedPackagesSection} from '@/components/dashboard/FeaturedPackagesSection';
 
 export default function FeaturedPackagesSectionScreen() {
   return <FeaturedPackagesSection />;

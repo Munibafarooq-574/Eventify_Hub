@@ -412,7 +412,9 @@ const handleApplyDiscountCode = async (
       '',
   );
 
-  if (!vendorId || !packageId) {
+    if (!vendorId || !packageId) {
+    console.log('Apply blocked, ids missing:', { vendorId, packageId });
+    Alert.alert('Cannot apply code', 'Package information is missing.');
     return;
   }
 
@@ -519,14 +521,20 @@ try {
       position: 'bottom',
     });
   } catch (error: any) {
-    Toast.show({
-      type: 'error',
-      text1: 'Code Not Applied',
-      text2:
-        error?.response?.data?.message ||
-        'This discount code is not available for your account.',
-      position: 'bottom',
-    });
+       const status = error?.response?.status;
+    const backendMessage = error?.response?.data?.message;
+
+    const isInvalidCode = status === 404;
+
+        console.log('Apply code error:', status, backendMessage);
+
+    Alert.alert(
+      isInvalidCode ? 'Invalid Code' : 'Code Not Applied',
+      isInvalidCode
+        ? 'This discount code is invalid. Please check and try again.'
+        : backendMessage ||
+            'This discount code could not be applied.',
+    );
   } finally {
     setApplyingDiscountCodeKey(null);
   }

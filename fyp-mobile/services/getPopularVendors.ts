@@ -4,6 +4,9 @@ export interface TopVendor {
     vendorId: string;
     averageRating: number;
     totalReviews: number;
+    completedOrders: number;
+    reliabilityScore: number;
+    popularityScore: number;
     vendor: {
         _id: string;
         name: string;

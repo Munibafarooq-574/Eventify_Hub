@@ -1,11 +1,11 @@
 import getPopularVendors, { TopVendor } from '@/services/getPopularVendors';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import {
+import React, { useCallback, useEffect, useState } from 'react';import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -23,7 +23,6 @@ const COLORS = {
   border: '#F3DCE8',
 };
 
-// Reusable component
 const ItemList: React.FC<{
   title: string;
   data: TopVendor[];
@@ -32,9 +31,11 @@ const ItemList: React.FC<{
   onRetry: () => void;
 }> = ({ title, data, loading, error, onRetry }) => (
   <View style={styles.container}>
-    <View style={styles.headerRow}>
-      <Text style={styles.title}>{title}</Text>
-      <View style={styles.titleAccent} />
+        <View style={styles.hdrRow}>
+      <View style={styles.hdrLeft}>
+        <View style={styles.hdrAccent} />
+        <Text style={styles.hdrTitle}>{title}</Text>
+      </View>
     </View>
 
     {loading ? (
@@ -68,11 +69,16 @@ const ItemList: React.FC<{
   </View>
 );
 
-const ItemCard: React.FC<{ item: TopVendor }> = ({ item }) => (
+const ItemCard: React.FC<{
+  item: TopVendor;
+  fullWidth?: boolean;
+  onOpen?: () => void;
+}> = ({ item, fullWidth = false, onOpen }) => (
   <TouchableOpacity
-    style={styles.card}
+    style={[styles.card, fullWidth && styles.cardFull]}
     activeOpacity={0.85}
     onPress={() => {
+      onOpen?.();
       router.push(`/vendorprofiledetails?id=${item.vendorId}`);
     }}
   >
@@ -109,7 +115,6 @@ const App: React.FC = () => {
     setError(false);
     try {
       const data = await getPopularVendors(5);
-      // Handles whatever the backend returns: array, null, or empty.
       setVendors(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching popular vendors:', err);
@@ -124,15 +129,16 @@ const App: React.FC = () => {
     fetchVendors();
   }, [fetchVendors]);
 
+
   return (
     <View>
-      <ItemList
-        title="Popular Vendors"
-        data={vendors}
-        loading={loading}
-        error={error}
-        onRetry={fetchVendors}
-      />
+  <ItemList
+  title="Popular Vendors"
+  data={vendors}
+  loading={loading}
+  error={error}
+  onRetry={fetchVendors}
+/>
     </View>
   );
 };
@@ -142,6 +148,32 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 22,
   },
+    hdrRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  hdrLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hdrAccent: {
+    width: 5,
+    height: 24,
+    borderRadius: 3,
+    backgroundColor: '#6B1E4F',
+    marginRight: 10,
+  },
+  hdrTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#2B1B26',
+    letterSpacing: 0.3,
+  },
+ 
+  cardFull: { width: '100%', marginRight: 0 },
+  
   headerRow: {
     marginBottom: 12,
     alignSelf: 'flex-start',
