@@ -148,7 +148,7 @@ async getPublicDashboardCoupons(
     .limit(safeLimit * 3)
     .exec();
 
-  const usableCoupons: VendorDiscount[] = [];
+  const usableCoupons: any[] = [];
 
   for (const coupon of coupons) {
     const hasAccess =
@@ -157,10 +157,56 @@ async getPublicDashboardCoupons(
       );
 
     if (!hasAccess) {
-      continue;
-    }
+  continue;
+}
 
-    usableCoupons.push(coupon);
+const vendor = await this.userModel
+  .findOne({
+    _id: coupon.vendorId,
+    role: 'Vendor',
+  })
+  .select(
+    'name contactDetails buisnessCategory businessCityId city',
+  )
+  .populate('buisnessCategory', 'name')
+  .populate('businessCityId', 'name')
+  .lean();
+
+if (!vendor) {
+  continue;
+}
+
+const couponObject =
+  typeof (coupon as any).toObject === 'function'
+    ? (coupon as any).toObject()
+    : coupon;
+
+usableCoupons.push({
+  ...couponObject,
+
+  vendorId: {
+    _id: String((vendor as any)._id),
+
+    name:
+      (vendor as any).name ||
+      '',
+
+    brandName:
+      (vendor as any).contactDetails?.brandName ||
+      (vendor as any).name ||
+      '',
+
+    categoryName:
+      (vendor as any).buisnessCategory?.name ||
+      '',
+
+    city:
+      (vendor as any).businessCityId?.name ||
+      (vendor as any).city ||
+      (vendor as any).contactDetails?.city ||
+      '',
+  },
+});
 
     if (usableCoupons.length >= safeLimit) {
       break;

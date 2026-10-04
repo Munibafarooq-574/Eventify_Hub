@@ -24,9 +24,9 @@ const CARD_GAP = 12;
 const LEFT_WIDTH = 100;
 const STEP = CARD_WIDTH + CARD_GAP;
 
-const AUTO_SCROLL_MS = 5000; // har kitni der baad agla card (5 sec)
-const HOME_LIMIT = 10; // home par kitne coupons carousel mein
-const ALL_LIMIT = 300; // View All mein max kitne coupons
+const AUTO_SCROLL_MS = 5000; 
+const HOME_LIMIT = 10; 
+const ALL_LIMIT = 300; 
 
 const getValidTill = (coupon: any) =>
   coupon.endDate
@@ -38,8 +38,31 @@ const getValidTill = (coupon: any) =>
 
 const getVendorName = (coupon: any) => {
   const v = coupon.vendorId;
+
   if (!v || typeof v === 'string') return '';
-  return v.businessName || v.name || '';
+
+  return (
+    v.brandName ||
+    v.businessName ||
+    v.name ||
+    ''
+  );
+};
+
+const getVendorCategory = (coupon: any) => {
+  const v = coupon.vendorId;
+
+  if (!v || typeof v === 'string') return '';
+
+  return v.categoryName || '';
+};
+
+const getVendorLocation = (coupon: any) => {
+  const v = coupon.vendorId;
+
+  if (!v || typeof v === 'string') return '';
+
+  return v.city || '';
 };
 
 /* ---------- Single coupon card ---------- */
@@ -66,6 +89,8 @@ const CouponCard: React.FC<CouponCardProps> = ({
   const isPercentage = coupon.discountType === 'percentage';
   const validTill = getValidTill(coupon);
   const vendorName = getVendorName(coupon);
+const vendorCategory = getVendorCategory(coupon);
+const vendorLocation = getVendorLocation(coupon);
 
   const handleCopy = async () => {
     try {
@@ -76,23 +101,27 @@ const CouponCard: React.FC<CouponCardProps> = ({
     } catch (e) {
       console.error('Copy failed:', e);
     }
-  };
+  }
 
   const openVendor = () => {
-    if (!coupon.vendorId) return;
+  if (!coupon.vendorId) return;
 
-    onBeforeNavigate?.();
+  const vendorId =
+    typeof coupon.vendorId === 'string'
+      ? coupon.vendorId
+      : coupon.vendorId._id;
 
-    router.push({
-      pathname: '/vendorprofiledetails/[vendorId]',
-      params: {
-        vendorId:
-          typeof coupon.vendorId === 'string'
-            ? coupon.vendorId
-            : coupon.vendorId._id,
-      },
-    } as any);
-  };
+  if (!vendorId) return;
+
+  onBeforeNavigate?.();
+
+  router.push({
+    pathname: '/vendorprofiledetails',
+    params: {
+      id: vendorId,
+    },
+  });
+};
 
   return (
     <TouchableOpacity
@@ -124,13 +153,29 @@ const CouponCard: React.FC<CouponCardProps> = ({
 
       {/* Right: details */}
       <View style={styles.right}>
-        {!!vendorName && (
-          <Text style={styles.vendor} numberOfLines={1}>
-            {vendorName}
-          </Text>
-        )}
+        <View>
+  {!!vendorName && (
+    <Text
+      style={styles.vendor}
+      numberOfLines={1}
+    >
+      {vendorName}
+    </Text>
+  )}
 
-        <Text style={styles.useCodeLabel}>USE CODE</Text>
+  {(vendorCategory || vendorLocation) && (
+    <Text
+      style={styles.vendorMeta}
+      numberOfLines={1}
+    >
+      {[vendorCategory, vendorLocation]
+        .filter(Boolean)
+        .join(' • ')}
+    </Text>
+  )}
+</View>
+
+<Text style={styles.useCodeLabel}>USE CODE</Text>
 
         <View style={styles.codeBox}>
           <Text style={styles.codeText} numberOfLines={1}>
@@ -486,6 +531,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2B1B26',
   },
+
+  vendorMeta: {
+  fontSize: 10.5,
+  color: '#8B7688',
+  marginTop: 2,
+},
   useCodeLabel: {
     fontSize: 10,
     fontWeight: '700',
