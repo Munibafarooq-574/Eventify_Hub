@@ -776,6 +776,11 @@ export class Package {
   @Prop({ required: false, min: 0 })
   price?: number;
 
+  // Phase 12: package can be disabled without deleting booking history.
+  // Missing legacy value is treated as active by final booking validation.
+  @Prop({ type: Boolean, default: true })
+  isActive: boolean;
+
      @Prop({ required: true })
   services: string;
 
@@ -996,6 +1001,9 @@ genericBusinessDetails?: GenericBusinessDetails;
 
 @Prop({ type: [PackageSchema], default: [] })
 packages: Package[];
+
+@Prop({ type: Number, default: 0 })
+bookingConcurrencyVersion: number;
 
     @Prop({
     type: VendorAvailabilitySettingsSchema,
