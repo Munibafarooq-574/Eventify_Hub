@@ -13,12 +13,24 @@ export interface ServiceItem {
   serviceName: string;
   price: number;
   packageId: string;
+  durationMinutes?: number;
+  quantity?: number;
+  requiredServiceWindow?: {
+    startDateTime: string;
+    endDateTime: string;
+  } | null;
+  promotion?: {
+    promotionId: string;
+    promotionType: "COUPON" | "DISCOUNT_CODE";
+    promotionCode: string;
+  };
 }
 /**
  * Place order payload
  */
 export interface PlaceOrderPayload {
   organizerId: string;
+  eventId: string;
   eventDate: string;
   eventTime: string;
   services: ServiceItem[];
@@ -29,6 +41,7 @@ export interface PlaceOrderPayload {
 
   eventCityId: string;
   eventAddress: string;
+  selectedCategoryIds?: string[];
 }
 
 /**
@@ -141,6 +154,7 @@ if (!orderData.eventAddress?.trim()) {
 
     data: {
       organizerId: orderData.organizerId,
+      eventId: orderData.eventId,
 
       eventDate: orderData.eventDate,
 
@@ -166,11 +180,19 @@ if (!orderData.eventAddress?.trim()) {
           }
         : {}),
 
+      selectedCategoryIds:
+        orderData.selectedCategoryIds ?? [],
+
       services: orderData.services.map((service) => ({
         vendorId: service.vendorId,
         serviceName: service.serviceName,
         price: Number(service.price),
         packageId: service.packageId,
+        durationMinutes: service.durationMinutes,
+        quantity: service.quantity,
+        requiredServiceWindow:
+          service.requiredServiceWindow,
+        promotion: service.promotion,
       })),
     },
   };
