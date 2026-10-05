@@ -1256,46 +1256,51 @@ export class OrderService {
         .lean()
         .exec();
 
-        if (type === 'Vendor') {
-        // Fetch the vendor's own down payment config once (reused field,
-        // no duplicate). Only needed for the vendor's own request list.
-        const vendorUser = await this.userModel.findById(userId).lean();
-        const downPaymentConfig = this.getDownPaymentConfig(vendorUser);
+       if (type === 'Vendor') {
+    return orders.map((order: any) => {
+        order.vendorOrders = (order.vendorOrders || [])
+            .filter((vo: any) => {
+                const vendorIdOnItem =
+                    vo.vendorId?._id ?? vo.vendorId;
 
-        return orders.map((order: any) => {
-            order.vendorOrders = (order.vendorOrders || [])
-                .filter((vo: any) => {
-                    const vendorIdOnItem = vo.vendorId?._id ?? vo.vendorId;
-                    return vendorIdOnItem?.toString() === userId;
-                })
-                .map((vo: any) => {
-                    if (!downPaymentConfig) {
-                        return vo;
-                    }
-
-                    const bookingAmount =
+                return (
+                    vendorIdOnItem?.toString() === userId
+                );
+            })
+            .map((vo: any) => {
+                const bookingAmount =
                     vo.finalAmount ?? vo.price;
 
-                const downPaymentAmount =
-                    downPaymentConfig.type === 'PERCENTAGE'
-                        ? Math.round(
-                            (bookingAmount * downPaymentConfig.value) / 100,
-                        )
-                        : downPaymentConfig.value;
+                return {
+                    ...vo,
 
-                    return {
-                        ...vo,
-                        downPaymentType: downPaymentConfig.type,
-                        downPaymentPercentage:
-                            downPaymentConfig.type === 'PERCENTAGE' ? downPaymentConfig.value : null,
-                        downPaymentAmount,
-                        remainingAmount: vo.price - downPaymentAmount,
-                    };
-                });
+                    // IMPORTANT:
+                    // Use frozen booking snapshot only.
+                    // Do not recalculate from vendor's current settings.
+                    downPaymentType:
+                        vo.downPaymentType ?? null,
 
-            return order;
-        });
-    }
+                    downPaymentPercentage:
+                        vo.downPaymentPercentage ?? null,
+
+                    downPaymentAmount:
+                        vo.downPaymentAmount ?? null,
+
+                    remainingAmount:
+                        vo.remainingAmount ??
+                        Math.max(
+                            bookingAmount -
+                                Number(
+                                    vo.downPaymentAmount ?? 0,
+                                ),
+                            0,
+                        ),
+                };
+            });
+
+        return order;
+    });
+}
 
     return orders;
 }
@@ -1565,17 +1570,68 @@ async getOrderStats(type: string, userId: string) {
         .findById(vendorOrder.vendorId)
         .lean();
 
-    const downPaymentConfig = this.getDownPaymentConfig(vendorUser);
-    const bookingAmount =
-    vendorOrder.finalAmount ?? vendorOrder.price;
+    const downPaymentConfig =
+    this.getDownPaymentConfig(vendorUser);
 
-    if (downPaymentConfig) {
-        const downPaymentAmount =
-            downPaymentConfig.type === 'PERCENTAGE'
-                ? Math.round(
-                    (bookingAmount * downPaymentConfig.value) / 100,
-                )
-                : downPaymentConfig.value;
+const bookingAmount =
+    Number(
+        vendorOrder.finalAmount ??
+        vendorOrder.price,
+    );
+
+if (
+    !Number.isFinite(bookingAmount) ||
+    bookingAmount < 0
+) {
+    throw new BadRequestException(
+        'Booking amount is invalid',
+    );
+}
+
+if (downPaymentConfig) {
+        const configValue =
+    Number(downPaymentConfig.value);
+
+if (
+    !Number.isFinite(configValue) ||
+    configValue < 0
+) {
+    throw new BadRequestException(
+        'Vendor down payment configuration is invalid',
+    );
+}
+
+if (
+    downPaymentConfig.type ===
+        'PERCENTAGE' &&
+    (
+        configValue <= 0 ||
+        configValue > 100
+    )
+) {
+   throw new BadRequestException(
+    'Vendor down payment percentage must be greater than 0 and cannot exceed 100',
+);
+}
+
+const downPaymentAmount =
+    downPaymentConfig.type ===
+    'PERCENTAGE'
+        ? Math.round(
+              (bookingAmount *
+                  configValue) /
+                  100,
+          )
+        : configValue;
+
+if (
+    downPaymentAmount < 0 ||
+    downPaymentAmount > bookingAmount
+) {
+    throw new BadRequestException(
+        'Calculated down payment is invalid',
+    );
+}
 
         vendorOrder.downPaymentType = downPaymentConfig.type;
 
@@ -1583,10 +1639,25 @@ async getOrderStats(type: string, userId: string) {
             downPaymentConfig.type === 'PERCENTAGE'
                 ? downPaymentConfig.value
                 : null;
+vendorOrder.downPaymentAmount =
+    downPaymentAmount;
 
-        vendorOrder.downPaymentAmount = downPaymentAmount;
+vendorOrder.remainingAmount =
+    Math.max(
+        bookingAmount -
+            downPaymentAmount,
+        0,
+    );
 
-        vendorOrder.remainingAmount = bookingAmount - downPaymentAmount;
+if (downPaymentAmount === 0) {
+    // Vendor requires no advance.
+    // Booking is secured immediately and full amount
+    // becomes remaining payment after completion.
+    vendorOrder.paymentStatus =
+        'PARTIALLY_PAID';
+
+    vendorOrder.paymentDeadline = null;
+}
     } else {
         // No down payment configured:
         // full booking price is treated as the required payment.
@@ -1596,8 +1667,13 @@ async getOrderStats(type: string, userId: string) {
         vendorOrder.remainingAmount = 0;
     }
 
-    vendorOrder.paymentStatus = 'PAYMENT_REQUIRED';
-    vendorOrder.paymentDeadline = vendorOrder.holdExpiresAt;
+    if (downPaymentConfig?.value !== 0) {
+    vendorOrder.paymentStatus =
+        'PAYMENT_REQUIRED';
+
+    vendorOrder.paymentDeadline =
+        vendorOrder.holdExpiresAt;
+}
 
     // ===== Phase 13: commission snapshot =====
 // Current platform commission is 0%, so vendor receives 100%.
@@ -1678,10 +1754,18 @@ vendorOrder.vendorNetAmount =
     const now = new Date();
 
     const stale = await this.vendorOrderModel.find({
-        status: 'accepted',
-        holdExpiresAt: { $ne: null, $lt: now },
-        paymentStatus: { $ne: 'PAID' },
-    });
+    status: 'accepted',
+    holdExpiresAt: { $ne: null, $lt: now },
+
+    // Only bookings whose required down payment
+    // has NOT been successfully paid may expire.
+    paymentStatus: {
+        $in: [
+            'PAYMENT_REQUIRED',
+            'PAYMENT_FAILED',
+        ],
+    },
+});
 
     for (const vendorOrder of stale) {
         vendorOrder.status = 'expired';

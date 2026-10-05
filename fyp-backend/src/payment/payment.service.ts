@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
 import { Payment } from 'src/schemas/payment.schema';
 import { PaymentBreakdown } from './payment.types';
+import { PayoutService } from 'src/payout/payout.service';
 
 @Injectable()
 export class PaymentService {
@@ -22,12 +24,41 @@ export class PaymentService {
 
         @InjectModel(Payment.name)
         private readonly paymentModel: Model<Payment>,
+
+        private readonly payoutService: PayoutService,
     ) {}
+
+    private async assertOrganizerOwnsVendorOrder(
+    vendorOrderId: string,
+    organizerId: string,
+) {
+    const order = await this.orderModel.findOne({
+        vendorOrders: vendorOrderId,
+    });
+
+    if (!order) {
+        throw new NotFoundException(
+            'Parent order not found',
+        );
+    }
+
+    if (
+        order.organizerId.toString() !==
+        organizerId
+    ) {
+        throw new ForbiddenException(
+            'You do not own this booking.',
+        );
+    }
+
+    return order;
+}
 
     // ===== Read-only status / breakdown, used by mobile UI =====
     async getPaymentStatus(
-        vendorOrderId: string,
-    ): Promise<PaymentBreakdown> {
+    vendorOrderId: string,
+    organizerId: string,
+): Promise<PaymentBreakdown> {
         const vendorOrder =
             await this.vendorOrderModel.findById(vendorOrderId);
 
@@ -35,34 +66,86 @@ export class PaymentService {
             throw new NotFoundException('Vendor order not found');
         }
 
-        return {
-            vendorOrderId,
-            totalAmount: vendorOrder.price,
-            downPaymentType:
-                vendorOrder.downPaymentType || 'PERCENTAGE',
-            downPaymentPercentage:
-                vendorOrder.downPaymentPercentage ?? null,
-            downPaymentAmount:
-                vendorOrder.downPaymentAmount ?? 0,
-            remainingAmount:
-                vendorOrder.remainingAmount ?? vendorOrder.price,
-            paymentStatus: vendorOrder.paymentStatus,
-            paymentDeadline:
-                vendorOrder.paymentDeadline ?? null,
-        };
+await this.assertOrganizerOwnsVendorOrder(
+    vendorOrderId,
+    organizerId,
+);
+        const bookingAmount =
+    vendorOrder.finalAmount ??
+    vendorOrder.price;
+
+const successfulPayments =
+    await this.paymentModel
+        .find({
+            vendorOrderId: vendorOrder._id,
+            status: 'SUCCESS',
+        })
+        .lean();
+
+const paidAmount =
+    successfulPayments.reduce(
+        (sum, payment) =>
+            sum + Number(payment.amount || 0),
+        0,
+    );
+
+const outstandingAmount = Math.max(
+    bookingAmount - paidAmount,
+    0,
+);
+
+return {
+    vendorOrderId,
+    totalAmount: bookingAmount,
+
+    downPaymentType:
+        vendorOrder.downPaymentType ?? null,
+
+    downPaymentPercentage:
+        vendorOrder.downPaymentPercentage ?? null,
+
+    downPaymentAmount:
+        vendorOrder.downPaymentAmount ?? 0,
+
+    remainingAmount:
+        vendorOrder.remainingAmount ??
+        Math.max(
+            bookingAmount -
+                Number(
+                    vendorOrder.downPaymentAmount ?? 0,
+                ),
+            0,
+        ),
+
+    paidAmount,
+    outstandingAmount,
+
+    paymentStatus:
+        vendorOrder.paymentStatus,
+
+    paymentDeadline:
+        vendorOrder.paymentDeadline ?? null,
+};
     }
 
     // ===== Organizer initiates the down payment =====
     async initiatePayment(
-        vendorOrderId: string,
-        method: string,
-    ) {
+    vendorOrderId: string,
+    method: string,
+    organizerId: string,
+) {
         const vendorOrder =
             await this.vendorOrderModel.findById(vendorOrderId);
 
         if (!vendorOrder) {
             throw new NotFoundException('Vendor order not found');
         }
+
+        const order =
+    await this.assertOrganizerOwnsVendorOrder(
+        vendorOrderId,
+        organizerId,
+    );
 
         if (vendorOrder.paymentStatus === 'PAID') {
             throw new ConflictException(
@@ -91,11 +174,40 @@ export class PaymentService {
             );
         }
 
-        if (vendorOrder.downPaymentAmount == null) {
-            throw new BadRequestException(
-                'Down payment amount not calculated for this booking yet.',
-            );
-        }
+        const bookingAmount =
+    Number(
+        vendorOrder.finalAmount ??
+        vendorOrder.price,
+    )
+    if (vendorOrder.downPaymentAmount == null) {
+    throw new BadRequestException(
+        'Down payment amount not calculated for this booking yet.',
+    );
+}
+const requiredDownPayment =
+    Number(
+        vendorOrder.downPaymentAmount,
+    );
+
+    
+if (
+    !Number.isFinite(bookingAmount) ||
+    bookingAmount < 0
+) {
+    throw new BadRequestException(
+        'Booking amount is invalid.',
+    );
+}
+
+if (
+    !Number.isFinite(requiredDownPayment) ||
+    requiredDownPayment < 0 ||
+    requiredDownPayment > bookingAmount
+) {
+    throw new BadRequestException(
+        'Down payment amount is invalid for this booking.',
+    );
+}
 
         // Prevent duplicate pending down-payment transactions
         const existingPendingPayment =
@@ -125,20 +237,12 @@ export class PaymentService {
             );
         }
 
-        const order = await this.orderModel.findOne({
-            vendorOrders: vendorOrder._id,
-        });
-
-        if (!order) {
-            throw new NotFoundException('Parent order not found');
-        }
-
         const payment = await this.paymentModel.create({
             vendorOrderId: vendorOrder._id,
             orderId: order._id,
             organizerId: order.organizerId,
             vendorId: vendorOrder.vendorId,
-            amount: vendorOrder.downPaymentAmount,
+            amount: requiredDownPayment,
             type: 'DOWN_PAYMENT',
             status: 'PENDING',
             method,
@@ -200,19 +304,46 @@ export class PaymentService {
                 0,
             );
 
-        if (paidSoFar >= vendorOrder.price) {
-            vendorOrder.paymentStatus = 'PAID';
-        } else if (paidSoFar > 0) {
-            vendorOrder.paymentStatus =
-                'PARTIALLY_PAID';
-        } else {
-            vendorOrder.paymentStatus =
-                'PAYMENT_REQUIRED';
-        }
+        const bookingAmount =
+    vendorOrder.finalAmount ??
+    vendorOrder.price;
 
-        await vendorOrder.save();
+if (paidSoFar >= bookingAmount) {
+    vendorOrder.paymentStatus = 'PAID';
+} else if (paidSoFar > 0) {
+    vendorOrder.paymentStatus =
+        'PARTIALLY_PAID';
+} else {
+    vendorOrder.paymentStatus =
+        'PAYMENT_REQUIRED';
+}
 
-        return payment;
+vendorOrder.remainingAmount = Math.max(
+    bookingAmount - paidSoFar,
+    0,
+);
+
+       await vendorOrder.save();
+
+if (
+    vendorOrder.status === 'completed' &&
+    vendorOrder.paymentStatus === 'PAID'
+) {
+    try {
+        await this.payoutService.createPayoutIfEligible(
+            vendorOrder._id.toString(),
+        );
+    } catch (error) {
+        console.log(
+            'Payout not created yet:',
+            error instanceof Error
+                ? error.message
+                : error,
+        );
+    }
+}
+
+return payment;
     }
 
     // ===== Called by gateway webhook (or manually for now) on failure =====
@@ -261,7 +392,11 @@ export class PaymentService {
                     0,
                 );
 
-            if (paidSoFar >= vendorOrder.price) {
+            const bookingAmount =
+                vendorOrder.finalAmount ??
+                vendorOrder.price;
+
+            if (paidSoFar >= bookingAmount) {
                 vendorOrder.paymentStatus = 'PAID';
             } else if (paidSoFar > 0) {
                 vendorOrder.paymentStatus =
@@ -271,6 +406,11 @@ export class PaymentService {
                     'PAYMENT_FAILED';
             }
 
+            vendorOrder.remainingAmount = Math.max(
+                bookingAmount - paidSoFar,
+                0,
+            );
+
             await vendorOrder.save();
         }
 
@@ -278,10 +418,11 @@ export class PaymentService {
     }
 
     // ===== Pay the remaining balance =====
-    async initiateRemainingPayment(
-        vendorOrderId: string,
-        method: string,
-    ) {
+   async initiateRemainingPayment(
+    vendorOrderId: string,
+    method: string,
+    organizerId: string,
+) {
         const vendorOrder =
             await this.vendorOrderModel.findById(
                 vendorOrderId,
@@ -291,7 +432,15 @@ export class PaymentService {
             throw new NotFoundException(
                 'Vendor order not found',
             );
+
+            
         }
+
+        const order =
+    await this.assertOrganizerOwnsVendorOrder(
+        vendorOrderId,
+        organizerId,
+    );
 
         if (
             vendorOrder.paymentStatus !==
@@ -302,14 +451,44 @@ export class PaymentService {
             );
         }
 
-        const remaining =
-            vendorOrder.remainingAmount ?? 0;
+        if (vendorOrder.status !== 'completed') {
+    throw new ConflictException(
+        'Remaining payment becomes due only after the service is completed.',
+    );
+}
 
-        if (remaining <= 0) {
-            throw new ConflictException(
-                'No remaining amount is due for this booking.',
-            );
-        }
+        const bookingAmount =
+    vendorOrder.finalAmount ??
+    vendorOrder.price;
+
+const successfulPayments =
+    await this.paymentModel
+        .find({
+            vendorOrderId: vendorOrder._id,
+            status: 'SUCCESS',
+        })
+        .lean();
+
+const paidSoFar =
+    successfulPayments.reduce(
+        (sum, payment) =>
+            sum + Number(payment.amount || 0),
+        0,
+    );
+
+    const remaining = Math.max(
+        bookingAmount - paidSoFar,
+        0,
+    );
+
+    if (remaining <= 0) {
+        throw new ConflictException(
+            'No remaining amount is due for this booking.',
+        );
+    }
+
+    vendorOrder.remainingAmount = remaining;
+    await vendorOrder.save();
 
         // Prevent duplicate successful remaining payment
         const existingSuccess =
@@ -339,16 +518,6 @@ export class PaymentService {
             );
         }
 
-        const order =
-            await this.orderModel.findOne({
-                vendorOrders: vendorOrder._id,
-            });
-
-        if (!order) {
-            throw new NotFoundException(
-                'Parent order not found',
-            );
-        }
 
         const payment =
             await this.paymentModel.create({
@@ -371,8 +540,9 @@ export class PaymentService {
 
     // ===== Booking financial summary =====
     async getBookingFinancials(
-        vendorOrderId: string,
-    ) {
+    vendorOrderId: string,
+    organizerId: string,
+) {
         const vendorOrder =
             await this.vendorOrderModel.findById(
                 vendorOrderId,
@@ -383,6 +553,10 @@ export class PaymentService {
                 'Vendor order not found',
             );
         }
+        await this.assertOrganizerOwnsVendorOrder(
+            vendorOrderId,
+            organizerId,
+        );
 
         const payments =
             await this.paymentModel
@@ -401,14 +575,18 @@ export class PaymentService {
                 0,
             );
 
+        const bookingAmount =
+    vendorOrder.finalAmount ??
+    vendorOrder.price;
+
         const outstandingAmount = Math.max(
-            vendorOrder.price - paidSoFar,
+            bookingAmount - paidSoFar,
             0,
         );
 
         return {
             vendorOrderId,
-            totalAmount: vendorOrder.price,
+            totalAmount: bookingAmount,
             downPaymentType:
                 vendorOrder.downPaymentType ??
                 null,
@@ -422,7 +600,7 @@ export class PaymentService {
             paidSoFar,
             outstandingAmount,
             fullyPaid:
-                paidSoFar >= vendorOrder.price,
+            paidSoFar >= bookingAmount,
             paymentStatus:
                 vendorOrder.paymentStatus,
             paymentDeadline:
@@ -431,13 +609,15 @@ export class PaymentService {
     }
 
     // ===== Retry failed down payment =====
-    async retryPayment(
-        vendorOrderId: string,
-        method: string,
-    ) {
-        return this.initiatePayment(
-            vendorOrderId,
-            method,
-        );
-    }
+        async retryPayment(
+            vendorOrderId: string,
+            method: string,
+            organizerId: string,
+        ) {
+            return this.initiatePayment(
+                vendorOrderId,
+                method,
+                organizerId,
+            );
+        }
 }

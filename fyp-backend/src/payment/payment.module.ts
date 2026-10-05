@@ -6,15 +6,19 @@ import { Order, OrderSchema } from 'src/schemas/order.schema';
 import { Payment, PaymentSchema } from 'src/schemas/payment.schema';
 import { PaymentService } from './payment.service';
 import { PaymentController } from './payment.controller';
+import { PayoutModule } from 'src/payout/payout.module';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
     imports: [
-        MongooseModule.forFeature([
-            { name: VendorOrder.name, schema: VendorOrderSchema },
-            { name: Order.name, schema: OrderSchema },
-            { name: Payment.name, schema: PaymentSchema },
-        ]),
-    ],
+    MongooseModule.forFeature([
+        { name: VendorOrder.name, schema: VendorOrderSchema },
+        { name: Order.name, schema: OrderSchema },
+        { name: Payment.name, schema: PaymentSchema },
+    ]),
+    PayoutModule,
+    AuthModule,
+],
     controllers: [PaymentController],
     providers: [PaymentService],
     exports: [PaymentService],
