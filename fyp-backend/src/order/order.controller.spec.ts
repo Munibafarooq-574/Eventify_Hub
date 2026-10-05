@@ -35,8 +35,16 @@ describe('OrderController - Unit Tests', () => {
   });
 
   it('should place an order', async () => {
+    const req = {
+      user: {
+        id: validObjectId,
+        role: 'Client',
+      },
+    };
+
     const body = {
   organizerId: validObjectId,
+  eventId: 'event-test-1',
   eventDate: '2026-12-01',
   eventTime: '18:00',
   eventName: 'Wedding',
@@ -52,7 +60,7 @@ describe('OrderController - Unit Tests', () => {
     },
   ],
 };
-    const result = await controller.placeOrder(body);
+    const result = await controller.placeOrder(req, body);
     expect(result._id).toBe('order123');
   });
 
