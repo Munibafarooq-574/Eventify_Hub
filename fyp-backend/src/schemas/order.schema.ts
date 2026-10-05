@@ -7,6 +7,16 @@ export class Order extends Document {
     @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
     organizerId: Types.ObjectId;
 
+    // Client-side event context identifier. Used for final booking
+    // idempotency so the same event cannot be confirmed twice
+    // by accidental double-taps/network retries.
+    @Prop({
+      type: String,
+      trim: true,
+      default: null,
+    })
+    eventId?: string | null;
+
     @Prop({ type: [Types.ObjectId], ref: 'VendorOrder', default: [] })
     vendorOrders: Types.ObjectId[];
 
@@ -69,3 +79,15 @@ eventAddress: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
+
+// One confirmed booking request per organizer/event context.
+// Legacy orders without eventId are not included in this unique index.
+OrderSchema.index(
+  { organizerId: 1, eventId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      eventId: { $type: 'string' },
+    },
+  },
+);
