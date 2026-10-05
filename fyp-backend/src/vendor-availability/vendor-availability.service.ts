@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 
 import { User } from 'src/schemas/user.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
@@ -38,6 +38,11 @@ export interface AvailabilityResult {
     startDateTime: Date;
     endDateTime: Date;
   };
+
+  // Phase 12: returned from the same authoritative overlap check.
+  // Used only to enforce capacity across multiple items in one request.
+  overlapCount?: number;
+  maxConcurrentBookings?: number;
 }
 
 @Injectable()
@@ -279,6 +284,7 @@ if (!hasAccess) {
     startDateTime: Date,
     endDateTime: Date,
     packageId?: string,
+    session?: ClientSession,
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -319,10 +325,15 @@ if (!hasAccess) {
     startDateTime = requestedStart;
     endDateTime = requestedEnd;
 
-    const vendor = await this.userModel
+    const vendorQuery = this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role packages')
-      .lean();
+      .select('availabilitySettings role packages');
+
+    if (session) {
+      vendorQuery.session(session);
+    }
+
+    const vendor = await vendorQuery.lean();
 
     if (!vendor || vendor.role !== 'Vendor') {
       return {
@@ -755,8 +766,8 @@ if (!hasAccess) {
     // Only overlapping blocking statuses count.
     // ---------------------------------------------------------
 
-    const overlapCount =
-      await this.vendorOrderModel.countDocuments({
+    const overlapQuery =
+      this.vendorOrderModel.countDocuments({
         vendorId:
           new Types.ObjectId(vendorId),
 
@@ -772,6 +783,12 @@ if (!hasAccess) {
           $gt: startDateTime,
         },
       });
+
+    if (session) {
+      overlapQuery.session(session);
+    }
+
+    const overlapCount = await overlapQuery;
 
     if (
       overlapCount >=
@@ -799,6 +816,8 @@ return {
     startDateTime,
     endDateTime,
   },
+  overlapCount,
+  maxConcurrentBookings,
 };
   }
 
