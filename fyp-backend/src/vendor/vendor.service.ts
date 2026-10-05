@@ -1346,6 +1346,11 @@ async updatePackage(
             updateDto.price;
     }
 
+    if (updateDto.isActive !== undefined) {
+        updatePayload['packages.$.isActive'] =
+            updateDto.isActive;
+    }
+
         if (updateDto.services !== undefined) {
         updatePayload['packages.$.services'] =
             updateDto.services;
