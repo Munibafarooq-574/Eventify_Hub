@@ -20,16 +20,16 @@ import {
 const PAGE_BG = '#FDF0F7';
 
 /* Ticket colors */
-const TICKET_BG = '#F8D7E6'; 
-const INK = '#1A1A1A'; 
+const TICKET_BG = '#F8D7E6';
+const INK = '#1A1A1A';
 const PLUM = '#6B1E4F'; // brand color
 
-const STUB_BG = '#6B1E4F'; 
-const STUB_PERCENT = '#FFFFFF'; 
-const STUB_OFF = '#D4A85A'; 
-const STUB_BAR = '#F6E3EE'; 
+const STUB_BG = '#6B1E4F';
+const STUB_PERCENT = '#FFFFFF';
+const STUB_OFF = '#D4A85A';
+const STUB_BAR = '#F6E3EE';
 
-const CARD_HEIGHT = 128;
+const CARD_HEIGHT = 156;
 const CARD_GAP = 10;
 const LEFT_WIDTH = 80;
 const PEEK = 36;
@@ -41,8 +41,7 @@ const ALL_LIMIT = 300;
 const BARCODE_PATTERN = [
   3, 1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1, 2, 1, 3, 1, 2,
 ];
-const DASH_COUNT = 13;
-const MAX_CITIES_SHOWN = 2;
+const DASH_COUNT = 16;
 
 const getValidTill = (coupon: any) =>
   coupon.endDate
@@ -65,20 +64,14 @@ const getVendorCategory = (coupon: any) => {
 };
 
 /* Vendor jin jin cities mein service deta hai wo sab nikalta hai */
-const getServiceCities = (
-  coupon: any,
-): string[] => {
+const getServiceCities = (coupon: any): string[] => {
   const v = coupon.vendorId;
 
-  if (
-    !v ||
-    typeof v === 'string'
-  ) {
+  if (!v || typeof v === 'string') {
     return [];
   }
 
-  const raw =
-    v.serviceLocationCityIds || [];
+  const raw = v.serviceLocationCityIds || [];
 
   if (!Array.isArray(raw)) {
     return [];
@@ -86,41 +79,24 @@ const getServiceCities = (
 
   const names = raw
     .map((city: any) => {
-      if (
-        city &&
-        typeof city === 'object'
-      ) {
-        return (
-          city?.name ||
-          city?.cityName ||
-          ''
-        );
+      if (city && typeof city === 'object') {
+        return city?.name || city?.cityName || '';
       }
-
       return '';
     })
-    .map((name: string) =>
-      String(name).trim(),
-    )
+    .map((name: string) => String(name).trim())
     .filter(Boolean);
 
-  const seen =
-    new Set<string>();
+  const seen = new Set<string>();
 
-  return names.filter(
-    (name: string) => {
-      const key =
-        name.toLowerCase();
-
-      if (seen.has(key)) {
-        return false;
-      }
-
-      seen.add(key);
-
-      return true;
-    },
-  );
+  return names.filter((name: string) => {
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -144,12 +120,9 @@ const CouponCard: React.FC<CouponCardProps> = ({
   const vendorName = getVendorName(coupon);
   const vendorCategory = getVendorCategory(coupon);
 
+  // Saari cities show hongi
   const cities = getServiceCities(coupon).map(capitalize);
-  const shownCities = cities.slice(0, MAX_CITIES_SHOWN).join(', ');
-  const extraCities = cities.length - MAX_CITIES_SHOWN;
-  const cityText = cities.length
-    ? `${shownCities}${extraCities > 0 ? ` +${extraCities} more` : ''}`
-    : '';
+  const cityText = cities.join(', ');
 
   const discountLabel = isPercentage
     ? `${coupon.discountValue}%`
@@ -179,10 +152,10 @@ const CouponCard: React.FC<CouponCardProps> = ({
       onPress={openVendor}
       style={[styles.card, fullWidth ? styles.cardFull : { width }]}
     >
-            {/* Left stub: vertical discount text (left) + barcode (right) */}
+      {/* Left stub: vertical discount text (left) + barcode (right) */}
       <View style={styles.left}>
         <View style={styles.rotatedWrap}>
-           <Text style={styles.rotatedText} numberOfLines={1}>
+          <Text style={styles.rotatedText} numberOfLines={1}>
             {discountLabel} <Text style={styles.rotatedOff}>OFF</Text>
           </Text>
         </View>
@@ -205,36 +178,34 @@ const CouponCard: React.FC<CouponCardProps> = ({
 
       {/* Right: details */}
       <View style={styles.right}>
-        {/* Vendor name + proper dark line */}
-        <View>
+        {/* Top block: vendor, line, category, cities */}
+        <View style={styles.infoBlock}>
           {!!vendorName && (
             <Text style={styles.vendor} numberOfLines={1}>
               {vendorName}
             </Text>
           )}
           <View style={styles.titleLine} />
+
           {!!vendorCategory && (
             <Text style={styles.vendorMeta} numberOfLines={1}>
               {vendorCategory}
             </Text>
           )}
-          {!!cityText && (
-          <View style={styles.serviceCitiesRow}>
-            <Text style={styles.serviceCitiesLabel}>
-              Service Cities
-            </Text>
 
-            <Text
-              style={styles.cities}
-              numberOfLines={1}
-            >
-              {cityText}
-            </Text>
-          </View>
-        )}
+          {!!cityText && (
+            <View style={styles.serviceCitiesRow}>
+              <Text style={styles.serviceCitiesLabel} numberOfLines={1}>
+                Service Cities
+              </Text>
+              <Text style={styles.cities} numberOfLines={2}>
+                {cityText}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Code + validity (same row, compact) */}
+        {/* Bottom row: code + validity */}
         <View style={styles.bottomRow}>
           <View style={styles.codeBox}>
             <Text style={styles.codeText} numberOfLines={1}>
@@ -515,7 +486,7 @@ const styles = StyleSheet.create({
   },
 
   /* Left stub */
-   left: {
+  left: {
     width: LEFT_WIDTH,
     backgroundColor: STUB_BG,
     borderTopLeftRadius: 14,
@@ -528,7 +499,7 @@ const styles = StyleSheet.create({
   },
   barcode: {
     width: 26,
-    height: 96,
+    height: 108,
     marginLeft: 6,
     flexDirection: 'column',
     justifyContent: 'center',
@@ -541,17 +512,17 @@ const styles = StyleSheet.create({
   },
   rotatedWrap: {
     width: 30,
-    height: 100,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rotatedText: {
-    width: 100,
+    width: 110,
     height: 30,
     textAlign: 'center',
     textAlignVertical: 'center',
     lineHeight: 30,
-     fontSize: 18,
+    fontSize: 18,
     fontWeight: '900',
     color: STUB_PERCENT,
     letterSpacing: 1,
@@ -594,10 +565,14 @@ const styles = StyleSheet.create({
   /* Right (details) */
   right: {
     flex: 1,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
     paddingLeft: 14,
     paddingRight: 12,
     justifyContent: 'space-between',
+  },
+  infoBlock: {
+    flexShrink: 1,
   },
   vendor: {
     fontSize: 18,
@@ -606,43 +581,42 @@ const styles = StyleSheet.create({
     color: INK,
     letterSpacing: 0.2,
   },
-  // proper dark line (pehle white thi)
   titleLine: {
     height: 1.5,
     backgroundColor: INK,
     marginTop: 4,
-    marginBottom: 5,
+    marginBottom: 6,
     width: '100%',
     opacity: 0.85,
   },
   vendorMeta: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: '#3A2A35',
+  },
+  serviceCitiesRow: {
+    marginTop: 4,
+  },
+  serviceCitiesLabel: {
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: '#8B7688',
+    letterSpacing: 0.3,
+    marginBottom: 1,
+  },
+  cities: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '600',
     color: '#3A2A35',
   },
- serviceCitiesRow: {
-  marginTop: 2,
-},
-
-serviceCitiesLabel: {
-  fontSize: 9.5,
-  lineHeight: 12,
-  fontWeight: '700',
-  color: '#8B7688',
-  marginBottom: 1,
-},
-
-cities: {
-  fontSize: 11,
-  lineHeight: 15,
-  fontWeight: '600',
-  color: '#3A2A35',
-},
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 6,
   },
   codeBox: {
     borderWidth: 1.5,
