@@ -63,58 +63,121 @@ export class OrderService {
     eventDate: Date,
     eventTime: string,
     services: {
-    vendorId: string;
-    serviceName: string;
-    price: number;
-    packageId: string;
-    durationMinutes?: number;
-    quantity?: number;
-    requiredServiceWindow?: {
-    startDateTime: string;
-    endDateTime: string;
-};
-
-promotion?: {
-    promotionId: string;
-    promotionType: 'COUPON' | 'DISCOUNT_CODE';
-    promotionCode: string;
-};
-}[],
+        vendorId: string;
+        serviceName: string;
+        price: number;
+        packageId: string;
+        durationMinutes?: number;
+        quantity?: number;
+        requiredServiceWindow?: {
+            startDateTime: string;
+            endDateTime: string;
+        } | null;
+        promotion?: {
+            promotionId: string;
+            promotionType: 'COUPON' | 'DISCOUNT_CODE';
+            promotionCode: string;
+        };
+    }[],
     eventName: string,
     guests: number,
     eventType?: string,
-durationMinutes = 60,
-eventCityId?: string,
-eventAddress?: string,
-selectedCategoryIds?: string[],
+    durationMinutes = 60,
+    eventCityId?: string,
+    eventAddress?: string,
+    selectedCategoryIds?: string[],
+    eventId?: string,
 ): Promise<Order> {
+    // ---------------------------------------------------------
+    // Phase 12 — FINAL BOOKING AUTHORITY
+    // Frontend price, availability and service window are hints only.
+    // No booking records are written until every validation passes.
+    // ---------------------------------------------------------
 
-    if (!eventCityId) {
-    throw new BadRequestException('Event city is required');
-}
+    if (!Types.ObjectId.isValid(organizerId)) {
+        throw new BadRequestException('Invalid organizer');
+    }
 
-if (!eventAddress?.trim()) {
-    throw new BadRequestException('Event address is required');
-}
+    if (!eventId?.trim()) {
+        throw new BadRequestException('Event ID is required');
+    }
 
-// Final backend authority:
-// eventCityId must exist and must currently be active.
-await this.cityService.requireActiveCity(eventCityId);
+    if (!eventName?.trim()) {
+        throw new BadRequestException('Event name is required');
+    }
 
-const normalizedEventAddress = eventAddress.trim();
+    if (
+        !Number.isInteger(Number(guests)) ||
+        Number(guests) <= 0
+    ) {
+        throw new BadRequestException(
+            'Guests must be a positive whole number',
+        );
+    }
 
-// Phase 5: validate Desired Services against existing active Categories.
-const uniqueSelectedCategoryIds = [
-    ...new Set(selectedCategoryIds ?? []),
-];
+    if (
+        !Number.isInteger(Number(durationMinutes)) ||
+        Number(durationMinutes) <= 0
+    ) {
+        throw new BadRequestException(
+            'Event duration must be a positive whole number',
+        );
+    }
 
-let validatedSelectedCategoryIds: Types.ObjectId[] = [];
+    if (!eventCityId || !Types.ObjectId.isValid(eventCityId)) {
+        throw new BadRequestException('Event city is required');
+    }
 
-if (uniqueSelectedCategoryIds.length > 0) {
-    // Reject malformed MongoDB IDs before constructing ObjectIds.
-    const invalidCategoryId = uniqueSelectedCategoryIds.find(
-        (categoryId) => !Types.ObjectId.isValid(categoryId),
-    );
+    if (!eventAddress?.trim()) {
+        throw new BadRequestException('Event address is required');
+    }
+
+    if (
+        !Array.isArray(services) ||
+        services.length === 0
+    ) {
+        throw new BadRequestException(
+            'At least one booking service is required',
+        );
+    }
+
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+    if (!timePattern.test(eventTime || '')) {
+        throw new BadRequestException(
+            'Event time must use HH:mm format',
+        );
+    }
+
+    const parsedEventDate = new Date(eventDate);
+
+    if (Number.isNaN(parsedEventDate.getTime())) {
+        throw new BadRequestException('Invalid event date');
+    }
+
+    // Final backend authority for city validity.
+    await this.cityService.requireActiveCity(eventCityId);
+
+    const normalizedEventAddress =
+        eventAddress.trim();
+
+    const uniqueSelectedCategoryIds = [
+        ...new Set(
+            (selectedCategoryIds ?? []).map(String),
+        ),
+    ];
+
+    if (uniqueSelectedCategoryIds.length === 0) {
+        throw new BadRequestException(
+            'At least one selected event category is required',
+        );
+    }
+
+    const invalidCategoryId =
+        uniqueSelectedCategoryIds.find(
+            (categoryId) =>
+                !Types.ObjectId.isValid(categoryId),
+        );
 
     if (invalidCategoryId) {
         throw new BadRequestException(
@@ -126,359 +189,1023 @@ if (uniqueSelectedCategoryIds.length > 0) {
         .find({
             _id: {
                 $in: uniqueSelectedCategoryIds.map(
-                    (categoryId) => new Types.ObjectId(categoryId),
+                    (categoryId) =>
+                        new Types.ObjectId(categoryId),
                 ),
             },
             isActive: { $ne: false },
         })
-        .select('_id')
+        .select('_id name normalizedName')
         .lean();
 
-    if (categories.length !== uniqueSelectedCategoryIds.length) {
+    if (
+        categories.length !==
+        uniqueSelectedCategoryIds.length
+    ) {
         throw new BadRequestException(
             'One or more selected categories do not exist or are inactive',
         );
     }
 
-    validatedSelectedCategoryIds = categories.map(
-        (category) => new Types.ObjectId(category._id.toString()),
-    );
-}
-
-// Calculate event start/end datetime
-const [h, m] = (eventTime || '00:00').split(':').map(Number);
-
-const eventStartDateTime = new Date(eventDate);
-
-eventStartDateTime.setHours(
-    h || 0,
-    m || 0,
-    0,
-    0,
-);
-
-const eventEndDateTime = new Date(
-    eventStartDateTime.getTime() + durationMinutes * 60000,
-);
-
-const session = await this.connection.startSession();
-
-try {
-    let savedOrder: Order;
-
-    await session.withTransaction(async () => {
-
-        // New-business subscription guard.
-        // A vendor must have usable subscription access when a NEW booking
-        // is created. Existing bookings are not affected by this check.
-        const uniqueVendorIds = [
-            ...new Set(
-                services.map((service) =>
-                    service.vendorId.toString(),
+    const validatedSelectedCategoryIds =
+        categories.map(
+            (category) =>
+                new Types.ObjectId(
+                    category._id.toString(),
                 ),
+        );
+
+    const selectedCategoryIdSet =
+        new Set(
+            validatedSelectedCategoryIds.map(
+                (categoryId) =>
+                    categoryId.toString(),
             ),
-        ];
+        );
 
-        const eventCityObjectId =
-    new Types.ObjectId(eventCityId);
-
-const vendorsServingEventCity =
-    await this.userModel
-        .find({
-            _id: {
-                $in: uniqueVendorIds.map(
-                    (vendorId) =>
-                        new Types.ObjectId(vendorId),
-                ),
-            },
-            role: 'Vendor',
-            serviceLocationCityIds: eventCityObjectId,
-        })
-        .select('_id')
-        .session(session)
-        .lean();
-
-const servingVendorIds = new Set(
-    vendorsServingEventCity.map((vendor) =>
-        vendor._id.toString(),
-    ),
-);
-
-const vendorOutsideServiceArea =
-    uniqueVendorIds.find(
-        (vendorId) =>
-            !servingVendorIds.has(vendorId),
+    const categoryById = new Map(
+        categories.map((category: any) => [
+            String(category._id),
+            category,
+        ]),
     );
 
-if (vendorOutsideServiceArea) {
-    throw new ConflictException(
-        'One or more selected vendors do not serve the event city.',
+    const [h, m] =
+        eventTime.split(':').map(Number);
+
+    const eventStartDateTime =
+        new Date(parsedEventDate);
+
+    eventStartDateTime.setHours(
+        h,
+        m,
+        0,
+        0,
     );
-}
-
-        const vendorAccessResults = await Promise.all(
-            uniqueVendorIds.map(async (vendorId) => ({
-                vendorId,
-                hasAccess:
-                    await this.featureAccessService.hasActiveSubscription(
-                        vendorId,
-                    ),
-            })),
-        );
-
-        const restrictedVendor = vendorAccessResults.find(
-            (result) => !result.hasAccess,
-        );
-
-        if (restrictedVendor) {
-            throw new ConflictException(
-                'This vendor is currently unavailable for new bookings.',
-            );
-        }
-
-       // Final authoritative availability check for every selected package.
-// Each package keeps its own bookingType / duration / service-window rules.
-const results = await Promise.all(
-    services.map((service) => {
-        const selectedDurationMinutes =
-            Number(service.durationMinutes) > 0
-                ? Number(service.durationMinutes)
-                : durationMinutes;
-
-        const requestedEndDateTime = new Date(
-            eventStartDateTime.getTime() +
-                selectedDurationMinutes * 60000,
-        );
-
-        return this.availabilityService.checkVendorAvailability(
-            service.vendorId,
-            eventStartDateTime,
-            requestedEndDateTime,
-            service.packageId,
-        );
-    }),
-);
-
-const unavailable = results.find(
-    (result) => !result.available,
-);
-
-        if (unavailable) {
-    throw new ConflictException(
-        'This vendor is no longer available for the selected time.',
-    );
-}
-
-const promotionValidations = new Map<
-    number,
-    {
-        promotionId: string;
-        promotionType: 'COUPON' | 'DISCOUNT_CODE';
-        promotionCode: string;
-        originalAmount: number;
-        discountAmount: number;
-        finalAmount: number;
-    }
->();
-
-// Step 14:
-// Final authoritative promotion re-validation.
-// Never trust the discount/final amount previously shown by frontend.
-for (const service of services) {
-    if (!service.promotion) {
-        continue;
-    }
-
-    const validation =
-        await this.discountService.validateCoupon(
-            service.vendorId,
-            service.promotion.promotionCode,
-            Number(service.price),
-            organizerId,
-            service.packageId,
-        );
 
     if (
-    validation.discountEntryId !==
-    service.promotion.promotionId
-) {
-    throw new BadRequestException(
-        'The applied promotion is no longer valid.',
-    );
-}
-
-const serviceIndex = services.indexOf(service);
-
-promotionValidations.set(serviceIndex, {
-    promotionId: validation.discountEntryId,
-    promotionType: service.promotion.promotionType,
-    promotionCode: validation.code,
-    originalAmount: Number(service.price),
-    discountAmount: Number(validation.discountAmount),
-    finalAmount: Number(validation.finalAmount),
-});
-}
-
-// Calculate total
-const totalAmount = services.reduce(
-    (sum, service) => sum + service.price,
-    0,
-);
-
-        // Create main Order
-        const [order] = await this.orderModel.create(
-            [
-                {
-                    organizerId: new Types.ObjectId(organizerId),
-                    eventDate,
-                    eventTime,
-                    eventName,
-                    eventType,
-                    guests,
-
-                    eventCityId: eventCityObjectId,
-                    eventAddress: normalizedEventAddress,
-                    selectedCategoryIds: validatedSelectedCategoryIds,
-
-                    totalAmount,
-                    discount: 0,
-                    finalAmount: totalAmount,
-
-                    status: 'pending',
-
-                    eventStartDateTime,
-                    eventEndDateTime,
-                    eventDurationMinutes: durationMinutes,
-                },
-            ],
-            { session },
-        );
-
-        // Create VendorOrders
-        const vendorOrderIds: Types.ObjectId[] = [];
-
-        for (const [serviceIndex, service] of services.entries()) {
-
-            const promotionSnapshot =
-    promotionValidations.get(serviceIndex);
-
-                const finalAvailability = results[serviceIndex];
-
-    if (
-        !finalAvailability?.available ||
-        !finalAvailability.requiredServiceWindow
+        Number.isNaN(
+            eventStartDateTime.getTime(),
+        ) ||
+        eventStartDateTime.getTime() <
+            Date.now()
     ) {
-        throw new ConflictException(
-            'Final service window could not be resolved for this package.',
+        throw new BadRequestException(
+            'Event date/time must be in the future',
         );
     }
 
-    const finalServiceStartDateTime =
+    const eventEndDateTime =
         new Date(
-            finalAvailability.requiredServiceWindow.startDateTime,
+            eventStartDateTime.getTime() +
+                Number(durationMinutes) *
+                    60000,
         );
 
-    const finalServiceEndDateTime =
-        new Date(
-            finalAvailability.requiredServiceWindow.endDateTime,
-        );
-            const [vendorOrder] =
-                await this.vendorOrderModel.create(
-                    [
-                        {
-                            orderId: order._id,
-                            vendorId: new Types.ObjectId(
-                                service.vendorId,
-                            ),
-                            serviceName: service.serviceName,
-                                price: service.price,
+    // Reject exact duplicate cart lines. Quantity is the authority
+    // for multiple units of the same vendor/package.
+    const requestKeys = new Set<string>();
 
-                                promotionId: promotionSnapshot
-                                    ? new Types.ObjectId(
-                                        promotionSnapshot.promotionId,
-                                    )
-                                    : null,
-
-                                promotionType:
-                                    promotionSnapshot?.promotionType ?? null,
-
-                                promotionCode:
-                                    promotionSnapshot?.promotionCode ?? null,
-
-                                originalAmount:
-                                    promotionSnapshot?.originalAmount ??
-                                    Number(service.price),
-
-                                discountAmount:
-                                    promotionSnapshot?.discountAmount ?? 0,
-
-                                finalAmount:
-                                    promotionSnapshot?.finalAmount ??
-                                    Number(service.price),
-
-                                packageId: service.packageId,
-                                status: 'pending',
-                            eventStartDateTime:
-                            finalServiceStartDateTime,
-
-                            eventEndDateTime:
-                            finalServiceEndDateTime,
-                        },
-                    ],
-                    { session },
-                );
-
-            vendorOrderIds.push(vendorOrder._id);
+    for (const service of services) {
+        if (
+            !Types.ObjectId.isValid(
+                String(service.vendorId),
+            )
+        ) {
+            throw new BadRequestException(
+                'Invalid vendor ID',
+            );
         }
 
-        // Attach VendorOrders to main Order
-order.vendorOrders = vendorOrderIds;
+        if (
+            !Types.ObjectId.isValid(
+                String(service.packageId),
+            )
+        ) {
+            throw new BadRequestException(
+                'Invalid package ID',
+            );
+        }
 
-await order.save({ session });
+        const key =
+            `${service.vendorId}:${service.packageId}`;
 
-// Step 15:
-// Redeem promotions only after the booking has been
-// successfully created inside this transaction.
-for (const service of services) {
-    if (!service.promotion) {
-        continue;
+        if (requestKeys.has(key)) {
+            throw new BadRequestException(
+                'Duplicate vendor/package found in booking',
+            );
+        }
+
+        requestKeys.add(key);
     }
 
-    await this.discountService.redeemCoupon(
-  service.vendorId,
-  service.promotion.promotionCode,
-  String(order.organizerId),
-  String(order._id),
-);
-}
+    const uniqueVendorIds = [
+        ...new Set(
+            services.map((service) =>
+                String(service.vendorId),
+            ),
+        ),
+    ].sort();
 
-savedOrder = order;
-    });
+    const eventCityObjectId =
+        new Types.ObjectId(eventCityId);
 
-    // Notifications AFTER successful transaction
+    const session =
+        await this.connection.startSession();
+
     try {
-        for (const service of services) {
-            await this.sendPushNotification(
-                'Order',
-                'A new order has been placed',
-                service.vendorId,
-                'CREATE_ORDER',
-            );
+        let savedOrder: Order | undefined;
 
-            console.log(
-                'Notification sent on create order',
-                service.vendorId,
+        try {
+            await session.withTransaction(
+                async () => {
+                    // -------------------------------------------------
+                    // SERIALIZE FINAL BOOKING BY VENDOR
+                    // -------------------------------------------------
+                    // All requests touching the same vendor write the
+                    // same vendor document first. MongoDB transactions
+                    // therefore cannot both pass the final overlap check
+                    // from the same stale snapshot.
+                    //
+                    // Sorted locking also reduces multi-vendor deadlock
+                    // risk when carts contain several vendors.
+                    // -------------------------------------------------
+                    for (
+                        const vendorId
+                        of uniqueVendorIds
+                    ) {
+                        const lockResult =
+                            await this.userModel
+                                .updateOne(
+                                    {
+                                        _id:
+                                            new Types.ObjectId(
+                                                vendorId,
+                                            ),
+                                        role: 'Vendor',
+                                    },
+                                    {
+                                        $inc: {
+                                            bookingConcurrencyVersion: 1,
+                                        },
+                                    },
+                                    { session },
+                                );
+
+                        if (
+                            lockResult.matchedCount !==
+                            1
+                        ) {
+                            throw new NotFoundException(
+                                'One or more selected vendors do not exist',
+                            );
+                        }
+                    }
+
+                    // Idempotency check after locks are acquired.
+                    const existingOrder =
+                        await this.orderModel
+                            .findOne({
+                                organizerId:
+                                    new Types.ObjectId(
+                                        organizerId,
+                                    ),
+                                eventId:
+                                    eventId.trim(),
+                            })
+                            .select('_id')
+                            .session(session)
+                            .lean();
+
+                    if (existingOrder) {
+                        throw new ConflictException(
+                            'This event has already been booked',
+                        );
+                    }
+
+                    const vendors =
+                        await this.userModel
+                            .find({
+                                _id: {
+                                    $in:
+                                        uniqueVendorIds.map(
+                                            (vendorId) =>
+                                                new Types.ObjectId(
+                                                    vendorId,
+                                                ),
+                                        ),
+                                },
+                                role: 'Vendor',
+                                serviceLocationCityIds:
+                                    eventCityObjectId,
+                            })
+                            .select(
+                                '_id buisnessCategory packages availabilitySettings serviceLocationCityIds',
+                            )
+                            .session(session)
+                            .lean();
+
+                    if (
+                        vendors.length !==
+                        uniqueVendorIds.length
+                    ) {
+                        throw new ConflictException(
+                            'One or more selected vendors do not serve the event city',
+                        );
+                    }
+
+                    const vendorMap =
+                        new Map(
+                            vendors.map(
+                                (vendor: any) => [
+                                    String(
+                                        vendor._id,
+                                    ),
+                                    vendor,
+                                ],
+                            ),
+                        );
+
+                    // Keep existing subscription enforcement.
+                    const vendorAccessResults =
+                        await Promise.all(
+                            uniqueVendorIds.map(
+                                async (
+                                    vendorId,
+                                ) => ({
+                                    vendorId,
+                                    hasAccess:
+                                        await this.featureAccessService
+                                            .hasActiveSubscription(
+                                                vendorId,
+                                            ),
+                                }),
+                            ),
+                        );
+
+                    const restrictedVendor =
+                        vendorAccessResults.find(
+                            (result) =>
+                                !result.hasAccess,
+                        );
+
+                    if (restrictedVendor) {
+                        throw new ConflictException(
+                            'This vendor is currently unavailable for new bookings',
+                        );
+                    }
+
+                    type ValidatedService = {
+                        serviceIndex: number;
+                        vendorId: string;
+                        packageId: string;
+                        serviceName: string;
+                        quantity: number;
+                        unitPrice: number;
+                        originalAmount: number;
+                        finalAmount: number;
+                        discountAmount: number;
+                        promotionSnapshot?: {
+                            promotionId: string;
+                            promotionType:
+                                | 'COUPON'
+                                | 'DISCOUNT_CODE';
+                            promotionCode: string;
+                        };
+                        startDateTime: Date;
+                        endDateTime: Date;
+                        maxConcurrentBookings: number;
+                        existingOverlapCount: number;
+                    };
+
+                    const validatedServices:
+                        ValidatedService[] = [];
+
+                    // -------------------------------------------------
+                    // ALL FINAL VALIDATIONS
+                    // -------------------------------------------------
+                    for (
+                        const [
+                            serviceIndex,
+                            service,
+                        ] of services.entries()
+                    ) {
+                        const vendor =
+                            vendorMap.get(
+                                String(
+                                    service.vendorId,
+                                ),
+                            );
+
+                        if (!vendor) {
+                            throw new NotFoundException(
+                                'Vendor not found',
+                            );
+                        }
+
+                        const vendorCategoryId =
+                            vendor.buisnessCategory
+                                ?.toString();
+
+                        if (
+                            !vendorCategoryId ||
+                            !selectedCategoryIdSet.has(
+                                vendorCategoryId,
+                            )
+                        ) {
+                            throw new BadRequestException(
+                                'Vendor category is not valid for this event',
+                            );
+                        }
+
+                        const packageDoc =
+                            (
+                                vendor.packages ??
+                                []
+                            ).find(
+                                (pkg: any) =>
+                                    String(
+                                        pkg._id,
+                                    ) ===
+                                    String(
+                                        service.packageId,
+                                    ),
+                            );
+
+                        if (!packageDoc) {
+                            throw new BadRequestException(
+                                'Package does not belong to the selected vendor',
+                            );
+                        }
+
+                        if (
+                            packageDoc.isActive ===
+                            false
+                        ) {
+                            throw new ConflictException(
+                                'Package is no longer active',
+                            );
+                        }
+
+                        const validBookingTypes =
+                            new Set([
+                                'DURATION_BASED',
+                                'TIME_SLOT_BASED',
+                                'DELIVERY_BASED',
+                                'SETUP_BASED',
+                                'CUSTOM',
+                            ]);
+
+                        if (
+                            !validBookingTypes.has(
+                                packageDoc.bookingType,
+                            )
+                        ) {
+                            throw new BadRequestException(
+                                'Package booking type is invalid',
+                            );
+                        }
+
+                        const quantity =
+                            service.quantity ==
+                            null
+                                ? 1
+                                : Number(
+                                      service.quantity,
+                                  );
+
+                        if (
+                            !Number.isInteger(
+                                quantity,
+                            ) ||
+                            quantity < 1
+                        ) {
+                            throw new BadRequestException(
+                                'Quantity must be a positive whole number',
+                            );
+                        }
+
+                        const selectedDurationMinutes =
+                            Number(
+                                service.durationMinutes,
+                            ) > 0
+                                ? Number(
+                                      service.durationMinutes,
+                                  )
+                                : Number(
+                                      durationMinutes,
+                                  );
+
+                        if (
+                            !Number.isInteger(
+                                selectedDurationMinutes,
+                            ) ||
+                            selectedDurationMinutes <
+                                1
+                        ) {
+                            throw new BadRequestException(
+                                'Service duration must be a positive whole number',
+                            );
+                        }
+
+                        const requestedEndDateTime =
+                            new Date(
+                                eventStartDateTime.getTime() +
+                                    selectedDurationMinutes *
+                                        60000,
+                            );
+
+                        // Existing availability engine remains the
+                        // single source of truth for bookingType window,
+                        // working slots, blocked dates, notice and DB
+                        // overlap/capacity.
+                        const availability =
+                            await this.availabilityService
+                                .checkVendorAvailability(
+                                    String(
+                                        service.vendorId,
+                                    ),
+                                    eventStartDateTime,
+                                    requestedEndDateTime,
+                                    String(
+                                        service.packageId,
+                                    ),
+                                    session,
+                                );
+
+                        if (
+                            !availability.available ||
+                            !availability
+                                .requiredServiceWindow
+                        ) {
+                            throw new ConflictException(
+                                availability.reason ||
+                                    'Vendor is no longer available for the selected time',
+                            );
+                        }
+
+                        const finalServiceStartDateTime =
+                            new Date(
+                                availability
+                                    .requiredServiceWindow
+                                    .startDateTime,
+                            );
+
+                        const finalServiceEndDateTime =
+                            new Date(
+                                availability
+                                    .requiredServiceWindow
+                                    .endDateTime,
+                            );
+
+                        if (
+                            Number.isNaN(
+                                finalServiceStartDateTime.getTime(),
+                            ) ||
+                            Number.isNaN(
+                                finalServiceEndDateTime.getTime(),
+                            ) ||
+                            finalServiceStartDateTime >=
+                                finalServiceEndDateTime
+                        ) {
+                            throw new BadRequestException(
+                                'Required service window is invalid',
+                            );
+                        }
+
+                        // Price comes from the current package document,
+                        // never from service.price supplied by the client.
+                        let unitPrice:
+                            | number
+                            | null = null;
+
+                        if (
+                            packageDoc.bookingType ===
+                            'DURATION_BASED'
+                        ) {
+                            const durationOption =
+                                (
+                                    packageDoc.durations ??
+                                    []
+                                ).find(
+                                    (
+                                        duration: any,
+                                    ) => {
+                                        const value =
+                                            Number(
+                                                duration.value,
+                                            );
+
+                                        const minutes =
+                                            duration.unit ===
+                                            'DAYS'
+                                                ? value *
+                                                  1440
+                                                : duration.unit ===
+                                                    'HOURS'
+                                                  ? value *
+                                                    60
+                                                  : NaN;
+
+                                        return (
+                                            minutes ===
+                                            selectedDurationMinutes
+                                        );
+                                    },
+                                );
+
+                            if (
+                                durationOption
+                            ) {
+                                unitPrice =
+                                    Number(
+                                        durationOption.price,
+                                    );
+                            } else if (
+                                packageDoc
+                                    .allowCustomDuration
+                            ) {
+                                const unitMinutes =
+                                    packageDoc
+                                        .customDurationUnit ===
+                                    'DAYS'
+                                        ? 1440
+                                        : packageDoc
+                                                .customDurationUnit ===
+                                            'HOURS'
+                                          ? 60
+                                          : 0;
+
+                                const customRate =
+                                    Number(
+                                        packageDoc
+                                            .customDurationRate,
+                                    );
+
+                                if (
+                                    unitMinutes <=
+                                        0 ||
+                                    selectedDurationMinutes %
+                                        unitMinutes !==
+                                        0 ||
+                                    !Number.isFinite(
+                                        customRate,
+                                    ) ||
+                                    customRate <
+                                        0
+                                ) {
+                                    throw new BadRequestException(
+                                        'Package custom duration pricing is invalid',
+                                    );
+                                }
+
+                                unitPrice =
+                                    (selectedDurationMinutes /
+                                        unitMinutes) *
+                                    customRate;
+                            } else {
+                                unitPrice =
+                                    Number(
+                                        packageDoc.price,
+                                    );
+                            }
+                        } else {
+                            unitPrice =
+                                Number(
+                                    packageDoc.price,
+                                );
+                        }
+
+                        if (
+                            !Number.isFinite(
+                                unitPrice,
+                            ) ||
+                            Number(unitPrice) < 0
+                        ) {
+                            throw new BadRequestException(
+                                'Package does not have a valid current price',
+                            );
+                        }
+
+                        const category =
+                            categoryById.get(
+                                vendorCategoryId,
+                            );
+
+                        const categoryIdentity =
+                            String(
+                                category
+                                    ?.normalizedName ??
+                                    category?.name ??
+                                    '',
+                            ).toLowerCase();
+
+                        const isCatering =
+                            categoryIdentity.includes(
+                                'catering',
+                            );
+
+                        const originalAmount =
+                            Number(unitPrice) *
+                            quantity *
+                            (isCatering
+                                ? Number(
+                                      guests,
+                                  )
+                                : 1);
+
+                        if (
+                            !Number.isFinite(
+                                originalAmount,
+                            ) ||
+                            originalAmount < 0
+                        ) {
+                            throw new BadRequestException(
+                                'Calculated booking price is invalid',
+                            );
+                        }
+
+                        const maxConcurrentBookings =
+                            Math.max(
+                                1,
+                                Number(
+                                    availability
+                                        .maxConcurrentBookings ??
+                                        1,
+                                ),
+                            );
+
+                        const existingOverlapCount =
+                            Math.max(
+                                0,
+                                Number(
+                                    availability
+                                        .overlapCount ??
+                                        0,
+                                ),
+                            );
+
+                        // Existing DB overlap is already checked by the
+                        // availability service. This extra count covers
+                        // multiple items inside THIS same request before
+                        // any VendorOrder has been inserted.
+                        const sameRequestOverlapCount =
+                            validatedServices.filter(
+                                (
+                                    previous,
+                                ) =>
+                                    previous.vendorId ===
+                                        String(
+                                            service.vendorId,
+                                        ) &&
+                                    previous.startDateTime <
+                                        finalServiceEndDateTime &&
+                                    previous.endDateTime >
+                                        finalServiceStartDateTime,
+                            ).length;
+
+                        if (
+                            existingOverlapCount +
+                                sameRequestOverlapCount >=
+                            maxConcurrentBookings
+                        ) {
+                            throw new ConflictException(
+                                'This vendor does not have enough remaining capacity for the selected time',
+                            );
+                        }
+
+                        let finalAmount =
+                            originalAmount;
+
+                        let discountAmount = 0;
+
+                        let promotionSnapshot:
+                            | ValidatedService['promotionSnapshot']
+                            | undefined;
+
+                        if (
+                            service.promotion
+                        ) {
+                            const validation =
+                                await this.discountService
+                                    .validateCoupon(
+                                        String(
+                                            service.vendorId,
+                                        ),
+                                        service
+                                            .promotion
+                                            .promotionCode,
+                                        originalAmount,
+                                        organizerId,
+                                        String(
+                                            service.packageId,
+                                        ),
+                                    );
+
+                            if (
+                                validation.discountEntryId !==
+                                service.promotion
+                                    .promotionId
+                            ) {
+                                throw new BadRequestException(
+                                    'The applied promotion is no longer valid',
+                                );
+                            }
+
+                            discountAmount =
+                                Number(
+                                    validation.discountAmount ??
+                                        0,
+                                );
+
+                            finalAmount =
+                                Number(
+                                    validation.finalAmount,
+                                );
+
+                            if (
+                                !Number.isFinite(
+                                    finalAmount,
+                                ) ||
+                                finalAmount < 0 ||
+                                !Number.isFinite(
+                                    discountAmount,
+                                ) ||
+                                discountAmount < 0
+                            ) {
+                                throw new BadRequestException(
+                                    'Promotion calculation is invalid',
+                                );
+                            }
+
+                            promotionSnapshot =
+                                {
+                                    promotionId:
+                                        validation.discountEntryId,
+                                    promotionType:
+                                        service
+                                            .promotion
+                                            .promotionType,
+                                    promotionCode:
+                                        validation.code,
+                                };
+                        }
+
+                        validatedServices.push(
+                            {
+                                serviceIndex,
+                                vendorId:
+                                    String(
+                                        service.vendorId,
+                                    ),
+                                packageId:
+                                    String(
+                                        service.packageId,
+                                    ),
+                                serviceName:
+                                    String(
+                                        packageDoc.packageName ??
+                                            service.serviceName,
+                                    ),
+                                quantity,
+                                unitPrice:
+                                    Number(
+                                        unitPrice,
+                                    ),
+                                originalAmount,
+                                finalAmount,
+                                discountAmount,
+                                promotionSnapshot,
+                                startDateTime:
+                                    finalServiceStartDateTime,
+                                endDateTime:
+                                    finalServiceEndDateTime,
+                                maxConcurrentBookings,
+                                existingOverlapCount,
+                            },
+                        );
+                    }
+
+                    // -------------------------------------------------
+                    // ALL VALIDATIONS PASSED — WRITES START HERE
+                    // -------------------------------------------------
+                    const totalAmount =
+                        validatedServices.reduce(
+                            (
+                                sum,
+                                service,
+                            ) =>
+                                sum +
+                                service.originalAmount,
+                            0,
+                        );
+
+                    const totalDiscount =
+                        validatedServices.reduce(
+                            (
+                                sum,
+                                service,
+                            ) =>
+                                sum +
+                                service.discountAmount,
+                            0,
+                        );
+
+                    const finalAmount =
+                        validatedServices.reduce(
+                            (
+                                sum,
+                                service,
+                            ) =>
+                                sum +
+                                service.finalAmount,
+                            0,
+                        );
+
+                    const [order] =
+                        await this.orderModel.create(
+                            [
+                                {
+                                    organizerId:
+                                        new Types.ObjectId(
+                                            organizerId,
+                                        ),
+                                    eventId:
+                                        eventId.trim(),
+                                    eventDate:
+                                        parsedEventDate,
+                                    eventTime,
+                                    eventName:
+                                        eventName.trim(),
+                                    eventType,
+                                    guests:
+                                        Number(
+                                            guests,
+                                        ),
+                                    eventCityId:
+                                        eventCityObjectId,
+                                    eventAddress:
+                                        normalizedEventAddress,
+                                    selectedCategoryIds:
+                                        validatedSelectedCategoryIds,
+                                    totalAmount,
+                                    discount:
+                                        totalDiscount,
+                                    finalAmount,
+                                    status:
+                                        'pending',
+                                    eventStartDateTime,
+                                    eventEndDateTime,
+                                    eventDurationMinutes:
+                                        Number(
+                                            durationMinutes,
+                                        ),
+                                },
+                            ],
+                            { session },
+                        );
+
+                    const vendorOrderIds:
+                        Types.ObjectId[] = [];
+
+                    for (
+                        const validatedService
+                        of validatedServices
+                    ) {
+                        const promotionSnapshot =
+                            validatedService
+                                .promotionSnapshot;
+
+                        const [vendorOrder] =
+                            await this.vendorOrderModel
+                                .create(
+                                    [
+                                        {
+                                            orderId:
+                                                order._id,
+                                            vendorId:
+                                                new Types.ObjectId(
+                                                    validatedService.vendorId,
+                                                ),
+                                            serviceName:
+                                                validatedService.serviceName,
+
+                                            // Existing field stays as the
+                                            // server-calculated original
+                                            // line amount for compatibility.
+                                            price:
+                                                validatedService.originalAmount,
+
+                                            promotionId:
+                                                promotionSnapshot
+                                                    ? new Types.ObjectId(
+                                                          promotionSnapshot
+                                                              .promotionId,
+                                                      )
+                                                    : null,
+                                            promotionType:
+                                                promotionSnapshot
+                                                    ?.promotionType ??
+                                                null,
+                                            promotionCode:
+                                                promotionSnapshot
+                                                    ?.promotionCode ??
+                                                null,
+                                            originalAmount:
+                                                validatedService.originalAmount,
+                                            discountAmount:
+                                                validatedService.discountAmount,
+                                            finalAmount:
+                                                validatedService.finalAmount,
+                                            packageId:
+                                                validatedService.packageId,
+                                            status:
+                                                'pending',
+                                            eventStartDateTime:
+                                                validatedService.startDateTime,
+                                            eventEndDateTime:
+                                                validatedService.endDateTime,
+                                        },
+                                    ],
+                                    { session },
+                                );
+
+                        vendorOrderIds.push(
+                            vendorOrder._id,
+                        );
+                    }
+
+                    order.vendorOrders =
+                        vendorOrderIds;
+
+                    await order.save({
+                        session,
+                    });
+
+                    // Preserve existing promotion redemption behavior,
+                    // but only after every booking validation and all
+                    // booking records have been prepared successfully.
+                    for (
+                        const service
+                        of validatedServices
+                    ) {
+                        if (
+                            !service
+                                .promotionSnapshot
+                        ) {
+                            continue;
+                        }
+
+                        await this.discountService
+                            .redeemCoupon(
+                                service.vendorId,
+                                service
+                                    .promotionSnapshot
+                                    .promotionCode,
+                                String(
+                                    order.organizerId,
+                                ),
+                                String(
+                                    order._id,
+                                ),
+                            );
+                    }
+
+                    savedOrder = order;
+                },
             );
+        } catch (error: any) {
+            // Unique organizerId+eventId index is the final
+            // race-proof idempotency backstop.
+            if (error?.code === 11000) {
+                throw new ConflictException(
+                    'This event has already been booked',
+                );
+            }
+
+            throw error;
         }
-    } catch (error) {
-        console.log(error);
+
+        // Notifications only after a successful transaction commit.
+        try {
+            for (
+                const service of services
+            ) {
+                await this.sendPushNotification(
+                    'Order',
+                    'A new order has been placed',
+                    service.vendorId,
+                    'CREATE_ORDER',
+                );
+            }
+        } catch (error) {
+            console.log(error);
+        }
+
+        return savedOrder!;
+    } finally {
+        await session.endSession();
     }
-
-    return savedOrder!;
-
-} finally {
-    await session.endSession();
-}
     }
 
 
