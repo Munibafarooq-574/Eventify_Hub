@@ -1,21 +1,11 @@
 // fyp-backend/src/vendor/growth/vendor-growth.module.ts
-//
-// Phase 1: Subscription Foundation.
-// Phase 3: Promotion (Featured Vendor) added.
-// Phase 4: Featured Package reused the same PromotionService/schema.
-// Phase 5: Badges added — computed on the fly, no new collection.
-// Phase 6: Discount (Coupons) added.
-// Phase 7: Discount Codes reused the same DiscountService/schema.
-// Phase 8: Analytics added below — reads VendorOrder directly plus
-// everything the earlier phases already built.
-// Phase 9: Discovery added — public featured vendors/packages discovery.
 
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CityModule } from '../../city/city.module';
 import { VendorAvailabilityModule } from '../../vendor-availability/vendor-availability.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
-
+import { EmailModule } from '../../email/email.module';
 // Subscription
 import {
   VendorSubscription,
@@ -161,6 +151,7 @@ import {
     forwardRef(() => VendorAvailabilityModule),
     FileUploadModule,
     NotificationsModule,
+    EmailModule,
         ],
 
   controllers: [

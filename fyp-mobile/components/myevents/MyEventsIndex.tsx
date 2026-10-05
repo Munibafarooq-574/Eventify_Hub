@@ -1,6 +1,7 @@
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
+import getPaymentStatus from '@/services/getPaymentStatus';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -41,11 +42,11 @@ const vendorStatusStyleMap: Record<
     icon: 'time-outline',
   },
 
-  processing: {
-    bg: '#E7F0FF',
-    text: '#007AFF',
-    icon: 'sync-outline',
-  },
+  accepted: {
+  bg: '#E7F0FF',
+  text: '#007AFF',
+  icon: 'checkmark-circle-outline',
+},
 
   completed: {
     bg: '#E6F7EA',
@@ -66,7 +67,7 @@ const MyEventsScreen = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
+const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
   // Safely get the logged-in user, trying AsyncStorage first (where login
   // saves it via saveUserData), then falling back to SecureStore in case
   // some part of the app still saves it there.
@@ -94,8 +95,58 @@ const MyEventsScreen = () => {
         setEvents([]);
         return;
       }
-      const fetchedEvents = await getVendorOrders('Organizer', user._id);
-      setEvents(fetchedEvents || []);
+      const fetchedEvents = await getVendorOrders(
+  'Organizer',
+  user._id,
+);
+
+setEvents(fetchedEvents || []);
+
+const paymentEntries =
+  await Promise.all(
+    (fetchedEvents || [])
+      .flatMap((event: any) =>
+        event.vendorOrders || [],
+      )
+      .filter((vendor: any) => {
+        const status = String(
+          vendor?.status || '',
+        ).toLowerCase();
+
+        return (
+          status === 'accepted' ||
+          status === 'completed'
+        );
+      })
+      .map(async (vendor: any) => {
+        try {
+          const breakdown =
+            await getPaymentStatus(
+              vendor._id,
+            );
+
+          return [
+            vendor._id,
+            breakdown,
+          ] as const;
+        } catch (error) {
+          console.error(
+            'Could not load payment breakdown:',
+            vendor._id,
+            error,
+          );
+
+          return [
+            vendor._id,
+            null,
+          ] as const;
+        }
+      }),
+  );
+
+setPaymentBreakdowns(
+  Object.fromEntries(paymentEntries),
+);
     } catch (error) {
       console.error('Error fetching events:', error);
       setErrorMsg('Something went wrong while loading your events.');
@@ -267,6 +318,48 @@ const MyEventsScreen = () => {
 const vStatus =
   vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
 
+  const paymentStatus = String(
+  vendor?.paymentStatus || 'UNPAID',
+).toUpperCase();
+
+const finalAmount = Number(
+  vendor?.finalAmount ??
+    vendor?.price ??
+    0,
+);
+
+const downPaymentAmount = Number(
+  vendor?.downPaymentAmount ?? 0,
+);
+
+const remainingAmount = Number(
+  vendor?.remainingAmount ??
+    Math.max(
+      finalAmount - downPaymentAmount,
+      0,
+    ),
+);
+
+const paymentDeadline =
+  vendor?.paymentDeadline
+    ? new Date(vendor.paymentDeadline)
+    : null;
+
+    const paymentBreakdown =
+  paymentBreakdowns[vendor._id];
+
+const pendingPayment =
+  paymentBreakdown?.pendingPayment;
+
+const hasPendingPayment =
+  !!pendingPayment;
+
+  const successfulPayment =
+  paymentBreakdown?.latestSuccessfulPayment;
+
+const hasSuccessfulPayment =
+  !!successfulPayment;
+
         return (
           <View key={index} style={styles.vendorCard}>
                     <View style={styles.vendorAvatar}>
@@ -350,6 +443,199 @@ Number(vendor?.discountAmount || 0) > 0 ? (
    {vendorStatus}
   </Text>
 </View>
+
+{(
+  vendorStatus === 'accepted' ||
+  vendorStatus === 'completed'
+) && (
+  <View style={styles.paymentBox}>
+    <View style={styles.paymentRow}>
+      <Text style={styles.paymentLabel}>
+        Payment Status
+      </Text>
+
+      <Text style={styles.paymentStatusText}>
+        {paymentStatus.replace(/_/g, ' ')}
+      </Text>
+    </View>
+
+    <View style={styles.paymentRow}>
+      <Text style={styles.paymentLabel}>
+        Total
+      </Text>
+
+      <Text style={styles.paymentValue}>
+        Rs. {finalAmount.toLocaleString()}
+      </Text>
+    </View>
+
+    <View style={styles.paymentRow}>
+      <Text style={styles.paymentLabel}>
+        Down Payment
+      </Text>
+
+      <Text style={styles.paymentValue}>
+        Rs. {downPaymentAmount.toLocaleString()}
+      </Text>
+    </View>
+
+    <View style={styles.paymentRow}>
+      <Text style={styles.paymentLabel}>
+        Remaining
+      </Text>
+
+      <Text style={styles.paymentValue}>
+        Rs. {remainingAmount.toLocaleString()}
+      </Text>
+    </View>
+
+    {paymentDeadline && (
+  <Text style={styles.paymentDeadlineText}>
+    Pay before{' '}
+    {paymentDeadline.toLocaleString()}
+  </Text>
+)}
+
+{hasPendingPayment && (
+  <View style={styles.paymentPendingBox}>
+    <Text style={styles.paymentPendingText}>
+      {String(
+        pendingPayment?.type || '',
+      ).toUpperCase() === 'REMAINING'
+        ? 'Remaining payment is awaiting confirmation.'
+        : 'Down payment is awaiting confirmation.'}
+    </Text>
+
+    <Text style={styles.paymentPendingSubtext}>
+      Rs.{' '}
+      {Number(
+        pendingPayment?.amount || 0,
+      ).toLocaleString()}
+      {' • '}
+      {String(
+        pendingPayment?.method || '',
+      ).toUpperCase()}
+    </Text>
+  </View>
+)}
+
+{paymentStatus === 'PAYMENT_REQUIRED' &&
+  !hasPendingPayment && (
+      <TouchableOpacity
+        style={styles.payNowButton}
+        onPress={() =>
+          router.push({
+            pathname: '/paymentmethod',
+            params: {
+              vendorOrderId: vendor._id,
+            },
+          })
+        }
+      >
+        <Text style={styles.payNowButtonText}>
+          Pay Down Payment
+        </Text>
+      </TouchableOpacity>
+    )}
+
+{paymentStatus === 'PAYMENT_FAILED' &&
+  !hasPendingPayment && (
+  <>
+    <View style={styles.paymentFailedBox}>
+      <Text style={styles.paymentFailedText}>
+        Previous payment attempt failed.
+      </Text>
+    </View>
+
+    <TouchableOpacity
+      style={styles.payNowButton}
+      onPress={() =>
+        router.push({
+          pathname: '/paymentmethod',
+          params: {
+            vendorOrderId: vendor._id,
+          },
+        })
+      }
+    >
+      <Text style={styles.payNowButtonText}>
+        Retry Down Payment
+      </Text>
+    </TouchableOpacity>
+  </>
+)}
+
+    {paymentStatus === 'PARTIALLY_PAID' &&
+      vendorStatus !== 'completed' && (
+        <View style={styles.paidInfoBox}>
+          <Text style={styles.paidInfoText}>
+            Down payment paid. Remaining amount will be due after service completion.
+          </Text>
+        </View>
+      )}
+
+    {paymentStatus === 'PARTIALLY_PAID' &&
+  vendorStatus === 'completed' &&
+  !hasPendingPayment && (
+        <TouchableOpacity
+          style={styles.payNowButton}
+          onPress={() =>
+            router.push({
+              pathname: '/paymentmethod',
+              params: {
+                vendorOrderId: vendor._id,
+              },
+            })
+          }
+        >
+          <Text style={styles.payNowButtonText}>
+            Pay Remaining Amount
+          </Text>
+        </TouchableOpacity>
+      )}
+
+    {paymentStatus === 'PAID' && (
+      <View style={styles.paidInfoBox}>
+        <Text style={styles.paidInfoText}>
+          Payment completed
+        </Text>
+      </View>
+    )}
+    {hasSuccessfulPayment && (
+  <TouchableOpacity
+    style={styles.receiptButton}
+    onPress={() =>
+      router.push({
+        pathname: '/paymentconfirmation',
+        params: {
+          vendorOrderId: vendor._id,
+        },
+      })
+    }
+  >
+    <Ionicons
+      name="receipt-outline"
+      size={14}
+      color="#7B2869"
+    />
+
+    <Text style={styles.receiptButtonText}>
+      View Receipt
+    </Text>
+  </TouchableOpacity>
+)}
+
+{paymentStatus === 'PAYMENT_EXPIRED' && (
+  <View style={styles.paymentExpiredBox}>
+    <Text style={styles.paymentExpiredText}>
+      Payment window expired.
+    </Text>
+  </View>
+)}
+
+  </View>
+)}
+
                     </View>
 
                     <TouchableOpacity
@@ -362,7 +648,6 @@ Number(vendor?.discountAmount || 0) > 0 ? (
                      </View>
   );
 })}
-
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total Event Price</Text>
                   <Text style={styles.totalPrice}>Rs. {event.totalAmount}</Text>
@@ -612,4 +897,140 @@ finalAmountValue: {
     fontWeight: 'bold',
     color: '#28a745',
   },
+  paymentBox: {
+  marginTop: 10,
+  padding: 10,
+  borderRadius: 10,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#EEDDE8',
+},
+
+paymentRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 5,
+},
+
+paymentLabel: {
+  fontSize: 11,
+  color: '#777',
+},
+
+paymentValue: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: '#333',
+},
+
+paymentStatusText: {
+  fontSize: 10,
+  fontWeight: '800',
+  color: '#7B2869',
+},
+
+paymentDeadlineText: {
+  fontSize: 10,
+  color: '#B8860B',
+  marginTop: 4,
+  marginBottom: 8,
+},
+
+payNowButton: {
+  backgroundColor: '#7B2869',
+  borderRadius: 9,
+  paddingVertical: 9,
+  alignItems: 'center',
+  marginTop: 6,
+},
+
+payNowButtonText: {
+  color: '#FFFFFF',
+  fontSize: 11,
+  fontWeight: '800',
+},
+
+paidInfoBox: {
+  backgroundColor: '#E6F7EA',
+  borderRadius: 8,
+  padding: 8,
+  marginTop: 6,
+},
+
+paidInfoText: {
+  fontSize: 10,
+  color: '#278A4B',
+  fontWeight: '700',
+  textAlign: 'center',
+},
+paymentFailedBox: {
+  backgroundColor: '#FDEAEC',
+  borderRadius: 8,
+  padding: 8,
+  marginTop: 6,
+},
+
+paymentFailedText: {
+  fontSize: 10,
+  color: '#DC3545',
+  fontWeight: '700',
+  textAlign: 'center',
+},
+
+paymentExpiredBox: {
+  backgroundColor: '#FFF3CD',
+  borderRadius: 8,
+  padding: 8,
+  marginTop: 6,
+},
+
+paymentExpiredText: {
+  fontSize: 10,
+  color: '#9A6B00',
+  fontWeight: '700',
+  textAlign: 'center',
+},
+
+paymentPendingBox: {
+  backgroundColor: '#FFF8E7',
+  borderRadius: 8,
+  padding: 8,
+  marginTop: 6,
+},
+
+paymentPendingText: {
+  fontSize: 10,
+  color: '#9A6B00',
+  fontWeight: '700',
+  textAlign: 'center',
+},
+
+paymentPendingSubtext: {
+  fontSize: 10,
+  color: '#8A6D1F',
+  fontWeight: '600',
+  textAlign: 'center',
+  marginTop: 3,
+},
+
+receiptButton: {
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: 6,
+  borderWidth: 1,
+  borderColor: '#7B2869',
+  borderRadius: 9,
+  paddingVertical: 8,
+  marginTop: 7,
+},
+
+receiptButtonText: {
+  color: '#7B2869',
+  fontSize: 11,
+  fontWeight: '800',
+},
+
+
 });

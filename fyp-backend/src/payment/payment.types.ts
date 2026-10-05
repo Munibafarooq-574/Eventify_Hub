@@ -17,5 +17,22 @@ export interface PaymentBreakdown {
     outstandingAmount: number;
 
     paymentStatus: string;
-    paymentDeadline: Date | null;
+paymentDeadline: Date | null;
+
+pendingPayment: {
+    paymentId: string;
+    type: string;
+    amount: number;
+    method: string;
+} | null;
+
+latestSuccessfulPayment: {
+    paymentId: string;
+    type: string;
+    amount: number;
+    method: string;
+    transactionRef: string | null;
+    paidAt: Date | null;
+} | null;
+
 }

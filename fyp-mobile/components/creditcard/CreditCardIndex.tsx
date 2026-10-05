@@ -1,8 +1,11 @@
 // fyp-mobile/components/creditcard/CreditCardIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
+import createPayment from '@/services/createPayment';
+import payRemainingAmount from '@/services/payRemainingAmount';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -25,6 +28,7 @@ const formatCardNumber = (raw: string) => {
   return digits.replace(/(.{4})/g, '$1 ').trim();
 };
 
+const CreditCardPaymentScreen = () => {
 // Auto-inserts the slash for "MM/YY".
 const formatExpiry = (raw: string) => {
   const digits = raw.replace(/\D/g, '').slice(0, 4);
@@ -32,11 +36,15 @@ const formatExpiry = (raw: string) => {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 };
 
-const CreditCardPaymentScreen = () => {
-  const { vendorOrderId, amount } = useLocalSearchParams<{
-    vendorOrderId?: string;
-    amount?: string;
-  }>();
+const {
+  vendorOrderId,
+  amount,
+  paymentType,
+} = useLocalSearchParams<{
+  vendorOrderId?: string;
+  amount?: string;
+  paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
+}>();
 
   const amountPayable = Number(amount || 0);
 
@@ -57,25 +65,74 @@ const CreditCardPaymentScreen = () => {
     );
   }, [cardholderName, cardNumber, expiry, cvv]);
 
-  const handlePayNow = () => {
-    if (!isValid || submitting) return;
+ const handlePayNow = async () => {
+  if (
+    !isValid ||
+    submitting ||
+    !vendorOrderId
+  ) {
+    return;
+  }
 
+  try {
     setSubmitting(true);
 
-    // TODO: replace with your real charge/create-payment API call using
-    // vendorOrderId + amountPayable, then navigate on success/failure.
-    setTimeout(() => {
-      setSubmitting(false);
-      router.push({
-        pathname: '/paymentconfirmation',
-        params: {
-          vendorOrderId,
-          amount: String(amountPayable),
-          method: 'Credit/Debit Card',
+    const payment =
+      paymentType === 'REMAINING'
+        ? await payRemainingAmount(
+            vendorOrderId,
+            'card',
+          )
+        : await createPayment(
+            vendorOrderId,
+            'card',
+          );
+
+    Alert.alert(
+      'Payment Initiated',
+      paymentType === 'REMAINING'
+        ? 'Your remaining payment request has been created and is awaiting confirmation.'
+        : 'Your down payment request has been created and is awaiting confirmation.',
+      [
+        {
+          text: 'OK',
+          onPress: () =>
+            router.replace('/myevents'),
         },
-      });
-    }, 900);
-  };
+      ],
+    );
+
+    console.log(
+      '[Payment Initiated]',
+      payment,
+    );
+  } catch (error: any) {
+    console.error(
+      'Payment initiation failed:',
+      error,
+    );
+
+    const rawMessage =
+      error?.response?.data?.message;
+
+    const safeMessage =
+      typeof rawMessage === 'string'
+        ? rawMessage
+        : typeof rawMessage?.message ===
+            'string'
+          ? rawMessage.message
+          : typeof error?.message ===
+              'string'
+            ? error.message
+            : 'Could not initiate payment. Please try again.';
+
+    Alert.alert(
+      'Payment Failed',
+      safeMessage,
+    );
+  } finally {
+    setSubmitting(false);
+  }
 
   return (
     <View style={styles.container}>
@@ -238,7 +295,7 @@ const CreditCardPaymentScreen = () => {
     </View>
   );
 };
-
+}
 export default CreditCardPaymentScreen;
 
 const styles = StyleSheet.create({

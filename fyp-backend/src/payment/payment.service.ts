@@ -12,6 +12,8 @@ import { Order } from 'src/schemas/order.schema';
 import { Payment } from 'src/schemas/payment.schema';
 import { PaymentBreakdown } from './payment.types';
 import { PayoutService } from 'src/payout/payout.service';
+import { User } from 'src/schemas/user.schema';
+import { EmailService } from 'src/email/email.service';
 
 @Injectable()
 export class PaymentService {
@@ -25,6 +27,9 @@ export class PaymentService {
         @InjectModel(Payment.name)
         private readonly paymentModel: Model<Payment>,
 
+        @InjectModel(User.name)
+        private readonly userModel: Model<User>,
+        private readonly emailService: EmailService,
         private readonly payoutService: PayoutService,
     ) {}
 
@@ -89,10 +94,34 @@ const paidAmount =
         0,
     );
 
+    const pendingPayment =
+    await this.paymentModel
+        .findOne({
+            vendorOrderId: vendorOrder._id,
+            status: 'PENDING',
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+
 const outstandingAmount = Math.max(
     bookingAmount - paidAmount,
     0,
 );
+
+const latestSuccessfulPayment =
+    await this.paymentModel
+        .findOne({
+            vendorOrderId: vendorOrder._id,
+            status: 'SUCCESS',
+        })
+        .sort({
+            paidAt: -1,
+            createdAt: -1,
+        })
+        .lean();
+
+
+
 
 return {
     vendorOrderId,
@@ -124,7 +153,51 @@ return {
         vendorOrder.paymentStatus,
 
     paymentDeadline:
-        vendorOrder.paymentDeadline ?? null,
+    vendorOrder.paymentDeadline ?? null,
+
+pendingPayment: pendingPayment
+    ? {
+          paymentId:
+              pendingPayment._id.toString(),
+          type: String(
+              pendingPayment.type || '',
+          ),
+          amount: Number(
+              pendingPayment.amount || 0,
+          ),
+          method: String(
+              pendingPayment.method || '',
+          ),
+      }
+    : null,
+
+    latestSuccessfulPayment:
+    latestSuccessfulPayment
+        ? {
+              paymentId:
+                  latestSuccessfulPayment._id.toString(),
+
+              type: String(
+                  latestSuccessfulPayment.type || '',
+              ),
+
+              amount: Number(
+                  latestSuccessfulPayment.amount || 0,
+              ),
+
+              method: String(
+                  latestSuccessfulPayment.method || '',
+              ),
+
+              transactionRef:
+                  latestSuccessfulPayment.transactionRef ??
+                  null,
+
+              paidAt:
+                  latestSuccessfulPayment.paidAt ??
+                  null,
+          }
+        : null,
 };
     }
 
@@ -252,6 +325,176 @@ if (
         return payment;
     }
 
+    private escapeHtml(
+    value: unknown,
+): string {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+private buildPaymentReceiptEmail(
+    data: {
+        amount: number;
+        paymentType: string;
+        method: string;
+        transactionRef: string;
+        paidAt: Date;
+    },
+): string {
+    const amount =
+        Number(
+            data.amount || 0,
+        ).toLocaleString('en-PK');
+
+    const paymentType =
+        data.paymentType ===
+        'DOWN_PAYMENT'
+            ? 'Down Payment'
+            : 'Remaining Payment';
+
+    const method =
+        data.method === 'card'
+            ? 'Credit / Debit Card'
+            : data.method ===
+                'jazzcash'
+              ? 'JazzCash'
+              : data.method ===
+                  'easypaisa'
+                ? 'EasyPaisa'
+                : data.method;
+
+    const transactionRef =
+        this.escapeHtml(
+            data.transactionRef,
+        );
+
+    const paidAt =
+        data.paidAt.toLocaleString(
+            'en-PK',
+            {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            },
+        );
+
+    return `
+<!DOCTYPE html>
+<html>
+<body
+  style="
+    margin:0;
+    padding:0;
+    background:#F8E9F6;
+    font-family:Arial,sans-serif;
+    color:#332633;
+  "
+>
+  <div
+    style="
+      max-width:600px;
+      margin:30px auto;
+      background:#FFFFFF;
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid #EAD5E6;
+    "
+  >
+    <div
+      style="
+        background:#7D0C72;
+        color:#FFFFFF;
+        padding:28px;
+      "
+    >
+      <div
+        style="
+          font-size:22px;
+          font-weight:700;
+        "
+      >
+        Eventify Hub
+      </div>
+
+      <div
+        style="
+          margin-top:8px;
+          font-size:16px;
+        "
+      >
+        Payment Receipt
+      </div>
+    </div>
+
+    <div style="padding:28px;">
+      <div
+        style="
+          font-size:22px;
+          font-weight:700;
+          color:#278A4B;
+        "
+      >
+        Payment Successful
+      </div>
+
+      <p>
+        Your payment has been confirmed
+        successfully.
+      </p>
+
+      <div
+        style="
+          margin-top:22px;
+          padding:18px;
+          background:#F8E9F6;
+          border-radius:12px;
+        "
+      >
+        <div>
+          <strong>Amount:</strong>
+          Rs. ${amount}
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Payment Type:</strong>
+          ${this.escapeHtml(paymentType)}
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Payment Method:</strong>
+          ${this.escapeHtml(method)}
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Transaction Reference:</strong>
+          ${transactionRef}
+        </div>
+
+        <div style="margin-top:10px;">
+          <strong>Paid At:</strong>
+          ${this.escapeHtml(paidAt)}
+        </div>
+      </div>
+
+      <p
+        style="
+          margin-top:22px;
+          color:#766B73;
+        "
+      >
+        You can also view this receipt
+        inside the Eventify Hub app.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
     // ===== Called by gateway webhook (or manually for now) on success =====
     async confirmPayment(
         paymentId: string,
@@ -341,6 +584,68 @@ if (
                 : error,
         );
     }
+}
+
+try {
+    const client =
+        await this.userModel
+            .findById(
+                payment.organizerId,
+            )
+            .select(
+                'email name',
+            )
+            .lean();
+
+    if (client?.email) {
+        const receiptHtml =
+            this.buildPaymentReceiptEmail({
+                amount:
+                    Number(
+                        payment.amount || 0,
+                    ),
+
+                paymentType:
+                    String(
+                        payment.type || '',
+                    ),
+
+                method:
+                    String(
+                        payment.method || '',
+                    ),
+
+                transactionRef:
+                    String(
+                        payment.transactionRef ||
+                            payment._id,
+                    ),
+
+                paidAt:
+                    payment.paidAt ||
+                    new Date(),
+            });
+
+        await this.emailService
+            .sendTransactionalEmail({
+                to: client.email,
+
+                subject:
+                    'Your Eventify Hub payment receipt',
+
+                html: receiptHtml,
+
+                senderName:
+                    'Eventify Hub',
+            });
+    }
+} catch (error) {
+    console.error(
+        '[Payment Receipt Email Failed]',
+        error instanceof Error
+            ? error.message
+            : error,
+    );
 }
 
 return payment;

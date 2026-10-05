@@ -19,8 +19,8 @@ import { FeatureKey, LimitKey } from '../subscription/subscription.types';
 import { User } from 'src/schemas/user.schema';
 import { CreateDiscountCodeDto } from './dto/create-discount-code.dto';
 import { NotificationService } from '../../../notifications/notifications.service';
-import * as nodemailer from 'nodemailer';
-import axios from 'axios';
+//import axios from 'axios';
+import { EmailService } from '../../../email/email.service';
 import { buildDiscountOfferEmail } from './discount-email.template';
 import { DiscountRedemption } from '../../../schemas/discount-redemption.schema';
 
@@ -59,6 +59,8 @@ private readonly redemptionModel: Model<DiscountRedemption>,
 private readonly featureAccessService: FeatureAccessService,
 
 private readonly notificationService: NotificationService,
+
+private readonly emailService: EmailService,
   ) {}
 
   // ---------------------------------------------------------------
@@ -558,7 +560,7 @@ private async sendDiscountOfferEmail(
   endDate,
 });
 
-   try {
+   /*try {
     await axios.post(
       'https://api.brevo.com/v3/smtp/email',
       {
@@ -583,7 +585,19 @@ private async sendDiscountOfferEmail(
     throw new Error(
       e?.response?.data?.message || e?.message || 'Email send failed',
     );
-  }
+  } */
+
+    await this.emailService
+  .sendTransactionalEmail({
+    to: recipientEmail,
+
+    subject:
+      'A special discount is waiting for you',
+
+    html,
+
+    senderName: vendorName,
+  });
 }
 
 async sendDiscountEmail(

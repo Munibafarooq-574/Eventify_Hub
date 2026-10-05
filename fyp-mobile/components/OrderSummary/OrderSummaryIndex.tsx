@@ -1,166 +1,124 @@
-import { getSecureData } from '@/store'; // Assuming you have this function to get data from local storage
-import * as FileSystem from 'expo-file-system'; // For saving files in file manager
-import * as Print from 'expo-print'; // Import the Print API
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Toast from "react-native-toast-message"; // Import Toast
+import React from "react";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
+} from "react-native";
 
 const SummaryScreen = () => {
-    const [cartData, setCartData] = useState<any>(null);
+    const { width, height } = useWindowDimensions();
 
-    useEffect(() => {
-        const fetchCartData = async () => {
-            try {
-                const storedCart = await getSecureData('cartData');
-                if (storedCart) {
-                    setCartData(JSON.parse(storedCart));
-                } else {
-                    setCartData({ vendors: [] });
-                }
-            } catch (error) {
-                console.error("Error fetching cart data:", error);
-                Toast.show({
-                    type: "error",
-                    text1: "Error",
-                    text2: "Failed to load cart data. Please try again.",
-                    position: "bottom",
-                });
-            }
-        };
-
-        fetchCartData();
-    }, []);
-
-    // Calculate the total amount from cart data
-    const calculateTotalAmount = () => {
-        let totalAmount = 0;
-        cartData?.vendors?.forEach((vendor: any) => {
-            vendor.packages.forEach((pkg: any) => {
-                totalAmount += pkg.price;
-            });
-        });
-        return totalAmount;
-    };
-
-    const totalAmount = calculateTotalAmount();
-
-    // Handle saving the receipt as a PDF to file manager
-    const handleSaveReceipt = async () => {
-        if (!cartData || cartData.vendors.length === 0) {
-            Toast.show({
-                type: "error",
-                text1: "Empty Cart",
-                text2: "Your cart is empty. Please add items to proceed.",
-                position: "bottom",
-            });
-            return;
-        }
-
-        try {
-            // Create HTML content for the receipt
-            const htmlContent = `
-                <html>
-                    <head>
-                        <style>
-                            body { font-family: Arial, sans-serif; }
-                            .header { font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-                            .vendor { font-size: 18px; font-weight: bold; margin-top: 20px; }
-                            .package { font-size: 14px; color: #7A7A7A; }
-                            .total { font-size: 16px; font-weight: bold; }
-                            
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">Receipt Summary</div>
-                        ${cartData.vendors.map((vendor: any) => `
-                            <div class="vendor">${vendor.vendor.name}</div>
-                            ${vendor.packages.map((pkg: any) => `
-                                <div class="package">${pkg.packageName} - Rs.${pkg.price}/-</div>
-                            `).join('')}
-                        `).join('')}
-                        <div class="total">Total Amount: Rs. ${totalAmount}</div>
-                    </body>
-                </html>
-            `;
-
-            // Generate PDF from HTML
-           const { uri } = await Print.printToFileAsync({
-                    html: htmlContent,
-                });
-
-                const pdfPath = uri;
-
-            // Notify the user
-            Toast.show({
-                type: "success",
-                text1: "Receipt Saved",
-                text2: "Your receipt has been saved successfully as a PDF.",
-                position: "bottom",
-            });
-
-            // Optionally, show the file URI or alert the user
-            Alert.alert("Receipt Saved", `The receipt has been saved to: ${pdfPath}`);
-
-        } catch (error) {
-            console.error("Error saving receipt:", error);
-            Toast.show({
-                type: "error",
-                text1: "Error",
-                text2: "Failed to save the receipt. Please try again.",
-                position: "bottom",
-            });
-        }
-    };
+    // Responsive scaling helpers
+    const isSmall = width < 360;
+    const isTablet = width >= 600;
+    const scale = (size: number) => Math.round((width / 390) * size);
+    const maxContentWidth = isTablet ? 560 : "100%";
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()}>
-                    <Text style={styles.backArrow}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Summary</Text>
-            </View>
+        <ScrollView
+            contentContainerStyle={[
+                styles.container,
+                {
+                    minHeight: height,
+                    paddingHorizontal: isSmall ? 16 : 20,
+                    paddingTop: Math.max(50, height * 0.07),
+                    paddingBottom: 30,
+                },
+            ]}
+            showsVerticalScrollIndicator={false}
+        >
+            <View style={[styles.content, { maxWidth: maxContentWidth as any }]}>
+                {/* Header (centered, no back button) */}
+                <View style={styles.header}>
+                    <Text style={[styles.title, { fontSize: Math.min(scale(26), 32) }]}>
+                        Summary
+                    </Text>
+                    <View style={styles.titleUnderline} />
+                </View>
 
-            {/* Progress Bar */}
-            <View style={styles.progress}>
-                <View style={[styles.progressStep, styles.completedStep]} />
-                <View style={styles.progressConnector} />
-                <View style={[styles.progressStep, styles.completedStep]} />
-                <View style={styles.progressConnector} />
-                <View style={styles.progressStep} />
-            </View>
+                {/* Progress Bar */}
+                <View style={styles.progress}>
+                    <View style={[styles.progressStep, styles.completedStep]} />
+                    <View style={styles.progressConnector} />
+                    <View style={[styles.progressStep, styles.completedStep]} />
+                    <View style={styles.progressConnector} />
+                    <View style={styles.progressStep} />
+                </View>
 
-            {/* Centered Vendor Message Section */}
-            <View style={styles.vendorMessageBox}>
-                <Text style={styles.vendorMessageText}>
-                    ✅ Thank you! The vendor will call you shortly, and payment will be made directly to the vendor.
-                </Text>
-            </View>
+                {/* Vendor Message Section */}
+                <View style={styles.vendorMessageBox}>
+                    <View style={styles.checkCircle}>
+                        <Text style={styles.checkMark}>✓</Text>
+                    </View>
 
-            {/* Receipt Section */}
-            <View style={styles.receiptContainer}>
-    
-            </View>
+                    <Text style={[styles.vendorMessageTitle, { fontSize: isSmall ? 18 : 20 }]}>
+                        Booking Request Sent
+                    </Text>
 
-            {/* Button Section */}
-            <View>
-                {/* Save Receipt Button */}
-                <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={handleSaveReceipt}
-                >
-                    <Text style={styles.saveButtonText}>Save Receipt</Text>
-                </TouchableOpacity>
+                    <Text style={[styles.vendorMessageText, { fontSize: isSmall ? 13 : 14 }]}>
+                        Your booking request has been sent to the selected vendors.
+                        Payment will become available separately for each vendor after
+                        they accept your request.
+                    </Text>
+                </View>
 
-                {/* Go to Dashboard Button */}
-                <TouchableOpacity
-                    style={styles.dashboardButton}
-                    onPress={() => router.push('/dashboard')} // Replace with your actual dashboard route
-                >
-                    <Text style={styles.dashboardButtonText}>Go to Dashboard</Text>
-                </TouchableOpacity>
+                {/* What happens next */}
+                <View style={styles.statusCard}>
+                    <Text style={styles.statusTitle}>What happens next?</Text>
+
+                    <View style={styles.statusRow}>
+                        <View style={styles.numberColumn}>
+                            <Text style={styles.statusNumber}>1</Text>
+                            <View style={styles.numberLine} />
+                        </View>
+                        <Text style={styles.statusText}>
+                            Vendors review your booking request.
+                        </Text>
+                    </View>
+
+                    <View style={styles.statusRow}>
+                        <View style={styles.numberColumn}>
+                            <Text style={styles.statusNumber}>2</Text>
+                            <View style={styles.numberLine} />
+                        </View>
+                        <Text style={styles.statusText}>
+                            Each vendor accepts or rejects independently.
+                        </Text>
+                    </View>
+
+                    <View style={[styles.statusRow, { marginBottom: 0 }]}>
+                        <View style={styles.numberColumn}>
+                            <Text style={styles.statusNumber}>3</Text>
+                        </View>
+                        <Text style={styles.statusText}>
+                            After acceptance, the required down payment becomes available.
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Button Section */}
+                <View style={styles.buttonSection}>
+                    <TouchableOpacity
+                        style={styles.primaryButton}
+                        activeOpacity={0.85}
+                        onPress={() => router.push("/myevents")}
+                    >
+                        <Text style={styles.primaryButtonText}>View My Bookings</Text>
+                    </TouchableOpacity>
+
+                    {/* Go to Dashboard Button */}
+                    <TouchableOpacity
+                        style={styles.dashboardButton}
+                        activeOpacity={0.85}
+                        onPress={() => router.push("/dashboard")}
+                    >
+                        <Text style={styles.dashboardButtonText}>Go to Dashboard</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </ScrollView>
     );
@@ -168,109 +126,205 @@ const SummaryScreen = () => {
 
 const styles = StyleSheet.create({
     container: {
-        flexGrow: 1, // Ensures the content stretches to fill the screen
+        flexGrow: 1,
         backgroundColor: "#FCEFF8",
-        paddingHorizontal: 20,
-        paddingTop: 70,
-        justifyContent: 'space-between', // Makes sure the buttons stay at the bottom
-    },
-    header: {
-        flexDirection: "row",
         alignItems: "center",
-        marginBottom: 20,
     },
-    backArrow: {
-        fontSize: 18,
-        color: '#780C60', // Dark purple color
-        marginRight: 10,
+    content: {
+        flex: 1,
+        width: "100%",
+        justifyContent: "space-between",
+    },
+
+    /* Header */
+    header: {
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 26,
     },
     title: {
-        fontSize: 20,
-        fontWeight: "bold",
-        color: "#000",
+        fontWeight: "800",
+        color: "#780C60",
+        letterSpacing: 0.5,
+        textAlign: "center",
     },
+    titleUnderline: {
+        width: 46,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: "#780C60",
+        opacity: 0.35,
+        marginTop: 8,
+    },
+
+    /* Progress */
     progress: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 20,
+        marginBottom: 28,
+        paddingHorizontal: 4,
     },
     progressStep: {
-        width: 15,
-        height: 15,
-        borderRadius: 7.5,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         backgroundColor: "#E0E0E0",
     },
     completedStep: {
-        backgroundColor: '#780C60', // Dark purple color
+        backgroundColor: "#780C60",
+        shadowColor: "#780C60",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 4,
+        elevation: 3,
     },
     progressConnector: {
-        height: 2,
+        height: 3,
         flex: 1,
-        backgroundColor: '#780C60', // Dark purple color
-    },
-    vendorMessageBox: {
-        backgroundColor: '#E8F5E9', // light green background
-        padding: 15,
-        borderRadius: 8,
-        marginBottom: 30,
-        alignItems: 'center',
-    },
-    vendorMessageText: {
-        color: '#2E7D32', // dark green text
-        fontSize: 14,
-        fontWeight: '500',
-        textAlign: 'center',
-    },
-    saveButton: {
-        backgroundColor: '#780C60', // dark purple
-        borderRadius: 5,
-        paddingVertical: 12,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    saveButtonText: {
-        color: '#FFF',
-        fontSize: 16,
-        fontWeight: 'bold',
+        borderRadius: 2,
+        backgroundColor: "#780C60",
     },
 
-    dashboardButton: {
-        backgroundColor: '#FFFFFF',
+    /* Success card */
+    vendorMessageBox: {
+        backgroundColor: "#E8F5E9",
+        paddingVertical: 24,
+        paddingHorizontal: 18,
+        borderRadius: 20,
+        marginBottom: 24,
+        alignItems: "center",
         borderWidth: 1,
-        borderColor: '#780C60', // dark purple border
-        borderRadius: 5,
-        paddingVertical: 12,
-        alignItems: 'center',
+        borderColor: "#CBE8CF",
+        shadowColor: "#278A4B",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    checkCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: "#278A4B",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 14,
+        shadowColor: "#278A4B",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    checkMark: {
+        color: "#FFFFFF",
+        fontSize: 28,
+        fontWeight: "900",
+        lineHeight: 32,
+    },
+    vendorMessageTitle: {
+        color: "#278A4B",
+        fontWeight: "800",
+        marginBottom: 8,
+        textAlign: "center",
+    },
+    vendorMessageText: {
+        color: "#2E7D32",
+        fontWeight: "500",
+        textAlign: "center",
+        lineHeight: 21,
+    },
+
+    /* Status card */
+    statusCard: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 28,
+        borderWidth: 1,
+        borderColor: "#F0DCE7",
+        shadowColor: "#780C60",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    statusTitle: {
+        fontSize: 17,
+        fontWeight: "800",
+        color: "#2A1F27",
+        marginBottom: 18,
+    },
+    statusRow: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        marginBottom: 14,
+    },
+    numberColumn: {
+        alignItems: "center",
+        marginRight: 14,
+    },
+    statusNumber: {
+        width: 30,
+        height: 30,
+        lineHeight: 30,
+        borderRadius: 15,
+        backgroundColor: "#780C60",
+        color: "#FFFFFF",
+        fontSize: 13,
+        fontWeight: "800",
+        textAlign: "center",
+        overflow: "hidden",
+    },
+    numberLine: {
+        width: 2,
+        height: 22,
+        backgroundColor: "#F0DCE7",
+        marginTop: 4,
+        marginBottom: -18,
+    },
+    statusText: {
+        flex: 1,
+        fontSize: 13.5,
+        color: "#6F646B",
+        lineHeight: 20,
+        paddingTop: 4,
+    },
+
+    /* Buttons */
+    buttonSection: {
+        width: "100%",
+    },
+    primaryButton: {
+        backgroundColor: "#780C60",
+        borderRadius: 14,
+        paddingVertical: 15,
+        alignItems: "center",
+        marginBottom: 14,
+        shadowColor: "#780C60",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    primaryButtonText: {
+        color: "#FFF",
+        fontSize: 16,
+        fontWeight: "bold",
+        letterSpacing: 0.3,
+    },
+    dashboardButton: {
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1.5,
+        borderColor: "#780C60",
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: "center",
     },
     dashboardButtonText: {
-        color: '#780C60',
+        color: "#780C60",
         fontSize: 16,
-        fontWeight: 'bold',
-    },
-    receiptContainer: {
-        padding: 20,
-        // backgroundColor: '#FFF',
-        borderRadius: 10,
-        marginBottom: 30,
-    },
-    receiptText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 10,
-    },
-    vendorName: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    packageDetails: {
-        fontSize: 14,
-        color: '#7A7A7A',
-    },
-    totalText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: '#333',
+        fontWeight: "bold",
+        letterSpacing: 0.3,
     },
 });
 

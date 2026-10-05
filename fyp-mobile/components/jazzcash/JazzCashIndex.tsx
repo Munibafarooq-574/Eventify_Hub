@@ -1,8 +1,11 @@
 // fyp-mobile/components/jazzcash/JazzCashIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
+import createPayment from '@/services/createPayment';
+import payRemainingAmount from '@/services/payRemainingAmount';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -27,10 +30,15 @@ const formatPhone = (raw: string) => {
 };
 
 const JazzCashPaymentScreen = () => {
-  const { vendorOrderId, amount } = useLocalSearchParams<{
-    vendorOrderId?: string;
-    amount?: string;
-  }>();
+  const {
+  vendorOrderId,
+  amount,
+  paymentType,
+} = useLocalSearchParams<{
+  vendorOrderId?: string;
+  amount?: string;
+  paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
+}>();
 
   const amountPayable = Number(amount || 0);
 
@@ -39,25 +47,73 @@ const JazzCashPaymentScreen = () => {
 
   const isValid = useMemo(() => /^03\d{2}-\d{7}$/.test(phone), [phone]);
 
-  const handlePayNow = () => {
-    if (!isValid || submitting) return;
+  const handlePayNow = async () => {
+  if (
+    !isValid ||
+    submitting ||
+    !vendorOrderId
+  ) {
+    return;
+  }
 
+  try {
     setSubmitting(true);
 
-    // TODO: replace with your real JazzCash mobile-account charge API call
-    // using vendorOrderId + amountPayable, then navigate on success/failure.
-    setTimeout(() => {
-      setSubmitting(false);
-      router.push({
-        pathname: '/paymentconfirmation',
-        params: {
-          vendorOrderId,
-          amount: String(amountPayable),
-          method: 'JazzCash',
+    const payment =
+      paymentType === 'REMAINING'
+        ? await payRemainingAmount(
+            vendorOrderId,
+            'jazzcash',
+          )
+        : await createPayment(
+            vendorOrderId,
+            'jazzcash',
+          );
+
+    console.log(
+      '[JazzCash Payment Initiated]',
+      payment,
+    );
+
+    Alert.alert(
+      'Payment Initiated',
+      paymentType === 'REMAINING'
+        ? 'Your remaining payment request has been created and is awaiting confirmation.'
+        : 'Your down payment request has been created and is awaiting confirmation.',
+      [
+        {
+          text: 'OK',
+          onPress: () =>
+            router.replace('/myevents'),
         },
-      });
-    }, 900);
-  };
+      ],
+    );
+  } catch (error: any) {
+    console.error(
+      'JazzCash payment initiation failed:',
+      error,
+    );
+
+    const rawMessage =
+      error?.response?.data?.message;
+
+    const safeMessage =
+      typeof rawMessage === 'string'
+        ? rawMessage
+        : typeof rawMessage?.message === 'string'
+          ? rawMessage.message
+          : typeof error?.message === 'string'
+            ? error.message
+            : 'Could not initiate payment. Please try again.';
+
+    Alert.alert(
+      'Payment Failed',
+      safeMessage,
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <View style={styles.container}>

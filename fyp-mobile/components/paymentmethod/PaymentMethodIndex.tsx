@@ -58,14 +58,24 @@ const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocale
 // Shape returned by /payment/vendor-order/:id/financials.
 // Adjust these field names if your backend response uses different keys.
 type BookingFinancials = {
+  vendorOrderId: string;
   totalAmount: number;
+
+  downPaymentType?: string | null;
+  downPaymentPercentage?: number | null;
   downPaymentAmount: number;
+
   remainingAmount: number;
-  downPaymentPaid?: boolean;
-  fullyPaid?: boolean;
+
+  paidSoFar: number;
+  outstandingAmount: number;
+
+  fullyPaid: boolean;
+  paymentStatus: string;
+  paymentDeadline?: string | null;
+
   serviceName?: string;
 };
-
 const PaymentMethodScreen = () => {
   // vendorOrderId is passed in as a route param when navigating here, e.g.
   // router.push({ pathname: '/paymentmethod', params: { vendorOrderId } })
@@ -105,28 +115,49 @@ const PaymentMethodScreen = () => {
 
   // Whichever amount is actually due right now: down payment first,
   // then the remaining balance once the down payment is settled.
-  const amountDue = !financials
-    ? 0
-    : financials.downPaymentPaid
-    ? financials.remainingAmount
-    : financials.downPaymentAmount;
+  const normalizedPaymentStatus =
+  String(
+    financials?.paymentStatus || '',
+  ).toUpperCase();
 
-  const amountLabel = !financials
-    ? 'Amount Payable'
-    : financials.downPaymentPaid
-    ? 'Remaining Payment'
-    : 'Down Payment';
+const isRemainingPayment =
+  normalizedPaymentStatus ===
+  'PARTIALLY_PAID';
 
-  const handlePayNow = () => {
-    if (!selected || !financials) return;
-    router.push({
-      pathname: selected.route,
-      params: {
-        vendorOrderId,
-        amount: String(amountDue),
-      },
-    });
-  };
+const amountDue = !financials
+  ? 0
+  : isRemainingPayment
+  ? Number(
+      financials.outstandingAmount || 0,
+    )
+  : Number(
+      financials.downPaymentAmount || 0,
+    );
+
+const amountLabel = !financials
+  ? 'Amount Payable'
+  : isRemainingPayment
+  ? 'Remaining Payment'
+  : 'Down Payment';
+
+ const handlePayNow = () => {
+  if (!selected || !financials) {
+    return;
+  }
+
+  router.push({
+    pathname: selected.route,
+    params: {
+      vendorOrderId,
+      amount: String(amountDue),
+
+      paymentType:
+        isRemainingPayment
+          ? 'REMAINING'
+          : 'DOWN_PAYMENT',
+    },
+  });
+};
 
   if (loading) {
     return (
@@ -231,12 +262,21 @@ const PaymentMethodScreen = () => {
 
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>
-              Down Payment{financials.downPaymentPaid ? ' (Paid)' : ''}
-            </Text>
-            <Text
+            Down Payment
+            {normalizedPaymentStatus ===
+              'PARTIALLY_PAID' ||
+            normalizedPaymentStatus === 'PAID'
+              ? ' (Paid)'
+              : ''}
+          </Text>
+                      <Text
               style={[
                 styles.breakdownValue,
-                financials.downPaymentPaid && styles.breakdownValuePaid,
+                (
+  normalizedPaymentStatus ===
+    'PARTIALLY_PAID' ||
+  normalizedPaymentStatus === 'PAID'
+) && styles.breakdownValuePaid
               ]}
             >
               {formatCurrency(financials.downPaymentAmount)}
@@ -248,7 +288,9 @@ const PaymentMethodScreen = () => {
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabelBold}>Remaining</Text>
             <Text style={styles.breakdownValueBold}>
-              {formatCurrency(financials.remainingAmount)}
+              {formatCurrency(
+                financials.outstandingAmount,
+              )}
             </Text>
           </View>
         </View>
