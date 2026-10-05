@@ -42,6 +42,10 @@ export class UpdatePackageDto {
   price?: number;
 
   @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
   @IsString()
   services?: string;
 
