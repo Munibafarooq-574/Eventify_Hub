@@ -781,7 +781,8 @@ async addPackages(
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
-                services: pkg.services,
+        isActive: pkg.isActive ?? true,
+        services: pkg.services,
         bookingType: pkg.bookingType,
         requiredServiceDurationMinutes:
             pkg.requiredServiceDurationMinutes,
