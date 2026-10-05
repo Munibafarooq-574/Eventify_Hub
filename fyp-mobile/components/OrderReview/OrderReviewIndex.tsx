@@ -1077,7 +1077,9 @@ try {
         vendorId: vendor.vendor._id,
         serviceName: pkg.packageName,
         price: Number(pkg.price),
-        packageId: pkg.packageId,
+        packageId:
+          pkg.packageId ||
+          pkg._id,
 
         promotion: promotion
           ? {
@@ -1111,9 +1113,13 @@ try {
 
     const response = await postPlaceOrder({
       organizerId: user._id,
+      eventId: eventDetails?.eventId,
 
       eventDate: eventDetails?.eventDate,
-      eventTime: eventDetails?.eventTime || '18:00',
+      eventTime:
+        eventDetails?.startTime ||
+        eventDetails?.eventTime ||
+        '18:00',
 
       durationMinutes: Number(
         eventDetails?.durationMinutes || 60,
@@ -1121,6 +1127,13 @@ try {
 
       eventCityId: eventDetails?.eventCityId,
       eventAddress: eventDetails?.eventAddress,
+
+      selectedCategoryIds:
+        Array.isArray(
+          eventDetails?.selectedCategoryIds,
+        )
+          ? eventDetails.selectedCategoryIds
+          : [],
 
       services,
 
