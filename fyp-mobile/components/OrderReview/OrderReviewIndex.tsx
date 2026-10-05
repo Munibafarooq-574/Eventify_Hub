@@ -555,18 +555,18 @@ const getResolvedServiceWindow = (
         pkg?.serviceWindowEndOffsetMinutes,
       );
 
-    if (
-      !Number.isFinite(
-        startOffset,
-      ) ||
-      !Number.isFinite(
-        endOffset,
-      ) ||
-      startOffset >
-        endOffset
-    ) {
-      return null;
-    }
+   if (
+  !Number.isFinite(
+    startOffset,
+  ) ||
+  !Number.isFinite(
+    endOffset,
+  ) ||
+  startOffset >=
+    endOffset
+) {
+  return null;
+}
 
     const start =
       new Date(
@@ -811,15 +811,21 @@ try {
       position: 'bottom',
     });
   } catch (error: any) {
-  const backendMessage =
-    error?.response?.data?.message ||
-    'This offer could not be applied.';
+  const rawMessage =
+  error?.response?.data?.message;
 
-  Alert.alert(
-    'Offer Requirements Not Met',
-    backendMessage,
-    [{ text: 'OK' }],
-  );
+const backendMessage =
+  typeof rawMessage === 'string'
+    ? rawMessage
+    : typeof rawMessage?.message === 'string'
+      ? rawMessage.message
+      : 'This offer could not be applied.';
+
+Alert.alert(
+  'Offer Requirements Not Met',
+  backendMessage,
+  [{ text: 'OK' }],
+);
 } finally {
     setApplyingCouponId(null);
   }
@@ -1001,10 +1007,21 @@ try {
       position: 'bottom',
     });
   } catch (error: any) {
-       const status = error?.response?.status;
-    const backendMessage = error?.response?.data?.message;
+      const status =
+  error?.response?.status;
 
-    const isInvalidCode = status === 404;
+const rawMessage =
+  error?.response?.data?.message;
+
+const backendMessage =
+  typeof rawMessage === 'string'
+    ? rawMessage
+    : typeof rawMessage?.message === 'string'
+      ? rawMessage.message
+      : undefined;
+
+const isInvalidCode =
+  status === 404;
 
         console.log('Apply code error:', status, backendMessage);
 
@@ -1491,8 +1508,74 @@ const packages =
  const vendorServiceWindows =
   packages
     .map((pkg: any) => {
-      const window =
-  getResolvedServiceWindow(pkg);
+      const bookingType =
+        String(
+          pkg?.bookingType ||
+            'DURATION_BASED',
+        ).toUpperCase();
+
+      let window =
+        getResolvedServiceWindow(pkg);
+
+      // ---------------------------------
+      // DELIVERY_BASED display fallback
+      // Delivered At = event start + delivery offset
+      // This is DISPLAY ONLY.
+      // Checkout/backend validation stays unchanged.
+      // ---------------------------------
+      if (
+        bookingType ===
+          'DELIVERY_BASED' &&
+        !window
+      ) {
+        const eventDate =
+          eventDetails?.eventDate;
+
+        const eventStartTime =
+          eventDetails?.startTime;
+
+        const deliveryOffset =
+          Number(
+            pkg?.serviceWindowStartOffsetMinutes,
+          );
+
+        if (
+          eventDate &&
+          eventStartTime &&
+          Number.isFinite(deliveryOffset)
+        ) {
+          const dateOnly =
+            String(eventDate).split('T')[0];
+
+          const eventStart =
+            new Date(
+              `${dateOnly}T${eventStartTime}:00`,
+            );
+
+          if (
+            !Number.isNaN(
+              eventStart.getTime(),
+            )
+          ) {
+            const deliveredAt =
+              new Date(
+                eventStart.getTime() +
+                  deliveryOffset *
+                    60 *
+                    1000,
+              );
+
+            window = {
+              startDateTime:
+                deliveredAt.toISOString(),
+
+              // Display fallback only.
+              endDateTime:
+                deliveredAt.toISOString(),
+            };
+          }
+        }
+      }
 
       if (!window) {
         return null;
@@ -1518,12 +1601,6 @@ const packages =
       ) {
         return null;
       }
-
-      const bookingType =
-        String(
-          pkg?.bookingType ||
-            'DURATION_BASED',
-        ).toUpperCase();
 
       const startDate =
         start.toLocaleDateString(
@@ -1566,13 +1643,15 @@ const packages =
           ? `${startDate} • ${startTime} - ${endTime}`
           : `${startDate} • ${startTime}`;
 
-      if (
-        bookingType ===
-        'DELIVERY_BASED'
-      ) {
-        label =
-          `Delivered At: ${startDate} • ${startTime}`;
-      } else if (
+       if (
+  bookingType ===
+  'DELIVERY_BASED'
+) {
+  title = 'Delivered At';
+
+  label =
+    `${startDate} • ${startTime}`;
+} else if (
         bookingType ===
         'SETUP_BASED'
       ) {
@@ -1765,19 +1844,11 @@ const packages =
               }
             >
               <Text
-                style={
-                  styles.serviceWindowPackage
-                }
-              >
-                {item.packageName}
-              </Text>
-
-              <Text
               style={
                 styles.serviceWindowPackage
               }
             >
-              {item.title}
+              {item.packageName} {item.title}
             </Text>
 
             <Text
@@ -1850,24 +1921,36 @@ const packages =
                           )}
 
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
-                          <View style={styles.packageMetaRow}>
-  <Ionicons
-    name="time-outline"
-    size={12}
-    color={MUTED}
-  />
+                          {String(
+  pkg?.bookingType || 'DURATION_BASED',
+).toUpperCase() !== 'DELIVERY_BASED' && (
+  <View style={styles.packageMetaRow}>
+    <Ionicons
+      name="time-outline"
+      size={12}
+      color={MUTED}
+    />
 
-  <Text style={styles.packageMetaText}>
-    {formatDuration(
-      Number(
-        pkg?.durationMinutes ||
-          eventDetails
-            ?.durationMinutes ||
-          0,
-      ),
-    )}
-  </Text>
-</View>
+    <Text style={styles.packageMetaText}>
+      {String(
+        pkg?.bookingType || '',
+      ).toUpperCase() === 'TIME_SLOT_BASED'
+        ? formatDuration(
+            Number(
+              pkg?.requiredServiceDurationMinutes ||
+              0,
+            ),
+          )
+        : formatDuration(
+            Number(
+              pkg?.durationMinutes ||
+                eventDetails?.durationMinutes ||
+                0,
+            ),
+          )}
+    </Text>
+  </View>
+)}
 
 {!!pkg?.requiredServiceWindow && (
   <View style={styles.packageMetaRow}>
@@ -2521,10 +2604,12 @@ serviceWindowPackage: {
 },
 
 serviceWindowValue: {
-  fontSize: 10,
-  color: MUTED,
-  marginTop: 2,
+  fontSize: 10.5,
+  color: GOLD,
+  fontWeight: '700',
+  marginTop: 3,
 },
+
 packageMetaRow: {
   flexDirection: 'row',
   alignItems: 'center',

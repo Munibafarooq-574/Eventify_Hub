@@ -870,10 +870,10 @@ const removeImageAsset = (index: number) => {
   const startOffset = serviceWindowStartOffsetMinutesValue;
   const endOffset = serviceWindowEndOffsetMinutesValue;
 
-  const validWindow =
-    startOffset !== undefined &&
-    endOffset !== undefined &&
-    startOffset <= endOffset;
+ const validWindow =
+  startOffset !== undefined &&
+  endOffset !== undefined &&
+  startOffset < endOffset;
 
   if (bookingType === "CUSTOM") {
     return validWindow;

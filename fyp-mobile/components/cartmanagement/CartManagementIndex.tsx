@@ -32,6 +32,8 @@ const [guests, setGuests] = useState<number>(0);
 
 const [eventCityName, setEventCityName] = useState('');
  const [eventAddress, setEventAddress] = useState('');
+const [eventDetails, setEventDetails] = useState<any>(null);
+
 
     useEffect(() => {
         navigation.setOptions({
@@ -46,6 +48,7 @@ const [eventCityName, setEventCityName] = useState('');
 
 if (eventDetailsRaw) {
     const eventDetails = JSON.parse(eventDetailsRaw);
+    setEventDetails(eventDetails);
 
     if (eventDetails?.guests !== undefined) {
         setGuests(
@@ -293,6 +296,179 @@ if (eventDetailsRaw) {
     // -----------------------------------------
     // Checkout
     // -----------------------------------------
+
+    const getResolvedServiceTiming = (pkg: any) => {
+    const bookingType = String(
+        pkg?.bookingType || 'DURATION_BASED',
+    ).toUpperCase();
+
+    const eventDate =
+        eventDetails?.eventDate ||
+        pkg?.eventDate;
+
+    const eventStartTime =
+        eventDetails?.startTime ||
+        eventDetails?.eventTime ||
+        pkg?.startTime;
+
+    const eventEndTime =
+        eventDetails?.endTime ||
+        pkg?.endTime;
+
+    if (!eventDate || !eventStartTime) {
+        return null;
+    }
+
+    const dateOnly =
+        String(eventDate).split('T')[0];
+
+    const eventStart =
+        new Date(
+            `${dateOnly}T${eventStartTime}:00`,
+        );
+
+    if (Number.isNaN(eventStart.getTime())) {
+        return null;
+    }
+
+    // -----------------------------------------
+    // DURATION_BASED
+    // Event start -> event end
+    // -----------------------------------------
+    if (bookingType === 'DURATION_BASED') {
+        let end: Date | null = null;
+
+        if (eventEndTime) {
+            end = new Date(
+                `${dateOnly}T${eventEndTime}:00`,
+            );
+        } else {
+            const durationMinutes =
+                Number(
+                    pkg?.durationMinutes ||
+                    eventDetails?.durationMinutes,
+                );
+
+            if (
+                Number.isFinite(durationMinutes) &&
+                durationMinutes > 0
+            ) {
+                end = new Date(
+                    eventStart.getTime() +
+                    durationMinutes * 60000,
+                );
+            }
+        }
+
+        if (
+            !end ||
+            Number.isNaN(end.getTime())
+        ) {
+            return null;
+        }
+
+        return {
+            bookingType,
+            start: eventStart,
+            end,
+        };
+    }
+
+    // -----------------------------------------
+    // TIME_SLOT_BASED
+    // Event start + package required duration
+    // -----------------------------------------
+    if (bookingType === 'TIME_SLOT_BASED') {
+        const duration =
+            Number(
+                pkg?.requiredServiceDurationMinutes,
+            );
+
+        if (
+            !Number.isFinite(duration) ||
+            duration <= 0
+        ) {
+            return null;
+        }
+
+        return {
+            bookingType,
+            start: eventStart,
+            end: new Date(
+                eventStart.getTime() +
+                duration * 60000,
+            ),
+        };
+    }
+
+    // -----------------------------------------
+    // DELIVERY_BASED
+    // Exact delivery time = configured start offset
+    // -----------------------------------------
+    if (bookingType === 'DELIVERY_BASED') {
+        const deliveryOffset =
+            Number(
+                pkg?.serviceWindowStartOffsetMinutes,
+            );
+
+        if (!Number.isFinite(deliveryOffset)) {
+            return null;
+        }
+
+        const deliveredAt =
+            new Date(
+                eventStart.getTime() +
+                deliveryOffset * 60000,
+            );
+
+        return {
+            bookingType,
+            start: deliveredAt,
+            end: deliveredAt,
+        };
+    }
+
+    // -----------------------------------------
+    // SETUP_BASED / CUSTOM
+    // Configured start/end offsets
+    // -----------------------------------------
+    if (
+        bookingType === 'SETUP_BASED' ||
+        bookingType === 'CUSTOM'
+    ) {
+        const startOffset =
+            Number(
+                pkg?.serviceWindowStartOffsetMinutes,
+            );
+
+        const endOffset =
+            Number(
+                pkg?.serviceWindowEndOffsetMinutes,
+            );
+
+        if (
+            !Number.isFinite(startOffset) ||
+            !Number.isFinite(endOffset) ||
+            startOffset > endOffset
+        ) {
+            return null;
+        }
+
+        return {
+            bookingType,
+            start: new Date(
+                eventStart.getTime() +
+                startOffset * 60000,
+            ),
+            end: new Date(
+                eventStart.getTime() +
+                endOffset * 60000,
+            ),
+        };
+    }
+
+    return null;
+};
 
     const handleCheckout = () => {
         if (!cartData?.vendors?.length) {
@@ -599,35 +775,34 @@ if (eventDetailsRaw) {
                                                         ?.buisnessCategory ===
                                                         cateringCategory._id;
 
+                                                         const resolvedTiming =
+                                                            getResolvedServiceTiming(pkg);
+
                                                         const serviceWindowStart =
-                                                        pkg?.requiredServiceWindow?.startDateTime
-                                                            ? new Date(
-                                                                pkg.requiredServiceWindow.startDateTime
-                                                            )
-                                                            : null;
+                                                            resolvedTiming?.start || null;
 
-                                                    const serviceWindowEnd =
-                                                        pkg?.requiredServiceWindow?.endDateTime
-                                                            ? new Date(
-                                                                pkg.requiredServiceWindow.endDateTime
-                                                            )
-                                                            : null;
+                                                        const serviceWindowEnd =
+                                                            resolvedTiming?.end || null;
 
-                                                    const formatServiceTime = (
-                                                        value: Date | null
-                                                    ) => {
-                                                        if (
-                                                            !value ||
-                                                            Number.isNaN(value.getTime())
-                                                        ) {
-                                                            return null;
-                                                        }
+                                                const formatServiceTime = (
+                                                            value: Date | null
+                                                        ) => {
+                                                            if (
+                                                                !value ||
+                                                                Number.isNaN(value.getTime())
+                                                            ) {
+                                                                return null;
+                                                            }
 
-                                                        return value.toLocaleTimeString([], {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        });
-                                                    };
+                                                            return value.toLocaleTimeString(
+                                                                'en-US',
+                                                                {
+                                                                    hour: 'numeric',
+                                                                    minute: '2-digit',
+                                                                    hour12: true,
+                                                                },
+                                                            );
+                                                        };
 
                                                     const serviceStartText =
                                                         formatServiceTime(serviceWindowStart);
@@ -711,20 +886,42 @@ if (eventDetailsRaw) {
                                                                     </View>
 
                                                                     <Text style={styles.bookingDetailText}>
-    {serviceStartText
-        ? pkg.bookingType === 'DELIVERY_BASED'
-            ? `${pkg.serviceWindowLabel || 'Delivery'}: ${serviceStartText}`
-            : serviceEndText
-              ? `${pkg.serviceWindowLabel || 'Service'}: ${serviceStartText} – ${serviceEndText}`
-              : `${pkg.serviceWindowLabel || 'Service'}: ${serviceStartText}`
-        : `${pkg.startTime || ''}${
-              pkg.endTime
-                  ? ` – ${pkg.endTime}`
-                  : ''
-          }`}
-</Text>
+                                                                    {resolvedTiming?.bookingType ===
+                                                                    'DELIVERY_BASED'
+                                                                        ? serviceStartText
+                                                                            ? `Delivered At: ${serviceStartText}`
+                                                                            : 'Delivery time unavailable'
+
+                                                                        : resolvedTiming?.bookingType ===
+                                                                        'SETUP_BASED'
+                                                                        ? serviceStartText &&
+                                                                        serviceEndText
+                                                                            ? `Setup Window: ${serviceStartText} - ${serviceEndText}`
+                                                                            : 'Setup window unavailable'
+
+                                                                        : resolvedTiming?.bookingType ===
+                                                                        'TIME_SLOT_BASED'
+                                                                        ? serviceStartText &&
+                                                                        serviceEndText
+                                                                            ? `Appointment: ${serviceStartText} - ${serviceEndText}`
+                                                                            : 'Appointment time unavailable'
+
+                                                                        : resolvedTiming?.bookingType ===
+                                                                        'CUSTOM'
+                                                                        ? serviceStartText &&
+                                                                        serviceEndText
+                                                                            ? `Service Window: ${serviceStartText} - ${serviceEndText}`
+                                                                            : 'Service window unavailable'
+
+                                                                        : serviceStartText &&
+                                                                        serviceEndText
+                                                                        ? `Service: ${serviceStartText} - ${serviceEndText}`
+                                                                        : 'Service time unavailable'}
+                                                                        </Text>
                                                                 </View>
 
+                                                               {resolvedTiming?.bookingType !==
+                                                                'DELIVERY_BASED' && (
                                                                 <View style={styles.bookingDetailItem}>
                                                                     <View style={styles.bookingDetailIcon}>
                                                                         <Ionicons
@@ -735,17 +932,33 @@ if (eventDetailsRaw) {
                                                                     </View>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {pkg.durationMinutes
-                                                                            ? `${(pkg.durationMinutes / 60).toFixed(
-                                                                                  pkg.durationMinutes % 60 === 0 ? 0 : 1
-                                                                              )} ${
-                                                                                  pkg.durationMinutes === 60
-                                                                                      ? 'Hour'
-                                                                                      : 'Hours'
-                                                                              }`
+                                                                        {resolvedTiming?.bookingType ===
+                                                                        'TIME_SLOT_BASED'
+                                                                            ? `${Number(
+                                                                                pkg?.requiredServiceDurationMinutes || 0,
+                                                                            ) / 60} ${
+                                                                                Number(
+                                                                                    pkg?.requiredServiceDurationMinutes || 0,
+                                                                                ) === 60
+                                                                                    ? 'Hour'
+                                                                                    : 'Hours'
+                                                                            }`
+                                                                            : pkg.durationMinutes
+                                                                            ? `${(
+                                                                                pkg.durationMinutes / 60
+                                                                            ).toFixed(
+                                                                                pkg.durationMinutes % 60 === 0
+                                                                                    ? 0
+                                                                                    : 1,
+                                                                            )} ${
+                                                                                pkg.durationMinutes === 60
+                                                                                    ? 'Hour'
+                                                                                    : 'Hours'
+                                                                            }`
                                                                             : 'Duration N/A'}
                                                                     </Text>
                                                                 </View>
+                                                            )}
 
                                                                 <View style={styles.bookingDetailItem}>
                                                                     <View style={styles.bookingDetailIcon}>

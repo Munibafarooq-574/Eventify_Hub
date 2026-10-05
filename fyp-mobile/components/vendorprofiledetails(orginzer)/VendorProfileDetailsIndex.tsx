@@ -29,6 +29,7 @@ import getVendorAvailability, {
 import checkVendorsAvailability from '@/services/checkVendorsAvailability';
 import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
 import { trackVendorView } from '@/services/trackVendorView';
+import  getActiveCities  from '@/services/getActiveCities';
 import {
   ActivityIndicator,
   Image,
@@ -424,6 +425,9 @@ const phase6AvailablePackageIds = useMemo(() => {
 
       const [publicCoupons, setPublicCoupons] =
   useState<any[]>([]);
+
+  const [cities, setCities] =
+  useState<any[]>([]);
     const [loading, setLoading] =
       useState<boolean>(true);
 
@@ -651,6 +655,30 @@ useEffect(() => {
     fetchPublicCoupons();
   }
 }, [vendorData?._id]);
+
+useEffect(() => {
+  const loadCities = async () => {
+    try {
+      const data =
+        await getActiveCities();
+
+      setCities(
+        Array.isArray(data)
+          ? data
+          : [],
+      );
+    } catch (error) {
+      console.error(
+        'Failed to load cities:',
+        error,
+      );
+
+      setCities([]);
+    }
+  };
+
+  loadCities();
+}, []);
 
   type TodayAvailabilitySummary = {
   day: string;
@@ -1930,6 +1958,40 @@ if (
       );
     }
 
+const serviceCityNamesFromIds =
+  Array.isArray(
+    vendorData?.serviceLocationCityIds,
+  )
+    ? vendorData.serviceLocationCityIds
+        .map((cityValue: any) => {
+          const cityId =
+            typeof cityValue === 'object'
+              ? String(
+                  cityValue?._id || '',
+                )
+              : String(cityValue || '');
+
+          const populatedName =
+            typeof cityValue === 'object'
+              ? cityValue?.name
+              : null;
+
+          if (populatedName) {
+            return populatedName;
+          }
+
+          const matchedCity =
+            cities.find(
+              (city: any) =>
+                String(city?._id) ===
+                cityId,
+            );
+
+          return matchedCity?.name;
+        })
+        .filter(Boolean)
+        .join(', ')
+    : '';
     const businessDetails =
       vendorData?.photographerBusinessDetails ||
       vendorData?.salonBusinessDetails ||
@@ -1939,6 +2001,14 @@ if (
       vendorData?.mehndiBusinessDetails ||
       vendorData?.soundBusinessDetails ||
       vendorData?.BusinessDetails;
+
+      const serviceCityNames =
+  serviceCityNamesFromIds ||
+  vendorData?.contactDetails?.cityCovered ||
+  vendorData?.ContactDetails?.cityCovered ||
+  businessDetails?.cityCovered ||
+  vendorData?.cityCovered ||
+  '';
 
     const category =
       vendorData?.photographerBusinessDetails
@@ -1960,6 +2030,12 @@ if (
     const selectedPackage =
       getSelectedPackage();
 
+      const selectedBookingType =
+  String(
+    selectedPackage?.bookingType ||
+      'DURATION_BASED',
+  ).toUpperCase();
+
     const relevantVendorSlots =
       getRelevantVendorSlots(
         vendorAvailability,
@@ -1975,6 +2051,71 @@ if (
       Array.isArray(startTime)
         ? startTime[0]
         : startTime;
+
+        const deliveredAtTime = (() => {
+  if (
+    selectedBookingType !==
+      'DELIVERY_BASED' ||
+    !eventStartTime
+  ) {
+    return null;
+  }
+
+  const [hours, minutes] =
+    String(eventStartTime)
+      .split(':')
+      .map(Number);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes)
+  ) {
+    return null;
+  }
+
+  const deliveryOffset =
+    Number(
+      selectedPackage
+        ?.serviceWindowStartOffsetMinutes,
+    );
+
+  if (
+    !Number.isFinite(deliveryOffset)
+  ) {
+    return null;
+  }
+
+  const totalMinutes =
+    hours * 60 +
+    minutes +
+    deliveryOffset;
+
+  const normalizedMinutes =
+    ((totalMinutes % 1440) + 1440) %
+    1440;
+
+  const deliveryHour =
+    Math.floor(
+      normalizedMinutes / 60,
+    );
+
+  const deliveryMinute =
+    normalizedMinutes % 60;
+
+  return formatTimeDisplay(
+    `${String(
+      deliveryHour,
+    ).padStart(
+      2,
+      '0',
+    )}:${String(
+      deliveryMinute,
+    ).padStart(
+      2,
+      '0',
+    )}`,
+  );
+})();
 
     const eventEndTime =
       Array.isArray(endTime)
@@ -2704,7 +2845,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                       serviceCityNames || undefined
                       }
                     />
                   </>
@@ -2730,7 +2871,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                        serviceCityNames || undefined
                       }
                     />
 
@@ -2789,7 +2930,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                        serviceCityNames || undefined
                       }
                     />
 
@@ -2852,7 +2993,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                        serviceCityNames || undefined
                       }
                     />
 
@@ -2892,7 +3033,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                        serviceCityNames || undefined
                       }
                     />
 
@@ -2934,7 +3075,7 @@ if (
                     <Field
                       label="City Covered"
                       value={
-                        businessDetails?.cityCovered
+                        serviceCityNames || undefined
                       }
                     />
 
@@ -3505,13 +3646,25 @@ if (
           color={TEXT_MUTED}
         />
 
-        <Text
-          style={
-            styles.availabilityLabel
-          }
-        >
-          Required Service Window
-        </Text>
+       <Text
+  style={
+    styles.availabilityLabel
+  }
+>
+  {selectedBookingType ===
+  'DELIVERY_BASED'
+    ? 'Delivered At'
+    : selectedBookingType ===
+      'SETUP_BASED'
+    ? 'Setup Window'
+    : selectedBookingType ===
+      'TIME_SLOT_BASED'
+    ? 'Appointment Time'
+    : selectedBookingType ===
+      'CUSTOM'
+    ? 'Service Window'
+    : 'Service Window'}
+</Text>
       </View>
 
       <Text
@@ -3519,27 +3672,33 @@ if (
           styles.availabilityValue
         }
       >
-        {new Date(
-          availabilityCheck.requiredServiceWindow.startDateTime,
-        ).toLocaleTimeString(
-          'en-US',
-          {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-          },
-        )}
-        {' - '}
-        {new Date(
-          availabilityCheck.requiredServiceWindow.endDateTime,
-        ).toLocaleTimeString(
-          'en-US',
-          {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-          },
-        )}
+   {selectedBookingType ===
+'DELIVERY_BASED'
+  ? deliveredAtTime ||
+    'Delivery time unavailable'
+  : `${new Date(
+      availabilityCheck
+        .requiredServiceWindow
+        .startDateTime,
+    ).toLocaleTimeString(
+      'en-US',
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      },
+    )} - ${new Date(
+      availabilityCheck
+        .requiredServiceWindow
+        .endDateTime,
+    ).toLocaleTimeString(
+      'en-US',
+      {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      },
+    )}`}
       </Text>
     </View>
   )}
@@ -3754,148 +3913,120 @@ if (
                       paddingRight: 8,
                     }}
                   >
-                    {visiblePackages.map(
-                      (
-                        pkg: any,
-                      ) => {
-                        const isActive =
-                          String(
-                            activePackage,
-                          ) ===
-                          String(
-                            pkg._id,
-                          );
+                  {visiblePackages.map((pkg: any) => {
+  const isActive =
+    String(activePackage) === String(pkg._id);
 
-                          const applicableCoupon =
-                        getApplicablePublicCoupon(
-                          String(pkg._id),
-                        );
+  const applicableCoupon = getApplicablePublicCoupon(
+    String(pkg._id),
+  );
 
-                      const couponBadgeText =
-                        applicableCoupon
-                          ? applicableCoupon.discountType ===
-                            'PERCENTAGE'
-                            ? `${Number(
-                                applicableCoupon.discountValue ||
-                                  0,
-                              )}% OFF available`
-                            : `Rs. ${Number(
-                                applicableCoupon.discountValue ||
-                                  0,
-                              ).toLocaleString()} OFF available`
-                          : null;
-                        return (
-                          <TouchableOpacity
-                            key={
-                              pkg._id
-                            }
-                            style={[
-                              styles.packageCard,
-                              isActive &&
-                                styles.activePackageCard,
-                            ]}
-                            onPress={() =>
-                              handlePackageSelect(
-                                pkg._id,
-                              )
-                            }
-                            activeOpacity={
-                              0.85
-                            }
-                          >
-                            <View
-                              style={[
-                                styles.packageCardIconWrap,
-                                isActive &&
-                                  styles.packageCardIconWrapActive,
-                              ]}
-                            >
-                              <Ionicons
-                                name="gift-outline"
-                                size={18}
-                                color={
-                                  isActive
-                                    ? '#FFFFFF'
-                                    : PRIMARY
-                                }
-                              />
-                            </View>
+  const couponBadgeText = applicableCoupon
+    ? String(applicableCoupon.discountType).toUpperCase() ===
+      'PERCENTAGE'
+      ? `${Number(applicableCoupon.discountValue || 0)}% OFF`
+      : `Rs. ${Number(
+          applicableCoupon.discountValue || 0,
+        ).toLocaleString()} OFF`
+    : null;
 
-                            <Text
-                              style={[
-                                styles.packageCardName,
-                                isActive &&
-                                  styles.packageCardNameActive,
-                              ]}
-                              numberOfLines={
-                                2
-                              }
-                            >
-                              {pkg.packageName ||
-                                'Package'}
-                            </Text>
+  return (
+    <TouchableOpacity
+      key={pkg._id}
+      style={[
+        styles.packageCard,
+        isActive && styles.activePackageCard,
+      ]}
+      onPress={() => handlePackageSelect(pkg._id)}
+      activeOpacity={0.88}
+    >
+      {/* Top row: icon + coupon ribbon */}
+      <View style={styles.pkgTopRow}>
+        <View
+          style={[
+            styles.packageCardIconWrap,
+            isActive && styles.packageCardIconWrapActive,
+          ]}
+        >
+          <Ionicons
+            name="gift-outline"
+            size={20}
+            color={isActive ? '#FFFFFF' : PRIMARY}
+          />
+        </View>
 
-                            <Text
-                              style={[
-                                styles.packageCardPrice,
-                                isActive &&
-                                  styles.packageCardPriceActive,
-                              ]}
-                            >
-                              Rs.{' '}
-                              {Number(
-                                pkg.price ||
-                                  0,
-                              ).toLocaleString()}
-                            </Text>
+        {couponBadgeText && (
+          <View style={styles.packageCouponBadge}>
+            <Ionicons
+              name="pricetag"
+              size={11}
+              color="#5A3A00"
+            />
+            <Text
+              style={styles.packageCouponBadgeText}
+              numberOfLines={1}
+            >
+              {couponBadgeText}
+            </Text>
+          </View>
+        )}
+      </View>
 
-                            {couponBadgeText && (
-                              <View
-                                style={[
-                                  styles.packageCouponBadge,
-                                  isActive &&
-                                    styles.packageCouponBadgeActive,
-                                ]}
-                              >
-                                <Ionicons
-                                  name="pricetag-outline"
-                                  size={11}
-                                  color={
-                                    isActive
-                                      ? '#FFFFFF'
-                                      : PRIMARY
-                                  }
-                                />
+      {/* Name */}
+      <Text
+        style={[
+          styles.packageCardName,
+          isActive && styles.packageCardNameActive,
+        ]}
+        numberOfLines={2}
+      >
+        {pkg.packageName || 'Package'}
+      </Text>
 
-                                <Text
-                                  style={[
-                                    styles.packageCouponBadgeText,
-                                    isActive &&
-                                      styles.packageCouponBadgeTextActive,
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {couponBadgeText}
-                                </Text>
-                              </View>
-                            )}
-                            {isActive && (
-                              <View
-                                style={
-                                  styles.activeDot
-                                }
-                              >
-                                <Ionicons
-                                  name="checkmark"
-                                  size={10}
-                                  color="#FFFFFF"
-                                />
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      },
-                    )}
+      {/* Footer: price + check */}
+      <View
+        style={[
+          styles.pkgFooter,
+          isActive && styles.pkgFooterActive,
+        ]}
+      >
+        <View>
+          <Text
+            style={[
+              styles.pkgFromLabel,
+              isActive && styles.pkgFromLabelActive,
+            ]}
+          >
+            Starting from
+          </Text>
+          <Text
+            style={[
+              styles.packageCardPrice,
+              isActive && styles.packageCardPriceActive,
+            ]}
+          >
+            Rs. {Number(pkg.price || 0).toLocaleString()}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.pkgSelectCircle,
+            isActive && styles.pkgSelectCircleActive,
+          ]}
+        >
+          {isActive && (
+            <Ionicons
+              name="checkmark"
+              size={14}
+              color="#FFFFFF"
+            />
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+})}
                   </ScrollView>
 
                   {/* ----------------------------------------- */}
@@ -6352,108 +6483,128 @@ specialOfferDetailText: {
     marginBottom: 14,
   },
 
-  packageCard: {
-    width: 140,
-    minHeight: 122,
-    backgroundColor: CARD,
-    borderRadius: 16,
-    padding: 12,
-    marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    position: 'relative',
-  },
-
-  activePackageCard: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 4,
-  },
-
-  packageCardIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor:
-      PRIMARY_SOFT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-
-  packageCardIconWrapActive: {
-    backgroundColor:
-      'rgba(255,255,255,0.2)',
-  },
-
-  packageCardName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: TEXT_DARK,
-    marginBottom: 4,
-  },
-
-  packageCardNameActive: {
-    color: '#FFFFFF',
-  },
-
-  packageCardPrice: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TEXT_MUTED,
-  },
-
-  packageCardPriceActive: {
-    color:
-      'rgba(255,255,255,0.85)',
-  },
-
-  packageCouponBadge: {
-  marginTop: 7,
-  flexDirection: 'row',
-  alignItems: 'center',
-  alignSelf: 'flex-start',
-  backgroundColor: PRIMARY_SOFT,
-  paddingHorizontal: 7,
-  paddingVertical: 4,
-  borderRadius: 8,
-  gap: 4,
+packageCard: {
+  width: 190,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 22,
+  padding: 14,
+  marginRight: 14,
+  borderWidth: 1.5,
+  borderColor: BORDER,
+  shadowColor: PRIMARY,
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
 },
 
-packageCouponBadgeActive: {
-  backgroundColor:
-    'rgba(255,255,255,0.18)',
+activePackageCard: {
+  backgroundColor: PRIMARY,
+  borderColor: PRIMARY_LIGHT,
+  shadowOpacity: 0.3,
+  shadowRadius: 14,
+  elevation: 8,
+},
+
+pkgTopRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 12,
+},
+
+packageCardIconWrap: {
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  backgroundColor: PRIMARY_SOFT,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+packageCardIconWrapActive: {
+  backgroundColor: 'rgba(255,255,255,0.2)',
+},
+
+packageCouponBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+  backgroundColor: '#F2CF74',
+  paddingHorizontal: 9,
+  paddingVertical: 5,
+  borderRadius: 999,
+  maxWidth: 110,
 },
 
 packageCouponBadgeText: {
+  fontSize: 11,
+  fontWeight: '800',
+  color: '#5A3A00',
+  letterSpacing: 0.3,
+},
+
+packageCardName: {
+  fontSize: 17,
+  fontWeight: '800',
+  color: TEXT_DARK,
+  lineHeight: 22,
+  minHeight: 44,
+},
+
+packageCardNameActive: {
+  color: '#FFFFFF',
+},
+
+pkgFooter: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginTop: 6,
+  paddingTop: 6,
+  borderTopWidth: 1,
+  borderTopColor: BORDER,
+},
+
+pkgFooterActive: {
+  borderTopColor: 'rgba(255,255,255,0.25)',
+},
+
+pkgFromLabel: {
   fontSize: 10.5,
-  fontWeight: '700',
+  color: TEXT_MUTED,
+  fontWeight: '600',
+  marginBottom: 2,
+},
+
+pkgFromLabelActive: {
+  color: 'rgba(255,255,255,0.75)',
+},
+
+packageCardPrice: {
+  fontSize: 17,
+  fontWeight: '800',
   color: PRIMARY,
 },
 
-packageCouponBadgeTextActive: {
+packageCardPriceActive: {
   color: '#FFFFFF',
 },
-  activeDot: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor:
-      'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
+pkgSelectCircle: {
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  borderWidth: 1.5,
+  borderColor: BORDER,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+pkgSelectCircleActive: {
+  backgroundColor: '#D8B45A',
+  borderColor: '#D8B45A',
+},
   packageDetailsCreative: {
     marginTop: 4,
     padding: 0,

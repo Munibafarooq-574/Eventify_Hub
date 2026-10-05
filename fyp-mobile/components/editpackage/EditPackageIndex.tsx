@@ -1197,11 +1197,22 @@ if (user?._id) {
         error,
     );
 
-    Alert.alert(
-      "Error",
-      error?.response?.data?.message ||
-        "Failed to update package.",
-    );
+   const rawMessage =
+  error?.response?.data?.message;
+
+const safeMessage =
+  typeof rawMessage === "string"
+    ? rawMessage
+    : typeof rawMessage?.message === "string"
+      ? rawMessage.message
+      : typeof error?.message === "string"
+        ? error.message
+        : "Failed to update package.";
+
+Alert.alert(
+  "Error",
+  safeMessage,
+);
   } finally {
     setUploadingImages(false);
   }
