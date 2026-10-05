@@ -40,6 +40,10 @@ export class PackageDto {
   @Min(0)
   price?: number;
 
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
   @IsString()
   services: string;
 
