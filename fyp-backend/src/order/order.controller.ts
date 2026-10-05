@@ -68,9 +68,15 @@ async placeOrder(
                 );
             }
 
+            const authenticatedRole =
+                req.user?.role
+                    ?.toString()
+                    .trim()
+                    .toLowerCase();
+
             if (
-                req.user?.role?.toString().toLowerCase() !==
-                'client'
+                authenticatedRole !== 'client' &&
+                authenticatedRole !== 'organizer'
             ) {
                 throw new ForbiddenException(
                     'Only Client accounts can create bookings',
