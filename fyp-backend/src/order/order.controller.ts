@@ -12,17 +12,25 @@ import {
   HttpException,
   InternalServerErrorException,
   BadRequestException,
+  UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('orders')
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
       @Post()
-async placeOrder(@Body() body: {
-    organizerId: string;
+@UseGuards(JwtAuthGuard)
+async placeOrder(
+  @Request() req: any,
+  @Body() body: {
+    organizerId?: string;
+    eventId: string;
     eventDate: string;
     eventTime: string;
     eventName: string;
@@ -51,10 +59,37 @@ async placeOrder(@Body() body: {
     durationMinutes?: number;
 }) {
         try {
+            const authenticatedOrganizerId =
+                req.user?.id?.toString();
+
+            if (!authenticatedOrganizerId) {
+                throw new ForbiddenException(
+                    'Authenticated organizer is required',
+                );
+            }
+
+            if (
+                req.user?.role?.toString().toLowerCase() !==
+                'client'
+            ) {
+                throw new ForbiddenException(
+                    'Only Client accounts can create bookings',
+                );
+            }
+
+            if (
+                body.organizerId &&
+                body.organizerId !== authenticatedOrganizerId
+            ) {
+                throw new ForbiddenException(
+                    'Organizer does not own this booking request',
+                );
+            }
+
             console.log(body.eventName, body.services)
-            // Call the service to create the order
+            // JWT identity is the final organizer authority.
             const order = await this.orderService.createOrder(
-                body.organizerId,
+                authenticatedOrganizerId,
                 new Date(body.eventDate),
                 body.eventTime,
                 body.services,
@@ -65,6 +100,7 @@ async placeOrder(@Body() body: {
                 body.eventCityId,
                 body.eventAddress,
                 body.selectedCategoryIds,
+                body.eventId,
             );
             
             return order;
