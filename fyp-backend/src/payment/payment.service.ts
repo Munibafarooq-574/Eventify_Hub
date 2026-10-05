@@ -33,13 +33,25 @@ export class PaymentService {
         private readonly payoutService: PayoutService,
     ) {}
 
-    private async assertOrganizerOwnsVendorOrder(
+  private async assertOrganizerOwnsVendorOrder(
     vendorOrderId: string,
     organizerId: string,
 ) {
-    const order = await this.orderModel.findOne({
-        vendorOrders: vendorOrderId,
-    });
+    const vendorOrder =
+        await this.vendorOrderModel.findById(
+            vendorOrderId,
+        );
+
+    if (!vendorOrder) {
+        throw new NotFoundException(
+            'Vendor order not found',
+        );
+    }
+
+    const order =
+        await this.orderModel.findById(
+            vendorOrder.orderId,
+        );
 
     if (!order) {
         throw new NotFoundException(
