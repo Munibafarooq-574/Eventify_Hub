@@ -2054,10 +2054,16 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new BadRequestException('Event time must use HH:mm format');
         }
         if (!Number.isInteger(Number(dto.durationMinutes)) || Number(dto.durationMinutes) <= 0) {
-            throw new BadRequestException('Event duration must be a positive whole number');
-        }
+                throw new BadRequestException('Event duration must be a positive whole number');
+            }
 
-        const newDate = new Date(dto.eventDate);
+            if (!dto.reason || !dto.reason.trim()) {
+                throw new BadRequestException(
+                    'Reason is required for rescheduling',
+                );
+            }
+
+            const newDate = new Date(dto.eventDate);
         if (Number.isNaN(newDate.getTime())) throw new BadRequestException('Invalid event date');
 
         const [h, m] = dto.eventTime.split(':').map(Number);
@@ -2143,7 +2149,7 @@ async completeVendorOrder(vendorOrderId: string) {
                 oldServiceEndDateTime: vendorOrder.eventEndDateTime || null,
                 newServiceStartDateTime: availability.requiredServiceWindow?.startDateTime || null,
                 newServiceEndDateTime: availability.requiredServiceWindow?.endDateTime || null,
-                reason: dto.reason?.trim() || null,
+                reason: dto.reason.trim(),
                 availabilityPrecheckPassed: availability.available,
                 availabilityPrecheckReason: availability.reason || null,
                 status: 'CHANGE_REQUESTED',

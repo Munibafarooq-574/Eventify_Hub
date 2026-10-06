@@ -672,7 +672,12 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {eventExpanded && !['completed', 'cancelled'].includes(String(event.status || '').toLowerCase()) && (
+                    {eventExpanded &&
+  vendorOrders.some((vendor: any) =>
+    ['pending', 'accepted'].includes(
+      String(vendor?.status || '').toLowerCase(),
+    ),
+  ) && (
                       <TouchableOpacity
                         style={styles.rescheduleButton}
                         activeOpacity={0.85}
