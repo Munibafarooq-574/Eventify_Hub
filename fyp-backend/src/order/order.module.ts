@@ -15,6 +15,8 @@ import {
   Category,
   CategorySchema,
 } from '../schemas/category.schema';
+import { RescheduleRequest, RescheduleRequestSchema } from '../schemas/reschedule-request.schema';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
     imports: [
@@ -25,6 +27,7 @@ import {
             { name: Notification.name, schema: NotificationSchema },
             { name: CommissionConfig.name, schema: CommissionConfigSchema },
             { name: Category.name, schema: CategorySchema, },
+            { name: RescheduleRequest.name, schema: RescheduleRequestSchema },
 
             
         ]),
@@ -32,6 +35,7 @@ import {
         PayoutModule,
         VendorGrowthModule,
         CityModule,
+        ChatModule,
     ],
     controllers: [OrderController],
     providers: [OrderService],

@@ -20,6 +20,9 @@ import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { DiscountService } from 'src/vendor/growth/discount/discount.service';
 import { CityService } from 'src/city/city.service';
 import { Category } from 'src/schemas/category.schema';
+import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
+import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
+import { ChatService } from '../chat/chat.service';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -40,6 +43,9 @@ export class OrderService {
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<Notification>,
 
+    @InjectModel(RescheduleRequest.name)
+    private readonly rescheduleRequestModel: Model<RescheduleRequest>,
+
     @InjectModel(CommissionConfig.name)
     private readonly commissionConfigModel: Model<CommissionConfig>,
 
@@ -54,6 +60,7 @@ export class OrderService {
     private readonly featureAccessService: FeatureAccessService,
     private readonly cityService: CityService,
     private readonly discountService: DiscountService,
+    private readonly chatService: ChatService,
 ) { }
 
 
@@ -2017,4 +2024,421 @@ async completeVendorOrder(vendorOrderId: string) {
         });
         return await notification.save();
     }
+
+    // =========================================================
+    // Phase 13B — Client event date/time rescheduling
+    // =========================================================
+
+    async requestEventReschedule(
+        orderId: string,
+        requesterId: string,
+        dto: CreateRescheduleRequestDto,
+    ) {
+        if (!Types.ObjectId.isValid(orderId) || !Types.ObjectId.isValid(requesterId)) {
+            throw new BadRequestException('Invalid booking or client ID');
+        }
+
+        const order: any = await this.orderModel.findById(orderId).lean();
+        if (!order) throw new NotFoundException('Booking not found');
+
+        if (String(order.organizerId) !== String(requesterId)) {
+            throw new BadRequestException('Only the booking client can request rescheduling');
+        }
+
+        if (['completed', 'cancelled'].includes(order.status)) {
+            throw new ConflictException('This booking can no longer be rescheduled');
+        }
+
+        const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+        if (!timePattern.test(dto.eventTime || '')) {
+            throw new BadRequestException('Event time must use HH:mm format');
+        }
+        if (!Number.isInteger(Number(dto.durationMinutes)) || Number(dto.durationMinutes) <= 0) {
+                throw new BadRequestException('Event duration must be a positive whole number');
+            }
+
+            if (!dto.reason || !dto.reason.trim()) {
+                throw new BadRequestException(
+                    'Reason is required for rescheduling',
+                );
+            }
+
+            const newDate = new Date(dto.eventDate);
+        if (Number.isNaN(newDate.getTime())) throw new BadRequestException('Invalid event date');
+
+        const [h, m] = dto.eventTime.split(':').map(Number);
+        const newEventStart = new Date(newDate);
+        newEventStart.setHours(h, m, 0, 0);
+        const newEventEnd = new Date(newEventStart.getTime() + Number(dto.durationMinutes) * 60000);
+
+        if (newEventStart.getTime() < Date.now()) {
+            throw new BadRequestException('Requested event date/time must be in the future');
+        }
+
+        const oldEventStart = order.eventStartDateTime
+            ? new Date(order.eventStartDateTime)
+            : new Date(order.eventDate);
+        const oldEventEnd = order.eventEndDateTime
+            ? new Date(order.eventEndDateTime)
+            : new Date(oldEventStart.getTime() + Number(order.eventDurationMinutes || 60) * 60000);
+
+        if (
+            oldEventStart.getTime() === newEventStart.getTime() &&
+            oldEventEnd.getTime() === newEventEnd.getTime()
+        ) {
+            throw new BadRequestException('Requested date/time is unchanged');
+        }
+
+        const vendorOrders: any[] = await this.vendorOrderModel.find({
+            _id: { $in: order.vendorOrders || [] },
+            status: { $in: ['pending', 'accepted'] },
+        }).lean();
+
+        if (!vendorOrders.length) {
+            throw new ConflictException('No active vendor bookings can be rescheduled');
+        }
+
+        const existing = await this.rescheduleRequestModel.findOne({
+            orderId: order._id,
+            status: 'CHANGE_REQUESTED',
+        }).lean();
+
+        if (existing) {
+            throw new ConflictException('A rescheduling request is already pending for this booking');
+        }
+
+        const expiresAt = new Date(Date.now() + DEFAULT_HOLD_HOURS * 60 * 60 * 1000);
+        const created: any[] = [];
+        const requestGroupId = new Types.ObjectId();
+
+        for (const vendorOrder of vendorOrders) {
+            const availability = await this.availabilityService.checkVendorAvailability(
+                String(vendorOrder.vendorId),
+                newEventStart,
+                newEventEnd,
+                vendorOrder.packageId || undefined,
+                undefined,
+                String(vendorOrder._id),
+            );
+
+            const vendor: any = await this.userModel
+                .findById(vendorOrder.vendorId)
+                .select('packages')
+                .lean();
+
+            const pkg = (vendor?.packages || []).find(
+                (p: any) => String(p._id) === String(vendorOrder.packageId),
+            );
+
+            const request = await this.rescheduleRequestModel.create({
+                requestGroupId,
+                bookingId: order._id,
+                orderId: order._id,
+                eventId: order.eventId || String(order._id),
+                vendorOrderId: vendorOrder._id,
+                vendorId: vendorOrder.vendorId,
+                requestedBy: new Types.ObjectId(requesterId),
+                bookingType: pkg?.bookingType || null,
+                oldEventDate: order.eventDate,
+                oldStartTime: order.eventTime,
+                oldEndTime: oldEventEnd,
+                newEventDate: newDate,
+                newStartTime: dto.eventTime,
+                newEndTime: newEventEnd,
+                oldServiceStartDateTime: vendorOrder.eventStartDateTime || null,
+                oldServiceEndDateTime: vendorOrder.eventEndDateTime || null,
+                newServiceStartDateTime: availability.requiredServiceWindow?.startDateTime || null,
+                newServiceEndDateTime: availability.requiredServiceWindow?.endDateTime || null,
+                reason: dto.reason.trim(),
+                availabilityPrecheckPassed: availability.available,
+                availabilityPrecheckReason: availability.reason || null,
+                status: 'CHANGE_REQUESTED',
+                expiresAt,
+            });
+
+            created.push(request);
+
+            try {
+                const chatId = await this.chatService.createOrGetConversation(
+                    requesterId,
+                    String(vendorOrder.vendorId),
+                );
+                await this.chatService.createMessage(
+                    chatId,
+                    requesterId,
+                    String(vendorOrder.vendorId),
+                    `Rescheduling requested: ${dto.eventDate} at ${dto.eventTime}. Please review the booking rescheduling request.`,
+                );
+            } catch (error) {
+                console.log('Reschedule chat message failed:', error instanceof Error ? error.message : error);
+            }
+
+            try {
+                await this.sendPushNotification(
+                    'Rescheduling request',
+                    'A client requested a new event date/time. Please review the request.',
+                    String(vendorOrder.vendorId),
+                    'RESCHEDULE_REQUESTED',
+                );
+            } catch (error) {
+                // Notification delivery must never roll back the request.
+                console.log('Reschedule push notification failed:', error instanceof Error ? error.message : error);
+                try {
+                    await this.saveNotification(
+                        String(vendorOrder.vendorId),
+                        'Rescheduling request',
+                        'A client requested a new event date/time. Please review the request.',
+                        'RESCHEDULE_REQUESTED',
+                    );
+                } catch {}
+            }
+        }
+
+        return {
+            orderId: order._id,
+            eventId: order.eventId,
+            requests: created,
+        };
+    }
+
+    async getRescheduleRequests(userId: string, role: string, orderId?: string) {
+        const normalizedRole = String(role || '').trim().toLowerCase();
+        const filter: any = {};
+
+        if (orderId) {
+            if (!Types.ObjectId.isValid(orderId)) throw new BadRequestException('Invalid booking ID');
+            filter.orderId = new Types.ObjectId(orderId);
+        }
+
+        if (normalizedRole === 'vendor') {
+            filter.vendorId = new Types.ObjectId(userId);
+        } else if (normalizedRole === 'client' || normalizedRole === 'organizer') {
+            filter.requestedBy = new Types.ObjectId(userId);
+        } else {
+            throw new BadRequestException('Unsupported account role');
+        }
+
+        await this.expireRescheduleRequests();
+        return this.rescheduleRequestModel.find(filter).sort({ createdAt: -1 }).lean();
+    }
+
+    async respondToRescheduleRequest(
+        requestId: string,
+        vendorId: string,
+        dto: RespondRescheduleRequestDto,
+    ) {
+        if (!Types.ObjectId.isValid(requestId) || !Types.ObjectId.isValid(vendorId)) {
+            throw new BadRequestException('Invalid request or vendor ID');
+        }
+
+        await this.expireRescheduleRequests();
+
+        const request: any = await this.rescheduleRequestModel.findById(requestId);
+        if (!request) throw new NotFoundException('Rescheduling request not found');
+
+        if (String(request.vendorId) !== String(vendorId)) {
+            throw new BadRequestException('This rescheduling request belongs to another vendor');
+        }
+
+        if (request.status !== 'CHANGE_REQUESTED') {
+            throw new ConflictException('This rescheduling request has already been resolved');
+        }
+
+        if (dto.status === 'ACCEPTED') {
+            const vendorOrder: any = await this.vendorOrderModel.findById(request.vendorOrderId).lean();
+            if (!vendorOrder || !['pending', 'accepted'].includes(vendorOrder.status)) {
+                throw new ConflictException('Vendor booking is no longer active');
+            }
+
+            const requestedStart = new Date(request.newEventDate);
+            const [rh, rm] = String(request.newStartTime).split(':').map(Number);
+            requestedStart.setHours(rh, rm, 0, 0);
+
+            const availability = await this.availabilityService.checkVendorAvailability(
+                String(request.vendorId),
+                requestedStart,
+                new Date(request.newEndTime),
+                vendorOrder.packageId || undefined,
+                undefined,
+                String(vendorOrder._id),
+            );
+
+            if (!availability.available) {
+                throw new ConflictException(
+                    availability.reason || 'Vendor is no longer available for the requested time',
+                );
+            }
+
+            request.newServiceStartDateTime =
+                availability.requiredServiceWindow?.startDateTime || request.newServiceStartDateTime;
+            request.newServiceEndDateTime =
+                availability.requiredServiceWindow?.endDateTime || request.newServiceEndDateTime;
+        }
+
+        request.status = dto.status;
+        request.respondedAt = new Date();
+        request.responseMessage = dto.message?.trim() || null;
+        await request.save();
+
+        const order: any = await this.orderModel.findById(request.orderId).lean();
+
+        if (dto.status === 'ACCEPTED') {
+            await this.applyRescheduleIfAllAccepted(String(request.orderId));
+        }
+
+        if (order) {
+            try {
+                const chatId = await this.chatService.createOrGetConversation(
+                    String(order.organizerId),
+                    String(request.vendorId),
+                );
+                await this.chatService.createMessage(
+                    chatId,
+                    String(request.vendorId),
+                    String(order.organizerId),
+                    dto.status === 'ACCEPTED'
+                        ? 'Rescheduling request accepted.'
+                        : 'Rescheduling request rejected. The original booking remains unchanged.',
+                );
+            } catch (error) {
+                console.log('Reschedule response chat message failed:', error instanceof Error ? error.message : error);
+            }
+
+            try {
+                await this.sendPushNotification(
+                    dto.status === 'ACCEPTED' ? 'Reschedule accepted' : 'Reschedule rejected',
+                    dto.status === 'ACCEPTED'
+                        ? 'A vendor accepted your requested event date/time.'
+                        : 'A vendor rejected your requested event date/time. Your original booking remains unchanged.',
+                    String(order.organizerId),
+                    dto.status === 'ACCEPTED' ? 'RESCHEDULE_ACCEPTED' : 'RESCHEDULE_REJECTED',
+                );
+            } catch (error) {
+                try {
+                    await this.saveNotification(
+                        String(order.organizerId),
+                        dto.status === 'ACCEPTED' ? 'Reschedule accepted' : 'Reschedule rejected',
+                        dto.status === 'ACCEPTED'
+                            ? 'A vendor accepted your requested event date/time.'
+                            : 'A vendor rejected your requested event date/time. Your original booking remains unchanged.',
+                        dto.status === 'ACCEPTED' ? 'RESCHEDULE_ACCEPTED' : 'RESCHEDULE_REJECTED',
+                    );
+                } catch {}
+            }
+        }
+
+        return request;
+    }
+
+    private async applyRescheduleIfAllAccepted(orderId: string) {
+        const latest: any = await this.rescheduleRequestModel
+            .findOne({ orderId: new Types.ObjectId(orderId) })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        if (!latest) return { applied: false };
+
+        const batch: any[] = await this.rescheduleRequestModel
+            .find({ requestGroupId: latest.requestGroupId })
+            .lean();
+
+        if (!batch.length || batch.some((r: any) => r.status !== 'ACCEPTED')) {
+            return { applied: false };
+        }
+
+        const session = await this.connection.startSession();
+        try {
+            await session.withTransaction(async () => {
+                const order: any = await this.orderModel.findById(orderId).session(session);
+                if (!order) throw new NotFoundException('Booking not found');
+
+                const vendorOrders: any[] = [];
+                for (const req of batch) {
+                    const vo: any = await this.vendorOrderModel.findById(req.vendorOrderId).session(session);
+                    if (!vo || !['pending', 'accepted'].includes(vo.status)) {
+                        throw new ConflictException('A vendor booking is no longer active');
+                    }
+                    vendorOrders.push(vo);
+                }
+
+                const vendorIds = [...new Set(batch.map((r: any) => String(r.vendorId)))].sort();
+                for (const id of vendorIds) {
+                    await this.userModel.updateOne(
+                        { _id: new Types.ObjectId(id), role: 'Vendor' },
+                        { $inc: { bookingConcurrencyVersion: 1 } },
+                        { session },
+                    );
+                }
+
+                for (let i = 0; i < batch.length; i++) {
+                    const req: any = batch[i];
+                    const vo: any = vendorOrders[i];
+
+                    const requestedStart = new Date(req.newEventDate);
+                    const [rh, rm] = String(req.newStartTime).split(':').map(Number);
+                    requestedStart.setHours(rh, rm, 0, 0);
+
+                    const availability = await this.availabilityService.checkVendorAvailability(
+                        String(req.vendorId),
+                        requestedStart,
+                        new Date(req.newEndTime),
+                        vo.packageId || undefined,
+                        session,
+                        String(vo._id),
+                    );
+
+                    if (!availability.available) {
+                        throw new ConflictException(
+                            availability.reason || 'Final rescheduling availability validation failed',
+                        );
+                    }
+
+                    vo.eventStartDateTime =
+                        availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime;
+                    vo.eventEndDateTime =
+                        availability.requiredServiceWindow?.endDateTime || req.newServiceEndDateTime;
+                    await vo.save({ session });
+
+                    await this.rescheduleRequestModel.updateOne(
+                        { _id: req._id },
+                        {
+                            $set: {
+                                newServiceStartDateTime: vo.eventStartDateTime,
+                                newServiceEndDateTime: vo.eventEndDateTime,
+                                appliedAt: new Date(),
+                            },
+                        },
+                        { session },
+                    );
+                }
+
+                const first: any = batch[0];
+                const newStart = new Date(first.newEventDate);
+                const [nh, nm] = String(first.newStartTime).split(':').map(Number);
+                newStart.setHours(nh, nm, 0, 0);
+
+                order.eventDate = new Date(first.newEventDate);
+                order.eventTime = first.newStartTime;
+                order.eventStartDateTime = newStart;
+                order.eventEndDateTime = new Date(first.newEndTime);
+                order.eventDurationMinutes =
+                    Math.round((new Date(first.newEndTime).getTime() - newStart.getTime()) / 60000);
+                await order.save({ session });
+            });
+        } finally {
+            await session.endSession();
+        }
+
+        return { applied: true };
+    }
+
+    async expireRescheduleRequests() {
+        const now = new Date();
+        const result = await this.rescheduleRequestModel.updateMany(
+            { status: 'CHANGE_REQUESTED', expiresAt: { $lt: now } },
+            { $set: { status: 'EXPIRED', respondedAt: now } },
+        );
+        return { expiredCount: result.modifiedCount };
+    }
+
 }

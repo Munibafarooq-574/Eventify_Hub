@@ -2,6 +2,7 @@
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
 import getPaymentStatus from '@/services/getPaymentStatus';
+import { getRescheduleRequests } from '@/services/rescheduleBooking';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -158,6 +159,7 @@ const MyEventsScreen = () => {
   const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({});
+  const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
 
   // Safely get the logged-in user, trying AsyncStorage first (where login
   // saves it via saveUserData), then falling back to SecureStore in case
@@ -189,6 +191,14 @@ const MyEventsScreen = () => {
       const fetchedEvents = await getVendorOrders('Organizer', user._id);
 
       setEvents(fetchedEvents || []);
+
+      try {
+        const requests = await getRescheduleRequests();
+        setRescheduleRequests(Array.isArray(requests) ? requests : []);
+      } catch (error) {
+        console.error('Could not load rescheduling requests:', error);
+        setRescheduleRequests([]);
+      }
 
       const paymentEntries = await Promise.all(
         (fetchedEvents || [])
@@ -659,6 +669,77 @@ const MyEventsScreen = () => {
                           </View>
                           <Text style={styles.detailValueLeft}>{getDesiredServices(event)}</Text>
                         </View>
+                      </View>
+                    )}
+
+                    {eventExpanded &&
+  vendorOrders.some((vendor: any) =>
+    ['pending', 'accepted'].includes(
+      String(vendor?.status || '').toLowerCase(),
+    ),
+  ) && (
+                      <TouchableOpacity
+                        style={styles.rescheduleButton}
+                        activeOpacity={0.85}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/reschedulebooking',
+                            params: {
+                              orderId: event._id,
+                              eventName: event.eventName,
+                              eventDate: event.eventDate,
+                              eventTime: event.eventTime,
+                              durationMinutes: String(event.eventDurationMinutes || 60),
+                            },
+                          })
+                        }
+                      >
+                        <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
+                        <Text style={styles.rescheduleButtonText}>Request Date/Time Change</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {eventExpanded && rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) && (
+                      <View style={styles.rescheduleStatusCard}>
+                        <Text style={styles.rescheduleStatusTitle}>Rescheduling status</Text>
+                        {rescheduleRequests
+                          .filter((request: any) => String(request.orderId) === String(event._id))
+                          .map((request: any) => {
+                            const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
+                            const vendorData = vendorOrder?.vendorId || {};
+                            const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
+                            const status = String(request.status || 'CHANGE_REQUESTED');
+                            const statusLabel =
+                              status === 'CHANGE_REQUESTED' ? 'Waiting for vendor' :
+                              status === 'ACCEPTED' ? 'New date accepted' :
+                              status === 'REJECTED' ? 'New date rejected' : 'Request expired';
+                            return (
+                              <View key={request._id} style={styles.rescheduleStatusRow}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.rescheduleVendorName}>{vendorName}</Text>
+                                  <Text style={styles.rescheduleRequestedTime}>
+                                    {formatDate(request.newEventDate)} • {formatTime(request.newStartTime)}
+                                  </Text>
+                                </View>
+                                <View style={[
+                                  styles.rescheduleChip,
+                                  status === 'ACCEPTED' && { backgroundColor: '#E6F7EA' },
+                                  status === 'REJECTED' && { backgroundColor: '#FDEAEC' },
+                                ]}>
+                                  <Text style={[
+                                    styles.rescheduleChipText,
+                                    status === 'ACCEPTED' && { color: COLORS.success },
+                                    status === 'REJECTED' && { color: COLORS.danger },
+                                  ]}>{statusLabel}</Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        {rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && request.status === 'REJECTED') && (
+                          <Text style={styles.rescheduleHelp}>
+                            A vendor rejected the new timing. The original booking remains unchanged.
+                          </Text>
+                        )}
                       </View>
                     )}
 
@@ -1134,6 +1215,16 @@ const MyEventsScreen = () => {
 export default MyEventsScreen;
 
 const styles = StyleSheet.create({
+  rescheduleButton: { marginTop: 16, backgroundColor: COLORS.primary, minHeight: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  rescheduleButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  rescheduleStatusCard: { marginTop: 14, padding: 14, backgroundColor: '#FFF8FC', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
+  rescheduleStatusTitle: { color: COLORS.primaryDark, fontWeight: '800', fontSize: 14, marginBottom: 10 },
+  rescheduleStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F4E5EE' },
+  rescheduleVendorName: { color: COLORS.text, fontWeight: '700', fontSize: 13 },
+  rescheduleRequestedTime: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  rescheduleChip: { maxWidth: 135, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6 },
+  rescheduleChipText: { color: '#8A6500', fontSize: 10.5, fontWeight: '800', textAlign: 'center' },
+  rescheduleHelp: { color: COLORS.danger, fontSize: 12, lineHeight: 18, marginTop: 10 },
   container: {
     flex: 1,
   },

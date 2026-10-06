@@ -1,6 +1,7 @@
 import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorOrders from "@/services/getVendorOrders";
+import { getRescheduleRequests, respondToRescheduleRequest } from "@/services/rescheduleBooking";
 import patchUpdateOrderStatus, {
     patchUpdateVendorOrderStatus,
 } from "@/services/patchUpdateOrderStatus";
@@ -8,7 +9,7 @@ import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 // Order interface
@@ -81,6 +82,8 @@ const OrderSummary = () => {
     const [selectedFilter, setSelectedFilter] = useState<FilterType>("All");
     const [orders, setOrders] = useState<any[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
+    const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
 
     useEffect(() => {
         // Fetch orders on mount. Stats are derived live from `orders` below,
@@ -94,12 +97,59 @@ const OrderSummary = () => {
                 const ordersData = await getVendorOrders("Vendor", user._id); // Fetch all orders
                 console.log(ordersData);
                 setOrders(ordersData || []);
+                try {
+                    const requests = await getRescheduleRequests();
+                    setRescheduleRequests(Array.isArray(requests) ? requests : []);
+                } catch (error) {
+                    console.error("Error fetching reschedule requests:", error);
+                    setRescheduleRequests([]);
+                }
             } catch (error) {
                 console.error('Error fetching data:', error);
             }
         };
         fetchData();
     }, []);
+
+    const handleRescheduleResponse = async (
+        requestId: string,
+        status: "ACCEPTED" | "REJECTED"
+    ) => {
+        const perform = async () => {
+            try {
+                setRespondingRequestId(requestId);
+                const updated = await respondToRescheduleRequest(requestId, status);
+                setRescheduleRequests((current) =>
+                    current.map((request) =>
+                        request._id === requestId ? { ...request, ...updated } : request
+                    )
+                );
+                Alert.alert(
+                    status === "ACCEPTED" ? "Reschedule accepted" : "Reschedule rejected",
+                    status === "ACCEPTED"
+                        ? "Your acceptance was saved. The booking only moves after all required vendors accept and final backend validation passes."
+                        : "The original booking remains unchanged."
+                );
+            } catch (error: any) {
+                Alert.alert("Could not respond", error?.message || "Please try again.");
+            } finally {
+                setRespondingRequestId(null);
+            }
+        };
+
+        if (status === "REJECTED") {
+            Alert.alert(
+                "Reject rescheduling?",
+                "The client will be told that your service cannot move to the requested date/time.",
+                [
+                    { text: "Keep reviewing", style: "cancel" },
+                    { text: "Reject", style: "destructive", onPress: perform },
+                ]
+            );
+            return;
+        }
+        await perform();
+    };
 
     // Live-computed stats: recalculates automatically whenever `orders` changes
     // (e.g. after Mark Processing / Mark Completed / Delete), so the numbers
@@ -510,6 +560,57 @@ const OrderSummary = () => {
                                                     </View>
                                                 )}
 
+                                                {rescheduleRequests
+                                                    .filter((request: any) => String(request.orderId) === String(item._id))
+                                                    .map((request: any) => {
+                                                        const pending = request.status === "CHANGE_REQUESTED";
+                                                        const busy = respondingRequestId === request._id;
+                                                        return (
+                                                            <View key={request._id} style={styles.rescheduleCard}>
+                                                                <View style={styles.rescheduleHeader}>
+                                                                    <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
+                                                                    <Text style={styles.rescheduleTitle}>Rescheduling Request</Text>
+                                                                </View>
+                                                                <Text style={styles.rescheduleLine}>
+                                                                    New date: {new Date(request.newEventDate).toDateString()}
+                                                                </Text>
+                                                                <Text style={styles.rescheduleLine}>
+                                                                    New start: {request.newStartTime}
+                                                                </Text>
+                                                                {!!request.reason && (
+                                                                    <Text style={styles.rescheduleReason}>Reason: {request.reason}</Text>
+                                                                )}
+                                                                {request.availabilityPrecheckPassed === false && (
+                                                                    <Text style={styles.rescheduleWarning}>
+                                                                        Availability pre-check found a conflict. Review carefully.
+                                                                    </Text>
+                                                                )}
+                                                                {pending ? (
+                                                                    <View style={styles.rescheduleActions}>
+                                                                        <TouchableOpacity
+                                                                            disabled={busy}
+                                                                            style={styles.rejectRescheduleButton}
+                                                                            onPress={() => handleRescheduleResponse(request._id, "REJECTED")}
+                                                                        >
+                                                                            <Text style={styles.rescheduleActionText}>Reject</Text>
+                                                                        </TouchableOpacity>
+                                                                        <TouchableOpacity
+                                                                            disabled={busy}
+                                                                            style={styles.acceptRescheduleButton}
+                                                                            onPress={() => handleRescheduleResponse(request._id, "ACCEPTED")}
+                                                                        >
+                                                                            {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.rescheduleActionText}>Accept</Text>}
+                                                                        </TouchableOpacity>
+                                                                    </View>
+                                                                ) : (
+                                                                    <Text style={styles.rescheduleResolved}>
+                                                                        {request.status === "ACCEPTED" ? "Accepted" : request.status === "REJECTED" ? "Rejected" : "Expired"}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                        );
+                                                    })}
+
                                                 {/* Organizer Details */}
                                                 <Text style={styles.expandedSubTitle}>Organizer Details</Text>
                                                 {!!item.organizerId?.name && (
@@ -666,6 +767,17 @@ const SummaryCard = ({
 );
 
 const styles = StyleSheet.create({
+    rescheduleCard: { marginTop: 14, padding: 13, borderRadius: 13, backgroundColor: '#FFF8FC', borderWidth: 1, borderColor: '#E8D4E1' },
+    rescheduleHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 9 },
+    rescheduleTitle: { color: PRIMARY, fontWeight: '800', fontSize: 14 },
+    rescheduleLine: { color: '#4F3B49', fontSize: 12.5, marginBottom: 4 },
+    rescheduleReason: { color: '#7A6675', fontSize: 12, marginTop: 5 },
+    rescheduleWarning: { color: '#B06B00', fontWeight: '700', fontSize: 11.5, marginTop: 7 },
+    rescheduleActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+    rejectRescheduleButton: { flex: 1, minHeight: 40, borderRadius: 10, backgroundColor: '#C0392B', alignItems: 'center', justifyContent: 'center' },
+    acceptRescheduleButton: { flex: 1, minHeight: 40, borderRadius: 10, backgroundColor: '#278A4B', alignItems: 'center', justifyContent: 'center' },
+    rescheduleActionText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+    rescheduleResolved: { marginTop: 9, color: PRIMARY, fontWeight: '800', fontSize: 12 },
     safeArea: {
         flex: 1,
         backgroundColor: PRIMARY,

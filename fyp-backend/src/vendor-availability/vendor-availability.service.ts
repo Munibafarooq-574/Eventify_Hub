@@ -285,6 +285,7 @@ if (!hasAccess) {
     endDateTime: Date,
     packageId?: string,
     session?: ClientSession,
+    excludeVendorOrderId?: string,
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -766,8 +767,7 @@ if (!hasAccess) {
     // Only overlapping blocking statuses count.
     // ---------------------------------------------------------
 
-    const overlapQuery =
-      this.vendorOrderModel.countDocuments({
+    const overlapFilter: any = {
         vendorId:
           new Types.ObjectId(vendorId),
 
@@ -782,7 +782,13 @@ if (!hasAccess) {
         eventEndDateTime: {
           $gt: startDateTime,
         },
-      });
+      };
+
+    if (excludeVendorOrderId && Types.ObjectId.isValid(excludeVendorOrderId)) {
+      overlapFilter._id = { $ne: new Types.ObjectId(excludeVendorOrderId) };
+    }
+
+    const overlapQuery = this.vendorOrderModel.countDocuments(overlapFilter);
 
     if (session) {
       overlapQuery.session(session);
