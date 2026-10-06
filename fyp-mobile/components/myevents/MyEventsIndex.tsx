@@ -68,6 +68,11 @@ const MyEventsScreen = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
+const [expandedEvents, setExpandedEvents] =
+  useState<Record<string, boolean>>({});
+
+const [expandedVendors, setExpandedVendors] =
+  useState<Record<string, boolean>>({});
   // Safely get the logged-in user, trying AsyncStorage first (where login
   // saves it via saveUserData), then falling back to SecureStore in case
   // some part of the app still saves it there.
@@ -159,6 +164,113 @@ setPaymentBreakdowns(
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const toggleEventDetails = (
+  eventId: string,
+) => {
+  setExpandedEvents((current) => ({
+    ...current,
+    [eventId]: !current[eventId],
+  }));
+};
+
+const toggleVendorDetails = (
+  vendorOrderId: string,
+) => {
+  setExpandedVendors((current) => ({
+    ...current,
+    [vendorOrderId]:
+      !current[vendorOrderId],
+  }));
+};
+
+const formatDate = (
+  value?: string | Date,
+) => {
+  if (!value) return 'N/A';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'N/A';
+  }
+
+  return date.toLocaleDateString(
+    'en-GB',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    },
+  );
+};
+
+const formatTime = (
+  value?: string | Date,
+) => {
+  if (!value) return 'N/A';
+
+  if (
+    typeof value === 'string' &&
+    /^\d{1,2}:\d{2}$/.test(value)
+  ) {
+    const [hourPart, minutePart] =
+      value.split(':');
+
+    const hour = Number(hourPart);
+    const minute = Number(minutePart);
+
+    const period =
+      hour >= 12 ? 'PM' : 'AM';
+
+    const displayHour =
+      hour % 12 || 12;
+
+    return `${displayHour}:${String(
+      minute,
+    ).padStart(2, '0')} ${period}`;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'N/A';
+  }
+
+  return date.toLocaleTimeString(
+    'en-US',
+    {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    },
+  );
+};
+
+const formatDuration = (
+  minutes?: number,
+) => {
+  const total =
+    Number(minutes || 0);
+
+  if (!total) return 'N/A';
+
+  const hours =
+    Math.floor(total / 60);
+
+  const mins =
+    total % 60;
+
+  if (hours && mins) {
+    return `${hours} hr ${mins} min`;
+  }
+
+  if (hours) {
+    return `${hours} hr`;
+  }
+
+  return `${mins} min`;
+};
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -285,15 +397,43 @@ setPaymentBreakdowns(
               <View key={event._id} style={[styles.card, isDeleting && styles.cardDeleting]}>
                 {/* Card top row */}
                 <View style={styles.cardTopRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.eventName}>{event.eventName}</Text>
-                    <View style={styles.infoRow}>
-                      <Ionicons name="calendar-outline" size={14} color="#777" />
-                      <Text style={styles.info}>
-                        {new Date(event.eventDate).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  </View>
+                 <TouchableOpacity
+  style={{ flex: 1 }}
+  onPress={() =>
+    toggleEventDetails(event._id)
+  }
+  activeOpacity={0.8}
+>
+  <View style={styles.expandHeaderRow}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.eventName}>
+        {event.eventName}
+      </Text>
+
+      <View style={styles.infoRow}>
+        <Ionicons
+          name="calendar-outline"
+          size={14}
+          color="#777"
+        />
+
+        <Text style={styles.info}>
+          {formatDate(event.eventDate)}
+        </Text>
+      </View>
+    </View>
+
+    <Ionicons
+      name={
+        expandedEvents[event._id]
+          ? 'chevron-up'
+          : 'chevron-down'
+      }
+      size={20}
+      color="#7B2869"
+    />
+  </View>
+</TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.deleteButton}
@@ -308,12 +448,217 @@ setPaymentBreakdowns(
                   </TouchableOpacity>
                 </View>
 
+{expandedEvents[event._id] && (
+  <View style={styles.detailsPanel}>
+
+    <Text style={styles.detailsSectionTitle}>
+      EVENT DETAILS
+    </Text>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Event Name
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {event.eventName || 'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Event Type
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {event.eventType || 'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Date
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatDate(event.eventDate)}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Start Time
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatTime(
+          event.eventStartDateTime ||
+          event.eventTime,
+        )}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        End Time
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatTime(
+          event.eventEndDateTime,
+        )}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Duration
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatDuration(
+          event.eventDurationMinutes,
+        )}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Guests
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {event.guests ?? 'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        City
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {event?.eventCityId?.name ||
+          'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailColumn}>
+      <Text style={styles.detailLabel}>
+        Event Address
+      </Text>
+
+      <Text style={styles.detailValueLeft}>
+        {event.eventAddress || 'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailColumn}>
+      <Text style={styles.detailLabel}>
+        Desired Services
+      </Text>
+
+      <Text style={styles.detailValueLeft}>
+        {Array.isArray(
+          event.selectedCategoryIds,
+        ) &&
+        event.selectedCategoryIds.length > 0
+          ? event.selectedCategoryIds
+              .map(
+                (category: any) =>
+                  category?.name ||
+                  category?.normalizedName,
+              )
+              .filter(Boolean)
+              .join(', ')
+          : 'N/A'}
+      </Text>
+    </View>
+
+  </View>
+)}
                 <View style={styles.divider} />
 
                 <Text style={styles.sectionTitle}>Vendors</Text>
                 {event.vendorOrders.map((vendor: any, index: number) => {
 
   const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
+
+  const vendorData =
+  vendor?.vendorId || {};
+
+const vendorBrandName =
+  vendorData?.contactDetails
+    ?.brandName ||
+  vendorData?.name ||
+  'Vendor';
+
+const vendorAccountName =
+  vendorData?.name ||
+  'N/A';
+
+const vendorCategory =
+  vendorData?.buisnessCategory
+    ?.name ||
+  vendorData?.buisnessCategory
+    ?.normalizedName ||
+  'N/A';
+
+const vendorServiceCities =
+  Array.isArray(
+    vendorData
+      ?.serviceLocationCityIds,
+  )
+    ? vendorData
+        .serviceLocationCityIds
+        .map(
+          (city: any) =>
+            city?.name,
+        )
+        .filter(Boolean)
+        .join(', ')
+    : 'N/A';
+
+const vendorBusinessCity =
+  vendorData?.businessCityId
+    ?.name ||
+  'N/A';
+
+const vendorPhone =
+  vendorData?.contactDetails
+    ?.contactNumber ||
+  vendorData?.phone_number ||
+  'N/A';
+
+const vendorSecondaryPhone =
+  vendorData?.contactDetails
+    ?.contactNumberSecondary ||
+  '';
+
+const vendorBookingEmail =
+  vendorData?.contactDetails
+    ?.bookingEmail ||
+  vendorData?.email ||
+  'N/A';
+
+const vendorWebsite =
+  vendorData?.contactDetails
+    ?.website ||
+  'N/A';
+
+const vendorInstagram =
+  vendorData?.contactDetails
+    ?.instagramLink ||
+  'N/A';
+
+const vendorOfficeAddress =
+  vendorData?.contactDetails
+    ?.officialAddress ||
+  vendorData?.businessAddress ||
+  'N/A';
+
+const vendorExpanded =
+  !!expandedVendors[vendor._id];
 
 const vStatus =
   vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
@@ -367,12 +712,193 @@ const hasSuccessfulPayment =
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.vendorText}>
-  {vendor?.vendorId?.contactDetails?.brandName || vendor?.vendorId?.name}
-</Text>
-                      <Text style={styles.packageText}>
-  {vendor.serviceName}
-</Text>
+                     <TouchableOpacity
+  onPress={() =>
+    toggleVendorDetails(
+      vendor._id,
+    )
+  }
+  activeOpacity={0.8}
+>
+  <View style={styles.expandHeaderRow}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.vendorText}>
+        {vendorBrandName}
+      </Text>
+
+      <Text style={styles.packageText}>
+        {vendor.serviceName}
+      </Text>
+    </View>
+
+    <Ionicons
+      name={
+        vendorExpanded
+          ? 'chevron-up'
+          : 'chevron-down'
+      }
+      size={18}
+      color="#7B2869"
+    />
+  </View>
+</TouchableOpacity>
+
+{vendorExpanded && (
+  <View style={styles.vendorDetailsPanel}>
+
+    <Text style={styles.detailsSectionTitle}>
+      VENDOR DETAILS
+    </Text>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Brand Name
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorBrandName}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Vendor Name
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorAccountName}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Category
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorCategory}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Service Cities
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorServiceCities || 'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Business City
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorBusinessCity}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Phone
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorPhone}
+      </Text>
+    </View>
+
+    {!!vendorSecondaryPhone && (
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>
+          Alternate Phone
+        </Text>
+
+        <Text style={styles.detailValue}>
+          {vendorSecondaryPhone}
+        </Text>
+      </View>
+    )}
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Booking Email
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorBookingEmail}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Website
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorWebsite}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Instagram
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendorInstagram}
+      </Text>
+    </View>
+
+    <View style={styles.detailColumn}>
+      <Text style={styles.detailLabel}>
+        Official Office Address
+      </Text>
+
+      <Text style={styles.detailValueLeft}>
+        {vendorOfficeAddress}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Package / Service
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {vendor.serviceName ||
+          'N/A'}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Service Start
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatTime(
+          vendor.eventStartDateTime,
+        )}
+      </Text>
+    </View>
+
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>
+        Service End
+      </Text>
+
+      <Text style={styles.detailValue}>
+        {formatTime(
+          vendor.eventEndDateTime,
+        )}
+      </Text>
+    </View>
+
+  </View>
+)}
 
 {vendor?.promotionCode &&
 Number(vendor?.discountAmount || 0) > 0 ? (
@@ -1031,6 +1557,72 @@ receiptButtonText: {
   fontSize: 11,
   fontWeight: '800',
 },
+expandHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
 
+detailsPanel: {
+  marginTop: 14,
+  padding: 14,
+  borderRadius: 12,
+  backgroundColor: '#FFF8FC',
+  borderWidth: 1,
+  borderColor: '#F0DCE7',
+},
+
+vendorDetailsPanel: {
+  marginTop: 12,
+  marginBottom: 8,
+  padding: 12,
+  borderRadius: 12,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 1,
+  borderColor: '#EFDCE9',
+},
+
+detailsSectionTitle: {
+  fontSize: 12,
+  fontWeight: '800',
+  color: '#7B2869',
+  marginBottom: 10,
+  letterSpacing: 0.5,
+},
+
+detailRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 12,
+  paddingVertical: 6,
+},
+
+detailColumn: {
+  paddingVertical: 6,
+},
+
+detailLabel: {
+  fontSize: 12,
+  color: '#8B7188',
+  fontWeight: '600',
+  flexShrink: 0,
+},
+
+detailValue: {
+  flex: 1,
+  fontSize: 12,
+  color: '#3D1233',
+  fontWeight: '700',
+  textAlign: 'right',
+},
+
+detailValueLeft: {
+  marginTop: 4,
+  fontSize: 12,
+  color: '#3D1233',
+  fontWeight: '700',
+  lineHeight: 18,
+},
 
 });

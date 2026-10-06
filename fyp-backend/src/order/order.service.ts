@@ -1242,19 +1242,54 @@ export class OrderService {
         .skip(Number(skip))
         .limit(Number(limit))
         .populate({
-            path: 'organizerId',
-            select: 'name email phone contactDetails',
-        })
-        .populate({
-            path: 'vendorOrders',
-            populate: {
-                path: 'vendorId',
-                model: 'User',
-                select: 'name email phone contactDetails',
+    path: 'organizerId',
+    select: 'name email phone_number contactDetails',
+})
+.populate({
+    path: 'eventCityId',
+    select: 'name',
+})
+.populate({
+    path: 'selectedCategoryIds',
+    select: 'name normalizedName',
+})
+.populate({
+    path: 'vendorOrders',
+    populate: {
+        path: 'vendorId',
+        model: 'User',
+        select: `
+            name
+            email
+            phone_number
+            businessAddress
+            contactDetails
+            buisnessCategory
+            serviceLocationCityIds
+            businessCityId
+            packages
+        `,
+        populate: [
+            {
+                path: 'buisnessCategory',
+                model: 'Category',
+                select: 'name normalizedName',
             },
-        })
-        .lean()
-        .exec();
+            {
+                path: 'serviceLocationCityIds',
+                model: 'City',
+                select: 'name',
+            },
+            {
+                path: 'businessCityId',
+                model: 'City',
+                select: 'name',
+            },
+        ],
+    },
+})
+.lean()
+.exec();
 
        if (type === 'Vendor') {
     return orders.map((order: any) => {
