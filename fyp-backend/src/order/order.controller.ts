@@ -19,6 +19,7 @@ import {
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
 
 @Controller('orders')
 export class OrderController {
@@ -214,6 +215,61 @@ async getOrderStats(
     @Get('stats/monthly')
     async getMonthlyOrderStats(@Query('vendorId') vendorId: string) {
         return this.orderService.getOrderStatsForVendor(vendorId);
+    }
+
+
+    // Phase 13B — Client requests a date/time change.
+    @Post(':id/reschedule')
+    @UseGuards(JwtAuthGuard)
+    async requestReschedule(
+        @Request() req: any,
+        @Param('id') orderId: string,
+        @Body() body: CreateRescheduleRequestDto,
+    ) {
+        return this.orderService.requestEventReschedule(
+            orderId,
+            req.user?.id?.toString(),
+            body,
+        );
+    }
+
+    // Client sees per-vendor states; vendor sees own requests.
+    @Get('reschedule/requests')
+    @UseGuards(JwtAuthGuard)
+    async getRescheduleRequests(
+        @Request() req: any,
+        @Query('orderId') orderId?: string,
+    ) {
+        return this.orderService.getRescheduleRequests(
+            req.user?.id?.toString(),
+            req.user?.role,
+            orderId,
+        );
+    }
+
+    // Vendor independently accepts/rejects its own request.
+    @Patch('reschedule/:requestId/respond')
+    @UseGuards(JwtAuthGuard)
+    async respondToReschedule(
+        @Request() req: any,
+        @Param('requestId') requestId: string,
+        @Body() body: RespondRescheduleRequestDto,
+    ) {
+        const role = req.user?.role?.toString().trim().toLowerCase();
+        if (role !== 'vendor') {
+            throw new ForbiddenException('Only vendors can respond to rescheduling requests');
+        }
+
+        return this.orderService.respondToRescheduleRequest(
+            requestId,
+            req.user?.id?.toString(),
+            body,
+        );
+    }
+
+    @Post('reschedule/expire-stale')
+    async expireRescheduleRequests() {
+        return this.orderService.expireRescheduleRequests();
     }
 
     // Delete an order
