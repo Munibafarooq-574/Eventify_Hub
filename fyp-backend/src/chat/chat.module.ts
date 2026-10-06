@@ -21,5 +21,6 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
     ],
     providers: [ChatGateway, ChatService, FileUploadService],
     controllers: [ChatController],
+    exports: [ChatService],
 })
 export class ChatModule { }
