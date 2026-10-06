@@ -66,6 +66,12 @@ export class RescheduleRequest extends Document {
   @Prop({ type: String, trim: true, default: null })
   reason?: string | null;
 
+  @Prop({ type: Boolean, required: true })
+  availabilityPrecheckPassed: boolean;
+
+  @Prop({ type: String, default: null })
+  availabilityPrecheckReason?: string | null;
+
   @Prop({
     type: String,
     enum: ['CHANGE_REQUESTED', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
