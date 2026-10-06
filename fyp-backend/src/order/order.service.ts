@@ -2101,6 +2101,7 @@ async completeVendorOrder(vendorOrderId: string) {
 
         const expiresAt = new Date(Date.now() + DEFAULT_HOLD_HOURS * 60 * 60 * 1000);
         const created: any[] = [];
+        const requestGroupId = new Types.ObjectId();
 
         for (const vendorOrder of vendorOrders) {
             const availability = await this.availabilityService.checkVendorAvailability(
@@ -2122,6 +2123,7 @@ async completeVendorOrder(vendorOrderId: string) {
             );
 
             const request = await this.rescheduleRequestModel.create({
+                requestGroupId,
                 bookingId: order._id,
                 orderId: order._id,
                 eventId: order.eventId || String(order._id),
@@ -2225,9 +2227,13 @@ async completeVendorOrder(vendorOrderId: string) {
                 throw new ConflictException('Vendor booking is no longer active');
             }
 
+            const requestedStart = new Date(request.newEventDate);
+            const [rh, rm] = String(request.newStartTime).split(':').map(Number);
+            requestedStart.setHours(rh, rm, 0, 0);
+
             const availability = await this.availabilityService.checkVendorAvailability(
                 String(request.vendorId),
-                new Date(request.newEventDate),
+                requestedStart,
                 new Date(request.newEndTime),
                 vendorOrder.packageId || undefined,
                 undefined,
@@ -2285,17 +2291,16 @@ async completeVendorOrder(vendorOrderId: string) {
     }
 
     private async applyRescheduleIfAllAccepted(orderId: string) {
-        const requests: any[] = await this.rescheduleRequestModel
-            .find({ orderId: new Types.ObjectId(orderId) })
+        const latest: any = await this.rescheduleRequestModel
+            .findOne({ orderId: new Types.ObjectId(orderId) })
             .sort({ createdAt: -1 })
             .lean();
 
-        if (!requests.length) return { applied: false };
+        if (!latest) return { applied: false };
 
-        const latestCreatedAt = new Date(requests[0].createdAt).getTime();
-        const batch = requests.filter(
-            (r: any) => Math.abs(new Date(r.createdAt).getTime() - latestCreatedAt) < 5000,
-        );
+        const batch: any[] = await this.rescheduleRequestModel
+            .find({ requestGroupId: latest.requestGroupId })
+            .lean();
 
         if (!batch.length || batch.some((r: any) => r.status !== 'ACCEPTED')) {
             return { applied: false };
@@ -2329,9 +2334,13 @@ async completeVendorOrder(vendorOrderId: string) {
                     const req: any = batch[i];
                     const vo: any = vendorOrders[i];
 
+                    const requestedStart = new Date(req.newEventDate);
+                    const [rh, rm] = String(req.newStartTime).split(':').map(Number);
+                    requestedStart.setHours(rh, rm, 0, 0);
+
                     const availability = await this.availabilityService.checkVendorAvailability(
                         String(req.vendorId),
-                        new Date(req.newEventDate),
+                        requestedStart,
                         new Date(req.newEndTime),
                         vo.packageId || undefined,
                         session,
