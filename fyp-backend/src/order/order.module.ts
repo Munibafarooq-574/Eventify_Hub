@@ -15,6 +15,7 @@ import {
   Category,
   CategorySchema,
 } from '../schemas/category.schema';
+import { RescheduleRequest, RescheduleRequestSchema } from '../schemas/reschedule-request.schema';
 
 @Module({
     imports: [
@@ -25,6 +26,7 @@ import {
             { name: Notification.name, schema: NotificationSchema },
             { name: CommissionConfig.name, schema: CommissionConfigSchema },
             { name: Category.name, schema: CategorySchema, },
+            { name: RescheduleRequest.name, schema: RescheduleRequestSchema },
 
             
         ]),
