@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import AdminSidebar from "@/components/AdminSidebar";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+import BookingPaymentActions from "@/components/BookingPaymentActions";
 
 type Person = {
   id: string;
@@ -358,7 +359,7 @@ export default async function PaymentsPage({
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1500px] w-full border-collapse">
+                  <table className="min-w-[1650px] w-full border-collapse">
                     <thead className="bg-slate-50">
                       <tr className="border-b border-slate-200">
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -411,6 +412,10 @@ export default async function PaymentsPage({
 
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                           Paid At
+                        </th>
+
+                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Actions
                         </th>
                       </tr>
                     </thead>
@@ -557,6 +562,13 @@ export default async function PaymentsPage({
                               {formatDateTime(
                                 payment.paidAt,
                               )}
+                            </td>
+
+                            <td className="px-5 py-4">
+                              <BookingPaymentActions
+                                paymentId={payment.paymentId}
+                                status={payment.status}
+                              />
                             </td>
                           </tr>
                         ),
