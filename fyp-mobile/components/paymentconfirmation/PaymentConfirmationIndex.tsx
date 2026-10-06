@@ -1,7 +1,10 @@
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { router, useLocalSearchParams } from 'expo-router';
+import ReceiptShape, { ReceiptDivider } from './ReceiptShape';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, {
   useCallback,
   useEffect,
@@ -13,7 +16,6 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -37,49 +39,6 @@ const toOrderRef = (id?: string) => {
 };
 
 /* ---------- Ticket helpers ---------- */
-
-const DashedLine = () => (
-  <View style={styles.dashedWrap}>
-    <View style={styles.dashedInner} />
-  </View>
-);
-
-const Notches = () => (
-  <>
-    <View style={[styles.notch, styles.notchLeft]} />
-    <View style={[styles.notch, styles.notchRight]} />
-  </>
-);
-
-const ScallopedBottom = () => {
-  const [width, setWidth] = useState(0);
-  const size = 16;
-  const gap = 8;
-  const count = width ? Math.ceil(width / (size + gap)) + 1 : 0;
-
-  return (
-    <View
-      style={styles.scallopWrap}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-    >
-      {Array.from({ length: count }).map((_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.scallopCircle,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-              left: i * (size + gap) + gap / 2 - 4,
-              top: 12 - size / 2,
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-};
 
 const PaymentConfirmationScreen = () => {
   const { vendorOrderId } = useLocalSearchParams<{
@@ -217,112 +176,422 @@ try {
         },
       );
   }
-      const html = `
-        <html>
-          <head>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                padding: 24px;
-                color: #1A1A1A;
-              }
+ const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-              .brand {
-                font-size: 20px;
-                font-weight: 800;
-                color: ${PRIMARY};
-                margin-bottom: 4px;
-              }
+  <style>
+    @page {
+      size: 210mm 297mm;
+      margin: 0;
+    }
 
-              .muted {
-                color: #8A8A8A;
-                font-size: 12px;
-                margin-bottom: 20px;
-              }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
 
-              .row {
-                display: flex;
-                justify-content: space-between;
-                padding: 10px 0;
-                border-bottom: 1px dashed #F0DDEA;
-              }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 210mm;
+      height: 296mm;
+      overflow: hidden;
+      background-color: #F8E9F0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1A1A1A;
+    }
 
-              .label {
-                color: #8A8A8A;
-                font-size: 13px;
-              }
+    .page {
+      width: 210mm;
+      height: 296mm;
+      padding: 20px 18px;
+      overflow: hidden;
+      background-color: #F8E9F0;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
 
-              .value {
-                font-weight: 700;
-                font-size: 13px;
-              }
+    .receipt {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #FFFFFF;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 2px solid #780C60;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
 
-              .total {
-                font-size: 18px;
-                font-weight: 800;
-                color: ${PRIMARY};
-              }
+    /* ---------- HEADER ---------- */
+    .header {
+      background-color: #780C60;
+      padding: 18px 24px;
+      border-bottom: 5px solid #E8A6D3;
+    }
 
-              .qr-section {
-              text-align: center;
-              margin-top: 28px;
-              padding-top: 22px;
-              border-top: 1px dashed #780C60;
-            }
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-            .qr-title {
-              font-size: 13px;
-              font-weight: 700;
-              margin-bottom: 12px;
-            }
+    .brand {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #FFFFFF !important;
+    }
 
-            .qr-image {
-              width: 120px;
-              height: 120px;
-}
-            </style>
-          </head>
+    .receipt-label {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #F8D7EE !important;
+      letter-spacing: 0.5px;
+    }
 
-          <body>
-            <div class="brand">Eventify Hub</div>
-            <div class="muted">Payment Receipt</div>
+    .header-badge {
+      text-align: right;
+      vertical-align: middle;
+    }
 
-            ${details
-              .map(
-                (detail) => `
-                  <div class="row">
-                    <span class="label">${detail.label}</span>
-                    <span class="value ${
-                      detail.label === 'Amount Paid' ? 'total' : ''
-                    }">${detail.value}</span>
-                  </div>
-                `,
-              )
-              .join('')}
-              ${qrDataUrl
-  ? `
-    <div class="qr-section">
-      <div class="qr-title">
-        Scan to verify this payment
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background-color: #FFFFFF;
+      color: #780C60 !important;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    /* ---------- CONTENT ---------- */
+    .content {
+      padding: 20px 24px 18px;
+    }
+
+    .success-wrap {
+      text-align: center;
+    }
+
+    .success-circle {
+      display: inline-block;
+      width: 56px;
+      height: 56px;
+      line-height: 46px;
+      border-radius: 50%;
+      background-color: #278A4B;
+      color: #FFFFFF !important;
+      font-size: 30px;
+      font-weight: bold;
+      border: 5px solid #CFEBD9;
+    }
+
+    .success-title {
+      margin-top: 10px;
+      font-size: 22px;
+      font-weight: 900;
+      color: #1A1A1A;
+    }
+
+    .success-subtitle {
+      margin-top: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555555;
+    }
+
+    /* ---------- AMOUNT ---------- */
+    .amount-card {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 16px;
+      background-color: #780C60;
+      text-align: center;
+    }
+
+    .amount-label {
+      color: #F8D7EE !important;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .amount {
+      margin-top: 4px;
+      color: #FFFFFF !important;
+      font-size: 32px;
+      font-weight: 900;
+    }
+
+    /* ---------- DETAILS ---------- */
+    .divider {
+      margin: 16px 0;
+      border-top: 2px dashed #C98BB8;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: #780C60;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      border-left: 5px solid #780C60;
+      padding-left: 8px;
+    }
+
+    .details-card {
+      border: 1.5px solid #D9B3CC;
+      border-radius: 14px;
+      padding: 2px 14px;
+      background-color: #FDF6FA;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 9px 0;
+      border-bottom: 1px solid #E6CCDD;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      width: 42%;
+      font-size: 12px;
+      color: #4A4A4A;
+      font-weight: 700;
+    }
+
+    .value {
+      width: 58%;
+      text-align: right;
+      font-size: 12px;
+      color: #111111;
+      font-weight: 800;
+      word-break: break-word;
+    }
+
+    .status-success {
+      display: inline-block;
+      color: #FFFFFF !important;
+      background-color: #278A4B;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-weight: 800;
+      width: auto;
+      margin-left: auto;
+    }
+
+    /* ---------- QR ---------- */
+    .qr-section {
+      text-align: center;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .qr-title {
+      font-size: 14px;
+      font-weight: 900;
+      color: #1A1A1A;
+    }
+
+    .qr-subtitle {
+      color: #555555;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 4px;
+      margin-bottom: 10px;
+    }
+
+    .qr-box {
+      display: inline-block;
+      padding: 8px;
+      border: 2px solid #780C60;
+      border-radius: 14px;
+      background-color: #FFFFFF;
+    }
+
+    .qr-image {
+      width: 110px;
+      height: 110px;
+      display: block;
+    }
+
+    .verified {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background-color: #E3F5E9;
+      border: 1px solid #278A4B;
+      color: #1B6B38 !important;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* ---------- FOOTER ---------- */
+    .footer {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid #D9B3CC;
+      text-align: center;
+      color: #555555;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .footer strong {
+      color: #780C60;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="receipt">
+
+      <div class="header">
+        <table class="header-table">
+          <tr>
+            <td>
+              <div class="brand">Eventify Hub</div>
+              <div class="receipt-label">Official Payment Receipt</div>
+            </td>
+            <td class="header-badge">
+              <span class="badge">PAID</span>
+            </td>
+          </tr>
+        </table>
       </div>
 
-      <img
-        src="${qrDataUrl}"
-        class="qr-image"
-      />
+      <div class="content">
+
+        <div class="success-wrap">
+          <div class="success-circle">✓</div>
+          <div class="success-title">Payment Successful</div>
+          <div class="success-subtitle">
+            Your payment has been confirmed successfully.
+          </div>
+        </div>
+
+        <div class="amount-card">
+          <div class="amount-label">AMOUNT PAID</div>
+          <div class="amount">
+            ${formatCurrency(amountPaid)}
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Payment Details</div>
+
+        <div class="details-card">
+
+          ${details
+            .map(
+              (detail) => `
+                <div class="row">
+
+                  <div class="label">
+                    ${detail.label}
+                  </div>
+
+                  <div
+                    class="value ${
+                      detail.label === 'Status'
+                        ? 'status-success'
+                        : ''
+                    }"
+                  >
+                    ${detail.value}
+                  </div>
+
+                </div>
+              `,
+            )
+            .join('')}
+
+        </div>
+
+        ${
+          qrDataUrl
+            ? `
+              <div class="divider"></div>
+
+              <div class="qr-section">
+
+                <div class="qr-title">
+                  Verify this payment
+                </div>
+
+                <div class="qr-subtitle">
+                  Scan this QR code to verify this receipt
+                  directly with Eventify Hub.
+                </div>
+
+                <div class="qr-box">
+                  <img
+                    src="${qrDataUrl}"
+                    class="qr-image"
+                  />
+                </div>
+
+                <br />
+
+                <div class="verified">
+                  ✓ Secure Verification
+                </div>
+
+              </div>
+            `
+            : ''
+        }
+
+        <div class="footer">
+          Thank you for choosing <strong>Eventify Hub</strong>.<br />
+          This receipt was generated electronically.
+        </div>
+
+      </div>
     </div>
-  `
-  : ''}
-          </body>
-        </html>
-      `;
+  </div>
+</body>
+</html>
+`;
+      const { uri } =
+  await Print.printToFileAsync({
+    html,
+  });
 
-      const { uri } = await Print.printToFileAsync({ html });
+const sharingAvailable =
+  await Sharing.isAvailableAsync();
 
-      await Share.share({
-        url: uri,
-        message: 'Here is your Eventify Hub payment receipt.',
-      });
+if (!sharingAvailable) {
+  throw new Error(
+    'Sharing is not available on this device.',
+  );
+}
+
+await Sharing.shareAsync(
+  uri,
+  {
+    mimeType: 'application/pdf',
+    dialogTitle:
+      'Share Eventify Hub Payment Receipt',
+    UTI: 'com.adobe.pdf',
+  },
+);
     } catch (err) {
       console.error('Error saving receipt:', err);
     } finally {
@@ -361,23 +630,27 @@ try {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={20} color={PRIMARY} />
-      </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: PRIMARY_LIGHT }}>
+      {/* Purple shading: upar se neeche fade */}
+      <LinearGradient
+        colors={[
+          'rgba(120,12,96,0.30)',
+          'rgba(120,12,96,0.10)',
+          'rgba(248,233,240,0)',
+        ]}
+        locations={[0, 0.45, 1]}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 420 }}
+      />
 
-      {/* ================= TICKET ================= */}
-      <View style={styles.ticketOuter}>
-        {/* Glow layers */}
-        <View style={[styles.glow, styles.glow3]} />
-        <View style={[styles.glow, styles.glow2]} />
-        <View style={[styles.glow, styles.glow1]} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ================= TICKET ================= */}
+        <ReceiptShape style={{ width: '100%' }}>
+          <View style={{ height: 18 }} />
 
-        <View style={styles.ticket}>
-          {/* ---- Header ---- */}
           <View style={styles.ticketHeader}>
             <Text style={styles.brand}>Eventify Hub</Text>
             <Ionicons name="receipt-outline" size={20} color="#B9B9B9" />
@@ -390,7 +663,6 @@ try {
           </View>
 
           <Text style={styles.title}>Payment Successful</Text>
-
           <Text style={styles.subtitle}>
             Your payment has been confirmed successfully.
           </Text>
@@ -400,16 +672,10 @@ try {
             <Text style={styles.amountValue}>{formatCurrency(amountPaid)}</Text>
           </View>
 
-          {/* ---- Divider 1 ---- */}
-          <View style={styles.dividerRow}>
-            <Notches />
-            <DashedLine />
-          </View>
+          <ReceiptDivider id="top" />
 
-          {/* ---- Details ---- */}
           <View style={styles.detailsWrap}>
             <Text style={styles.cardTitle}>Payment Details</Text>
-
             {details.map((row, index) => (
               <View
                 key={row.label}
@@ -419,7 +685,6 @@ try {
                 ]}
               >
                 <Text style={styles.cardLabel}>{row.label}</Text>
-
                 <Text
                   style={[
                     styles.cardValue,
@@ -433,13 +698,8 @@ try {
             ))}
           </View>
 
-          {/* ---- Divider 2 ---- */}
-          <View style={styles.dividerRow}>
-            <Notches />
-            <DashedLine />
-          </View>
+          <ReceiptDivider id="bottom" />
 
-          {/* ---- QR ---- */}
           <View style={styles.qrSection}>
             <Text style={styles.thanks}>Thank you for choosing us!</Text>
             <Text style={styles.qrHint}>
@@ -448,20 +708,18 @@ try {
 
             <View style={styles.qrBox}>
               {qrValue ? (
-            <QRCode
-              value={qrValue}
-              size={110}
-              color="#1A1A1A"
-              backgroundColor="#FFFFFF"
-              getRef={(ref) => {
-                qrRef.current = ref;
-              }}
-            />
-          ) : (
-            <Text style={styles.qrHint}>
-              Verification QR unavailable.
-            </Text>
-          )}
+                <QRCode
+                  value={qrValue}
+                  size={110}
+                  color="#1A1A1A"
+                  backgroundColor="#FFFFFF"
+                  getRef={(ref) => {
+                    qrRef.current = ref;
+                  }}
+                />
+              ) : (
+                <Text style={styles.qrHint}>Verification QR unavailable.</Text>
+              )}
             </View>
 
             <View style={styles.receiptNote}>
@@ -471,10 +729,7 @@ try {
               </Text>
             </View>
           </View>
-
-          <ScallopedBottom />
-        </View>
-      </View>
+        </ReceiptShape>
 
       {/* ================= ACTIONS ================= */}
       <TouchableOpacity
@@ -497,19 +752,20 @@ try {
         <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
       </TouchableOpacity>
 
-      <TouchableOpacity
+          <TouchableOpacity
         style={styles.doneLink}
         onPress={() => router.replace('/dashboard')}
       >
         <Text style={styles.doneLinkText}>Back to Dashboard</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 export default PaymentConfirmationScreen;
 
-const NOTCH = 26;
+const NOTCH = 22;
 
 const styles = StyleSheet.create({
   container: {
@@ -537,10 +793,10 @@ const styles = StyleSheet.create({
   },
 
   /* ---------- Ticket ---------- */
-  ticketOuter: {
-    width: '100%',
-    marginTop: 6,
-  },
+ ticketOuter: {
+  width: '100%',
+  marginTop: 0,
+},
 
   glow: {
     position: 'absolute',
@@ -572,21 +828,27 @@ const styles = StyleSheet.create({
   },
 
   ticket: {
-    width: '100%',
-    backgroundColor: TICKET_BG,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(120,12,96,0.25)',
-    borderBottomWidth: 0,
-    paddingTop: 18,
-    shadowColor: PRIMARY,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 10,
-  },
+  width: '100%',
+  backgroundColor: TICKET_BG,
 
+  borderTopLeftRadius: 10,
+  borderTopRightRadius: 10,
+
+  borderWidth: 1,
+  borderColor: 'rgba(120,12,96,0.28)',
+
+  borderBottomWidth: 0,
+
+  paddingTop: 18,
+
+  shadowColor: PRIMARY,
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 0.28,
+  shadowRadius: 14,
+  elevation: 8,
+
+  overflow: 'visible',
+},
   ticketHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -670,30 +932,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  dashedWrap: {
-    marginHorizontal: 22,
-    height: 1,
-    overflow: 'hidden',
-  },
+ dashedWrap: {
+  marginHorizontal: 24,
+  height: 2,
+  overflow: 'hidden',
+},
 
-  dashedInner: {
-    height: 2,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: PRIMARY,
-    borderRadius: 1,
-    opacity: 0.55,
-  },
+dashedInner: {
+  height: 2,
+  borderTopWidth: 1.4,
+  borderStyle: 'dashed',
+  borderColor: PRIMARY,
+  opacity: 0.65,
+},
 
-  notch: {
-    position: 'absolute',
-    width: NOTCH,
-    height: NOTCH,
-    borderRadius: NOTCH / 2,
-    backgroundColor: PRIMARY_LIGHT,
-    top: -NOTCH / 2 + 0.5,
-    zIndex: 2,
-  },
+notch: {
+  position: 'absolute',
+  width: NOTCH,
+  height: NOTCH,
+  borderRadius: NOTCH / 2,
+
+  backgroundColor: PRIMARY_LIGHT,
+
+  top: -NOTCH / 2,
+  zIndex: 10,
+},
   notchLeft: {
     left: -NOTCH / 2 - 1,
   },
@@ -798,17 +1061,20 @@ const styles = StyleSheet.create({
 
   /* ---------- Scalloped bottom ---------- */
   scallopWrap: {
-    height: 12,
-    backgroundColor: TICKET_BG,
-    overflow: 'hidden',
-    width: '100%',
-    marginTop: 6,
-  },
+  height: 18,
+  backgroundColor: TICKET_BG,
+  overflow: 'hidden',
+  width: '100%',
+  marginTop: 2,
+},
 
-  scallopCircle: {
-    position: 'absolute',
-    backgroundColor: PRIMARY_LIGHT,
-  },
+scallopCircle: {
+  position: 'absolute',
+  backgroundColor: PRIMARY_LIGHT,
+
+  borderWidth: 1,
+  borderColor: 'rgba(120,12,96,0.05)',
+},
 
   /* ---------- Buttons ---------- */
   secondaryButton: {
@@ -858,4 +1124,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+    scrollContent: {
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40,
+  },
+
 });
