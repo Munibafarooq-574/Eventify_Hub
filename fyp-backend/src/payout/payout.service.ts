@@ -57,31 +57,64 @@ export class PayoutService {
 
         // Phase 13: use commission snapshot instead of raw price.
         // Current commission is 0%, so payoutAmount remains 100% of booking price.
-        const commissionAmount = vendorOrder.commissionAmount ?? 0;
+        const bookingAmount =
+    Number(
+        vendorOrder.finalAmount ??
+        vendorOrder.price,
+    );
 
-        const payoutAmount =
-            vendorOrder.vendorNetAmount ??
-            (vendorOrder.price - commissionAmount);
+const commissionAmount =
+    Number(
+        vendorOrder.commissionAmount ?? 0,
+    );
 
-        const payout = await this.payoutModel.create({
-            vendorOrderId: vendorOrder._id,
-            orderId: order._id,
-            vendorId: vendorOrder.vendorId,
-            grossAmount: vendorOrder.price,
-            payoutAmount,
-            status: 'PENDING',
+const payoutAmount =
+    vendorOrder.vendorNetAmount != null
+        ? Number(vendorOrder.vendorNetAmount)
+        : Math.max(
+              bookingAmount -
+                  commissionAmount,
+              0,
+          );
+
+const payout = await this.payoutModel.create({
+    vendorOrderId: vendorOrder._id,
+    orderId: order._id,
+    vendorId: vendorOrder.vendorId,
+    grossAmount: bookingAmount,
+    payoutAmount,
+    status: 'PENDING',
+});
+
+        return payout;
+    }
+
+  async getPayoutStatus(
+    vendorOrderId: string,
+    userId: string,
+) {
+    const payout =
+        await this.payoutModel.findOne({
+            vendorOrderId,
         });
 
-        return payout;
+    if (!payout) {
+        throw new NotFoundException(
+            'No payout found for this vendor order',
+        );
     }
 
-    async getPayoutStatus(vendorOrderId: string) {
-        const payout = await this.payoutModel.findOne({ vendorOrderId });
-        if (!payout) {
-            throw new NotFoundException('No payout found for this vendor order');
-        }
-        return payout;
+    if (
+        String(payout.vendorId) !==
+        String(userId)
+    ) {
+        throw new NotFoundException(
+            'No payout found for this vendor order',
+        );
     }
+
+    return payout;
+}
 
     async getPayoutsForVendor(vendorId: string) {
         return this.payoutModel

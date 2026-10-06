@@ -1010,9 +1010,9 @@ if (status !== 'ALL') {
       await this.paymentModel
         .find(query)
         .populate(
-          'vendorOrderId',
-          'serviceName price downPaymentType downPaymentPercentage downPaymentAmount remainingAmount paymentStatus status',
-        )
+  'vendorOrderId',
+  'serviceName price finalAmount downPaymentType downPaymentPercentage downPaymentAmount remainingAmount paymentStatus status',
+)
         .populate(
           'organizerId',
           'name email phone_number',
@@ -1102,10 +1102,11 @@ if (status !== 'ALL') {
           );
 
         const totalBookingAmount =
-          Number(
-            vendorOrder?.price ??
-              0,
-          );
+  Number(
+    vendorOrder?.finalAmount ??
+      vendorOrder?.price ??
+      0,
+  );
 
         const paidSoFar =
           paidMap.get(
