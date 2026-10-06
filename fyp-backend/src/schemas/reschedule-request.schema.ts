@@ -9,6 +9,9 @@ export type RescheduleStatus =
 
 @Schema({ timestamps: true })
 export class RescheduleRequest extends Document {
+  @Prop({ type: Types.ObjectId, required: true, index: true })
+  requestGroupId: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, required: true, ref: 'Order', index: true })
   bookingId: Types.ObjectId;
 
