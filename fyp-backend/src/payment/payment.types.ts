@@ -33,6 +33,7 @@ latestSuccessfulPayment: {
     method: string;
     transactionRef: string | null;
     paidAt: Date | null;
+    verificationUrl: string;
 } | null;
 
 }

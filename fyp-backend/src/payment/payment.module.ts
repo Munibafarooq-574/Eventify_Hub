@@ -9,6 +9,9 @@ import { PaymentController } from './payment.controller';
 import { PayoutModule } from 'src/payout/payout.module';
 import { AuthModule } from 'src/auth/auth.module';
 import {
+  PaymentVerificationController,
+} from './payment-verification.controller';
+import {
   User,
   UserSchema,
 } from 'src/schemas/user.schema';
@@ -42,7 +45,10 @@ import { EmailModule } from 'src/email/email.module';
     AuthModule,
     EmailModule,
 ],
-    controllers: [PaymentController],
+    controllers: [
+    PaymentController,
+    PaymentVerificationController,
+],
     providers: [PaymentService],
     exports: [PaymentService],
 })

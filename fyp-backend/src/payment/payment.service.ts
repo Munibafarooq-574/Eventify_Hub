@@ -5,6 +5,11 @@ import {
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+    createHmac,
+    timingSafeEqual,
+} from 'crypto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
@@ -31,7 +36,299 @@ export class PaymentService {
         private readonly userModel: Model<User>,
         private readonly emailService: EmailService,
         private readonly payoutService: PayoutService,
+        private readonly configService: ConfigService,
     ) {}
+
+    private getVerificationSecret(): string {
+    const secret =
+        this.configService.get<string>(
+            'JWT_SECRET',
+        );
+
+    if (!secret) {
+        throw new Error(
+            'JWT_SECRET is not configured',
+        );
+    }
+
+    return secret;
+}
+
+private createPaymentVerificationToken(
+    paymentId: string,
+    vendorOrderId: string,
+): string {
+    const payload = Buffer.from(
+        JSON.stringify({
+            paymentId,
+            vendorOrderId,
+        }),
+        'utf8',
+    ).toString('base64url');
+
+    const signature = createHmac(
+        'sha256',
+        this.getVerificationSecret(),
+    )
+        .update(
+            `eventify-payment-receipt:${payload}`,
+        )
+        .digest('base64url');
+
+    return `${payload}.${signature}`;
+}
+
+private buildPaymentVerificationUrl(
+    paymentId: string,
+    vendorOrderId: string,
+): string {
+    const token =
+        this.createPaymentVerificationToken(
+            paymentId,
+            vendorOrderId,
+        );
+
+    const baseUrl =
+        (
+            this.configService.get<string>(
+                'PUBLIC_API_URL',
+            ) ||
+            'https://eventify-hub.onrender.com'
+        ).replace(/\/+$/, '');
+
+    return `${baseUrl}/payment/verify/${encodeURIComponent(
+        token,
+    )}`;
+}
+
+async verifyPaymentReceipt(
+    token: string,
+) {
+    const parts = String(
+        token || '',
+    ).split('.');
+
+    if (parts.length !== 2) {
+        throw new NotFoundException(
+            'Invalid payment verification link',
+        );
+    }
+
+    const [
+        payloadPart,
+        suppliedSignature,
+    ] = parts;
+
+    const expectedSignature =
+        createHmac(
+            'sha256',
+            this.getVerificationSecret(),
+        )
+            .update(
+                `eventify-payment-receipt:${payloadPart}`,
+            )
+            .digest('base64url');
+
+    const suppliedBuffer =
+        Buffer.from(
+            suppliedSignature,
+            'utf8',
+        );
+
+    const expectedBuffer =
+        Buffer.from(
+            expectedSignature,
+            'utf8',
+        );
+
+    if (
+        suppliedBuffer.length !==
+            expectedBuffer.length ||
+        !timingSafeEqual(
+            suppliedBuffer,
+            expectedBuffer,
+        )
+    ) {
+        throw new NotFoundException(
+            'Invalid payment verification link',
+        );
+    }
+
+    let payload: {
+        paymentId?: string;
+        vendorOrderId?: string;
+    };
+
+    try {
+        payload = JSON.parse(
+            Buffer.from(
+                payloadPart,
+                'base64url',
+            ).toString('utf8'),
+        );
+    } catch {
+        throw new NotFoundException(
+            'Invalid payment verification link',
+        );
+    }
+
+    if (
+        !payload.paymentId ||
+        !payload.vendorOrderId
+    ) {
+        throw new NotFoundException(
+            'Invalid payment verification link',
+        );
+    }
+
+    const payment =
+        await this.paymentModel
+            .findOne({
+                _id:
+                    payload.paymentId,
+
+                vendorOrderId:
+                    payload.vendorOrderId,
+
+                status:
+                    'SUCCESS',
+            })
+            .lean();
+
+    if (!payment) {
+        throw new NotFoundException(
+            'Verified payment not found',
+        );
+    }
+
+    const vendorOrder =
+        await this.vendorOrderModel
+            .findById(
+                payload.vendorOrderId,
+            )
+            .lean();
+
+    if (!vendorOrder) {
+        throw new NotFoundException(
+            'Booking not found',
+        );
+    }
+
+    const [
+        client,
+        vendor,
+        successfulPayments,
+    ] = await Promise.all([
+        this.userModel
+            .findById(
+                payment.organizerId,
+            )
+            .select('name')
+            .lean(),
+
+        this.userModel
+            .findById(
+                payment.vendorId,
+            )
+            .select('name')
+            .lean(),
+
+        this.paymentModel
+            .find({
+                vendorOrderId:
+                    vendorOrder._id,
+
+                status:
+                    'SUCCESS',
+            })
+            .select('amount')
+            .lean(),
+    ]);
+
+    const totalAmount =
+        Number(
+            vendorOrder.finalAmount ??
+                vendorOrder.price ??
+                0,
+        );
+
+    const paidSoFar =
+        successfulPayments.reduce(
+            (
+                total,
+                item,
+            ) =>
+                total +
+                Number(
+                    item.amount ||
+                        0,
+                ),
+            0,
+        );
+
+    const remainingAmount =
+        Math.max(
+            totalAmount -
+                paidSoFar,
+            0,
+        );
+
+    return {
+        verified: true,
+
+        bookingReference:
+            `EH-${String(
+                vendorOrder._id,
+            )
+                .slice(-8)
+                .toUpperCase()}`,
+
+        clientName:
+            client?.name ||
+            'Client',
+
+        vendorName:
+            vendor?.name ||
+            'Vendor',
+
+        serviceName:
+            vendorOrder.serviceName ||
+            'N/A',
+
+        paymentType:
+            payment.type,
+
+        amountPaid:
+            Number(
+                payment.amount ||
+                    0,
+            ),
+
+        paymentMethod:
+            payment.method ||
+            null,
+
+        transactionReference:
+            payment.transactionRef ||
+            null,
+
+        paidAt:
+            payment.paidAt ||
+            null,
+
+        transactionStatus:
+            payment.status,
+
+        bookingPaymentStatus:
+            vendorOrder.paymentStatus,
+
+        totalAmount,
+
+        paidSoFar,
+
+        remainingAmount,
+    };
+}
 
   private async assertOrganizerOwnsVendorOrder(
     vendorOrderId: string,
@@ -208,6 +505,12 @@ pendingPayment: pendingPayment
               paidAt:
                   latestSuccessfulPayment.paidAt ??
                   null,
+                verificationUrl:
+                    this.buildPaymentVerificationUrl(
+                        latestSuccessfulPayment._id.toString(),
+                        vendorOrder._id.toString(),
+                    ),
+                
           }
         : null,
 };
