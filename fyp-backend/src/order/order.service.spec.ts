@@ -7,6 +7,8 @@ import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { Notification } from 'src/schemas/notification.schema';
 import { CommissionConfig } from 'src/schemas/commission-config.schema';
 import { Category } from 'src/schemas/category.schema';
+import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
+import { ChatService } from 'src/chat/chat.service';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 import { PayoutService } from 'src/payout/payout.service';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
@@ -89,6 +91,10 @@ describe('OrderService - Unit Tests', () => {
                     useValue: {},
                 },
                 {
+                    provide: getModelToken(RescheduleRequest.name),
+                    useValue: {},
+                },
+                {
                     provide: getConnectionToken(),
                     useValue: {},
                 },
@@ -113,6 +119,13 @@ describe('OrderService - Unit Tests', () => {
                 {
                     provide: DiscountService,
                     useValue: {},
+                },
+                {
+                    provide: ChatService,
+                    useValue: {
+                        createOrGetConversation: jest.fn(),
+                        createMessage: jest.fn(),
+                    },
                 },
             ],
         }).compile();
