@@ -355,18 +355,107 @@ private buildPaymentReceiptEmail(
         method: string;
         transactionRef: string;
         paidAt: Date;
+
+        eventName: string;
+        eventType?: string | null;
+        eventDate?: Date | null;
+        eventTime?: string | null;
+        eventDurationMinutes?: number | null;
+        guests?: number | null;
+        eventAddress?: string | null;
+
+        vendorName: string;
+        brandName?: string | null;
+        vendorPhone?: string | null;
+        vendorEmail?: string | null;
+        vendorAddress?: string | null;
+
+        serviceName?: string | null;
+        packageName?: string | null;
+
+        serviceStart?: Date | null;
+        serviceEnd?: Date | null;
+
+        bookingTotal: number;
+        previouslyPaid: number;
+        totalPaid: number;
+        remainingBalance: number;
+        paymentStatus: string;
     },
 ): string {
-    const amount =
-        Number(
-            data.amount || 0,
-        ).toLocaleString('en-PK');
+    const money = (value: number) =>
+        Number(value || 0).toLocaleString('en-PK');
+
+    const formatDate = (
+        value?: Date | null,
+    ) => {
+        if (!value) {
+            return 'N/A';
+        }
+
+        return new Date(value).toLocaleDateString(
+            'en-PK',
+            {
+                dateStyle: 'medium',
+            },
+        );
+    };
+
+    const formatDateTime = (
+        value?: Date | null,
+    ) => {
+        if (!value) {
+            return 'N/A';
+        }
+
+        return new Date(value).toLocaleString(
+            'en-PK',
+            {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            },
+        );
+    };
+
+    const formatDuration = (
+        minutes?: number | null,
+    ) => {
+        if (
+            !minutes ||
+            !Number.isFinite(minutes)
+        ) {
+            return 'N/A';
+        }
+
+        const hours = Math.floor(
+            minutes / 60,
+        );
+
+        const remainingMinutes =
+            minutes % 60;
+
+        if (
+            hours > 0 &&
+            remainingMinutes > 0
+        ) {
+            return `${hours} hr ${remainingMinutes} min`;
+        }
+
+        if (hours > 0) {
+            return `${hours} hr`;
+        }
+
+        return `${remainingMinutes} min`;
+    };
 
     const paymentType =
         data.paymentType ===
         'DOWN_PAYMENT'
             ? 'Down Payment'
-            : 'Remaining Payment';
+            : data.paymentType ===
+                'REMAINING'
+              ? 'Remaining Payment'
+              : data.paymentType;
 
     const method =
         data.method === 'card'
@@ -378,20 +467,6 @@ private buildPaymentReceiptEmail(
                   'easypaisa'
                 ? 'EasyPaisa'
                 : data.method;
-
-    const transactionRef =
-        this.escapeHtml(
-            data.transactionRef,
-        );
-
-    const paidAt =
-        data.paidAt.toLocaleString(
-            'en-PK',
-            {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-            },
-        );
 
     return `
 <!DOCTYPE html>
@@ -407,7 +482,7 @@ private buildPaymentReceiptEmail(
 >
   <div
     style="
-      max-width:600px;
+      max-width:650px;
       margin:30px auto;
       background:#FFFFFF;
       border-radius:16px;
@@ -415,6 +490,7 @@ private buildPaymentReceiptEmail(
       border:1px solid #EAD5E6;
     "
   >
+
     <div
       style="
         background:#7D0C72;
@@ -424,7 +500,7 @@ private buildPaymentReceiptEmail(
     >
       <div
         style="
-          font-size:22px;
+          font-size:24px;
           font-weight:700;
         "
       >
@@ -442,6 +518,7 @@ private buildPaymentReceiptEmail(
     </div>
 
     <div style="padding:28px;">
+
       <div
         style="
           font-size:22px;
@@ -453,53 +530,284 @@ private buildPaymentReceiptEmail(
       </div>
 
       <p>
-        Your payment has been confirmed
-        successfully.
+        Your payment has been confirmed successfully.
       </p>
 
       <div
         style="
-          margin-top:22px;
+          margin-top:24px;
+          font-size:17px;
+          font-weight:700;
+          color:#7D0C72;
+        "
+      >
+        Event Details
+      </div>
+
+      <div
+        style="
+          margin-top:12px;
+          padding:18px;
+          background:#FAF5F9;
+          border-radius:12px;
+        "
+      >
+        <div>
+          <strong>Event Name:</strong>
+          ${this.escapeHtml(data.eventName)}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Event Type:</strong>
+          ${this.escapeHtml(
+              data.eventType || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Event Date:</strong>
+          ${this.escapeHtml(
+              formatDate(data.eventDate),
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Event Time:</strong>
+          ${this.escapeHtml(
+              data.eventTime || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Duration:</strong>
+          ${this.escapeHtml(
+              formatDuration(
+                  data.eventDurationMinutes,
+              ),
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Guests:</strong>
+          ${this.escapeHtml(
+              data.guests ?? 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Event Address:</strong>
+          ${this.escapeHtml(
+              data.eventAddress || 'N/A',
+          )}
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top:24px;
+          font-size:17px;
+          font-weight:700;
+          color:#7D0C72;
+        "
+      >
+        Vendor Details
+      </div>
+
+      <div
+        style="
+          margin-top:12px;
+          padding:18px;
+          background:#FAF5F9;
+          border-radius:12px;
+        "
+      >
+        <div>
+          <strong>Brand Name:</strong>
+          ${this.escapeHtml(
+              data.brandName ||
+                  data.vendorName,
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Vendor Name:</strong>
+          ${this.escapeHtml(
+              data.vendorName,
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Contact Number:</strong>
+          ${this.escapeHtml(
+              data.vendorPhone || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Booking Email:</strong>
+          ${this.escapeHtml(
+              data.vendorEmail || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Office Address:</strong>
+          ${this.escapeHtml(
+              data.vendorAddress || 'N/A',
+          )}
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top:24px;
+          font-size:17px;
+          font-weight:700;
+          color:#7D0C72;
+        "
+      >
+        Service Details
+      </div>
+
+      <div
+        style="
+          margin-top:12px;
+          padding:18px;
+          background:#FAF5F9;
+          border-radius:12px;
+        "
+      >
+        <div>
+          <strong>Service:</strong>
+          ${this.escapeHtml(
+              data.serviceName || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Package:</strong>
+          ${this.escapeHtml(
+              data.packageName || 'N/A',
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Service Start:</strong>
+          ${this.escapeHtml(
+              formatDateTime(
+                  data.serviceStart,
+              ),
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Service End:</strong>
+          ${this.escapeHtml(
+              formatDateTime(
+                  data.serviceEnd,
+              ),
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Booking Total:</strong>
+          Rs. ${money(
+              data.bookingTotal,
+          )}
+        </div>
+      </div>
+
+      <div
+        style="
+          margin-top:24px;
+          font-size:17px;
+          font-weight:700;
+          color:#7D0C72;
+        "
+      >
+        Payment Details
+      </div>
+
+      <div
+        style="
+          margin-top:12px;
           padding:18px;
           background:#F8E9F6;
           border-radius:12px;
         "
       >
         <div>
-          <strong>Amount:</strong>
-          Rs. ${amount}
-        </div>
-
-        <div style="margin-top:10px;">
           <strong>Payment Type:</strong>
-          ${this.escapeHtml(paymentType)}
+          ${this.escapeHtml(
+              paymentType,
+          )}
         </div>
 
-        <div style="margin-top:10px;">
+        <div style="margin-top:8px;">
+          <strong>Amount Paid:</strong>
+          Rs. ${money(data.amount)}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Previously Paid:</strong>
+          Rs. ${money(
+              data.previouslyPaid,
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Total Paid:</strong>
+          Rs. ${money(
+              data.totalPaid,
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Remaining Balance:</strong>
+          Rs. ${money(
+              data.remainingBalance,
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
           <strong>Payment Method:</strong>
           ${this.escapeHtml(method)}
         </div>
 
-        <div style="margin-top:10px;">
+        <div style="margin-top:8px;">
           <strong>Transaction Reference:</strong>
-          ${transactionRef}
+          ${this.escapeHtml(
+              data.transactionRef,
+          )}
         </div>
 
-        <div style="margin-top:10px;">
+        <div style="margin-top:8px;">
           <strong>Paid At:</strong>
-          ${this.escapeHtml(paidAt)}
+          ${this.escapeHtml(
+              formatDateTime(
+                  data.paidAt,
+              ),
+          )}
+        </div>
+
+        <div style="margin-top:8px;">
+          <strong>Payment Status:</strong>
+          ${this.escapeHtml(
+              data.paymentStatus,
+          )}
         </div>
       </div>
 
       <p
         style="
-          margin-top:22px;
+          margin-top:24px;
           color:#766B73;
         "
       >
-        You can also view this receipt
-        inside the Eventify Hub app.
+        You can also view this receipt inside
+        the Eventify Hub app.
       </p>
+
     </div>
   </div>
 </body>
@@ -599,23 +907,91 @@ if (
 }
 
 try {
-    const client =
-        await this.userModel
+    const [
+        client,
+        order,
+        vendor,
+    ] = await Promise.all([
+        this.userModel
             .findById(
                 payment.organizerId,
             )
             .select(
                 'email name',
             )
-            .lean();
+            .lean(),
 
-    if (client?.email) {
+        this.orderModel
+            .findById(
+                vendorOrder.orderId,
+            )
+            .lean(),
+
+        this.userModel
+            .findById(
+                vendorOrder.vendorId,
+            )
+            .select(
+                `
+                name
+                phone_number
+                contactDetails
+                packages
+                businessAddress
+                `,
+            )
+            .lean(),
+    ]);
+
+    if (
+        client?.email &&
+        order &&
+        vendor
+    ) {
+        const packageData =
+            Array.isArray(vendor.packages)
+                ? vendor.packages.find(
+                      (pkg: any) =>
+                          pkg?._id?.toString() ===
+                          vendorOrder.packageId?.toString(),
+                  )
+                : null;
+
+        const bookingAmount =
+            Number(
+                vendorOrder.finalAmount ??
+                vendorOrder.price ??
+                0,
+            );
+
+        const paymentAmount =
+            Number(
+                payment.amount || 0,
+            );
+
+        const totalPaid =
+            Number(
+                paidSoFar || 0,
+            );
+
+        const previouslyPaid =
+            Math.max(
+                totalPaid -
+                    paymentAmount,
+                0,
+            );
+
+        const remainingBalance =
+            Math.max(
+                bookingAmount -
+                    totalPaid,
+                0,
+            );
+
         const receiptHtml =
             this.buildPaymentReceiptEmail({
                 amount:
-                    Number(
-                        payment.amount || 0,
-                    ),
+                    paymentAmount,
 
                 paymentType:
                     String(
@@ -636,16 +1012,113 @@ try {
                 paidAt:
                     payment.paidAt ||
                     new Date(),
+
+                eventName:
+                    order.eventName,
+
+                eventType:
+                    order.eventType ??
+                    null,
+
+                eventDate:
+                    order.eventDate ??
+                    null,
+
+                eventTime:
+                    order.eventTime ??
+                    null,
+
+                eventDurationMinutes:
+                    order.eventDurationMinutes ??
+                    null,
+
+                guests:
+                    order.guests ??
+                    null,
+
+                eventAddress:
+                    order.eventAddress ??
+                    null,
+
+                vendorName:
+                    vendor.name ||
+                    vendorOrder.serviceName ||
+                    'Vendor',
+
+                brandName:
+                    vendor.contactDetails
+                        ?.brandName ??
+                    null,
+
+                vendorPhone:
+                    vendor.contactDetails
+                        ?.contactNumber ||
+                    vendor.phone_number ||
+                    null,
+
+                vendorEmail:
+                    vendor.contactDetails
+                        ?.bookingEmail ??
+                    null,
+
+                vendorAddress:
+                    vendor.contactDetails
+                        ?.officialAddress ||
+                    vendor.businessAddress ||
+                    null,
+
+                serviceName:
+                    vendorOrder.serviceName ??
+                    null,
+
+                packageName:
+                    packageData
+                        ?.packageName ??
+                    null,
+
+                serviceStart:
+                    vendorOrder
+                        .eventStartDateTime ??
+                    null,
+
+                serviceEnd:
+                    vendorOrder
+                        .eventEndDateTime ??
+                    null,
+
+                bookingTotal:
+                    bookingAmount,
+
+                previouslyPaid,
+
+                totalPaid,
+
+                remainingBalance,
+
+                paymentStatus:
+                    String(
+                        vendorOrder
+                            .paymentStatus ||
+                            '',
+                    ),
             });
+
+        const brandName =
+            vendor.contactDetails
+                ?.brandName ||
+            vendor.name ||
+            'Vendor';
 
         await this.emailService
             .sendTransactionalEmail({
-                to: client.email,
+                to:
+                    client.email,
 
                 subject:
-                    'Your Eventify Hub payment receipt',
+                    `Payment Receipt — ${order.eventName} | ${brandName}`,
 
-                html: receiptHtml,
+                html:
+                    receiptHtml,
 
                 senderName:
                     'Eventify Hub',
