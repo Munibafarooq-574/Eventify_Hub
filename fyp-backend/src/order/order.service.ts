@@ -22,6 +22,7 @@ import { CityService } from 'src/city/city.service';
 import { Category } from 'src/schemas/category.schema';
 import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
+import { ChatService } from '../chat/chat.service';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -59,6 +60,7 @@ export class OrderService {
     private readonly featureAccessService: FeatureAccessService,
     private readonly cityService: CityService,
     private readonly discountService: DiscountService,
+    private readonly chatService: ChatService,
 ) { }
 
 
@@ -2151,6 +2153,21 @@ async completeVendorOrder(vendorOrderId: string) {
             created.push(request);
 
             try {
+                const chatId = await this.chatService.createOrGetConversation(
+                    requesterId,
+                    String(vendorOrder.vendorId),
+                );
+                await this.chatService.createMessage(
+                    chatId,
+                    requesterId,
+                    String(vendorOrder.vendorId),
+                    `Rescheduling requested: ${dto.eventDate} at ${dto.eventTime}. Please review the booking rescheduling request.`,
+                );
+            } catch (error) {
+                console.log('Reschedule chat message failed:', error instanceof Error ? error.message : error);
+            }
+
+            try {
                 await this.sendPushNotification(
                     'Rescheduling request',
                     'A client requested a new event date/time. Please review the request.',
@@ -2264,6 +2281,23 @@ async completeVendorOrder(vendorOrderId: string) {
         }
 
         if (order) {
+            try {
+                const chatId = await this.chatService.createOrGetConversation(
+                    String(order.organizerId),
+                    String(request.vendorId),
+                );
+                await this.chatService.createMessage(
+                    chatId,
+                    String(request.vendorId),
+                    String(order.organizerId),
+                    dto.status === 'ACCEPTED'
+                        ? 'Rescheduling request accepted.'
+                        : 'Rescheduling request rejected. The original booking remains unchanged.',
+                );
+            } catch (error) {
+                console.log('Reschedule response chat message failed:', error instanceof Error ? error.message : error);
+            }
+
             try {
                 await this.sendPushNotification(
                     dto.status === 'ACCEPTED' ? 'Reschedule accepted' : 'Reschedule rejected',
