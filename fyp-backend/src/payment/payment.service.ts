@@ -182,24 +182,26 @@ async verifyPaymentReceipt(
     }
 
     const payment =
-        await this.paymentModel
-            .findOne({
-                _id:
-                    payload.paymentId,
+    await this.paymentModel
+        .findById(
+            payload.paymentId,
+        )
+        .lean();
 
-                vendorOrderId:
-                    payload.vendorOrderId,
-
-                status:
-                    'SUCCESS',
-            })
-            .lean();
-
-    if (!payment) {
-        throw new NotFoundException(
-            'Verified payment not found',
-        );
-    }
+if (
+    !payment ||
+    payment.status !== 'SUCCESS' ||
+    String(
+        payment.vendorOrderId,
+    ) !==
+        String(
+            payload.vendorOrderId,
+        )
+) {
+    throw new NotFoundException(
+        'Verified payment not found',
+    );
+}
 
     const vendorOrder =
         await this.vendorOrderModel
