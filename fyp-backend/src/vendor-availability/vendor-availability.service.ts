@@ -13,6 +13,8 @@ import { User } from 'src/schemas/user.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 
+import { CityService } from '../city/city.service';
+import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -54,6 +56,7 @@ export class VendorAvailabilityService {
     @InjectModel(VendorOrder.name)
     private readonly vendorOrderModel: Model<VendorOrder>,
     private readonly featureAccessService: FeatureAccessService,
+    private readonly cityService: CityService,
   ) {}
 
   async getAvailability(vendorId: string) {
@@ -328,7 +331,7 @@ if (!hasAccess) {
 
     const vendorQuery = this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role packages');
+      .select('availabilitySettings role packages businessCityId');
 
     if (session) {
       vendorQuery.session(session);
@@ -546,6 +549,15 @@ if (!hasAccess) {
       }
     }
 
+    const vendorTimeZone = await this.cityService.requireCityTimeZone(String((vendor as any).businessCityId));
+    const localParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: vendorTimeZone, year: 'numeric', month: '2-digit',
+      day: '2-digit', weekday: 'short',
+    }).formatToParts(startDateTime);
+    const localMap = Object.fromEntries(localParts.map(p => [p.type, p.value]));
+    const localDateKey = localMap.year + '-' + localMap.month + '-' + localMap.day;
+    const localDayCode = localMap.weekday.toUpperCase().slice(0, 3);
+    const localWindow = (time: string) => eventLocalToUtc(localDateKey, time, vendorTimeZone);
     const settings: any = vendor.availabilitySettings ?? {};
 
     const workingDays = settings.workingDays ?? [];
@@ -568,7 +580,7 @@ if (!hasAccess) {
     // ---------------------------------------------------------
 
     const dayCode =
-      DAY_CODES[startDateTime.getDay()];
+      localDayCode;
 
     const daySlots: any[] =
       settings.daySlots ?? [];
@@ -601,31 +613,8 @@ if (!hasAccess) {
 
       const fitsAnySlot = slots.some(
         (slot: any) => {
-          const [sh, sm] =
-            slot.start.split(':').map(Number);
-
-          const [eh, em] =
-            slot.end.split(':').map(Number);
-
-          const slotStart =
-            new Date(startDateTime);
-
-          slotStart.setHours(
-            sh,
-            sm,
-            0,
-            0,
-          );
-
-          const slotEnd =
-            new Date(startDateTime);
-
-          slotEnd.setHours(
-            eh,
-            em,
-            0,
-            0,
-          );
+          const slotStart = localWindow(slot.start);
+          const slotEnd = localWindow(slot.end);
 
           return (
             startDateTime >= slotStart &&
@@ -663,35 +652,8 @@ if (!hasAccess) {
         };
       }
 
-      const [wsH, wsM] =
-        workingHoursStart
-          .split(':')
-          .map(Number);
-
-      const [weH, weM] =
-        workingHoursEnd
-          .split(':')
-          .map(Number);
-
-      const dayStart =
-        new Date(startDateTime);
-
-      dayStart.setHours(
-        wsH,
-        wsM,
-        0,
-        0,
-      );
-
-      const dayEnd =
-        new Date(startDateTime);
-
-      dayEnd.setHours(
-        weH,
-        weM,
-        0,
-        0,
-      );
+      const dayStart = localWindow(workingHoursStart);
+      const dayEnd = localWindow(workingHoursEnd);
 
       if (
         startDateTime < dayStart ||
@@ -705,8 +667,7 @@ if (!hasAccess) {
         };
       }
     }
-    const key =
-      toDateKey(startDateTime);
+    const key = localDateKey;
 
     if (
       blockedDates.some(
@@ -855,7 +816,7 @@ return {
   ) {
     const vendor = await this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role')
+      .select('availabilitySettings role businessCityId')
       .lean();
 
     if (!vendor || vendor.role !== 'Vendor') {
@@ -871,32 +832,19 @@ return {
     // Selected day boundaries
     // ---------------------------------------------------------
 
-    const dayStart =
-      new Date(dateStr);
-
-    dayStart.setHours(
-      0,
-      0,
-      0,
-      0,
+    // Interpret the selected calendar day in the vendor's business-city timezone.
+    const vendorTimeZone = await this.cityService.requireCityTimeZone(
+      String((vendor as any).businessCityId),
     );
-
-    const dayEnd =
-      new Date(dateStr);
-
-    dayEnd.setHours(
-      23,
-      59,
-      59,
-      999,
-    );
-
-    // ---------------------------------------------------------
-    // Determine selected day code
-    // ---------------------------------------------------------
-
-    const dayCode =
-      DAY_CODES[dayStart.getDay()];
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) {
+      throw new BadRequestException('Calendar date must use YYYY-MM-DD');
+    }
+    const dayStart = eventLocalToUtc(dateStr, '00:00', vendorTimeZone);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const nextDay = new Date(Date.UTC(year, month - 1, day + 1))
+      .toISOString().slice(0, 10);
+    const dayEnd = eventLocalToUtc(nextDay, '00:00', vendorTimeZone);
+    const dayCode = DAY_CODES[new Date(dateStr + 'T12:00:00.000Z').getUTCDay()];
 
     // ---------------------------------------------------------
     // Get configured working slots

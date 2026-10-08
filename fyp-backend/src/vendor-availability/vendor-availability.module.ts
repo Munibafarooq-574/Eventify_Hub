@@ -1,4 +1,5 @@
 //fyp-backend/src/vendor-availability/vendor-availability.module.ts
+import { CityModule } from 'src/city/city.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from 'src/schemas/user.schema';
@@ -10,6 +11,7 @@ import { VendorGrowthModule } from 'src/vendor/growth/vendor-growth.module';
 @Module({
      imports: [
     forwardRef(() => VendorGrowthModule),
+    CityModule,
     MongooseModule.forFeature([
     { name: User.name, schema: UserSchema },
     { name: VendorOrder.name, schema: VendorOrderSchema },

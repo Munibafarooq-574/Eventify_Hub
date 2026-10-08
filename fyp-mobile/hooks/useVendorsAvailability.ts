@@ -9,6 +9,7 @@ interface Params {
   eventDate: string | null; // "2026-09-10"
   startTime: string | null; // "17:00"
   durationMinutes: number | null;
+  eventCityId: string | null;
 }
 
 export function useVendorsAvailability({
@@ -16,12 +17,13 @@ export function useVendorsAvailability({
   eventDate,
   startTime,
   durationMinutes,
+  eventCityId,
 }: Params) {
   const [results, setResults] = useState<Record<string, AvailabilityCheckResult>>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!vendorIds.length || !eventDate || !startTime || !durationMinutes) {
+    if (!vendorIds.length || !eventDate || !startTime || !durationMinutes || !eventCityId) {
       setResults({});
       return;
     }
@@ -29,7 +31,7 @@ export function useVendorsAvailability({
     let cancelled = false;
     setLoading(true);
 
-    checkVendorsAvailability({ vendorIds, eventDate, startTime, durationMinutes })
+    checkVendorsAvailability({ vendorIds, eventDate, startTime, durationMinutes, eventCityId })
       .then((res) => {
         if (cancelled) return;
         const map: Record<string, AvailabilityCheckResult> = {};
@@ -43,7 +45,7 @@ export function useVendorsAvailability({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vendorIds.join(','), eventDate, startTime, durationMinutes]);
+  }, [vendorIds.join(','), eventDate, startTime, durationMinutes, eventCityId]);
 
   return { results, loading };
 }

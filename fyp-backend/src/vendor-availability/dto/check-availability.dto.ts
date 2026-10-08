@@ -24,6 +24,10 @@ export class CheckAvailabilityDto {
   @Min(1)
   durationMinutes: number;
 
+    @IsString()
+  @IsNotEmpty()
+  eventCityId: string;
+  
   @IsOptional()
   @IsString()
   packageId?: string;

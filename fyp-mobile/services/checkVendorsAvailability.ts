@@ -16,7 +16,8 @@ export default function checkVendorsAvailability(
   vendorIds: string[];
   eventDate: string;
   startTime: string;
-  durationMinutes: number;
+    durationMinutes: number;
+  eventCityId: string;
   packageId?: string;
 }
 ) {
