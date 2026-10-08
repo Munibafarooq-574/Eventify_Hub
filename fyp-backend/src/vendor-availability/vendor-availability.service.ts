@@ -13,6 +13,8 @@ import { User } from 'src/schemas/user.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 
+import { CityService } from '../city/city.service';
+import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -54,6 +56,7 @@ export class VendorAvailabilityService {
     @InjectModel(VendorOrder.name)
     private readonly vendorOrderModel: Model<VendorOrder>,
     private readonly featureAccessService: FeatureAccessService,
+    private readonly cityService: CityService,
   ) {}
 
   async getAvailability(vendorId: string) {
@@ -328,7 +331,7 @@ if (!hasAccess) {
 
     const vendorQuery = this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role packages');
+      .select('availabilitySettings role packages businessCityId');
 
     if (session) {
       vendorQuery.session(session);
@@ -546,6 +549,15 @@ if (!hasAccess) {
       }
     }
 
+    const vendorTimeZone = await this.cityService.requireCityTimeZone(String((vendor as any).businessCityId));
+    const localParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: vendorTimeZone, year: 'numeric', month: '2-digit',
+      day: '2-digit', weekday: 'short',
+    }).formatToParts(startDateTime);
+    const localMap = Object.fromEntries(localParts.map(p => [p.type, p.value]));
+    const localDateKey = localMap.year + '-' + localMap.month + '-' + localMap.day;
+    const localDayCode = localMap.weekday.toUpperCase().slice(0, 3);
+    const localWindow = (time: string) => eventLocalToUtc(localDateKey, time, vendorTimeZone);
     const settings: any = vendor.availabilitySettings ?? {};
 
     const workingDays = settings.workingDays ?? [];
@@ -568,7 +580,7 @@ if (!hasAccess) {
     // ---------------------------------------------------------
 
     const dayCode =
-      DAY_CODES[startDateTime.getDay()];
+      localDayCode;
 
     const daySlots: any[] =
       settings.daySlots ?? [];
@@ -601,31 +613,8 @@ if (!hasAccess) {
 
       const fitsAnySlot = slots.some(
         (slot: any) => {
-          const [sh, sm] =
-            slot.start.split(':').map(Number);
-
-          const [eh, em] =
-            slot.end.split(':').map(Number);
-
-          const slotStart =
-            new Date(startDateTime);
-
-          slotStart.setHours(
-            sh,
-            sm,
-            0,
-            0,
-          );
-
-          const slotEnd =
-            new Date(startDateTime);
-
-          slotEnd.setHours(
-            eh,
-            em,
-            0,
-            0,
-          );
+          const slotStart = localWindow(slot.start);
+          const slotEnd = localWindow(slot.end);
 
           return (
             startDateTime >= slotStart &&
@@ -663,35 +652,8 @@ if (!hasAccess) {
         };
       }
 
-      const [wsH, wsM] =
-        workingHoursStart
-          .split(':')
-          .map(Number);
-
-      const [weH, weM] =
-        workingHoursEnd
-          .split(':')
-          .map(Number);
-
-      const dayStart =
-        new Date(startDateTime);
-
-      dayStart.setHours(
-        wsH,
-        wsM,
-        0,
-        0,
-      );
-
-      const dayEnd =
-        new Date(startDateTime);
-
-      dayEnd.setHours(
-        weH,
-        weM,
-        0,
-        0,
-      );
+      const dayStart = localWindow(workingHoursStart);
+      const dayEnd = localWindow(workingHoursEnd);
 
       if (
         startDateTime < dayStart ||
@@ -705,8 +667,7 @@ if (!hasAccess) {
         };
       }
     }
-    const key =
-      toDateKey(startDateTime);
+    const key = localDateKey;
 
     if (
       blockedDates.some(
