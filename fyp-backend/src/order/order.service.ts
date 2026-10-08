@@ -22,6 +22,7 @@ import { CityService } from 'src/city/city.service';
 import { Category } from 'src/schemas/category.schema';
 import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
+import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { ChatService } from '../chat/chat.service';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
@@ -240,15 +241,12 @@ export class OrderService {
     const [h, m] =
         eventTime.split(':').map(Number);
 
-    const eventStartDateTime =
-        new Date(parsedEventDate);
-
-    eventStartDateTime.setHours(
-        h,
-        m,
-        0,
-        0,
-    );
+    const eventTimeZone = await this.cityService.requireCityTimeZone(eventCityId);
+      const eventStartDateTime = eventLocalToUtc(
+        parsedEventDate.toISOString().slice(0, 10),
+        eventTime,
+        eventTimeZone,
+      );
 
     if (
         Number.isNaN(
