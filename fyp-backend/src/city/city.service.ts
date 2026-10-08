@@ -44,6 +44,19 @@ export class CityService {
     .lean();
 }
 
+  async requireCityTimeZone(cityId: string): Promise<string> {
+    const city = await this.requireActiveCity(cityId);
+    if (!city.timeZone) {
+      throw new BadRequestException('Selected city has no configured IANA timezone');
+    }
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: city.timeZone });
+    } catch {
+      throw new BadRequestException('Selected city has an invalid IANA timezone');
+    }
+    return city.timeZone;
+  }
+
   async requireActiveCity(cityId: string) {
     if (!Types.ObjectId.isValid(cityId)) {
       throw new BadRequestException('Invalid city ID.');
