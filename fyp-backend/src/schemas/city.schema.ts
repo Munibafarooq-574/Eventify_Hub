@@ -39,6 +39,13 @@ export class City extends Document {
   })
   stateProvinceName: string;
 
+    @Prop({
+    type: String,
+    trim: true,
+    required: false,
+  })
+  timeZone?: string;
+  
   @Prop({
     default: true,
     index: true,
