@@ -44,6 +44,19 @@ export class CityService {
     .lean();
 }
 
+  private validateCityTimeZone(value: string | undefined): string {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new BadRequestException('A valid IANA city timezone is required');
+    }
+    const timeZone = value.trim();
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone });
+    } catch {
+      throw new BadRequestException('Invalid IANA city timezone');
+    }
+    return timeZone;
+  }
+
   async requireCityTimeZone(cityId: string): Promise<string> {
     const city = await this.requireActiveCity(cityId);
     if (!city.timeZone) {
@@ -136,6 +149,7 @@ export class CityService {
     countryName: string;
     stateProvinceCode?: string;
     stateProvinceName?: string;
+    timeZone?: string;
   }) {
     const name = data.name?.trim();
     const countryCode =
@@ -189,6 +203,7 @@ export class CityService {
       countryName,
       stateProvinceCode,
       stateProvinceName,
+      timeZone: this.validateCityTimeZone(data.timeZone),
       isActive: true,
     });
   }
@@ -201,6 +216,7 @@ export class CityService {
       countryName?: string;
       stateProvinceCode?: string;
       stateProvinceName?: string;
+    timeZone?: string;
     },
   ) {
     if (!Types.ObjectId.isValid(cityId)) {
@@ -274,6 +290,10 @@ export class CityService {
     ) {
       city.stateProvinceName =
         data.stateProvinceName.trim();
+    }
+
+    if (data.timeZone !== undefined) {
+      city.timeZone = this.validateCityTimeZone(data.timeZone);
     }
 
     const duplicate =
