@@ -27,6 +27,7 @@ import getVendorAvailability, {
   VendorAvailabilityResponse,
 } from '@/services/getVendorAvailability';
 import checkVendorsAvailability from '@/services/checkVendorsAvailability';
+import getMarketplaceEventContext from '@/services/getMarketplaceEventContext';
 import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
 import { trackVendorView } from '@/services/trackVendorView';
 import  getActiveCities  from '@/services/getActiveCities';
@@ -565,11 +566,16 @@ const [availabilityCheck, setAvailabilityCheck] =
         );
 
         if (isEventMode) {
+          const marketplaceContext = await getMarketplaceEventContext();
+          if (!marketplaceContext.eventCityId) {
+            throw new Error('Select an event city before checking vendor availability');
+          }
           const checkResult =
   await checkVendorsAvailability({
     vendorIds: [
       vendorData._id,
     ],
+    eventCityId: marketplaceContext.eventCityId,
     eventDate: String(
       Array.isArray(eventDate)
         ? eventDate[0]
