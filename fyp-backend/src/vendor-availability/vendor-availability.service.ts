@@ -816,7 +816,7 @@ return {
   ) {
     const vendor = await this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role')
+      .select('availabilitySettings role businessCityId')
       .lean();
 
     if (!vendor || vendor.role !== 'Vendor') {
@@ -832,32 +832,19 @@ return {
     // Selected day boundaries
     // ---------------------------------------------------------
 
-    const dayStart =
-      new Date(dateStr);
-
-    dayStart.setHours(
-      0,
-      0,
-      0,
-      0,
+    // Interpret the selected calendar day in the vendor's business-city timezone.
+    const vendorTimeZone = await this.cityService.requireCityTimeZone(
+      String((vendor as any).businessCityId),
     );
-
-    const dayEnd =
-      new Date(dateStr);
-
-    dayEnd.setHours(
-      23,
-      59,
-      59,
-      999,
-    );
-
-    // ---------------------------------------------------------
-    // Determine selected day code
-    // ---------------------------------------------------------
-
-    const dayCode =
-      DAY_CODES[dayStart.getDay()];
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) {
+      throw new BadRequestException('Calendar date must use YYYY-MM-DD');
+    }
+    const dayStart = eventLocalToUtc(dateStr, '00:00', vendorTimeZone);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const nextDay = new Date(Date.UTC(year, month - 1, day + 1))
+      .toISOString().slice(0, 10);
+    const dayEnd = eventLocalToUtc(nextDay, '00:00', vendorTimeZone);
+    const dayCode = DAY_CODES[new Date(dateStr + 'T12:00:00.000Z').getUTCDay()];
 
     // ---------------------------------------------------------
     // Get configured working slots
