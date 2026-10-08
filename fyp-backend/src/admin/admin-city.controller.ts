@@ -72,6 +72,7 @@ export class AdminCityController {
       countryName: string;
       stateProvinceCode?: string;
       stateProvinceName?: string;
+      timeZone?: string;
     },
   ) {
     return this.cityService
@@ -90,6 +91,7 @@ export class AdminCityController {
       countryName?: string;
       stateProvinceCode?: string;
       stateProvinceName?: string;
+      timeZone?: string;
     },
   ) {
     return this.cityService
