@@ -2064,9 +2064,10 @@ async completeVendorOrder(vendorOrderId: string) {
             const newDate = new Date(dto.eventDate);
         if (Number.isNaN(newDate.getTime())) throw new BadRequestException('Invalid event date');
 
-        const [h, m] = dto.eventTime.split(':').map(Number);
-        const newEventStart = new Date(newDate);
-        newEventStart.setHours(h, m, 0, 0);
+        const rescheduleTimeZone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+        const newEventStart = eventLocalToUtc(
+            newDate.toISOString().slice(0, 10), dto.eventTime, rescheduleTimeZone,
+        );
         const newEventEnd = new Date(newEventStart.getTime() + Number(dto.durationMinutes) * 60000);
 
         if (newEventStart.getTime() < Date.now()) {
@@ -2248,9 +2249,13 @@ async completeVendorOrder(vendorOrderId: string) {
                 throw new ConflictException('Vendor booking is no longer active');
             }
 
-            const requestedStart = new Date(request.newEventDate);
-            const [rh, rm] = String(request.newStartTime).split(':').map(Number);
-            requestedStart.setHours(rh, rm, 0, 0);
+            const requestOrder = await this.orderModel.findById(request.orderId).lean();
+            if (!requestOrder) throw new NotFoundException('Original booking not found');
+            const requestTimeZone = await this.cityService.requireCityTimeZone(String(requestOrder.eventCityId));
+            const requestedStart = eventLocalToUtc(
+                new Date(request.newEventDate).toISOString().slice(0, 10),
+                String(request.newStartTime), requestTimeZone,
+            );
 
             const availability = await this.availabilityService.checkVendorAvailability(
                 String(request.vendorId),
@@ -2349,6 +2354,7 @@ async completeVendorOrder(vendorOrderId: string) {
             await session.withTransaction(async () => {
                 const order: any = await this.orderModel.findById(orderId).session(session);
                 if (!order) throw new NotFoundException('Booking not found');
+                const rescheduleTimeZone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
 
                 const vendorOrders: any[] = [];
                 for (const req of batch) {
@@ -2372,9 +2378,10 @@ async completeVendorOrder(vendorOrderId: string) {
                     const req: any = batch[i];
                     const vo: any = vendorOrders[i];
 
-                    const requestedStart = new Date(req.newEventDate);
-                    const [rh, rm] = String(req.newStartTime).split(':').map(Number);
-                    requestedStart.setHours(rh, rm, 0, 0);
+                    const requestedStart = eventLocalToUtc(
+                        new Date(req.newEventDate).toISOString().slice(0, 10),
+                        String(req.newStartTime), rescheduleTimeZone,
+                    );
 
                     const availability = await this.availabilityService.checkVendorAvailability(
                         String(req.vendorId),
@@ -2411,9 +2418,10 @@ async completeVendorOrder(vendorOrderId: string) {
                 }
 
                 const first: any = batch[0];
-                const newStart = new Date(first.newEventDate);
-                const [nh, nm] = String(first.newStartTime).split(':').map(Number);
-                newStart.setHours(nh, nm, 0, 0);
+                const newStart = eventLocalToUtc(
+                    new Date(first.newEventDate).toISOString().slice(0, 10),
+                    String(first.newStartTime), rescheduleTimeZone,
+                );
 
                 order.eventDate = new Date(first.newEventDate);
                 order.eventTime = first.newStartTime;
