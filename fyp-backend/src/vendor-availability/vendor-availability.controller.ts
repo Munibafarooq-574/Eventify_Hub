@@ -14,19 +14,13 @@ import {
 import { VendorAvailabilityService } from './vendor-availability.service';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
 import { CheckAvailabilityDto } from './dto/check-availability.dto';
+import { CityService } from '../city/city.service';
+import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-
-function buildRange(eventDate: string, startTime: string, durationMinutes: number) {
-  const [h, m] = startTime.split(':').map(Number);
-  const start = new Date(eventDate);
-  start.setHours(h, m, 0, 0);
-  const end = new Date(start.getTime() + durationMinutes * 60000);
-  return { start, end };
-}
 
 @Controller('vendor-availability')
 export class VendorAvailabilityController {
-  constructor(private readonly service: VendorAvailabilityService) {}
+  constructor(private readonly service: VendorAvailabilityService, private readonly cityService: CityService) {}
 
   @Get(':vendorId')
   getAvailability(@Param('vendorId') vendorId: string) {
@@ -54,11 +48,9 @@ setAvailability(
 
     @Post('check')
   async check(@Body() dto: CheckAvailabilityDto) {
-    const { start, end } = buildRange(
-      dto.eventDate,
-      dto.startTime,
-      dto.durationMinutes,
-    );
+    const timeZone = await this.cityService.requireCityTimeZone(dto.eventCityId);
+    const start = eventLocalToUtc(dto.eventDate, dto.startTime, timeZone);
+    const end = new Date(start.getTime() + dto.durationMinutes * 60000);
 
     return this.service.checkMany(
       dto.vendorIds,
