@@ -2097,6 +2097,10 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new ConflictException('No active vendor bookings can be rescheduled');
         }
 
+        if (vendorOrders.some((vendorOrder: any) => ['PARTIALLY_PAID', 'PAID'].includes(String(vendorOrder?.paymentStatus || 'UNPAID').toUpperCase()))) {
+            throw new ConflictException('Date/time changes are only allowed before any down payment has been paid');
+        }
+
         // One rescheduling request per event, regardless of vendor response.
         // A single request creates one record per affected vendor; any record
         // means this event has already used its one request.
