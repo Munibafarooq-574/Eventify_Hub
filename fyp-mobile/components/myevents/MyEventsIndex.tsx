@@ -830,6 +830,37 @@ const MyEventsScreen = () => {
                                     status === 'REJECTED' && { color: COLORS.danger },
                                   ]}>{statusLabel}</Text>
                                 </View>
+                                {resolutionStatus === 'REPLACEMENT_REQUIRED' && ['REJECTED', 'EXPIRED'].includes(status) && (
+                                  <TouchableOpacity
+                                    style={styles.findReplacementButton}
+                                    onPress={() => {
+                                      const categoryId = String(vendorData?.buisnessCategory?._id || vendorData?.buisnessCategory || '');
+                                      const categoryName = String(vendorData?.buisnessCategory?.name || vendorData?.buisnessCategory?.categoryName || vendorOrder?.serviceName || 'Service');
+                                      if (!categoryId) {
+                                        Alert.alert('Category unavailable', 'Could not identify the service category for this vendor.');
+                                        return;
+                                      }
+                                      router.push({
+                                        pathname: '/categoryvendorlisting',
+                                        params: {
+                                          categoryIds: JSON.stringify([categoryId]),
+                                          categoryNames: JSON.stringify([categoryName]),
+                                          eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''),
+                                          eventDate: new Date(firstRequest.newEventDate).toISOString().slice(0, 10),
+                                          startTime: String(firstRequest.newStartTime || ''),
+                                          durationMinutes: String(requestedDuration || 60),
+                                          replacementMode: 'true',
+                                          replacementOrderId: String(event._id),
+                                          replacementRequestId: String(request._id),
+                                          excludedVendorId: String(request.vendorId || ''),
+                                        },
+                                      });
+                                    }}
+                                  >
+                                    <Ionicons name="search-outline" size={14} color="#FFFFFF" />
+                                    <Text style={styles.findReplacementButtonText}>Find Replacement Vendor</Text>
+                                  </TouchableOpacity>
+                                )}
                               </View>
                             );
                           })}
@@ -1378,6 +1409,8 @@ const styles = StyleSheet.create({
   reschedulePrimaryActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   rescheduleSecondaryAction: { minHeight: 42, borderRadius: 11, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
   rescheduleSecondaryActionText: { color: COLORS.primary, fontSize: 12, fontWeight: '800' },
+  findReplacementButton: { marginTop: 8, minHeight: 38, borderRadius: 10, backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10 },
+  findReplacementButtonText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
   container: {
     flex: 1,
   },
