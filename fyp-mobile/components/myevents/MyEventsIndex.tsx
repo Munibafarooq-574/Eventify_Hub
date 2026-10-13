@@ -548,6 +548,9 @@ const MyEventsScreen = () => {
               const vendorOrders: any[] = Array.isArray(event.vendorOrders)
                 ? event.vendorOrders
                 : [];
+              const hasSuccessfulVendorPayment = vendorOrders.some((vendor: any) =>
+                ['PARTIALLY_PAID', 'PAID'].includes(String(vendor?.paymentStatus || 'UNPAID').toUpperCase()),
+              );
 
               return (
                 <FadeInUp key={event._id} index={eventIndex}>
@@ -693,6 +696,7 @@ const MyEventsScreen = () => {
 
                     {eventExpanded &&
   !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) &&
+  !hasSuccessfulVendorPayment &&
   vendorOrders.some((vendor: any) =>
     ['pending', 'accepted'].includes(
       String(vendor?.status || '').toLowerCase(),
@@ -830,38 +834,7 @@ const MyEventsScreen = () => {
                                     status === 'REJECTED' && { color: COLORS.danger },
                                   ]}>{statusLabel}</Text>
                                 </View>
-                                {resolutionStatus === 'REPLACEMENT_REQUIRED' && ['REJECTED', 'EXPIRED'].includes(status) && (
-                                  <TouchableOpacity
-                                    style={styles.findReplacementButton}
-                                    onPress={() => {
-                                      const categoryId = String(vendorData?.buisnessCategory?._id || vendorData?.buisnessCategory || '');
-                                      const categoryName = String(vendorData?.buisnessCategory?.name || vendorData?.buisnessCategory?.categoryName || vendorOrder?.serviceName || 'Service');
-                                      if (!categoryId) {
-                                        Alert.alert('Category unavailable', 'Could not identify the service category for this vendor.');
-                                        return;
-                                      }
-                                      router.push({
-                                        pathname: '/categoryvendorlisting',
-                                        params: {
-                                          categoryIds: JSON.stringify([categoryId]),
-                                          categoryNames: JSON.stringify([categoryName]),
-                                          eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''),
-                                          eventDate: new Date(firstRequest.newEventDate).toISOString().slice(0, 10),
-                                          startTime: String(firstRequest.newStartTime || ''),
-                                          durationMinutes: String(requestedDuration || 60),
-                                          replacementMode: 'true',
-                                          replacementOrderId: String(event._id),
-                                          replacementRequestId: String(request._id),
-                                          excludedVendorId: String(request.vendorId || ''),
-                                        },
-                                      });
-                                    }}
-                                  >
-                                    <Ionicons name="search-outline" size={14} color="#FFFFFF" />
-                                    <Text style={styles.findReplacementButtonText}>Find Replacement Vendor</Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
+                             </View>
                             );
                           })}
 
@@ -877,13 +850,34 @@ const MyEventsScreen = () => {
                           {needsClientAction && (
                             <View style={styles.rescheduleActions}>
                               <Text style={styles.rescheduleActionTitle}>Your decision is required</Text>
-                              <Text style={styles.rescheduleActionText}>Keep the current event schedule, or continue with the new date and resolve unavailable vendors.</Text>
+                              <Text style={styles.rescheduleActionText}>One or more vendors cannot accommodate the requested schedule. Choose how you want to continue.</Text>
                               <TouchableOpacity style={styles.reschedulePrimaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
                                 <Text style={styles.reschedulePrimaryActionText}>Keep Original Schedule</Text>
                               </TouchableOpacity>
                               <TouchableOpacity style={styles.rescheduleSecondaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'CONTINUE_WITH_NEW_DATE')}>
-                                <Text style={styles.rescheduleSecondaryActionText}>Continue with New Date</Text>
+                                <Text style={styles.rescheduleSecondaryActionText}>Continue & Replace Unavailable Vendor</Text>
                               </TouchableOpacity>
+                              <TouchableOpacity style={styles.rescheduleTertiaryAction} onPress={() => Alert.alert('Continue without vendor', 'Removing a booked service can affect cancellation/refund rules. This option will be enabled when the existing cancellation/refund workflow can process the removal safely.')}>
+                                <Text style={styles.rescheduleTertiaryActionText}>Continue Without Unavailable Vendor</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+
+                          {resolutionStatus === 'REPLACEMENT_REQUIRED' && (
+                            <View style={styles.rescheduleActions}>
+                              <Text style={styles.rescheduleActionTitle}>Replacement required</Text>
+                              <Text style={styles.rescheduleActionText}>The event is still on its original schedule. Choose a replacement for each unavailable vendor.</Text>
+                              {eventRequests.filter((request: any) => ['REJECTED', 'EXPIRED'].includes(String(request.status))).map((request: any) => {
+                                const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
+                                const vendorData = vendorOrder?.vendorId || {};
+                                const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
+                                return <TouchableOpacity key={`replacement-${request._id}`} style={styles.findReplacementButton} onPress={() => {
+                                  const categoryId = String(vendorData?.buisnessCategory?._id || vendorData?.buisnessCategory || '');
+                                  const categoryName = String(vendorData?.buisnessCategory?.name || vendorData?.buisnessCategory?.categoryName || vendorOrder?.serviceName || 'Service');
+                                  if (!categoryId) return Alert.alert('Category unavailable', 'Could not identify the service category for this vendor.');
+                                  router.push({ pathname: '/categoryvendorlisting', params: { categoryIds: JSON.stringify([categoryId]), categoryNames: JSON.stringify([categoryName]), eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''), eventDate: new Date(firstRequest.newEventDate).toISOString().slice(0, 10), startTime: String(firstRequest.newStartTime || ''), durationMinutes: String(requestedDuration || 60), replacementMode: 'true', replacementOrderId: String(event._id), replacementRequestId: String(request._id), excludedVendorId: String(request.vendorId || '') } });
+                                }}><Ionicons name="search-outline" size={14} color="#FFFFFF" /><Text style={styles.findReplacementButtonText}>Find Replacement for {vendorName}</Text></TouchableOpacity>;
+                              })}
                             </View>
                           )}
                         </View>
@@ -1409,6 +1403,8 @@ const styles = StyleSheet.create({
   reschedulePrimaryActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   rescheduleSecondaryAction: { minHeight: 42, borderRadius: 11, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
   rescheduleSecondaryActionText: { color: COLORS.primary, fontSize: 12, fontWeight: '800' },
+  rescheduleTertiaryAction: { minHeight: 42, borderRadius: 11, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FAFAFA', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
+  rescheduleTertiaryActionText: { color: COLORS.primaryDark, fontSize: 12, fontWeight: '800' },
   findReplacementButton: { marginTop: 8, minHeight: 38, borderRadius: 10, backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10 },
   findReplacementButtonText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
   container: {
