@@ -560,6 +560,13 @@ const OrderSummary = () => {
                                                     </View>
                                                 )}
 
+                                                {!!(item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city) && (
+                                                    <View style={styles.detailRow}><Ionicons name="location-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>City: {item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city}</Text></View>
+                                                )}
+                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start: {new Date(item.eventStartDateTime).toLocaleString()}</Text></View>}
+                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End: {new Date(item.eventEndDateTime).toLocaleString()}</Text></View>}
+                                                {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
+
                                                 {rescheduleRequests
                                                     .filter((request: any) => String(request.orderId) === String(item._id))
                                                     .map((request: any) => {
@@ -649,15 +656,25 @@ const OrderSummary = () => {
                                                 {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
                                                     <>
                                                         <Text style={styles.expandedSubTitle}>Services</Text>
-                                                        {item.vendorOrders.map((service: any, idx: number) => (
-                                                            <View key={idx} style={styles.detailRow}>
-                                                                <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
-                                                                <Text style={styles.detailText}>
-                                                                    {service.serviceName}
-                                                                    {service.price ? ` - Rs. ${service.price}` : ""}
-                                                                </Text>
-                                                            </View>
-                                                        ))}
+                                                        {item.vendorOrders.map((service: any, idx: number) => {
+                                                            const vendorPackages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
+                                                            const selectedPackage = vendorPackages.find((pkg: any) => String(pkg?._id || pkg?.id) === String(service?.packageId || ""));
+                                                            const total = Number(service?.finalAmount ?? service?.price ?? 0);
+                                                            const remaining = Number(service?.remainingAmount ?? total);
+                                                            const paid = Math.max(total - remaining, 0);
+                                                            return (
+                                                              <View key={service?._id || idx} style={styles.serviceDetailCard}>
+                                                                <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
+                                                                <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
+                                                                {!!selectedPackage?.bookingType && <Text style={styles.serviceDetailText}>Booking Type: {String(selectedPackage.bookingType).replace(/_/g, " ")}</Text>}
+                                                                <Text style={styles.serviceDetailText}>Service / Delivery Window: {service?.eventStartDateTime ? new Date(service.eventStartDateTime).toLocaleString() : "Not provided"} → {service?.eventEndDateTime ? new Date(service.eventEndDateTime).toLocaleString() : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
+                                                                <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
+                                                                <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>
+                                                                <Text style={styles.serviceDetailText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
+                                                              </View>
+                                                            );
+                                                        })}
                                                     </>
                                                 )}
                                             </View>
@@ -778,6 +795,9 @@ const styles = StyleSheet.create({
     acceptRescheduleButton: { flex: 1, minHeight: 40, borderRadius: 10, backgroundColor: '#278A4B', alignItems: 'center', justifyContent: 'center' },
     rescheduleActionText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
     rescheduleResolved: { marginTop: 9, color: PRIMARY, fontWeight: '800', fontSize: 12 },
+    serviceDetailCard: { marginTop: 8, padding: 10, borderRadius: 11, backgroundColor: '#FFF8FC', borderWidth: 1, borderColor: '#E8D4E1' },
+    serviceDetailTitle: { color: PRIMARY, fontSize: 12.5, fontWeight: '800', marginBottom: 4 },
+    serviceDetailText: { color: '#4F3B49', fontSize: 11.5, lineHeight: 18 },
     safeArea: {
         flex: 1,
         backgroundColor: PRIMARY,
