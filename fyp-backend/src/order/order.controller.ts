@@ -19,7 +19,7 @@ import {
 import { OrderService } from "./order.service";
 import { UpdateOrderStatusDto } from "./dto/update-order-status.dto";
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
+import { CreateRescheduleRequestDto, RespondRescheduleRequestDto, ResolveRescheduleRequestDto } from './dto/reschedule-request.dto';
 
 @Controller('orders')
 export class OrderController {
@@ -265,6 +265,15 @@ async getOrderStats(
             req.user?.id?.toString(),
             body,
         );
+    }
+
+    @Patch(':id/reschedule/resolve')
+    @UseGuards(JwtAuthGuard)
+    async resolvePartialReschedule(@Request() req: any, @Param('id') orderId: string, @Body() body: ResolveRescheduleRequestDto) {
+        const role = req.user?.role?.toString().trim().toLowerCase();
+        if (role !== 'client' && role !== 'organizer') throw new ForbiddenException('Only the booking client can resolve rescheduling');
+        if (!['KEEP_ORIGINAL', 'CONTINUE_WITH_NEW_DATE'].includes(body?.action)) throw new BadRequestException('Unsupported rescheduling resolution');
+        return this.orderService.resolvePartialReschedule(orderId, req.user?.id?.toString(), body.action);
     }
 
     @Post('reschedule/expire-stale')
