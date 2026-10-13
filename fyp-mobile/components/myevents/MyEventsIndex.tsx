@@ -761,6 +761,11 @@ const MyEventsScreen = () => {
                                     Original: {formatDate(request.oldEventDate)} • {formatTime(request.oldStartTime)}
                                   </Text>
                                   <Text style={styles.rescheduleRequestedTime}>
+                                    Duration: {request.requestedDurationMinutes != null
+                                      ? formatDuration(request.requestedDurationMinutes)
+                                      : 'Not recorded for this request'}
+                                  </Text>
+                                  <Text style={styles.rescheduleRequestedTime}>
                                     Reason: {request.reason || 'Not provided'}
                                   </Text>
                                   <Text style={styles.rescheduleRequestedTime}>
