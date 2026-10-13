@@ -10,3 +10,7 @@ export interface RespondRescheduleRequestDto {
   status: 'ACCEPTED' | 'REJECTED';
   message?: string;
 }
+
+export interface ResolveRescheduleRequestDto {
+  action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE';
+}
