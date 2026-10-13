@@ -95,6 +95,12 @@ export class RescheduleRequest extends Document {
   @Prop({ type: Date, required: true })
   expiresAt: Date;
 
+  @Prop({ type: String, enum: ['PENDING', 'KEEP_ORIGINAL', 'REPLACEMENT_REQUIRED', 'APPLIED'], default: 'PENDING', index: true })
+  resolutionStatus: 'PENDING' | 'KEEP_ORIGINAL' | 'REPLACEMENT_REQUIRED' | 'APPLIED';
+
+  @Prop({ type: Date, default: null })
+  resolvedAt?: Date | null;
+
   @Prop({ type: Date, default: null })
   appliedAt?: Date | null;
 }
