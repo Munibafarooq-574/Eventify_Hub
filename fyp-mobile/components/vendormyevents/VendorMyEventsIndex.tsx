@@ -742,36 +742,84 @@ renderItem={({ item }) => {
               </View>
             )}
 
-            <Text style={styles.expandedSubTitle}>Booking Details</Text>
-
-            {!!vendorTotal && (
+            {!!(item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city) && (
               <View style={styles.eventMeta}>
-                <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>Your Earnings: Rs. {vendorTotal}</Text>
+                <Ionicons name="location-outline" size={14} color="#8A8A8A" />
+                <Text style={styles.expandedText}>City: {item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city}</Text>
               </View>
             )}
 
+            {!!item?.eventStartDateTime && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="time-outline" size={14} color="#8A8A8A" />
+                <Text style={styles.expandedText}>Start: {new Date(item.eventStartDateTime).toLocaleString()}</Text>
+              </View>
+            )}
+
+            {!!item?.eventEndDateTime && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="time-outline" size={14} color="#8A8A8A" />
+                <Text style={styles.expandedText}>End: {new Date(item.eventEndDateTime).toLocaleString()}</Text>
+              </View>
+            )}
+
+            {!!item?.eventDurationMinutes && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="hourglass-outline" size={14} color="#8A8A8A" />
+                <Text style={styles.expandedText}>Duration: {formatMinutes(Number(item.eventDurationMinutes))}</Text>
+              </View>
+            )}
+
+            {!!item?.eventAddress && (
+              <View style={styles.eventMeta}>
+                <Ionicons name="navigate-outline" size={14} color="#8A8A8A" />
+                <Text style={styles.expandedText}>Event Address: {item.eventAddress}</Text>
+              </View>
+            )}
+
+            <Text style={styles.expandedSubTitle}>Organizer Details</Text>
+            {!!item?.organizerId?.name && <Text style={styles.expandedText}>Name: {item.organizerId.name}</Text>}
+            {!!item?.organizerId?.email && <Text style={styles.expandedText}>Email: {item.organizerId.email}</Text>}
+            {!!(item?.organizerId?.phone || item?.organizerId?.phone_number) && (
+              <Text style={styles.expandedText}>Phone: {item.organizerId.phone || item.organizerId.phone_number}</Text>
+            )}
+
+            <Text style={styles.expandedSubTitle}>Booking & Payment Details</Text>
+            <View style={styles.eventMeta}>
+              <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+              <Text style={styles.expandedText}>Your Earnings: Rs. {vendorTotal}</Text>
+            </View>
             {!!vendorStatus && (
               <View style={styles.eventMeta}>
                 <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                <Text style={[styles.expandedText, { textTransform: "capitalize" }]}>
-                  Status: {vendorStatus}
-                </Text>
+                <Text style={[styles.expandedText, { textTransform: "capitalize" }]}>Status: {vendorStatus}</Text>
               </View>
             )}
 
             {ownVendorOrders.length > 0 && (
               <>
-                <Text style={styles.expandedSubTitle}>Services</Text>
-                {ownVendorOrders.map((service: any, index: number) => (
-                  <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.eventMeta}>
-                    <Ionicons name="checkmark-circle-outline" size={14} color={PRIMARY} />
-                    <Text style={styles.expandedText}>
-                      {service?.serviceName || "Service"}
-                      {service?.price != null ? ` - Rs. ${service.price}` : ""}
-                    </Text>
-                  </View>
-                ))}
+                <Text style={styles.expandedSubTitle}>Package / Service Details</Text>
+                {ownVendorOrders.map((service: any, index: number) => {
+                  const vendorPackages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
+                  const selectedPackage = vendorPackages.find((pkg: any) =>
+                    String(pkg?._id || pkg?.id) === String(service?.packageId || "")
+                  );
+                  const total = Number(service?.finalAmount ?? service?.price ?? 0);
+                  const remaining = Number(service?.remainingAmount ?? total);
+                  const paid = Math.max(total - remaining, 0);
+                  return (
+                    <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.vendorDetailCard}>
+                      <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
+                      <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
+                      {!!selectedPackage?.bookingType && <Text style={styles.expandedText}>Booking Type: {String(selectedPackage.bookingType).replace(/_/g, " ")}</Text>}
+                      <Text style={styles.expandedText}>Service / Delivery Window: {service?.eventStartDateTime ? new Date(service.eventStartDateTime).toLocaleString() : "Not provided"} → {service?.eventEndDateTime ? new Date(service.eventEndDateTime).toLocaleString() : "Not provided"}</Text>
+                      <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>
+                      <Text style={styles.expandedText}>Paid: Rs. {paid}</Text>
+                      <Text style={styles.expandedText}>Remaining: Rs. {remaining}</Text>
+                      <Text style={styles.expandedText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
+                    </View>
+                  );
+                })}
               </>
             )}
           </View>
@@ -928,6 +976,8 @@ const styles = StyleSheet.create({
   expandedBlock: { marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: "rgba(120,12,96,0.12)" },
   expandedText: { marginLeft: 6, fontSize: 12, color: "#4A4A4A" },
   expandedSubTitle: { fontSize: 11, fontWeight: "800", color: PRIMARY, marginTop: 6, textTransform: "uppercase" },
+  vendorDetailCard: { marginTop: 8, padding: 10, borderRadius: 12, backgroundColor: "#FFF8FC", borderWidth: 1, borderColor: "#F0DDEA" },
+  vendorDetailTitle: { fontSize: 12.5, fontWeight: "800", color: PRIMARY, marginBottom: 3 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 30 },
   emptyIconCircle: { width: 70, height: 70, borderRadius: 35, backgroundColor: PRIMARY_LIGHT, justifyContent: "center", alignItems: "center", marginBottom: 14 },
   emptyTitle: { fontSize: 15, fontWeight: "700", color: "#1A1A1A", marginBottom: 4 },
