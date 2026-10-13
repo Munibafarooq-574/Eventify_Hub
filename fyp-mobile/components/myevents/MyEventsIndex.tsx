@@ -280,6 +280,33 @@ const MyEventsScreen = () => {
     });
   };
 
+  const formatEventEndTime = (
+  eventTime?: string,
+  durationMinutes?: number,
+  fallback?: string | Date,
+) => {
+  if (
+    eventTime &&
+    /^\d{1,2}:\d{2}$/.test(eventTime) &&
+    Number.isFinite(Number(durationMinutes))
+  ) {
+    const [hours, minutes] = eventTime.split(':').map(Number);
+    const totalMinutes =
+      hours * 60 + minutes + Number(durationMinutes);
+
+    const endHour = Math.floor(
+      ((totalMinutes % 1440) + 1440) % 1440 / 60,
+    );
+    const endMinute = ((totalMinutes % 60) + 60) % 60;
+
+    return formatTime(
+      `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`,
+    );
+  }
+
+  return formatTime(fallback);
+};
+
   const formatDuration = (minutes?: number) => {
     const total = Number(minutes || 0);
     if (!total) return 'N/A';
@@ -631,7 +658,7 @@ const MyEventsScreen = () => {
                             <View style={styles.timelineContent}>
                               <Text style={styles.detailLabel}>Start time</Text>
                               <Text style={styles.timelineValue}>
-                                {formatTime(event.eventStartDateTime || event.eventTime)}
+                                {formatTime(event.eventTime || event.eventStartDateTime)}
                               </Text>
                             </View>
                           </View>
@@ -641,7 +668,11 @@ const MyEventsScreen = () => {
                             <View style={styles.timelineContent}>
                               <Text style={styles.detailLabel}>End time</Text>
                               <Text style={styles.timelineValue}>
-                                {formatTime(event.eventEndDateTime)}
+                                {formatEventEndTime(
+                                event.eventTime,
+                                event.eventDurationMinutes,
+                                event.eventEndDateTime,
+                              )}
                               </Text>
                             </View>
                           </View>
