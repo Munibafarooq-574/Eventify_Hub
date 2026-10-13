@@ -704,57 +704,107 @@ const MyEventsScreen = () => {
                       </TouchableOpacity>
                     )}
 
-                    {eventExpanded && rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) && (
-                      <View style={styles.rescheduleStatusCard}>
-                        <Text style={styles.rescheduleStatusTitle}>Date/Time Change Request</Text>
-                        <Text style={styles.rescheduleRequestedTime}>One request is allowed per event. Each vendor's decision is shown below.</Text>
-                        {rescheduleRequests
-                          .filter((request: any) => String(request.orderId) === String(event._id))
-                          .map((request: any) => {
+                    {eventExpanded && rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) && (() => {
+                      const eventRequests = rescheduleRequests.filter(
+                        (request: any) => String(request.orderId) === String(event._id),
+                      );
+                      const firstRequest = eventRequests[0];
+                      const requestedDuration =
+                        firstRequest?.requestedDurationMinutes ??
+                        event.eventDurationMinutes;
+                      const statusCounts = {
+                        waiting: eventRequests.filter((request: any) => request.status === 'CHANGE_REQUESTED').length,
+                        accepted: eventRequests.filter((request: any) => request.status === 'ACCEPTED').length,
+                        rejected: eventRequests.filter((request: any) => request.status === 'REJECTED').length,
+                      };
+
+                      return (
+                        <View style={styles.rescheduleStatusCard}>
+                          <View style={styles.rescheduleHeaderRow}>
+                            <View style={styles.rescheduleHeaderIcon}>
+                              <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.rescheduleStatusTitle}>Date/Time Change Request</Text>
+                              <Text style={styles.rescheduleStatusSubtitle}>
+                                One request per event • {eventRequests.length} vendor{eventRequests.length === 1 ? '' : 's'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.rescheduleSummary}>
+                            <View style={styles.rescheduleSummaryItem}>
+                              <Text style={styles.rescheduleSummaryLabel}>Original</Text>
+                              <Text style={styles.rescheduleSummaryValue}>
+                                {formatDate(firstRequest?.oldEventDate)} • {formatTime(firstRequest?.oldStartTime)}
+                              </Text>
+                            </View>
+                            <Ionicons name="arrow-forward" size={18} color={COLORS.primary} />
+                            <View style={styles.rescheduleSummaryItem}>
+                              <Text style={styles.rescheduleSummaryLabel}>Requested</Text>
+                              <Text style={styles.rescheduleSummaryValue}>
+                                {formatDate(firstRequest?.newEventDate)} • {formatTime(firstRequest?.newStartTime)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.rescheduleMetaRow}>
+                            <View style={styles.rescheduleMetaPill}>
+                              <Ionicons name="hourglass-outline" size={13} color={COLORS.primary} />
+                              <Text style={styles.rescheduleMetaText}>{formatDuration(requestedDuration)}</Text>
+                            </View>
+                            <View style={styles.rescheduleMetaPill}>
+                              <Ionicons name="time-outline" size={13} color={COLORS.primary} />
+                              <Text style={styles.rescheduleMetaText}>
+                                {firstRequest?.createdAt ? new Date(firstRequest.createdAt).toLocaleString() : 'N/A'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.rescheduleReasonBox}>
+                            <Text style={styles.rescheduleReasonLabel}>Reason</Text>
+                            <Text style={styles.rescheduleReasonText}>{firstRequest?.reason || 'Not provided'}</Text>
+                          </View>
+
+                          <View style={styles.rescheduleDecisionSummary}>
+                            {!!statusCounts.waiting && <Text style={styles.rescheduleWaitingText}>{statusCounts.waiting} waiting</Text>}
+                            {!!statusCounts.accepted && <Text style={styles.rescheduleAcceptedText}>{statusCounts.accepted} accepted</Text>}
+                            {!!statusCounts.rejected && <Text style={styles.rescheduleRejectedText}>{statusCounts.rejected} rejected</Text>}
+                          </View>
+
+                          {eventRequests.map((request: any) => {
                             const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                             const vendorData = vendorOrder?.vendorId || {};
                             const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
                             const status = String(request.status || 'CHANGE_REQUESTED');
                             const statusLabel =
                               status === 'CHANGE_REQUESTED' ? 'Waiting for vendor' :
-                              status === 'ACCEPTED' ? 'New date accepted' :
-                              status === 'REJECTED' ? 'New date rejected' : 'Request expired';
+                              status === 'ACCEPTED' ? 'Accepted' :
+                              status === 'REJECTED' ? 'Rejected' : 'Expired';
+
                             return (
                               <View key={request._id} style={styles.rescheduleStatusRow}>
+                                <View style={styles.rescheduleVendorAvatar}>
+                                  <Text style={styles.rescheduleVendorAvatarText}>
+                                    {String(vendorName).trim().charAt(0).toUpperCase() || 'V'}
+                                  </Text>
+                                </View>
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.rescheduleVendorName}>{vendorName}</Text>
-                                  <Text style={styles.rescheduleRequestedTime}>
-                                    Requested: {formatDate(request.newEventDate)} • {formatTime(request.newStartTime)}
-                                  </Text>
-                                  <Text style={styles.rescheduleRequestedTime}>
-                                    Original: {formatDate(request.oldEventDate)} • {formatTime(request.oldStartTime)}
-                                  </Text>
-                                  <Text style={styles.rescheduleRequestedTime}>
-                                    Duration: {request.requestedDurationMinutes != null
-                                      ? formatDuration(request.requestedDurationMinutes)
-                                      : 'Not recorded for this request'}
-                                  </Text>
-                                  <Text style={styles.rescheduleRequestedTime}>
-                                    Reason: {request.reason || 'Not provided'}
-                                  </Text>
-                                  <Text style={styles.rescheduleRequestedTime}>
-                                    Submitted: {request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}
-                                  </Text>
                                   {request.respondedAt && (
                                     <Text style={styles.rescheduleRequestedTime}>
-                                      Responded: {new Date(request.respondedAt).toLocaleString()}
+                                      Responded {new Date(request.respondedAt).toLocaleString()}
                                     </Text>
                                   )}
                                   {request.responseMessage && (
-                                    <Text style={styles.rescheduleRequestedTime}>
-                                      Vendor response: {request.responseMessage}
-                                    </Text>
+                                    <Text style={styles.rescheduleRequestedTime}>{request.responseMessage}</Text>
                                   )}
                                 </View>
                                 <View style={[
                                   styles.rescheduleChip,
-                                  status === 'ACCEPTED' && { backgroundColor: '#E6F7EA' },
-                                  status === 'REJECTED' && { backgroundColor: '#FDEAEC' },
+                                  status === 'ACCEPTED' && styles.rescheduleChipAccepted,
+                                  status === 'REJECTED' && styles.rescheduleChipRejected,
+                                  status === 'EXPIRED' && styles.rescheduleChipExpired,
                                 ]}>
                                   <Text style={[
                                     styles.rescheduleChipText,
@@ -765,13 +815,18 @@ const MyEventsScreen = () => {
                               </View>
                             );
                           })}
-                        {rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && request.status === 'REJECTED') && (
-                          <Text style={styles.rescheduleHelp}>
-                            A vendor rejected the new timing. The original booking remains unchanged.
-                          </Text>
-                        )}
-                      </View>
-                    )}
+
+                          {statusCounts.rejected > 0 && (
+                            <View style={styles.rescheduleHelpBox}>
+                              <Ionicons name="information-circle-outline" size={15} color={COLORS.danger} />
+                              <Text style={styles.rescheduleHelp}>
+                                A vendor rejected the new timing. The original booking remains unchanged.
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
 
                     <View style={styles.divider} />
 
@@ -1247,14 +1302,37 @@ export default MyEventsScreen;
 const styles = StyleSheet.create({
   rescheduleButton: { marginTop: 16, backgroundColor: COLORS.primary, minHeight: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   rescheduleButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
-  rescheduleStatusCard: { marginTop: 14, padding: 14, backgroundColor: '#FFF8FC', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
-  rescheduleStatusTitle: { color: COLORS.primaryDark, fontWeight: '800', fontSize: 14, marginBottom: 10 },
-  rescheduleStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F4E5EE' },
-  rescheduleVendorName: { color: COLORS.text, fontWeight: '700', fontSize: 13 },
-  rescheduleRequestedTime: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
-  rescheduleChip: { maxWidth: 135, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6 },
-  rescheduleChipText: { color: '#8A6500', fontSize: 10.5, fontWeight: '800', textAlign: 'center' },
-  rescheduleHelp: { color: COLORS.danger, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  rescheduleStatusCard: { marginTop: 14, padding: 16, backgroundColor: '#FFF9FC', borderRadius: 20, borderWidth: 1, borderColor: '#E9D2E1', shadowColor: COLORS.primary, shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  rescheduleHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  rescheduleHeaderIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  rescheduleStatusTitle: { color: COLORS.primaryDark, fontWeight: '800', fontSize: 15 },
+  rescheduleStatusSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  rescheduleSummary: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border },
+  rescheduleSummaryItem: { flex: 1 },
+  rescheduleSummaryLabel: { color: COLORS.muted, fontSize: 10.5, fontWeight: '700', marginBottom: 3 },
+  rescheduleSummaryValue: { color: COLORS.text, fontSize: 11.5, fontWeight: '800', lineHeight: 17 },
+  rescheduleMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  rescheduleMetaPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 9, borderRadius: 12, backgroundColor: COLORS.primarySoft },
+  rescheduleMetaText: { color: COLORS.primary, fontSize: 10.5, fontWeight: '700' },
+  rescheduleReasonBox: { marginTop: 10, padding: 11, borderRadius: 12, backgroundColor: '#FFFFFF', borderLeftWidth: 3, borderLeftColor: COLORS.primary },
+  rescheduleReasonLabel: { color: COLORS.primary, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase' },
+  rescheduleReasonText: { color: COLORS.text, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  rescheduleDecisionSummary: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 2 },
+  rescheduleWaitingText: { color: '#8A6500', fontSize: 10.5, fontWeight: '800' },
+  rescheduleAcceptedText: { color: COLORS.success, fontSize: 10.5, fontWeight: '800' },
+  rescheduleRejectedText: { color: COLORS.danger, fontSize: 10.5, fontWeight: '800' },
+  rescheduleStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#F1E1EA' },
+  rescheduleVendorAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  rescheduleVendorAvatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 12 },
+  rescheduleVendorName: { color: COLORS.text, fontWeight: '800', fontSize: 12.5 },
+  rescheduleRequestedTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 2 },
+  rescheduleChip: { maxWidth: 125, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6 },
+  rescheduleChipAccepted: { backgroundColor: '#E6F7EA' },
+  rescheduleChipRejected: { backgroundColor: '#FDEAEC' },
+  rescheduleChipExpired: { backgroundColor: '#F1F1F1' },
+  rescheduleChipText: { color: '#8A6500', fontSize: 10, fontWeight: '800', textAlign: 'center' },
+  rescheduleHelpBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, padding: 9, borderRadius: 10, backgroundColor: '#FDEAEC' },
+  rescheduleHelp: { flex: 1, color: COLORS.danger, fontSize: 11, lineHeight: 16 },
   container: {
     flex: 1,
   },
