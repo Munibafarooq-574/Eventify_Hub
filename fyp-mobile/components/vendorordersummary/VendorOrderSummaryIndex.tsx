@@ -60,6 +60,13 @@ const CANCELLED_STATUS = "cancelled";
 // VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
 const mapVendorStatus = (status: string) => (status === "accepted" ? "confirmed" : status);
 
+const formatTimeOnly = (value: string | Date) => {
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime())
+        ? "Not provided"
+        : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
 // IMPORTANT: don't use order.status here — that's the PARENT order's
 // aggregate status across ALL vendors on the order, and can differ from
 // what THIS vendor's own service actually is (e.g. this vendor is
@@ -563,8 +570,8 @@ const OrderSummary = () => {
                                                 {!!(item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city) && (
                                                     <View style={styles.detailRow}><Ionicons name="location-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>City: {item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city}</Text></View>
                                                 )}
-                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start: {new Date(item.eventStartDateTime).toLocaleString()}</Text></View>}
-                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End: {new Date(item.eventEndDateTime).toLocaleString()}</Text></View>}
+                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatTimeOnly(item.eventStartDateTime)}</Text></View>}
+                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatTimeOnly(item.eventEndDateTime)}</Text></View>}
                                                 {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
 
                                                 {rescheduleRequests
@@ -666,8 +673,8 @@ const OrderSummary = () => {
                                                               <View key={service?._id || idx} style={styles.serviceDetailCard}>
                                                                 <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
-                                                                {!!selectedPackage?.bookingType && <Text style={styles.serviceDetailText}>Booking Type: {String(selectedPackage.bookingType).replace(/_/g, " ")}</Text>}
-                                                                <Text style={styles.serviceDetailText}>Service / Delivery Window: {service?.eventStartDateTime ? new Date(service.eventStartDateTime).toLocaleString() : "Not provided"} → {service?.eventEndDateTime ? new Date(service.eventEndDateTime).toLocaleString() : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>Start Time: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>End Time: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
                                                                 <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
                                                                 <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>
