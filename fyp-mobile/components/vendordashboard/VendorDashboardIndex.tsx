@@ -1634,7 +1634,7 @@ if (!hasValidSubscription) {
                     activeOpacity={0.85}
                     onPress={() => {
                         if (vendorId) {
-                            router.push({ pathname: "/VPD", params: { id: vendorId } });
+                            router.push({ pathname: "/vendorprofiledetails", params: { id: vendorId } });
                         } else {
                             Alert.alert("Error", "Vendor ID not found.");
                         }
