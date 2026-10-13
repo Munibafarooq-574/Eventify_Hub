@@ -5,7 +5,7 @@ import getPaymentStatus from '@/services/getPaymentStatus';
 import { getRescheduleRequests } from '@/services/rescheduleBooking';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -228,9 +228,13 @@ const MyEventsScreen = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Refresh when returning from the reschedule form, so the request
+  // details appear immediately without creating another request.
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData]),
+  );
 
   const toggleEventDetails = (eventId: string) => {
     smoothLayout();
@@ -704,6 +708,7 @@ const MyEventsScreen = () => {
                     )}
 
                     {eventExpanded &&
+  !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) &&
   vendorOrders.some((vendor: any) =>
     ['pending', 'accepted'].includes(
       String(vendor?.status || '').toLowerCase(),
@@ -732,7 +737,8 @@ const MyEventsScreen = () => {
 
                     {eventExpanded && rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) && (
                       <View style={styles.rescheduleStatusCard}>
-                        <Text style={styles.rescheduleStatusTitle}>Rescheduling status</Text>
+                        <Text style={styles.rescheduleStatusTitle}>Date/Time Change Request</Text>
+                        <Text style={styles.rescheduleRequestedTime}>One request is allowed per event. Each vendor's decision is shown below.</Text>
                         {rescheduleRequests
                           .filter((request: any) => String(request.orderId) === String(event._id))
                           .map((request: any) => {
@@ -749,8 +755,27 @@ const MyEventsScreen = () => {
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.rescheduleVendorName}>{vendorName}</Text>
                                   <Text style={styles.rescheduleRequestedTime}>
-                                    {formatDate(request.newEventDate)} • {formatTime(request.newStartTime)}
+                                    Requested: {formatDate(request.newEventDate)} • {formatTime(request.newStartTime)}
                                   </Text>
+                                  <Text style={styles.rescheduleRequestedTime}>
+                                    Original: {formatDate(request.oldEventDate)} • {formatTime(request.oldStartTime)}
+                                  </Text>
+                                  <Text style={styles.rescheduleRequestedTime}>
+                                    Reason: {request.reason || 'Not provided'}
+                                  </Text>
+                                  <Text style={styles.rescheduleRequestedTime}>
+                                    Submitted: {request.createdAt ? new Date(request.createdAt).toLocaleString() : 'N/A'}
+                                  </Text>
+                                  {request.respondedAt && (
+                                    <Text style={styles.rescheduleRequestedTime}>
+                                      Responded: {new Date(request.respondedAt).toLocaleString()}
+                                    </Text>
+                                  )}
+                                  {request.responseMessage && (
+                                    <Text style={styles.rescheduleRequestedTime}>
+                                      Vendor response: {request.responseMessage}
+                                    </Text>
+                                  )}
                                 </View>
                                 <View style={[
                                   styles.rescheduleChip,
