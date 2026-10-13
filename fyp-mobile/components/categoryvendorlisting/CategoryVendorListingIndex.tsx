@@ -226,13 +226,15 @@ const getServiceWindowLabel = (
     const timing = await getEventTimingParams();
     setEventTiming(timing);
 
-    if (!timing?.eventCityId) {
-      console.error(
-        "Event City is missing from event context.",
-      );
-      setData([]);
-      return;
-    }
+    // Category browsing from the dashboard is valid even when the
+    // client has not planned an event yet. In that case use the existing
+    // discovery-city fallback; availability fields remain optional.
+    const marketplaceContext =
+      await getMarketplaceEventContext();
+
+    const discoveryCityId =
+      timing?.eventCityId ||
+      marketplaceContext.discoveryCityId;
 
     const staff = Array.isArray(routeParams?.staff)
       ? routeParams.staff[0]
@@ -251,10 +253,10 @@ const getServiceWindowLabel = (
     
          const filters = {
       name: searchQuery || undefined,
-      eventCityId: timing.eventCityId,
-      eventDate: timing.eventDate,
-      startTime: timing.startTime,
-      durationMinutes: timing.durationMinutes,
+      eventCityId: discoveryCityId || undefined,
+      eventDate: timing?.eventDate,
+      startTime: timing?.startTime,
+      durationMinutes: timing?.durationMinutes,
       staff: staff || undefined,
       cancellationPolicy: cancellationPolicy || undefined,
       minRating: minRatingStr
