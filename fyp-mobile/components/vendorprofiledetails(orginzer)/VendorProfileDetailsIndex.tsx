@@ -415,8 +415,11 @@ const phase6AvailablePackageIds = useMemo(() => {
 
     const [activeTab, setActiveTab] =
       useState<
-        'Details' | 'Packages' | 'Reviews'
+        'Details' | 'Contact' | 'Packages' | 'Reviews'
       >('Details');
+
+    const [isOwnerView, setIsOwnerView] =
+      useState(false);
 
     const [activePackage, setActivePackage] =
       useState<string | null>(null);
@@ -1768,6 +1771,19 @@ Toast.show({
             vendor,
           );
 
+          // The same profile screen is reused for clients and for the
+          // signed-in vendor. Owner-only edit actions are enabled only
+          // when the loaded profile belongs to the current user.
+          try {
+            const currentUser = await getUserData();
+            setIsOwnerView(
+              String(currentUser?._id || '') ===
+                String(vendor?._id || ''),
+            );
+          } catch {
+            setIsOwnerView(false);
+          }
+
                     // Record one profile view after the vendor loads successfully.
           // Do not count refreshes or package changes as new profile visits.
           const loadedVendorId = String(vendor?._id || '');
@@ -2254,6 +2270,11 @@ const serviceCityNamesFromIds =
                           id: 'tab-details',
                         },
                         {
+                          name: 'Contact',
+                          icon: 'call-outline',
+                          id: 'tab-contact',
+                        },
+                        {
                           name: 'Packages',
                           icon: 'gift-outline',
                           id: 'tab-packages',
@@ -2264,7 +2285,7 @@ const serviceCityNamesFromIds =
                           id: 'tab-reviews',
                         },
                       ]) as {
-                    name: 'Details' | 'Packages' | 'Reviews';
+                    name: 'Details' | 'Contact' | 'Packages' | 'Reviews';
                     icon: keyof typeof Ionicons.glyphMap;
                     id: string;
                   }[]
@@ -2813,6 +2834,53 @@ const serviceCityNamesFromIds =
                       Details
                     </Text>
                   </View>
+
+                  {isOwnerView && (
+                    <TouchableOpacity
+                      style={styles.profileEditButton}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        const routeByCategory: Record<string, string> = {
+                          cake: '/bdcakes',
+                          catering: '/bdcatering',
+                          photographer: '/bdphotographer',
+                          salon: '/bdsalon',
+                          mehndi: '/bdmehndi',
+                          sound: '/bdsounds',
+                          venue: '/bdvenue',
+                        };
+
+                        const pathname = routeByCategory[category];
+
+                        if (!pathname) {
+                          Toast.show({
+                            type: 'info',
+                            text1: 'Edit unavailable',
+                            text2: 'Business category could not be resolved.',
+                            position: 'bottom',
+                          });
+                          return;
+                        }
+
+                        router.push({
+                          pathname: pathname as any,
+                          params: {
+                            edit: 'true',
+                            userId: String(vendorData?._id || ''),
+                          },
+                        });
+                      }}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={15}
+                        color={PRIMARY}
+                      />
+                      <Text style={styles.profileEditButtonText}>
+                        Edit
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {category ===
@@ -3190,6 +3258,141 @@ const serviceCityNamesFromIds =
                   label="Additional Notes"
                   value={
                     businessDetails?.additionalInfo
+                  }
+                  isLast
+                />
+              </View>
+            </View>
+          )}
+
+          {/* ================================================= */}
+          {/* CONTACT */}
+          {/* ================================================= */}
+
+          {activeTab === 'Contact' && (
+            <View style={styles.detailsContainer}>
+              <View style={styles.card}>
+                <View style={styles.detailsHeader}>
+                  <View style={styles.sectionTitleWithIcon}>
+                    <Ionicons
+                      name="call-outline"
+                      size={18}
+                      color={PRIMARY}
+                    />
+                    <Text style={styles.sectionTitle}>
+                      Contact Details
+                    </Text>
+                  </View>
+
+                  {isOwnerView && (
+                    <TouchableOpacity
+                      style={styles.profileEditButton}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        router.push('/editvendorcontactdetails' as any)
+                      }
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={15}
+                        color={PRIMARY}
+                      />
+                      <Text style={styles.profileEditButtonText}>
+                        Edit
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <Field
+                  label="Brand Name"
+                  value={
+                    vendorData?.contactDetails?.brandName ||
+                    vendorData?.ContactDetails?.brandName
+                  }
+                />
+                <Field
+                  label="Contact Number"
+                  value={
+                    vendorData?.contactDetails?.contactNumber ||
+                    vendorData?.ContactDetails?.contactNumber
+                  }
+                />
+                <Field
+                  label="Booking Email"
+                  value={
+                    vendorData?.contactDetails?.bookingEmail ||
+                    vendorData?.ContactDetails?.bookingEmail
+                  }
+                />
+                <Field
+                  label="Website"
+                  value={
+                    vendorData?.contactDetails?.website ||
+                    vendorData?.ContactDetails?.website
+                  }
+                />
+                <Field
+                  label="Instagram"
+                  value={
+                    vendorData?.contactDetails?.instagramLink ||
+                    vendorData?.ContactDetails?.instagramLink
+                  }
+                />
+                <Field
+                  label="Facebook"
+                  value={
+                    vendorData?.contactDetails?.facebookLink ||
+                    vendorData?.ContactDetails?.facebookLink
+                  }
+                />
+                <Field
+                  label="Business City"
+                  value={(() => {
+                    const details =
+                      vendorData?.contactDetails ||
+                      vendorData?.ContactDetails ||
+                      {};
+                    const rawCity =
+                      details?.businessCityId ||
+                      vendorData?.businessCityId;
+                    const cityId =
+                      typeof rawCity === 'object'
+                        ? String(rawCity?._id || '')
+                        : String(rawCity || '');
+                    const populatedName =
+                      typeof rawCity === 'object'
+                        ? rawCity?.name
+                        : '';
+                    return (
+                      populatedName ||
+                      cities.find(
+                        (city: any) =>
+                          String(city?._id) === cityId,
+                      )?.name ||
+                      details?.city ||
+                      undefined
+                    );
+                  })()}
+                />
+                <Field
+                  label="Service Cities"
+                  value={serviceCityNames || undefined}
+                />
+                <Field
+                  label="Official Address"
+                  value={
+                    vendorData?.contactDetails?.officialAddress ||
+                    vendorData?.contactDetails?.businessAddress ||
+                    vendorData?.ContactDetails?.officialAddress ||
+                    vendorData?.ContactDetails?.businessAddress
+                  }
+                />
+                <Field
+                  label="Google Maps"
+                  value={
+                    vendorData?.contactDetails?.officialGoogleLink ||
+                    vendorData?.ContactDetails?.officialGoogleLink
                   }
                   isLast
                 />
@@ -6050,6 +6253,21 @@ specialOfferDetailText: {
     color: '#8A7A85',
     marginTop: 8,
     fontWeight: '600',
+  },
+
+  profileEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PRIMARY_SOFT,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 5,
+  },
+  profileEditButtonText: {
+    color: PRIMARY,
+    fontSize: 12,
+    fontWeight: '700',
   },
 
   detailsHeader: {
