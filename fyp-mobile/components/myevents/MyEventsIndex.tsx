@@ -2,7 +2,7 @@
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
 import getPaymentStatus from '@/services/getPaymentStatus';
-import { getRescheduleRequests } from '@/services/rescheduleBooking';
+import { getRescheduleRequests, resolvePartialReschedule } from '@/services/rescheduleBooking';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -332,6 +332,21 @@ const MyEventsScreen = () => {
 
     return vendorCategories.length > 0 ? [...new Set(vendorCategories)].join(', ') : 'N/A';
   };
+
+  const resolveRescheduleDecision = useCallback((orderId: string, action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE') => {
+    const keepOriginal = action === 'KEEP_ORIGINAL';
+    Alert.alert(
+      keepOriginal ? 'Keep original schedule?' : 'Continue with new date?',
+      keepOriginal ? 'The original event and vendor schedules will stay unchanged.' : 'Your event will not move yet. Unavailable vendors must be resolved before the new schedule can be finalized.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: keepOriginal ? 'Keep Original' : 'Continue', onPress: async () => {
+          try { await resolvePartialReschedule(orderId, action); await fetchData(); }
+          catch (error: any) { Alert.alert('Could not update request', error?.message || 'Please try again.'); }
+        } },
+      ],
+    );
+  }, [fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -716,7 +731,10 @@ const MyEventsScreen = () => {
                         waiting: eventRequests.filter((request: any) => request.status === 'CHANGE_REQUESTED').length,
                         accepted: eventRequests.filter((request: any) => request.status === 'ACCEPTED').length,
                         rejected: eventRequests.filter((request: any) => request.status === 'REJECTED').length,
+                        expired: eventRequests.filter((request: any) => request.status === 'EXPIRED').length,
                       };
+                      const resolutionStatus = firstRequest?.resolutionStatus || 'PENDING';
+                      const needsClientAction = statusCounts.waiting === 0 && (statusCounts.rejected > 0 || statusCounts.expired > 0) && resolutionStatus === 'PENDING';
 
                       return (
                         <View style={styles.rescheduleStatusCard}>
@@ -816,12 +834,25 @@ const MyEventsScreen = () => {
                             );
                           })}
 
-                          {statusCounts.rejected > 0 && (
+                          {(statusCounts.rejected > 0 || statusCounts.expired > 0) && (
                             <View style={styles.rescheduleHelpBox}>
                               <Ionicons name="information-circle-outline" size={15} color={COLORS.danger} />
                               <Text style={styles.rescheduleHelp}>
-                                A vendor rejected the new timing. The original booking remains unchanged.
+                                {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.' : 'A vendor could not accommodate the new timing. Your original event schedule is still authoritative.'}
                               </Text>
+                            </View>
+                          )}
+
+                          {needsClientAction && (
+                            <View style={styles.rescheduleActions}>
+                              <Text style={styles.rescheduleActionTitle}>Your decision is required</Text>
+                              <Text style={styles.rescheduleActionText}>Keep the current event schedule, or continue with the new date and resolve unavailable vendors.</Text>
+                              <TouchableOpacity style={styles.reschedulePrimaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
+                                <Text style={styles.reschedulePrimaryActionText}>Keep Original Schedule</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.rescheduleSecondaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'CONTINUE_WITH_NEW_DATE')}>
+                                <Text style={styles.rescheduleSecondaryActionText}>Continue with New Date</Text>
+                              </TouchableOpacity>
                             </View>
                           )}
                         </View>
@@ -1340,6 +1371,13 @@ const styles = StyleSheet.create({
   rescheduleChipText: { color: '#8A6500', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   rescheduleHelpBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, padding: 9, borderRadius: 10, backgroundColor: '#FDEAEC' },
   rescheduleHelp: { flex: 1, color: COLORS.danger, fontSize: 11, lineHeight: 16 },
+  rescheduleActions: { marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: COLORS.border },
+  rescheduleActionTitle: { color: COLORS.primaryDark, fontSize: 13, fontWeight: '800' },
+  rescheduleActionText: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 4, marginBottom: 10 },
+  reschedulePrimaryAction: { minHeight: 42, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  reschedulePrimaryActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  rescheduleSecondaryAction: { minHeight: 42, borderRadius: 11, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, marginTop: 8 },
+  rescheduleSecondaryActionText: { color: COLORS.primary, fontSize: 12, fontWeight: '800' },
   container: {
     flex: 1,
   },
