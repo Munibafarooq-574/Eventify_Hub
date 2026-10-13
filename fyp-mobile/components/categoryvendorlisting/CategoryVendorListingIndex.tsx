@@ -405,6 +405,7 @@ router.push({
   params: {
   id: item._id,
   eventId: eventTiming?.eventId || "",
+  eventCityId: eventTiming?.eventCityId || "",
   eventDate: eventTiming?.eventDate || "",
   startTime: eventTiming?.startTime || "",
   endTime: eventTiming?.endTime || "",
@@ -514,6 +515,7 @@ router.push({
    params: {
   id: item._id,
   eventId: eventTiming?.eventId || "",
+  eventCityId: eventTiming?.eventCityId || "",
   eventDate: eventTiming?.eventDate || "",
   startTime: eventTiming?.startTime || "",
   endTime: eventTiming?.endTime || "",
