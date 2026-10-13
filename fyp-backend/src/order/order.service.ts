@@ -2167,6 +2167,7 @@ async completeVendorOrder(vendorOrderId: string) {
                 availabilityPrecheckPassed: availability.available,
                 availabilityPrecheckReason: availability.reason || null,
                 status: 'CHANGE_REQUESTED',
+                resolutionStatus: 'PENDING',
                 expiresAt,
             });
 
@@ -2445,12 +2446,38 @@ async completeVendorOrder(vendorOrderId: string) {
                 order.eventDurationMinutes =
                     Math.round((new Date(first.newEndTime).getTime() - newStart.getTime()) / 60000);
                 await order.save({ session });
+
+                await this.rescheduleRequestModel.updateMany(
+                    { requestGroupId: first.requestGroupId },
+                    { $set: { resolutionStatus: 'APPLIED', resolvedAt: new Date() } },
+                    { session },
+                );
             });
         } finally {
             await session.endSession();
         }
 
         return { applied: true };
+    }
+
+    async resolvePartialReschedule(orderId: string, requesterId: string, action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE') {
+        if (!Types.ObjectId.isValid(orderId) || !Types.ObjectId.isValid(requesterId)) throw new BadRequestException('Invalid booking or client ID');
+        const order: any = await this.orderModel.findById(orderId).lean();
+        if (!order) throw new NotFoundException('Booking not found');
+        if (String(order.organizerId) !== String(requesterId)) throw new BadRequestException('Only the booking client can resolve rescheduling');
+        await this.expireRescheduleRequests();
+        const latest: any = await this.rescheduleRequestModel.findOne({ orderId: order._id }).sort({ createdAt: -1 }).lean();
+        if (!latest) throw new NotFoundException('Rescheduling request not found');
+        const batch: any[] = await this.rescheduleRequestModel.find({ requestGroupId: latest.requestGroupId }).lean();
+        if (!batch.length) throw new NotFoundException('Rescheduling request group not found');
+        const currentResolution = batch[0]?.resolutionStatus || 'PENDING';
+        if (currentResolution !== 'PENDING') throw new ConflictException('This rescheduling request has already been resolved');
+        if (batch.some((r: any) => r.status === 'CHANGE_REQUESTED')) throw new ConflictException('Wait for all vendors to respond or for pending requests to expire');
+        if (!batch.some((r: any) => ['REJECTED', 'EXPIRED'].includes(r.status))) throw new ConflictException('Client resolution is only required when a vendor rejects or a request expires');
+        const resolutionStatus = action === 'KEEP_ORIGINAL' ? 'KEEP_ORIGINAL' : 'REPLACEMENT_REQUIRED';
+        const resolvedAt = new Date();
+        await this.rescheduleRequestModel.updateMany({ requestGroupId: latest.requestGroupId }, { $set: { resolutionStatus, resolvedAt } });
+        return { orderId: order._id, requestGroupId: latest.requestGroupId, resolutionStatus, originalSchedulePreserved: true };
     }
 
     async expireRescheduleRequests() {
