@@ -2469,6 +2469,40 @@ async completeVendorOrder(vendorOrderId: string) {
         const resolutionStatus = action === 'KEEP_ORIGINAL' ? 'KEEP_ORIGINAL' : 'REPLACEMENT_REQUIRED';
         const resolvedAt = new Date();
         await this.rescheduleRequestModel.updateMany({ requestGroupId: latest.requestGroupId }, { $set: { resolutionStatus, resolvedAt } });
+
+        if (action === 'KEEP_ORIGINAL') {
+            const reason = String(latest.reason || '').trim();
+            const vendorIds = Array.from(
+                new Set(batch.map((request: any) => String(request.vendorId || '')).filter(Boolean)),
+            );
+
+            for (const vendorId of vendorIds) {
+                const title = 'Original schedule kept';
+                const body = reason
+                    ? `The client chose to keep the original event schedule. Reschedule reason: ${reason}`
+                    : 'The client chose to keep the original event schedule. Your existing booking remains unchanged.';
+
+                try {
+                    await this.sendPushNotification(
+                        title,
+                        body,
+                        vendorId,
+                        'RESCHEDULE_KEEP_ORIGINAL',
+                    );
+                } catch (error) {
+                    console.log('Keep-original push notification failed:', error instanceof Error ? error.message : error);
+                    try {
+                        await this.saveNotification(
+                            vendorId,
+                            title,
+                            body,
+                            'RESCHEDULE_KEEP_ORIGINAL',
+                        );
+                    } catch {}
+                }
+            }
+        }
+
         return { orderId: order._id, requestGroupId: latest.requestGroupId, resolutionStatus, originalSchedulePreserved: true };
     }
 
