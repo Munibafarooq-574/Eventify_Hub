@@ -49,6 +49,9 @@ export class RescheduleRequest extends Document {
   @Prop({ type: String, required: true })
   newStartTime: string;
 
+  @Prop({ type: Number, default: null })
+  requestedDurationMinutes?: number | null;
+
   @Prop({ type: Date, required: true })
   newEndTime: Date;
 
