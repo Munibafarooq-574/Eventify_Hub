@@ -1038,6 +1038,13 @@ const MyEventsScreen = () => {
 
                               <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
 
+                              {bookingType !== 'DELIVERY_BASED' && (
+                                <DetailRow
+                                  label="Service date"
+                                  value={formatDate(vendor?.eventStartDateTime || event.eventDate)}
+                                />
+                              )}
+
                               {bookingType === 'DELIVERY_BASED' ? (
                                 <DetailRow
                                   label="Delivered at"
