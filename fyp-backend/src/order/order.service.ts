@@ -2109,13 +2109,15 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new ConflictException('No active vendor bookings can be rescheduled');
         }
 
+        // One rescheduling request per event, regardless of vendor response.
+        // A single request creates one record per affected vendor; any record
+        // means this event has already used its one request.
         const existing = await this.rescheduleRequestModel.findOne({
             orderId: order._id,
-            status: 'CHANGE_REQUESTED',
         }).lean();
 
         if (existing) {
-            throw new ConflictException('A rescheduling request is already pending for this booking');
+            throw new ConflictException('A date/time change request has already been sent for this event');
         }
 
         const expiresAt = new Date(Date.now() + DEFAULT_HOLD_HOURS * 60 * 60 * 1000);
