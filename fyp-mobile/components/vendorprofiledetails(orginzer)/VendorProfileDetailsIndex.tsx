@@ -2258,6 +2258,11 @@ const serviceCityNamesFromIds =
                           id: 'tab-details',
                         },
                         {
+                          name: 'Contact',
+                          icon: 'call-outline',
+                          id: 'tab-contact',
+                        },
+                        {
                           name: 'Reviews',
                           icon: 'star-outline',
                           id: 'tab-reviews',
