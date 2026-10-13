@@ -2157,6 +2157,7 @@ async completeVendorOrder(vendorOrderId: string) {
                 oldEndTime: oldEventEnd,
                 newEventDate: newDate,
                 newStartTime: dto.eventTime,
+                requestedDurationMinutes: Number(dto.durationMinutes),
                 newEndTime: newEventEnd,
                 oldServiceStartDateTime: vendorOrder.eventStartDateTime || null,
                 oldServiceEndDateTime: vendorOrder.eventEndDateTime || null,
