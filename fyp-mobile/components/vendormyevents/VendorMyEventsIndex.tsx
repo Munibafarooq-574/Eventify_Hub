@@ -752,14 +752,14 @@ renderItem={({ item }) => {
             {!!item?.eventStartDateTime && (
               <View style={styles.eventMeta}>
                 <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>Start: {new Date(item.eventStartDateTime).toLocaleString()}</Text>
+                <Text style={styles.expandedText}>Start Time: {formatTime(new Date(item.eventStartDateTime))}</Text>
               </View>
             )}
 
             {!!item?.eventEndDateTime && (
               <View style={styles.eventMeta}>
                 <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>End: {new Date(item.eventEndDateTime).toLocaleString()}</Text>
+                <Text style={styles.expandedText}>End Time: {formatTime(new Date(item.eventEndDateTime))}</Text>
               </View>
             )}
 
@@ -811,8 +811,8 @@ renderItem={({ item }) => {
                     <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.vendorDetailCard}>
                       <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
                       <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
-                      {!!selectedPackage?.bookingType && <Text style={styles.expandedText}>Booking Type: {String(selectedPackage.bookingType).replace(/_/g, " ")}</Text>}
-                      <Text style={styles.expandedText}>Service / Delivery Window: {service?.eventStartDateTime ? new Date(service.eventStartDateTime).toLocaleString() : "Not provided"} → {service?.eventEndDateTime ? new Date(service.eventEndDateTime).toLocaleString() : "Not provided"}</Text>
+                      <Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
+                      <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>
                       <Text style={styles.expandedText}>Paid: Rs. {paid}</Text>
                       <Text style={styles.expandedText}>Remaining: Rs. {remaining}</Text>
