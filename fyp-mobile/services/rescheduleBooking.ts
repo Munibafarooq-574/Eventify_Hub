@@ -77,3 +77,12 @@ export async function respondToRescheduleRequest(
     throw apiError(error);
   }
 }
+
+export async function resolvePartialReschedule(orderId: string, action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE') {
+  try {
+    const response = await axios.patch(`${API_BASE_URL}/orders/${orderId}/reschedule/resolve`, { action }, { headers: await authHeaders() });
+    return response.data;
+  } catch (error) {
+    throw apiError(error);
+  }
+}
