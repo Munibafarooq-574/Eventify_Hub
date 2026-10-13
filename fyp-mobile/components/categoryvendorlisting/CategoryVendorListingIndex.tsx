@@ -54,6 +54,29 @@ export default function App() {
   const context =
     await getMarketplaceEventContext();
 
+  const replacementMode = String(Array.isArray(routeParams?.replacementMode) ? routeParams.replacementMode[0] : routeParams?.replacementMode || '') === 'true';
+  if (replacementMode) {
+    const eventCityId = String(Array.isArray(routeParams?.eventCityId) ? routeParams.eventCityId[0] : routeParams?.eventCityId || '');
+    const eventDate = String(Array.isArray(routeParams?.eventDate) ? routeParams.eventDate[0] : routeParams?.eventDate || '');
+    const startTime = String(Array.isArray(routeParams?.startTime) ? routeParams.startTime[0] : routeParams?.startTime || '');
+    const durationMinutes = Number(Array.isArray(routeParams?.durationMinutes) ? routeParams.durationMinutes[0] : routeParams?.durationMinutes);
+    if (eventCityId && eventDate && startTime && Number.isFinite(durationMinutes) && durationMinutes > 0) {
+      const [h, m] = startTime.split(':').map(Number);
+      const end = new Date(`${eventDate}T00:00:00`);
+      end.setHours(h, m, 0, 0);
+      end.setMinutes(end.getMinutes() + durationMinutes);
+      return {
+        eventId: String(Array.isArray(routeParams?.replacementOrderId) ? routeParams.replacementOrderId[0] : routeParams?.replacementOrderId || context.eventId || ''),
+        eventCityId,
+        eventAddress: context.eventAddress ?? '',
+        eventDate,
+        startTime,
+        endTime: `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`,
+        durationMinutes,
+      };
+    }
+  }
+
   if (
     !context.eventCityId ||
     !context.eventDate ||
@@ -273,8 +296,12 @@ const mergedResults = resultsPerCategory.flat();
       return;
     }
 
-    setData(vendorResults);
-    fetchVendorDetails(vendorResults);
+    const excludedVendorId = String(Array.isArray(routeParams?.excludedVendorId) ? routeParams.excludedVendorId[0] : routeParams?.excludedVendorId || '');
+    const visibleVendorResults = excludedVendorId
+      ? vendorResults.filter((vendor: any) => String(vendor?._id) !== excludedVendorId)
+      : vendorResults;
+    setData(visibleVendorResults);
+    fetchVendorDetails(visibleVendorResults);
   } catch (error) {
     console.error("Error fetching vendors:", error);
     setData([]);
@@ -382,6 +409,9 @@ router.push({
   durationMinutes: String(eventTiming?.durationMinutes || 0),
   openTab: "Details",
   bookingMode: eventTiming ? "event" : "browse",
+  replacementMode: Array.isArray(routeParams?.replacementMode) ? routeParams.replacementMode[0] : routeParams?.replacementMode || "",
+  replacementOrderId: Array.isArray(routeParams?.replacementOrderId) ? routeParams.replacementOrderId[0] : routeParams?.replacementOrderId || "",
+  replacementRequestId: Array.isArray(routeParams?.replacementRequestId) ? routeParams.replacementRequestId[0] : routeParams?.replacementRequestId || "",
   availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
@@ -489,6 +519,9 @@ router.push({
   openTab: "Packages",
   packageOnly: "true",
   bookingMode: eventTiming ? "event" : "browse",
+  replacementMode: Array.isArray(routeParams?.replacementMode) ? routeParams.replacementMode[0] : routeParams?.replacementMode || "",
+  replacementOrderId: Array.isArray(routeParams?.replacementOrderId) ? routeParams.replacementOrderId[0] : routeParams?.replacementOrderId || "",
+  replacementRequestId: Array.isArray(routeParams?.replacementRequestId) ? routeParams.replacementRequestId[0] : routeParams?.replacementRequestId || "",
   availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
