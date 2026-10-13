@@ -361,7 +361,7 @@ const EditContactDetailsScreen = () => {
   if (
     !brandName.trim() ||
     !contactNumber.trim() ||
-    !instagramLink.trim() ||
+    (!instagramLink.trim() && !facebookLink.trim()) ||
     !bookingEmail.trim() ||
     !businessCityId
   ) {
@@ -405,15 +405,22 @@ const EditContactDetailsScreen = () => {
         contactNumber.trim(),
       );
 
-      formData.append(
-        "instagramLink",
-        instagramLink.trim(),
-      );
+      // Social links are optional individually. The form requires at
+      // least one of Instagram/Facebook, so do not send an empty optional
+      // URL to the backend validator.
+      if (instagramLink.trim()) {
+        formData.append(
+          "instagramLink",
+          instagramLink.trim(),
+        );
+      }
 
-      formData.append(
-        "facebookLink",
-        facebookLink.trim(),
-      );
+      if (facebookLink.trim()) {
+        formData.append(
+          "facebookLink",
+          facebookLink.trim(),
+        );
+      }
 
       formData.append(
         "bookingEmail",
@@ -434,20 +441,26 @@ const EditContactDetailsScreen = () => {
         },
       );
 
-      formData.append(
-        "website",
-        website.trim(),
-      );
+      if (website.trim()) {
+        formData.append(
+          "website",
+          website.trim(),
+        );
+      }
 
-      formData.append(
-        "officialAddress",
-        address.trim(),
-      );
+      if (address.trim()) {
+        formData.append(
+          "officialAddress",
+          address.trim(),
+        );
+      }
 
-      formData.append(
-        "officialGoogleLink",
-        googleLink.trim(),
-      );
+      if (googleLink.trim()) {
+        formData.append(
+          "officialGoogleLink",
+          googleLink.trim(),
+        );
+      }
 
       // Sirf tab file bhejo jab
       // vendor ne naya logo choose kiya ho.
