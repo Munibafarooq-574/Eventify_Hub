@@ -58,7 +58,12 @@ const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 
 // VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
-const mapVendorStatus = (status: string) => (status === "accepted" ? "confirmed" : status);
+const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
+    replacementOutcome === "NO_LONGER_ASSIGNED"
+        ? "no_longer_assigned"
+        : status === "accepted"
+            ? "confirmed"
+            : status;
 
 const formatTimeOnly = (value: string | Date) => {
     const date = value instanceof Date ? value : new Date(value);
@@ -75,7 +80,8 @@ const formatTimeOnly = (value: string | Date) => {
 const getVendorStatus = (order: any) => {
     const vOrders = order.vendorOrders || [];
     if (vOrders.length === 0) return order.status; // fallback safety
-    const statuses = vOrders.map((v: any) => mapVendorStatus(v.status));
+    const statuses = vOrders.map((v: any) => mapVendorStatus(v.status, v.replacementOutcome));
+    if (statuses.every((s: string) => s === "no_longer_assigned")) return "no_longer_assigned";
     if (statuses.every((s: string) => s === "completed")) return "completed";
     if (statuses.every((s: string) => s === "cancelled")) return "cancelled";
     if (statuses.some((s: string) => s === "confirmed" || s === "completed")) return "confirmed";
@@ -132,10 +138,10 @@ const OrderSummary = () => {
                     )
                 );
                 Alert.alert(
-                    status === "ACCEPTED" ? "Reschedule accepted" : "Reschedule rejected",
+                    status === "ACCEPTED" ? "Schedule response saved" : "Thanks for letting us know 💜",
                     status === "ACCEPTED"
-                        ? "Your acceptance was saved. The booking only moves after all required vendors accept and final backend validation passes."
-                        : "The original booking remains unchanged."
+                        ? "Thank you! Your availability for the updated schedule has been shared. The event will move once all required vendors are confirmed."
+                        : "We’ve shared your availability with the client. The current booking remains unchanged while they decide how they’d like to proceed."
                 );
             } catch (error: any) {
                 Alert.alert("Could not respond", error?.message || "Please try again.");
@@ -146,11 +152,11 @@ const OrderSummary = () => {
 
         if (status === "REJECTED") {
             Alert.alert(
-                "Reject rescheduling?",
-                "The client will be told that your service cannot move to the requested date/time.",
+                "Unable to accommodate this schedule?",
+                "That’s completely okay. We’ll let the client know that the requested date/time doesn’t work for you, while the current booking stays unchanged for now.",
                 [
                     { text: "Keep reviewing", style: "cancel" },
-                    { text: "Reject", style: "destructive", onPress: perform },
+                    { text: "Confirm availability", onPress: perform },
                 ]
             );
             return;
@@ -583,7 +589,7 @@ const OrderSummary = () => {
                                                             <View key={request._id} style={styles.rescheduleCard}>
                                                                 <View style={styles.rescheduleHeader}>
                                                                     <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
-                                                                    <Text style={styles.rescheduleTitle}>Rescheduling Request</Text>
+                                                                    <Text style={styles.rescheduleTitle}>Schedule Update Request</Text>
                                                                 </View>
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New date: {new Date(request.newEventDate).toDateString()}
@@ -606,19 +612,19 @@ const OrderSummary = () => {
                                                                             style={styles.rejectRescheduleButton}
                                                                             onPress={() => handleRescheduleResponse(request._id, "REJECTED")}
                                                                         >
-                                                                            <Text style={styles.rescheduleActionText}>Reject</Text>
+                                                                            <Text style={styles.rescheduleActionText}>Unable to Accommodate</Text>
                                                                         </TouchableOpacity>
                                                                         <TouchableOpacity
                                                                             disabled={busy}
                                                                             style={styles.acceptRescheduleButton}
                                                                             onPress={() => handleRescheduleResponse(request._id, "ACCEPTED")}
                                                                         >
-                                                                            {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.rescheduleActionText}>Accept</Text>}
+                                                                            {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.rescheduleActionText}>Accept New Schedule</Text>}
                                                                         </TouchableOpacity>
                                                                     </View>
                                                                 ) : (
                                                                     <Text style={styles.rescheduleResolved}>
-                                                                        {request.status === "ACCEPTED" ? "Accepted" : request.status === "REJECTED" ? "Rejected" : "Expired"}
+                                                                        {request.status === "ACCEPTED" ? "New schedule accepted" : request.status === "REJECTED" ? "Unable to accommodate" : "Request expired"}
                                                                     </Text>
                                                                 )}
                                                             </View>
