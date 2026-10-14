@@ -911,6 +911,7 @@ const MyEventsScreen = () => {
                                       eventAddress: event.eventAddress || '',
                                       selectedServices,
                                       selectedCategoryIds,
+                                      replacementRescheduleRequestId: String(request._id),
                                     }),
                                   );
 
