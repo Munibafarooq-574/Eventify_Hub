@@ -42,6 +42,7 @@ export interface PlaceOrderPayload {
   eventCityId: string;
   eventAddress: string;
   selectedCategoryIds?: string[];
+  replacementRescheduleRequestId?: string;
 }
 
 /**
@@ -182,6 +183,10 @@ if (!orderData.eventAddress?.trim()) {
 
       selectedCategoryIds:
         orderData.selectedCategoryIds ?? [],
+
+      ...(orderData.replacementRescheduleRequestId
+        ? { replacementRescheduleRequestId: orderData.replacementRescheduleRequestId }
+        : {}),
 
       services: orderData.services.map((service) => ({
         vendorId: service.vendorId,
