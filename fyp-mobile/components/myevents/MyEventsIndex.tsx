@@ -844,11 +844,20 @@ const MyEventsScreen = () => {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.rescheduleVendorName}>{vendorName}</Text>
-                                  {request.respondedAt && (
-                                    <Text style={styles.rescheduleRequestedTime}>
-                                      Responded {new Date(request.respondedAt).toLocaleString()}
-                                    </Text>
-                                  )}
+                                  {request.respondedAt && (() => {
+                                    const respondedAt = new Date(request.respondedAt);
+                                    return (
+                                      <View style={styles.rescheduleResponseMeta}>
+                                        <Ionicons name="checkmark-circle-outline" size={13} color={COLORS.muted} />
+                                        <Text style={styles.rescheduleResponseLabel}>Responded</Text>
+                                        <Text style={styles.rescheduleResponseDate}>
+                                          {respondedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                          {' · '}
+                                          {respondedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })()}
                                   {request.responseMessage && (
                                     <Text style={styles.rescheduleRequestedTime}>{request.responseMessage}</Text>
                                   )}
@@ -1460,6 +1469,9 @@ const styles = StyleSheet.create({
   rescheduleVendorAvatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 12 },
   rescheduleVendorName: { color: COLORS.text, fontWeight: '800', fontSize: 12.5 },
   rescheduleRequestedTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 2 },
+  rescheduleResponseMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  rescheduleResponseLabel: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
+  rescheduleResponseDate: { color: COLORS.text, fontSize: 10.5, fontWeight: '600' },
   rescheduleChip: { maxWidth: 125, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6 },
   rescheduleChipAccepted: { backgroundColor: '#E6F7EA' },
   rescheduleChipRejected: { backgroundColor: '#FDEAEC' },
