@@ -822,7 +822,7 @@ const MyEventsScreen = () => {
                           <View style={styles.rescheduleDecisionSummary}>
                             {!!statusCounts.waiting && <Text style={styles.rescheduleWaitingText}>{statusCounts.waiting} waiting</Text>}
                             {!!statusCounts.accepted && <Text style={styles.rescheduleAcceptedText}>{statusCounts.accepted} accepted</Text>}
-                            {!!statusCounts.rejected && <Text style={styles.rescheduleRejectedText}>{statusCounts.rejected} rejected</Text>}
+                            {!!statusCounts.rejected && <Text style={styles.rescheduleRejectedText}>{statusCounts.rejected} unavailable for new schedule</Text>}
                           </View>
 
                           {eventRequests.map((request: any) => {
@@ -833,7 +833,7 @@ const MyEventsScreen = () => {
                             const statusLabel =
                               status === 'CHANGE_REQUESTED' ? 'Waiting for vendor' :
                               status === 'ACCEPTED' ? 'Accepted' :
-                              status === 'REJECTED' ? 'Rejected' : 'Expired';
+                              status === 'REJECTED' ? 'Unavailable for new schedule' : 'Request expired';
 
                             return (
                               <View key={request._id} style={styles.rescheduleStatusRow}>
@@ -873,7 +873,7 @@ const MyEventsScreen = () => {
                             <View style={styles.rescheduleHelpBox}>
                               <Ionicons name="information-circle-outline" size={15} color={COLORS.danger} />
                               <Text style={styles.rescheduleHelp}>
-                                {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.' : 'A vendor could not accommodate the new timing. Your original event schedule is still authoritative.'}
+                                {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.' : 'A vendor isn’t available for the new schedule. No worries — your current booking is still safe while you decide how you’d like to continue.'}
                               </Text>
                             </View>
                           )}
@@ -896,8 +896,8 @@ const MyEventsScreen = () => {
 
                           {resolutionStatus === 'REPLACEMENT_REQUIRED' && (
                             <View style={styles.rescheduleActions}>
-                              <Text style={styles.rescheduleActionTitle}>Replacement required</Text>
-                              <Text style={styles.rescheduleActionText}>The event is still on its original schedule. Choose a replacement for each unavailable vendor.</Text>
+                              <Text style={styles.rescheduleActionTitle}>Let’s find the right fit</Text>
+                              <Text style={styles.rescheduleActionText}>Your current booking is still safe. Choose another vendor for each service that isn’t available for your preferred schedule.</Text>
                               {eventRequests.filter((request: any) => ['REJECTED', 'EXPIRED'].includes(String(request.status))).map((request: any) => {
                                 const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                                 const vendorData = vendorOrder?.vendorId || {};
