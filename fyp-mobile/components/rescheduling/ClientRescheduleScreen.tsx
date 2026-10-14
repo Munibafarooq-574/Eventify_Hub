@@ -91,8 +91,8 @@ export default function ClientRescheduleScreen() {
       });
 
       Alert.alert(
-        'Request sent',
-        'Each vendor will review the new date/time independently. Your original booking stays unchanged until all required vendors accept and the backend completes final validation.',
+        'Schedule change request sent 💜',
+        'We’ve shared your preferred date and time with your vendors. Your current schedule will stay in place until the update is confirmed.',
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (error: any) {
@@ -150,7 +150,7 @@ export default function ClientRescheduleScreen() {
               <Ionicons name="information" size={16} color="#fff" />
             </View>
             <Text style={styles.noticeText}>
-              This sends a rescheduling request. It does not automatically move any vendor booking.
+              Your preferred schedule will be shared with your vendors. Your current booking stays safely in place until the update is confirmed.
             </Text>
           </View>
 
@@ -247,7 +247,7 @@ export default function ClientRescheduleScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.warningTitle}>What happens next?</Text>
               <Text style={styles.warningText}>
-                Each affected vendor can accept or reject independently. If anyone rejects, your original booking remains unchanged and you can decide what to do next.
+                Each vendor can confirm whether the new schedule works for them. If someone isn’t available, your current booking stays safe and you’ll have the option to choose another vendor.
               </Text>
             </View>
           </View>
@@ -266,7 +266,7 @@ export default function ClientRescheduleScreen() {
             ) : (
               <>
                 <Ionicons name="paper-plane" size={17} color="#fff" />
-                <Text style={styles.submitText}>Send Rescheduling Request</Text>
+                <Text style={styles.submitText}>Send Schedule Change Request</Text>
               </>
             )}
           </TouchableOpacity>
