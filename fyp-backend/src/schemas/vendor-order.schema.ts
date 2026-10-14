@@ -53,6 +53,14 @@ finalAmount: number;
 @Prop({ type: String, default: null })
 packageId: string | null;
 
+    // Present only when this VendorOrder replaces an unavailable vendor
+    // during an existing event reschedule. Normal bookings remain null.
+    @Prop({ type: Types.ObjectId, ref: 'RescheduleRequest', default: null, index: true })
+    replacementRescheduleRequestId?: Types.ObjectId | null;
+
+    @Prop({ type: Types.ObjectId, ref: 'VendorOrder', default: null })
+    replacesVendorOrderId?: Types.ObjectId | null;
+
     // IMPORTANT: Existing booking lifecycle — DO NOT CHANGE
     @Prop({ default: 'pending' })
 status:
