@@ -18,6 +18,7 @@ import { Payment } from 'src/schemas/payment.schema';
 import { PaymentBreakdown } from './payment.types';
 import { PayoutService } from 'src/payout/payout.service';
 import { User } from 'src/schemas/user.schema';
+import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { EmailService } from 'src/email/email.service';
 
 @Injectable()
@@ -25,6 +26,9 @@ export class PaymentService {
     constructor(
         @InjectModel(VendorOrder.name)
         private readonly vendorOrderModel: Model<VendorOrder>,
+
+        @InjectModel(RescheduleRequest.name)
+        private readonly rescheduleRequestModel: Model<RescheduleRequest>,
 
         @InjectModel(Order.name)
         private readonly orderModel: Model<Order>,
@@ -536,6 +540,16 @@ pendingPayment: pendingPayment
         vendorOrderId,
         organizerId,
     );
+
+        const unresolvedReschedule = await this.rescheduleRequestModel.exists({
+            orderId: order._id,
+            resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] },
+        });
+        if (unresolvedReschedule) {
+            throw new ConflictException(
+                'Payment is temporarily unavailable while the date/time change is being resolved.',
+            );
+        }
 
         if (vendorOrder.paymentStatus === 'PAID') {
             throw new ConflictException(

@@ -736,6 +736,7 @@ const MyEventsScreen = () => {
                         accepted: eventRequests.filter((request: any) => request.status === 'ACCEPTED').length,
                         rejected: eventRequests.filter((request: any) => request.status === 'REJECTED').length,
                         expired: eventRequests.filter((request: any) => request.status === 'EXPIRED').length,
+                        cancelledByVendor: eventRequests.filter((request: any) => request.status === 'CANCELLED_BY_VENDOR').length,
                       };
                       const resolutionStatus = firstRequest?.resolutionStatus || 'PENDING';
                       const needsClientAction = statusCounts.waiting === 0 && (statusCounts.rejected > 0 || statusCounts.expired > 0) && resolutionStatus === 'PENDING';
@@ -792,6 +793,7 @@ const MyEventsScreen = () => {
                             {!!statusCounts.waiting && <Text style={styles.rescheduleWaitingText}>{statusCounts.waiting} waiting</Text>}
                             {!!statusCounts.accepted && <Text style={styles.rescheduleAcceptedText}>{statusCounts.accepted} accepted</Text>}
                             {!!statusCounts.rejected && <Text style={styles.rescheduleRejectedText}>{statusCounts.rejected} unavailable for new schedule</Text>}
+                            {!!statusCounts.cancelledByVendor && <Text style={styles.rescheduleRejectedText}>{statusCounts.cancelledByVendor} cancelled by vendor</Text>}
                           </View>
 
                           {eventRequests.map((request: any) => {
@@ -802,7 +804,8 @@ const MyEventsScreen = () => {
                             const statusLabel =
                               status === 'CHANGE_REQUESTED' ? 'Waiting for vendor' :
                               status === 'ACCEPTED' ? 'Accepted' :
-                              status === 'REJECTED' ? 'Unavailable for new schedule' : 'Request expired';
+                              status === 'REJECTED' ? 'Unavailable for new schedule' :
+                              status === 'CANCELLED_BY_VENDOR' ? 'Booking cancelled by vendor' : 'Request expired';
 
                             return (
                               <View key={request._id} style={styles.rescheduleStatusRow}>
@@ -857,11 +860,11 @@ const MyEventsScreen = () => {
                             );
                           })}
 
-                          {(statusCounts.rejected > 0 || statusCounts.expired > 0) && (
+                          {(statusCounts.rejected > 0 || statusCounts.expired > 0 || statusCounts.cancelledByVendor > 0) && (
                             <View style={styles.rescheduleHelpBox}>
                               <Ionicons name="information-circle-outline" size={15} color={COLORS.danger} />
                               <Text style={styles.rescheduleHelp}>
-                                {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.' : 'A vendor isn’t available for the new schedule. No worries — your current booking is still safe while you decide how you’d like to continue.'}
+                                {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? (statusCounts.cancelledByVendor > 0 ? 'A vendor cancelled before responding to your schedule change. Your other confirmed bookings are safe. Choose a replacement to continue with the new schedule.' : 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.') : 'A vendor isn’t available for the new schedule. No worries — your current booking is still safe while you decide how you’d like to continue.'}
                               </Text>
                             </View>
                           )}
@@ -886,7 +889,7 @@ const MyEventsScreen = () => {
                             <View style={styles.rescheduleActions}>
                               <Text style={styles.rescheduleActionTitle}>Let’s find the right fit</Text>
                               <Text style={styles.rescheduleActionText}>Your current booking is still safe. Choose another vendor for each service that isn’t available for your preferred schedule.</Text>
-                              {eventRequests.filter((request: any) => ['REJECTED', 'EXPIRED'].includes(String(request.status))).map((request: any) => {
+                              {eventRequests.filter((request: any) => ['REJECTED', 'EXPIRED', 'CANCELLED_BY_VENDOR'].includes(String(request.status))).map((request: any) => {
                                 const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                                 const vendorData = vendorOrder?.vendorId || {};
                                 const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
@@ -1303,7 +1306,7 @@ const MyEventsScreen = () => {
                                 </View>
                               )}
 
-                              {paymentStatus === 'PAYMENT_REQUIRED' && !hasPendingPayment && (
+                              {paymentStatus === 'PAYMENT_REQUIRED' && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
                                 <TouchableOpacity
                                   style={styles.payNowButton}
                                   activeOpacity={0.85}
@@ -1314,7 +1317,7 @@ const MyEventsScreen = () => {
                                 </TouchableOpacity>
                               )}
 
-                              {paymentStatus === 'PAYMENT_FAILED' && !hasPendingPayment && (
+                              {paymentStatus === 'PAYMENT_FAILED' && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
                                 <>
                                   <View style={styles.paymentFailedBox}>
                                     <Ionicons name="warning-outline" size={13} color="#DC3545" />
