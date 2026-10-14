@@ -389,6 +389,9 @@ const VendorDetailsScreen: React.FC =
   source,
   availablePackageIds,
   packageOnly,
+  replacementMode,
+  replacementOrderId,
+  replacementRequestId,
 } = useGlobalSearchParams();
 
 const isPackageOnlyMode =
@@ -1738,6 +1741,49 @@ Toast.show({
         }
 
         await saveSecureData('cartData', JSON.stringify(cart));
+
+        // Keep replacement checkout context attached to the cart as well.
+        // This does not alter normal bookings; it only gives downstream
+        // checkout a durable fallback if eventDetails is unavailable.
+        const isReplacementBooking =
+          String(Array.isArray(replacementMode) ? replacementMode[0] : replacementMode || '') === 'true';
+
+        if (isReplacementBooking) {
+          const existingEventDetailsRaw = await getSecureData('eventDetails');
+          let existingEventDetails: any = null;
+          try {
+            existingEventDetails = existingEventDetailsRaw
+              ? JSON.parse(existingEventDetailsRaw)
+              : null;
+          } catch {
+            existingEventDetails = null;
+          }
+
+          await saveSecureData(
+            'eventDetails',
+            JSON.stringify({
+              ...(existingEventDetails || {}),
+              eventId: String(
+                Array.isArray(replacementOrderId)
+                  ? replacementOrderId[0]
+                  : replacementOrderId || resolvedEventId,
+              ),
+              eventCityId: String(
+                Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || existingEventDetails?.eventCityId || '',
+              ),
+              eventDate: String(Array.isArray(eventDate) ? eventDate[0] : eventDate || ''),
+              startTime: String(Array.isArray(startTime) ? startTime[0] : startTime || ''),
+              endTime: String(Array.isArray(endTime) ? endTime[0] : endTime || ''),
+              durationMinutes: selectedDurationMinutes,
+              replacementMode: true,
+              replacementRequestId: String(
+                Array.isArray(replacementRequestId)
+                  ? replacementRequestId[0]
+                  : replacementRequestId || '',
+              ),
+            }),
+          );
+        }
 
         Toast.show({
           type: 'success',
