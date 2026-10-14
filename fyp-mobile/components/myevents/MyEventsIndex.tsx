@@ -871,7 +871,7 @@ const MyEventsScreen = () => {
                                 const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                                 const vendorData = vendorOrder?.vendorId || {};
                                 const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
-                                return <TouchableOpacity key={`replacement-${request._id}`} style={styles.findReplacementButton} onPress={() => {
+                                return <TouchableOpacity key={`replacement-${request._id}`} style={styles.findReplacementButton} onPress={async () => {
                                   const categoryId = String(vendorData?.buisnessCategory?._id || vendorData?.buisnessCategory || '');
                                   const categoryName = String(vendorData?.buisnessCategory?.name || vendorData?.buisnessCategory?.categoryName || vendorOrder?.serviceName || 'Service');
                                   if (!categoryId) return Alert.alert('Category unavailable', 'Could not identify the service category for this vendor.');
