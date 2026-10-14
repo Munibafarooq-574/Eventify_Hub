@@ -1672,6 +1672,26 @@ async getOrderStats(type: string, userId: string) {
 
     const mappedStatus = statusMap[status];
 
+    const existingVendorOrder: any = await this.vendorOrderModel.findById(vendorOrderId).lean();
+    if (!existingVendorOrder) {
+        throw new NotFoundException('Vendor order not found');
+    }
+    if (existingVendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED') {
+        throw new ConflictException('This booking is no longer assigned to you and can’t be updated.');
+    }
+
+    // IMPORTANT: accepting a vendor booking must go through the same
+    // acceptance flow that snapshots the down-payment configuration and
+    // changes paymentStatus from UNPAID to PAYMENT_REQUIRED.  Previously
+    // this generic status endpoint changed only VendorOrder.status, which
+    // left newly accepted bookings stuck at UNPAID and hid the Pay button.
+    if (status === 'confirmed') {
+        return this.updateVendorResponse(
+            vendorOrderId,
+            'accepted',
+        );
+    }
+
     const vendorOrder = await this.vendorOrderModel.findByIdAndUpdate(
         vendorOrderId,
         { status: mappedStatus },
@@ -1744,6 +1764,10 @@ async getOrderStats(type: string, userId: string) {
 
         if (!vendorOrder) {
             throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
+        }
+
+        if (vendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED') {
+            throw new ConflictException('This booking is no longer assigned to you and can’t be updated.');
         }
 
         vendorOrder.status = status;
