@@ -1523,6 +1523,7 @@ async getOrderStats(type: string, userId: string) {
       processing,
       completed,
       cancelled,
+      noLongerAssigned,
     ] = await Promise.all([
       this.vendorOrderModel.countDocuments(vQuery),
       this.vendorOrderModel.countDocuments({
@@ -1541,6 +1542,10 @@ async getOrderStats(type: string, userId: string) {
         ...vQuery,
         status: 'cancelled',
       }),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        replacementOutcome: 'NO_LONGER_ASSIGNED',
+      }),
     ]);
 
     console.log('📊 Vendor order stats:', {
@@ -1549,6 +1554,7 @@ async getOrderStats(type: string, userId: string) {
       processing,
       completed,
       cancelled,
+      noLongerAssigned,
     });
 
     return {
@@ -1557,6 +1563,7 @@ async getOrderStats(type: string, userId: string) {
       processing,
       completed,
       cancelled,
+      noLongerAssigned,
     };
   }
 
