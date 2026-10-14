@@ -61,6 +61,19 @@ packageId: string | null;
     @Prop({ type: Types.ObjectId, ref: 'VendorOrder', default: null })
     replacesVendorOrderId?: Types.ObjectId | null;
 
+    // Historical closure for a vendor who could not accommodate a
+    // requested schedule and was replaced. Kept separate from the
+    // existing booking lifecycle so normal status/payment logic is untouched.
+    @Prop({
+        type: String,
+        enum: ['NO_LONGER_ASSIGNED', null],
+        default: null,
+    })
+    replacementOutcome?: 'NO_LONGER_ASSIGNED' | null;
+
+    @Prop({ type: Date, default: null })
+    replacementFinalizedAt?: Date | null;
+
     // IMPORTANT: Existing booking lifecycle — DO NOT CHANGE
     @Prop({ default: 'pending' })
 status:
