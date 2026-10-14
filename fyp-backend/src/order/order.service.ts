@@ -1424,14 +1424,42 @@ export class OrderService {
 .exec();
 
        if (type === 'Vendor') {
+    const historicalVendorOrders: any[] = await this.vendorOrderModel
+        .find({
+            vendorId: userIdObj,
+            replacementOutcome: 'NO_LONGER_ASSIGNED',
+            orderId: { $in: orders.map((order: any) => order._id) },
+        })
+        .populate({
+            path: 'vendorId',
+            model: 'User',
+            select: 'name email phone_number contactDetails',
+        })
+        .lean();
+
+    const historicalByOrder = new Map<string, any[]>();
+    for (const vendorOrder of historicalVendorOrders) {
+        const key = String(vendorOrder.orderId);
+        historicalByOrder.set(key, [
+            ...(historicalByOrder.get(key) || []),
+            vendorOrder,
+        ]);
+    }
+
     return orders.map((order: any) => {
-        order.vendorOrders = (order.vendorOrders || [])
-            .filter((vo: any) => {
+        const visibleVendorOrders = [
+            ...(order.vendorOrders || []),
+            ...(historicalByOrder.get(String(order._id)) || []),
+        ];
+
+        order.vendorOrders = visibleVendorOrders
+            .filter((vo: any, index: number, all: any[]) => {
                 const vendorIdOnItem =
                     vo.vendorId?._id ?? vo.vendorId;
 
                 return (
-                    vendorIdOnItem?.toString() === userId
+                    vendorIdOnItem?.toString() === userId &&
+                    all.findIndex((candidate: any) => String(candidate._id) === String(vo._id)) === index
                 );
             })
             .map((vo: any) => {
