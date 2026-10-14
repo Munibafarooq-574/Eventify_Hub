@@ -511,7 +511,7 @@ const OrderSummary = () => {
                                             <Text style={styles.orderName}>{item.organizerId?.name}</Text>
                                         </View>
                                         <View style={styles.statusBadge}>
-                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item)}</Text>
+                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item)}</Text>
                                         </View>
                                         <Ionicons
                                             name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -579,6 +579,33 @@ const OrderSummary = () => {
                                                 {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatTimeOnly(item.eventStartDateTime)}</Text></View>}
                                                 {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatTimeOnly(item.eventEndDateTime)}</Text></View>}
                                                 {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
+
+                                                {getVendorStatus(item) === "no_longer_assigned" && (() => {
+                                                    const service = (item.vendorOrders || []).find((vo: any) => vo.replacementOutcome === "NO_LONGER_ASSIGNED");
+                                                    const request = rescheduleRequests.find((r: any) =>
+                                                        String(r.orderId) === String(item._id) &&
+                                                        String(r.replacesVendorOrderId || r.vendorOrderId) === String(service?._id)
+                                                    ) || rescheduleRequests.find((r: any) => String(r.orderId) === String(item._id));
+                                                    return (
+                                                        <View style={styles.rescheduleCard}>
+                                                            <View style={styles.rescheduleHeader}>
+                                                                <Ionicons name="heart-outline" size={17} color={PRIMARY} />
+                                                                <Text style={styles.rescheduleTitle}>Booking schedule updated 💜</Text>
+                                                            </View>
+                                                            <Text style={styles.rescheduleLine}>You’re no longer assigned to this event.</Text>
+                                                            {!!request && (
+                                                                <>
+                                                                    <Text style={styles.rescheduleLine}>Original: {new Date(request.oldEventDate).toDateString()} · {request.oldStartTime}</Text>
+                                                                    <Text style={styles.rescheduleLine}>Requested: {new Date(request.newEventDate).toDateString()} · {request.newStartTime}</Text>
+                                                                    <Text style={styles.rescheduleResolved}>Your response: Unable to accommodate</Text>
+                                                                </>
+                                                            )}
+                                                            <Text style={styles.rescheduleReason}>
+                                                                Thank you for letting us know about your availability. The client made alternative arrangements for the updated schedule, so no further action is needed from you. We hope to work with you on another event soon.
+                                                            </Text>
+                                                        </View>
+                                                    );
+                                                })()}
 
                                                 {rescheduleRequests
                                                     .filter((request: any) => String(request.orderId) === String(item._id))
