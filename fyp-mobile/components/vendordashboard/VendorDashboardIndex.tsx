@@ -54,7 +54,7 @@ const MONTH_NAMES = [
 ];
 
 //type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
-type OrderStats = { totalOrders: number; pending: number; processing: number; completed: number; cancelled: number };
+type OrderStats = { totalOrders: number; pending: number; processing: number; completed: number; cancelled: number; noLongerAssigned: number };
 
 function formatPKR(amount: number): string {
     if (!amount) return "Rs. 0";
@@ -72,6 +72,7 @@ const DashboardScreen = () => {
         processing: 0,
         completed: 0,
         cancelled: 0,
+        noLongerAssigned: 0,
     });
     const [orderCountArray, setOrderCountArray] = useState<number[]>([]);
     const [orderAmountArray, setOrderAmountArray] = useState<number[]>([]);
@@ -229,6 +230,7 @@ const packageLimitReached =
                 processing: statsData.processing ?? 0,
                 completed: statsData.completed ?? 0,
                 cancelled: (statsData as any).cancelled ?? 0,
+                noLongerAssigned: (statsData as any).noLongerAssigned ?? 0,
             });
 
             setOrderStatsError(false);
@@ -888,6 +890,18 @@ if (!hasValidSubscription) {
                                 router.push({
                                     pathname: "/vendorordersummary",
                                     params: { selectedTab: "Cancelled" },
+                                })
+                            }
+                        />
+                        <StatBox
+                            icon="archive-outline"
+                            value={orderStats.noLongerAssigned}
+                            label="No Longer Assigned"
+                            accent="#8B6B82"
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/vendorordersummary",
+                                    params: { selectedTab: "No Longer Assigned" },
                                 })
                             }
                         />
