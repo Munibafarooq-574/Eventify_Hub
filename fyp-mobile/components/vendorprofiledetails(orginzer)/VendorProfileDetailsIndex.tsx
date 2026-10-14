@@ -379,6 +379,7 @@ const VendorDetailsScreen: React.FC =
   packageId,
   openTab,
   eventId,
+  eventCityId,
   eventDate,
   startTime,
   endTime,
@@ -569,16 +570,29 @@ const [availabilityCheck, setAvailabilityCheck] =
         );
 
         if (isEventMode) {
-          const marketplaceContext = await getMarketplaceEventContext();
-          if (!marketplaceContext.eventCityId) {
+          const routeEventCityId = String(
+            Array.isArray(eventCityId)
+              ? eventCityId[0]
+              : eventCityId || '',
+          );
+          const marketplaceContext = routeEventCityId
+            ? null
+            : await getMarketplaceEventContext();
+          const resolvedEventCityId =
+            routeEventCityId ||
+            marketplaceContext?.eventCityId ||
+            '';
+
+          if (!resolvedEventCityId) {
             throw new Error('Select an event city before checking vendor availability');
           }
+
           const checkResult =
   await checkVendorsAvailability({
     vendorIds: [
       vendorData._id,
     ],
-    eventCityId: marketplaceContext.eventCityId,
+    eventCityId: resolvedEventCityId,
     eventDate: String(
       Array.isArray(eventDate)
         ? eventDate[0]
