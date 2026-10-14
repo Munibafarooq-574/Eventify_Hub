@@ -88,7 +88,7 @@ const getVendorStatus = (order: any) => {
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled";
+type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled" | "No Longer Assigned";
 
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
@@ -172,12 +172,14 @@ const OrderSummary = () => {
         const processing = orders.filter((o) => getVendorStatus(o) === PROCESSING_STATUS).length;
         const completed = orders.filter((o) => getVendorStatus(o) === COMPLETED_STATUS).length;
         const cancelled = orders.filter((o) => getVendorStatus(o) === CANCELLED_STATUS).length;
+        const noLongerAssigned = orders.filter((o) => getVendorStatus(o) === "no_longer_assigned").length;
         return {
             totalOrders: orders.length, // matches dashboard's total (includes every status)
             pending,
             processing,
             completed,
             cancelled,
+            noLongerAssigned,
         };
     }, [orders]);
 
@@ -191,6 +193,8 @@ const OrderSummary = () => {
                 return "#5CB85C";
             case "cancelled":
                 return "#D9534F";
+            case "no_longer_assigned":
+                return "#8B6B82";
             default:
                 return "#999";
         }
@@ -208,6 +212,7 @@ const OrderSummary = () => {
             if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
             if (selectedFilter === "Completed") return getVendorStatus(order) === COMPLETED_STATUS;
             if (selectedFilter === "Cancelled") return getVendorStatus(order) === CANCELLED_STATUS;
+            if (selectedFilter === "No Longer Assigned") return getVendorStatus(order) === "no_longer_assigned";
             return true;
         });
     }, [orders, selectedFilter]);
@@ -461,6 +466,18 @@ const OrderSummary = () => {
                             isActive={selectedFilter === "Cancelled"}
                         />
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => handleSummaryCardClick("No Longer Assigned")}
+                        activeOpacity={0.7}
+                    >
+                        <SummaryCard
+                            label="No Longer Assigned"
+                            value={orderStats.noLongerAssigned}
+                            icon="archive-outline"
+                            isActive={selectedFilter === "No Longer Assigned"}
+                        />
+                    </TouchableOpacity>
                 </ScrollView>
 
                 {/* Orders List */}
@@ -688,7 +705,7 @@ const OrderSummary = () => {
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item)}</Text>
+                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item)}</Text>
                                                     </View>
                                                 )}
 
@@ -721,7 +738,16 @@ const OrderSummary = () => {
                                         )}
                                     </View>
 
-                                                                        <View style={styles.actionButtons}>
+                                                                        {getVendorStatus(item) === "no_longer_assigned" ? (
+                                        <View style={styles.closedBookingBox}>
+                                            <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.closedBookingTitle}>This booking is closed</Text>
+                                                <Text style={styles.closedBookingText}>This record is available for your history only. No further actions are required.</Text>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                    <View style={styles.actionButtons}>
                                         {getVendorStatus(item) !== "cancelled" && getVendorStatus(item) !== "completed" && (
                                             <TouchableOpacity
                                                 style={styles.deleteButton}
@@ -780,6 +806,7 @@ const OrderSummary = () => {
                                             <Text style={styles.buttonText}>Message</Text>
                                         </TouchableOpacity>
                                     </View>
+                                    )}
                                 </View>
                             </TouchableOpacity>
                         );
@@ -1100,6 +1127,9 @@ const styles = StyleSheet.create({
         paddingVertical: 7,
         borderRadius: 8,
     },
+    closedBookingBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12, padding: 13, borderRadius: 12, backgroundColor: '#F8EEF5', borderWidth: 1, borderColor: '#E7CFDF' },
+    closedBookingTitle: { color: PRIMARY, fontWeight: '800', fontSize: 13 },
+    closedBookingText: { color: '#76636F', fontSize: 11.5, lineHeight: 17, marginTop: 2 },
     messageButton: {
         flexDirection: "row",
         alignItems: "center",
