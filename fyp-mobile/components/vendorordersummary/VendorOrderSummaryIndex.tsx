@@ -99,6 +99,14 @@ const OrderSummary = () => {
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
 
     useEffect(() => {
+        const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
+        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Completed", "Cancelled", "No Longer Assigned"];
+        if (tab && validTabs.includes(tab as FilterType)) {
+            setSelectedFilter(tab as FilterType);
+        }
+    }, [selectedTab]);
+
+    useEffect(() => {
         // Fetch orders on mount. Stats are derived live from `orders` below,
         // so they always match the current list (no separate stale stats call needed).
         const fetchData = async () => {
