@@ -897,7 +897,7 @@ if (!hasValidSubscription) {
                             icon="archive-outline"
                             value={orderStats.noLongerAssigned}
                             label="No Longer Assigned"
-                            accent="#8B6B82"
+                            accent="#A66A9B"
                             onPress={() =>
                                 router.push({
                                     pathname: "/vendorordersummary",
@@ -2100,7 +2100,15 @@ headerActionButton: {
         marginBottom: 8,
     },
     statValue: { fontSize: 20, fontWeight: "800", color: "#fff" },
-    statLabel: { fontSize: 12, color: "rgba(255,255,255,0.8)", marginTop: 2, fontWeight: "500" },
+    statLabel: {
+        fontSize: 12,
+        color: "rgba(255,255,255,0.8)",
+        marginTop: 2,
+        fontWeight: "500",
+        textAlign: "center",
+        width: "100%",
+        lineHeight: 16,
+    },
 
     // Error banner
     errorBanner: {
