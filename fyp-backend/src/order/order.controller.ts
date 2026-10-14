@@ -40,6 +40,7 @@ async placeOrder(
     eventCityId: string;
     eventAddress: string;
     selectedCategoryIds?: string[];
+    replacementRescheduleRequestId?: string;
     services: {
     vendorId: string;
     serviceName: string;
@@ -108,6 +109,7 @@ async placeOrder(
                 body.eventAddress,
                 body.selectedCategoryIds,
                 body.eventId,
+                body.replacementRescheduleRequestId,
             );
             
             return order;
