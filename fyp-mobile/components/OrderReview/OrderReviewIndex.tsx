@@ -1157,6 +1157,8 @@ const isInvalidCode =
       guests: eventDetails?.guests,
       eventName: eventDetails?.eventName,
       eventType: eventDetails?.eventType,
+      replacementRescheduleRequestId:
+        eventDetails?.replacementRescheduleRequestId,
     });
 
       if (response) {
