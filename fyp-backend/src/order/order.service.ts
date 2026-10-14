@@ -2418,8 +2418,8 @@ async completeVendorOrder(vendorOrderId: string) {
 
             try {
                 await this.sendPushNotification(
-                    'Rescheduling request',
-                    'A client requested a new event date/time. Please review the request.',
+                    'Schedule update request',
+                    'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
                     String(vendorOrder.vendorId),
                     'RESCHEDULE_REQUESTED',
                 );
@@ -2429,8 +2429,8 @@ async completeVendorOrder(vendorOrderId: string) {
                 try {
                     await this.saveNotification(
                         String(vendorOrder.vendorId),
-                        'Rescheduling request',
-                        'A client requested a new event date/time. Please review the request.',
+                        'Schedule update request',
+                        'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
                         'RESCHEDULE_REQUESTED',
                     );
                 } catch {}
@@ -2553,10 +2553,10 @@ async completeVendorOrder(vendorOrderId: string) {
 
             try {
                 await this.sendPushNotification(
-                    dto.status === 'ACCEPTED' ? 'Reschedule accepted' : 'Reschedule rejected',
+                    dto.status === 'ACCEPTED' ? 'Schedule update accepted' : 'Vendor availability updated',
                     dto.status === 'ACCEPTED'
-                        ? 'A vendor accepted your requested event date/time.'
-                        : 'A vendor rejected your requested event date/time. Your original booking remains unchanged.',
+                        ? 'A vendor confirmed availability for your preferred schedule.'
+                        : 'A vendor isn’t available for the preferred schedule. No worries — your current booking remains unchanged while you decide how to continue.',
                     String(order.organizerId),
                     dto.status === 'ACCEPTED' ? 'RESCHEDULE_ACCEPTED' : 'RESCHEDULE_REJECTED',
                 );
@@ -2564,10 +2564,10 @@ async completeVendorOrder(vendorOrderId: string) {
                 try {
                     await this.saveNotification(
                         String(order.organizerId),
-                        dto.status === 'ACCEPTED' ? 'Reschedule accepted' : 'Reschedule rejected',
+                        dto.status === 'ACCEPTED' ? 'Schedule update accepted' : 'Vendor availability updated',
                         dto.status === 'ACCEPTED'
-                            ? 'A vendor accepted your requested event date/time.'
-                            : 'A vendor rejected your requested event date/time. Your original booking remains unchanged.',
+                            ? 'A vendor confirmed availability for your preferred schedule.'
+                            : 'A vendor isn’t available for the preferred schedule. No worries — your current booking remains unchanged while you decide how to continue.',
                         dto.status === 'ACCEPTED' ? 'RESCHEDULE_ACCEPTED' : 'RESCHEDULE_REJECTED',
                     );
                 } catch {}
