@@ -842,37 +842,47 @@ const MyEventsScreen = () => {
                                     {String(vendorName).trim().charAt(0).toUpperCase() || 'V'}
                                   </Text>
                                 </View>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.rescheduleVendorName}>{vendorName}</Text>
+
+                                <View style={styles.rescheduleVendorContent}>
+                                  <View style={styles.rescheduleVendorTopRow}>
+                                    <Text style={styles.rescheduleVendorName} numberOfLines={1}>{vendorName}</Text>
+                                    <View style={[
+                                      styles.rescheduleChip,
+                                      status === 'ACCEPTED' && styles.rescheduleChipAccepted,
+                                      status === 'REJECTED' && styles.rescheduleChipRejected,
+                                      status === 'EXPIRED' && styles.rescheduleChipExpired,
+                                    ]}>
+                                      <Text style={[
+                                        styles.rescheduleChipText,
+                                        status === 'ACCEPTED' && { color: COLORS.success },
+                                        status === 'REJECTED' && { color: COLORS.danger },
+                                      ]}>{statusLabel}</Text>
+                                    </View>
+                                  </View>
+
                                   {request.respondedAt && (() => {
                                     const respondedAt = new Date(request.respondedAt);
                                     return (
                                       <View style={styles.rescheduleResponseMeta}>
-                                        <Ionicons name="checkmark-circle-outline" size={13} color={COLORS.muted} />
+                                        <View style={styles.rescheduleResponseIcon}>
+                                          <Ionicons name="checkmark" size={10} color={COLORS.primary} />
+                                        </View>
                                         <Text style={styles.rescheduleResponseLabel}>Responded</Text>
+                                        <View style={styles.rescheduleResponseDot} />
                                         <Text style={styles.rescheduleResponseDate}>
                                           {respondedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                          {' · '}
+                                        </Text>
+                                        <View style={styles.rescheduleResponseDot} />
+                                        <Text style={styles.rescheduleResponseDate}>
                                           {respondedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                                         </Text>
                                       </View>
                                     );
                                   })()}
+
                                   {request.responseMessage && (
                                     <Text style={styles.rescheduleRequestedTime}>{request.responseMessage}</Text>
                                   )}
-                                </View>
-                                <View style={[
-                                  styles.rescheduleChip,
-                                  status === 'ACCEPTED' && styles.rescheduleChipAccepted,
-                                  status === 'REJECTED' && styles.rescheduleChipRejected,
-                                  status === 'EXPIRED' && styles.rescheduleChipExpired,
-                                ]}>
-                                  <Text style={[
-                                    styles.rescheduleChipText,
-                                    status === 'ACCEPTED' && { color: COLORS.success },
-                                    status === 'REJECTED' && { color: COLORS.danger },
-                                  ]}>{statusLabel}</Text>
                                 </View>
                              </View>
                             );
@@ -1464,15 +1474,19 @@ const styles = StyleSheet.create({
   rescheduleWaitingText: { color: '#8A6500', fontSize: 10.5, fontWeight: '800' },
   rescheduleAcceptedText: { color: COLORS.success, fontSize: 10.5, fontWeight: '800' },
   rescheduleRejectedText: { color: COLORS.danger, fontSize: 10.5, fontWeight: '800' },
-  rescheduleStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: '#F1E1EA' },
-  rescheduleVendorAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  rescheduleVendorAvatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 12 },
-  rescheduleVendorName: { color: COLORS.text, fontWeight: '800', fontSize: 12.5 },
-  rescheduleRequestedTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 2 },
-  rescheduleResponseMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  rescheduleResponseLabel: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
-  rescheduleResponseDate: { color: COLORS.text, fontSize: 10.5, fontWeight: '600' },
-  rescheduleChip: { maxWidth: 125, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6 },
+  rescheduleStatusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F1E1EA' },
+  rescheduleVendorAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.primarySoft, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  rescheduleVendorAvatarText: { color: COLORS.primary, fontWeight: '800', fontSize: 13 },
+  rescheduleVendorContent: { flex: 1, minWidth: 0 },
+  rescheduleVendorTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  rescheduleVendorName: { flex: 1, color: COLORS.text, fontWeight: '800', fontSize: 12.5 },
+  rescheduleRequestedTime: { color: COLORS.muted, fontSize: 10.5, marginTop: 5 },
+  rescheduleResponseMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 7, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#FBF4F8', alignSelf: 'flex-start' },
+  rescheduleResponseIcon: { width: 17, height: 17, borderRadius: 9, backgroundColor: '#F1DCE9', alignItems: 'center', justifyContent: 'center' },
+  rescheduleResponseDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#C9A8BC' },
+  rescheduleResponseLabel: { color: COLORS.muted, fontSize: 9.5, fontWeight: '700' },
+  rescheduleResponseDate: { color: COLORS.text, fontSize: 9.5, fontWeight: '700' },
+  rescheduleChip: { maxWidth: 132, backgroundColor: '#FFF3CD', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, flexShrink: 0 },
   rescheduleChipAccepted: { backgroundColor: '#E6F7EA' },
   rescheduleChipRejected: { backgroundColor: '#FDEAEC' },
   rescheduleChipExpired: { backgroundColor: '#F1F1F1' },
