@@ -934,10 +934,12 @@ const styles = StyleSheet.create({
     },
     summaryCard: {
         width: 92,
+        height: 116,
         paddingVertical: 12,
         paddingHorizontal: 6,
         borderRadius: 14,
         alignItems: "center",
+        justifyContent: "flex-start",
         backgroundColor: "#FFFFFF",
         borderWidth: 1.5,
         borderColor: "#F0DDEA",
