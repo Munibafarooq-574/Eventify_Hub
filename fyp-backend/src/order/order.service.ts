@@ -1352,8 +1352,16 @@ export class OrderService {
         });
 
         const vendorOrderIds = vendorOrders.map(order => order._id);
+        const vendorOrderParentIds = vendorOrders
+            .map((order: any) => order.orderId)
+            .filter(Boolean);
 
-        query.vendorOrders = { $in: vendorOrderIds };
+        // Include historical vendor assignments even after a replacement
+        // removes that VendorOrder from the active order.vendorOrders array.
+        query.$or = [
+            { vendorOrders: { $in: vendorOrderIds } },
+            { _id: { $in: vendorOrderParentIds } },
+        ];
     } else if (type === 'Organizer') {
         query.organizerId = userIdObj;
     }
