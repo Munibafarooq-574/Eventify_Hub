@@ -1316,7 +1316,12 @@ export class OrderService {
                 await currentRequest.save({ session });
 
                 if (oldVendorOrder) {
+                    // Keep the old vendor's booking record for history/audit.
+                    // It is no longer part of the active Order, but the vendor can
+                    // still see why the assignment ended.
                     oldVendorOrder.status = 'rejected';
+                    oldVendorOrder.replacementOutcome = 'NO_LONGER_ASSIGNED';
+                    oldVendorOrder.replacementFinalizedAt = new Date();
                     await oldVendorOrder.save({ session });
                 }
 
@@ -1871,7 +1876,60 @@ vendorOrder.vendorNetAmount =
                 await replacementRequest.save();
 
                 if (status === 'accepted') {
-                    await this.applyRescheduleIfAllAccepted(String(replacementRequest.orderId));
+                    const result = await this.applyRescheduleIfAllAccepted(String(replacementRequest.orderId));
+
+                    if (result?.applied) {
+                        const oldVendorOrder: any = vendorOrder.replacesVendorOrderId
+                            ? await this.vendorOrderModel.findById(vendorOrder.replacesVendorOrderId)
+                            : null;
+                        const originalOrder: any = await this.orderModel.findById(replacementRequest.orderId).lean();
+
+                        if (oldVendorOrder) {
+                            const oldVendorTitle = 'Booking schedule updated';
+                            const oldVendorBody =
+                                'Thank you for letting us know about your availability. The client has made alternative arrangements for the updated schedule, so no further action is needed from you. We hope to work with you on another event soon.';
+                            try {
+                                await this.sendPushNotification(
+                                    oldVendorTitle,
+                                    oldVendorBody,
+                                    String(oldVendorOrder.vendorId),
+                                    'RESCHEDULE_NO_LONGER_ASSIGNED',
+                                );
+                            } catch (error) {
+                                try {
+                                    await this.saveNotification(
+                                        String(oldVendorOrder.vendorId),
+                                        oldVendorTitle,
+                                        oldVendorBody,
+                                        'RESCHEDULE_NO_LONGER_ASSIGNED',
+                                    );
+                                } catch {}
+                            }
+                        }
+
+                        if (originalOrder) {
+                            const clientTitle = 'Your new schedule is all set';
+                            const clientBody =
+                                'Your replacement vendor has confirmed availability, and your event schedule has been updated successfully. You can now continue with the down payment.';
+                            try {
+                                await this.sendPushNotification(
+                                    clientTitle,
+                                    clientBody,
+                                    String(originalOrder.organizerId),
+                                    'RESCHEDULE_APPLIED',
+                                );
+                            } catch (error) {
+                                try {
+                                    await this.saveNotification(
+                                        String(originalOrder.organizerId),
+                                        clientTitle,
+                                        clientBody,
+                                        'RESCHEDULE_APPLIED',
+                                    );
+                                } catch {}
+                            }
+                        }
+                    }
                 }
             }
         }
