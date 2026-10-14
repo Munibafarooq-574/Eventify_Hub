@@ -95,7 +95,28 @@ export class OrderService {
     eventAddress?: string,
     selectedCategoryIds?: string[],
     eventId?: string,
+    replacementRescheduleRequestId?: string,
 ): Promise<Order> {
+    let replacementRequest: any = null;
+    if (replacementRescheduleRequestId) {
+        if (!Types.ObjectId.isValid(replacementRescheduleRequestId)) {
+            throw new BadRequestException('Invalid replacement reschedule request');
+        }
+        replacementRequest = await this.rescheduleRequestModel
+            .findById(replacementRescheduleRequestId)
+            .lean();
+        if (!replacementRequest) {
+            throw new NotFoundException('Replacement reschedule request not found');
+        }
+        if (
+            String(replacementRequest.requestedBy) !== String(organizerId) ||
+            replacementRequest.resolutionStatus !== 'REPLACEMENT_REQUIRED' ||
+            !['REJECTED', 'EXPIRED'].includes(String(replacementRequest.status))
+        ) {
+            throw new ConflictException('This reschedule request is not awaiting a replacement');
+        }
+    }
+
     // ---------------------------------------------------------
     // Phase 12 — FINAL BOOKING AUTHORITY
     // Frontend price, availability and service window are hints only.
@@ -1124,6 +1145,10 @@ export class OrderService {
                                                 validatedService.finalAmount,
                                             packageId:
                                                 validatedService.packageId,
+                                            replacementRescheduleRequestId:
+                                                replacementRequest?._id ?? null,
+                                            replacesVendorOrderId:
+                                                replacementRequest?.vendorOrderId ?? null,
                                             status:
                                                 'pending',
                                             eventStartDateTime:
@@ -1191,6 +1216,14 @@ export class OrderService {
             throw error;
         }
 
+        if (replacementRequest && savedOrder) {
+            await this.attachReplacementOrder(
+                savedOrder,
+                replacementRequest,
+                organizerId,
+            );
+        }
+
         // Notifications only after a successful transaction commit.
         try {
             for (
@@ -1211,6 +1244,87 @@ export class OrderService {
     } finally {
         await session.endSession();
     }
+    }
+
+
+    private async attachReplacementOrder(
+        temporaryOrder: any,
+        replacementRequest: any,
+        organizerId: string,
+    ) {
+        const replacementVendorOrders: any[] = await this.vendorOrderModel.find({
+            orderId: temporaryOrder._id,
+            replacementRescheduleRequestId: replacementRequest._id,
+        });
+
+        if (replacementVendorOrders.length !== 1) {
+            throw new ConflictException('Replacement checkout must contain exactly one vendor booking');
+        }
+
+        const replacementVendorOrder = replacementVendorOrders[0];
+        const session = await this.connection.startSession();
+        try {
+            await session.withTransaction(async () => {
+                const originalOrder: any = await this.orderModel
+                    .findById(replacementRequest.orderId)
+                    .session(session);
+                if (!originalOrder || String(originalOrder.organizerId) !== String(organizerId)) {
+                    throw new NotFoundException('Original booking not found');
+                }
+
+                const currentRequest: any = await this.rescheduleRequestModel
+                    .findById(replacementRequest._id)
+                    .session(session);
+                if (
+                    !currentRequest ||
+                    currentRequest.resolutionStatus !== 'REPLACEMENT_REQUIRED' ||
+                    !['REJECTED', 'EXPIRED'].includes(String(currentRequest.status))
+                ) {
+                    throw new ConflictException('This replacement is no longer required');
+                }
+
+                const oldVendorOrder: any = await this.vendorOrderModel
+                    .findById(currentRequest.vendorOrderId)
+                    .session(session);
+
+                replacementVendorOrder.orderId = originalOrder._id;
+                await replacementVendorOrder.save({ session });
+
+                originalOrder.vendorOrders = (originalOrder.vendorOrders || [])
+                    .filter((id: any) => String(id) !== String(currentRequest.vendorOrderId));
+                originalOrder.vendorOrders.push(replacementVendorOrder._id);
+
+                const oldAmount = Number(oldVendorOrder?.finalAmount ?? oldVendorOrder?.price ?? 0);
+                const oldOriginalAmount = Number(oldVendorOrder?.originalAmount ?? oldVendorOrder?.price ?? 0);
+                const oldDiscount = Number(oldVendorOrder?.discountAmount ?? 0);
+                originalOrder.totalAmount =
+                    Number(originalOrder.totalAmount || 0) - oldOriginalAmount + Number(replacementVendorOrder.originalAmount ?? replacementVendorOrder.price ?? 0);
+                originalOrder.discount =
+                    Number(originalOrder.discount || 0) - oldDiscount + Number(replacementVendorOrder.discountAmount ?? 0);
+                originalOrder.finalAmount =
+                    Number(originalOrder.finalAmount || 0) - oldAmount + Number(replacementVendorOrder.finalAmount ?? replacementVendorOrder.price ?? 0);
+                await originalOrder.save({ session });
+
+                currentRequest.vendorOrderId = replacementVendorOrder._id;
+                currentRequest.vendorId = replacementVendorOrder.vendorId;
+                currentRequest.bookingType = currentRequest.bookingType || null;
+                currentRequest.status = 'CHANGE_REQUESTED';
+                currentRequest.respondedAt = null;
+                currentRequest.responseMessage = null;
+                currentRequest.availabilityPrecheckPassed = true;
+                currentRequest.availabilityPrecheckReason = null;
+                await currentRequest.save({ session });
+
+                if (oldVendorOrder) {
+                    oldVendorOrder.status = 'rejected';
+                    await oldVendorOrder.save({ session });
+                }
+
+                await this.orderModel.deleteOne({ _id: temporaryOrder._id }, { session });
+            });
+        } finally {
+            await session.endSession();
+        }
     }
 
 
@@ -1745,6 +1859,22 @@ vendorOrder.vendorNetAmount =
 }
 
         const saved = await vendorOrder.save();
+
+        if (vendorOrder.replacementRescheduleRequestId) {
+            const replacementRequest: any = await this.rescheduleRequestModel.findById(
+                vendorOrder.replacementRescheduleRequestId,
+            );
+            if (replacementRequest && replacementRequest.status === 'CHANGE_REQUESTED') {
+                replacementRequest.status = status === 'accepted' ? 'ACCEPTED' : 'REJECTED';
+                replacementRequest.respondedAt = new Date();
+                replacementRequest.responseMessage = message?.trim() || null;
+                await replacementRequest.save();
+
+                if (status === 'accepted') {
+                    await this.applyRescheduleIfAllAccepted(String(replacementRequest.orderId));
+                }
+            }
+        }
 
         // Notify organizer (reuses existing notification pipeline)
         try {
