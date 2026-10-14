@@ -2084,6 +2084,7 @@ headerActionButton: {
     statsContainer: { flexDirection: "row", paddingRight: 5 },
     statBox: {
         width: 84,
+        height: 122,
         alignItems: "center",
         paddingVertical: 16,
         marginHorizontal: 5,
