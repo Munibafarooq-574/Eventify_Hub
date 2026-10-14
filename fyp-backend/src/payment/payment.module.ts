@@ -17,6 +17,7 @@ import {
 } from 'src/schemas/user.schema';
 
 import { EmailModule } from 'src/email/email.module';
+import { RescheduleRequest, RescheduleRequestSchema } from 'src/schemas/reschedule-request.schema';
 
 @Module({
     imports: [
@@ -39,6 +40,10 @@ import { EmailModule } from 'src/email/email.module';
   {
     name: User.name,
     schema: UserSchema,
+  },
+  {
+    name: RescheduleRequest.name,
+    schema: RescheduleRequestSchema,
   },
 ]),
     PayoutModule,

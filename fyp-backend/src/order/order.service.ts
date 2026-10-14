@@ -111,7 +111,7 @@ export class OrderService {
         if (
             String(replacementRequest.requestedBy) !== String(organizerId) ||
             replacementRequest.resolutionStatus !== 'REPLACEMENT_REQUIRED' ||
-            !['REJECTED', 'EXPIRED'].includes(String(replacementRequest.status))
+            !['REJECTED', 'EXPIRED', 'CANCELLED_BY_VENDOR'].includes(String(replacementRequest.status))
         ) {
             throw new ConflictException('This reschedule request is not awaiting a replacement');
         }
@@ -1278,7 +1278,7 @@ export class OrderService {
                 if (
                     !currentRequest ||
                     currentRequest.resolutionStatus !== 'REPLACEMENT_REQUIRED' ||
-                    !['REJECTED', 'EXPIRED'].includes(String(currentRequest.status))
+                    !['REJECTED', 'EXPIRED', 'CANCELLED_BY_VENDOR'].includes(String(currentRequest.status))
                 ) {
                     throw new ConflictException('This replacement is no longer required');
                 }
@@ -1317,11 +1317,14 @@ export class OrderService {
 
                 if (oldVendorOrder) {
                     // Keep the old vendor's booking record for history/audit.
-                    // It is no longer part of the active Order, but the vendor can
-                    // still see why the assignment ended.
-                    oldVendorOrder.status = 'rejected';
-                    oldVendorOrder.replacementOutcome = 'NO_LONGER_ASSIGNED';
-                    oldVendorOrder.replacementFinalizedAt = new Date();
+                    // A vendor who already cancelled remains cancelled; only a
+                    // vendor replaced for schedule unavailability becomes
+                    // "No Longer Assigned".
+                    if (String(oldVendorOrder.status) !== 'cancelled_by_vendor') {
+                        oldVendorOrder.status = 'rejected';
+                        oldVendorOrder.replacementOutcome = 'NO_LONGER_ASSIGNED';
+                        oldVendorOrder.replacementFinalizedAt = new Date();
+                    }
                     await oldVendorOrder.save({ session });
                 }
 

@@ -5,7 +5,8 @@ export type RescheduleStatus =
   | 'CHANGE_REQUESTED'
   | 'ACCEPTED'
   | 'REJECTED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'CANCELLED_BY_VENDOR';
 
 @Schema({ timestamps: true })
 export class RescheduleRequest extends Document {
@@ -80,7 +81,7 @@ export class RescheduleRequest extends Document {
 
   @Prop({
     type: String,
-    enum: ['CHANGE_REQUESTED', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+    enum: ['CHANGE_REQUESTED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'CANCELLED_BY_VENDOR'],
     default: 'CHANGE_REQUESTED',
     index: true,
   })

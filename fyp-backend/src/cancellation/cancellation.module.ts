@@ -11,6 +11,7 @@ import {
     CancellationPolicyConfigSchema,
 } from 'src/schemas/cancellation-policy.schema';
 import { User, UserSchema } from 'src/schemas/user.schema';
+import { RescheduleRequest, RescheduleRequestSchema } from 'src/schemas/reschedule-request.schema';
 import { CancellationService } from './cancellation.service';
 import { CancellationController } from './cancellation.controller';
 
@@ -27,6 +28,7 @@ import { CancellationController } from './cancellation.controller';
                 schema: CancellationPolicyConfigSchema,
             },
             { name: User.name, schema: UserSchema },
+            { name: RescheduleRequest.name, schema: RescheduleRequestSchema },
         ]),
     ],
     controllers: [CancellationController],

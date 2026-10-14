@@ -13,6 +13,7 @@ import { Refund } from 'src/schemas/refund.schema';
 import { VendorPenalty } from 'src/schemas/vendor-penalty.schema';
 import { CancellationPolicyConfig } from 'src/schemas/cancellation-policy.schema';
 import { User } from 'src/schemas/user.schema';
+import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
 import { RefundCalculationResult } from './cancellation.types';
 
@@ -39,6 +40,9 @@ export class CancellationService {
 
         @InjectModel(User.name)
         private readonly userModel: Model<User>,
+
+        @InjectModel(RescheduleRequest.name)
+        private readonly rescheduleRequestModel: Model<RescheduleRequest>,
     ) {}
 
     // ===== Admin: get/update global penalty config =====
@@ -198,6 +202,31 @@ export class CancellationService {
         vendorOrder.cancelledAt = new Date();
         vendorOrder.cancellationReason = reason || null;
         await vendorOrder.save();
+
+        // If the vendor cancels while an event date/time change is awaiting
+        // their response, close that request immediately. The already accepted
+        // responses from other vendors remain untouched and the client can
+        // continue through the existing replacement flow.
+        const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
+            vendorOrderId: vendorOrder._id,
+            status: 'CHANGE_REQUESTED',
+        });
+        if (pendingReschedule) {
+            pendingReschedule.status = 'CANCELLED_BY_VENDOR';
+            pendingReschedule.respondedAt = new Date();
+            pendingReschedule.responseMessage =
+                'This vendor cancelled the booking before responding to the schedule change.';
+            pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
+            pendingReschedule.resolvedAt = new Date();
+            await pendingReschedule.save();
+
+            // Keep the whole request group in the same replacement-required
+            // state without changing any vendor's accepted response.
+            await this.rescheduleRequestModel.updateMany(
+                { requestGroupId: pendingReschedule.requestGroupId },
+                { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: new Date() } },
+            );
+        }
 
         const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
 
