@@ -875,7 +875,46 @@ const MyEventsScreen = () => {
                                   const categoryId = String(vendorData?.buisnessCategory?._id || vendorData?.buisnessCategory || '');
                                   const categoryName = String(vendorData?.buisnessCategory?.name || vendorData?.buisnessCategory?.categoryName || vendorOrder?.serviceName || 'Service');
                                   if (!categoryId) return Alert.alert('Category unavailable', 'Could not identify the service category for this vendor.');
-                                  router.push({ pathname: '/categoryvendorlisting', params: { categoryIds: JSON.stringify([categoryId]), categoryNames: JSON.stringify([categoryName]), eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''), eventDate: new Date(firstRequest.newEventDate).toISOString().slice(0, 10), startTime: String(firstRequest.newStartTime || ''), durationMinutes: String(requestedDuration || 60), replacementMode: 'true', replacementOrderId: String(event._id), replacementRequestId: String(request._id), excludedVendorId: String(request.vendorId || '') } });
+
+                                  // Replacement checkout uses the same existing eventDetails
+                                  // store as the normal checkout. Refresh only that existing
+                                  // context with this event + requested schedule so Review Order
+                                  // does not fall back to stale/missing planning data.
+                                  const replacementDurationMinutes = Number(requestedDuration || 60);
+                                  const replacementDate = new Date(firstRequest.newEventDate).toISOString().slice(0, 10);
+                                  const replacementStartTime = String(firstRequest.newStartTime || '');
+                                  const [replacementHour, replacementMinute] = replacementStartTime.split(':').map(Number);
+                                  const replacementEndDate = new Date(`${replacementDate}T00:00:00`);
+                                  replacementEndDate.setHours(replacementHour, replacementMinute, 0, 0);
+                                  replacementEndDate.setMinutes(replacementEndDate.getMinutes() + replacementDurationMinutes);
+                                  const replacementEndTime = `${String(replacementEndDate.getHours()).padStart(2, '0')}:${String(replacementEndDate.getMinutes()).padStart(2, '0')}`;
+                                  const selectedCategoryIds = Array.isArray(event?.selectedCategoryIds)
+                                    ? event.selectedCategoryIds.map((category: any) => String(category?._id || category)).filter(Boolean)
+                                    : [];
+                                  const desiredServices = getDesiredServices(event);
+                                  const selectedServices = desiredServices === 'N/A'
+                                    ? []
+                                    : desiredServices.split(',').map((service: string) => service.trim()).filter(Boolean);
+
+                                  await saveSecureData(
+                                    'eventDetails',
+                                    JSON.stringify({
+                                      eventId: String(event._id),
+                                      eventName: event.eventName,
+                                      eventType: event.eventType,
+                                      eventDate: replacementDate,
+                                      startTime: replacementStartTime,
+                                      endTime: replacementEndTime,
+                                      durationMinutes: replacementDurationMinutes,
+                                      guests: event.guests,
+                                      eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''),
+                                      eventAddress: event.eventAddress || '',
+                                      selectedServices,
+                                      selectedCategoryIds,
+                                    }),
+                                  );
+
+                                  router.push({ pathname: '/categoryvendorlisting', params: { categoryIds: JSON.stringify([categoryId]), categoryNames: JSON.stringify([categoryName]), eventCityId: String(event?.eventCityId?._id || event?.eventCityId || ''), eventDate: replacementDate, startTime: replacementStartTime, durationMinutes: String(replacementDurationMinutes), replacementMode: 'true', replacementOrderId: String(event._id), replacementRequestId: String(request._id), excludedVendorId: String(request.vendorId || '') } });
                                 }}><Ionicons name="search-outline" size={14} color="#FFFFFF" /><Text style={styles.findReplacementButtonText}>Find Replacement for {vendorName}</Text></TouchableOpacity>;
                               })}
                             </View>
