@@ -632,7 +632,7 @@ const OrderSummary = () => {
                                                     );
                                                 })()}
 
-                                                {rescheduleRequests
+                                                {!["cancelled", "no_longer_assigned"].includes(getVendorStatus(item)) && rescheduleRequests
                                                     .filter((request: any) => String(request.orderId) === String(item._id))
                                                     .map((request: any) => {
                                                         const pending = request.status === "CHANGE_REQUESTED";
@@ -772,7 +772,7 @@ const OrderSummary = () => {
                                             </TouchableOpacity>
                                         )}
 
-                                        {item.status !== "completed" && item.status !== "cancelled" && (
+                                        {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
                                             getVendorStatus(item) === "pending" ? (
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
