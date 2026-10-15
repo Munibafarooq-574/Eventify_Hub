@@ -826,7 +826,7 @@ const MyEventsScreen = () => {
                           </View>
 
                           {eventRequests.map((request: any) => {
-                            const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
+                            const vendorOrder = allVendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                             const vendorData = vendorOrder?.vendorId || {};
                             const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
                             const status = String(request.status || 'CHANGE_REQUESTED');
@@ -919,7 +919,7 @@ const MyEventsScreen = () => {
                               <Text style={styles.rescheduleActionTitle}>Let’s find the right fit</Text>
                               <Text style={styles.rescheduleActionText}>Your current booking is still safe. Choose another vendor for each service that isn’t available for your preferred schedule.</Text>
                               {eventRequests.filter((request: any) => ['REJECTED', 'EXPIRED', 'CANCELLED_BY_VENDOR'].includes(String(request.status))).map((request: any) => {
-                                const vendorOrder = vendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
+                                const vendorOrder = allVendorOrders.find((item: any) => String(item._id) === String(request.vendorOrderId));
                                 const vendorData = vendorOrder?.vendorId || {};
                                 const vendorName = vendorData?.contactDetails?.brandName || vendorData?.name || vendorOrder?.serviceName || 'Vendor';
                                 return <TouchableOpacity key={`replacement-${request._id}`} style={styles.findReplacementButton} onPress={async () => {
