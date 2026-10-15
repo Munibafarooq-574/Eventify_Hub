@@ -54,7 +54,7 @@ const MONTH_NAMES = [
 ];
 
 //type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
-type OrderStats = { totalOrders: number; pending: number; processing: number; completed: number; cancelled: number; noLongerAssigned: number };
+type OrderStats = { totalOrders: number; pending: number; processing: number; completed: number; cancelled: number; paymentExpired: number; noLongerAssigned: number };
 
 function formatPKR(amount: number): string {
     if (!amount) return "Rs. 0";
@@ -72,6 +72,7 @@ const DashboardScreen = () => {
         processing: 0,
         completed: 0,
         cancelled: 0,
+        paymentExpired: 0,
         noLongerAssigned: 0,
     });
     const [orderCountArray, setOrderCountArray] = useState<number[]>([]);
@@ -230,6 +231,7 @@ const packageLimitReached =
                 processing: statsData.processing ?? 0,
                 completed: statsData.completed ?? 0,
                 cancelled: (statsData as any).cancelled ?? 0,
+                paymentExpired: (statsData as any).paymentExpired ?? 0,
                 noLongerAssigned: (statsData as any).noLongerAssigned ?? 0,
             });
 
@@ -890,6 +892,18 @@ if (!hasValidSubscription) {
                                 router.push({
                                     pathname: "/vendorordersummary",
                                     params: { selectedTab: "Cancelled" },
+                                })
+                            }
+                        />
+                        <StatBox
+                            icon="timer-outline"
+                            value={orderStats.paymentExpired}
+                            label="Payment Expired"
+                            accent="#C47A2C"
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/vendorordersummary",
+                                    params: { selectedTab: "Payment Expired" },
                                 })
                             }
                         />
