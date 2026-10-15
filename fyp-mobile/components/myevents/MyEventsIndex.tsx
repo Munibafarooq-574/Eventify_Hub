@@ -82,6 +82,22 @@ const paymentChipMap: Record<string, { bg: string; text: string }> = {
   PAYMENT_EXPIRED: { bg: '#FFF3CD', text: '#9A6B00' },
 };
 
+/**
+ * Client My Events shows the current booking composition only.
+ * Inactive vendor orders stay in backend/order history and reschedule history,
+ * but are excluded from the active vendor list, count and displayed event total.
+ */
+const isActiveVendorOrder = (vendor: any) => {
+  const status = String(vendor?.status || '').toLowerCase();
+  const replacementOutcome = String(vendor?.replacementOutcome || '').toUpperCase();
+
+  return (
+    !['cancelled', 'rejected', 'expired'].includes(status) &&
+    replacementOutcome !== 'NO_LONGER_ASSIGNED'
+  );
+};
+
+
 // ───────────────────────── Small UI helpers ─────────────────────────
 const smoothLayout = () =>
   LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
@@ -416,7 +432,11 @@ const MyEventsScreen = () => {
 
   // ─────────── Summary numbers for the hero card (display only) ───────────
   const totalVendors = events.reduce(
-    (sum, e) => sum + (Array.isArray(e.vendorOrders) ? e.vendorOrders.length : 0),
+    (sum, e) =>
+      sum +
+      (Array.isArray(e.vendorOrders)
+        ? e.vendorOrders.filter(isActiveVendorOrder).length
+        : 0),
     0,
   );
   const paymentsDue = events.reduce(
@@ -545,9 +565,18 @@ const MyEventsScreen = () => {
               const isDeleting = deletingId === event._id;
               const eventExpanded = !!expandedEvents[event._id];
               const badge = getDateBadge(event.eventDate);
-              const vendorOrders: any[] = Array.isArray(event.vendorOrders)
+              const allVendorOrders: any[] = Array.isArray(event.vendorOrders)
                 ? event.vendorOrders
                 : [];
+              const vendorOrders = allVendorOrders.filter(isActiveVendorOrder);
+              const inactiveVendorOrders = allVendorOrders.filter(
+                (vendor: any) => !isActiveVendorOrder(vendor),
+              );
+              const activeEventTotal = vendorOrders.reduce(
+                (sum: number, vendor: any) =>
+                  sum + Number(vendor?.finalAmount ?? vendor?.price ?? 0),
+                0,
+              );
               const hasSuccessfulVendorPayment = vendorOrders.some((vendor: any) =>
                 ['PARTIALLY_PAID', 'PAID'].includes(String(vendor?.paymentStatus || 'UNPAID').toUpperCase()),
               );
@@ -1399,6 +1428,55 @@ const MyEventsScreen = () => {
                       );
                     })}
 
+                    {inactiveVendorOrders.length > 0 && (
+                      <View style={styles.inactiveHistoryBox}>
+                        <View style={styles.inactiveHistoryHeader}>
+                          <Ionicons name="time-outline" size={14} color={COLORS.muted} />
+                          <Text style={styles.inactiveHistoryTitle}>Booking history</Text>
+                        </View>
+                        <Text style={styles.inactiveHistoryHint}>
+                          These vendors are no longer part of the active event total.
+                        </Text>
+                        {inactiveVendorOrders.map((vendor: any, index: number) => {
+                          const vendorData = vendor?.vendorId || {};
+                          const vendorName =
+                            vendorData?.contactDetails?.brandName ||
+                            vendorData?.name ||
+                            vendor?.serviceName ||
+                            'Vendor';
+                          const status = String(vendor?.status || '').toLowerCase();
+                          const replacementOutcome = String(
+                            vendor?.replacementOutcome || '',
+                          ).toUpperCase();
+                          const historyLabel =
+                            replacementOutcome === 'NO_LONGER_ASSIGNED'
+                              ? 'No longer assigned'
+                              : status === 'cancelled'
+                                ? 'Cancelled'
+                                : status === 'rejected'
+                                  ? 'Rejected'
+                                  : 'Expired';
+
+                          return (
+                            <View
+                              key={vendor?._id || `inactive-${index}`}
+                              style={styles.inactiveHistoryRow}
+                            >
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.inactiveHistoryVendor}>{vendorName}</Text>
+                                <Text style={styles.inactiveHistoryService}>
+                                  {vendor?.serviceName || 'Service'}
+                                </Text>
+                              </View>
+                              <View style={styles.inactiveHistoryChip}>
+                                <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+
                     {/* ───── Total ───── */}
                     <View style={styles.totalRow}>
                       <View>
@@ -1407,7 +1485,9 @@ const MyEventsScreen = () => {
                           {vendorOrders.length} {vendorOrders.length === 1 ? 'vendor' : 'vendors'}
                         </Text>
                       </View>
-                      <Text style={styles.totalPrice}>Rs. {event.totalAmount}</Text>
+                      <Text style={styles.totalPrice}>
+                        Rs. {activeEventTotal.toLocaleString()}
+                      </Text>
                     </View>
                   </View>
                 </FadeInUp>
@@ -2248,6 +2328,60 @@ const styles = StyleSheet.create({
   receiptButtonText: {
     color: COLORS.primary,
     fontSize: 12,
+    fontWeight: '800',
+  },
+
+  inactiveHistoryBox: {
+    marginTop: 10,
+    padding: 13,
+    borderRadius: 16,
+    backgroundColor: '#FFF9FC',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  inactiveHistoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  inactiveHistoryTitle: {
+    color: COLORS.primaryDark,
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  inactiveHistoryHint: {
+    color: COLORS.muted,
+    fontSize: 10.5,
+    marginTop: 3,
+    marginBottom: 8,
+  },
+  inactiveHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 10,
+  },
+  inactiveHistoryVendor: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  inactiveHistoryService: {
+    color: COLORS.muted,
+    fontSize: 10.5,
+    marginTop: 2,
+  },
+  inactiveHistoryChip: {
+    backgroundColor: '#FDEAEC',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  inactiveHistoryChipText: {
+    color: COLORS.danger,
+    fontSize: 10,
     fontWeight: '800',
   },
 
