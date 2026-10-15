@@ -25,6 +25,9 @@ export interface GetOrdersResponse {
         status: string;
         message?: string;
         confirmationTime?: string;
+        cancelledBy?: string | null;
+        cancelledAt?: string | null;
+        cancellationReason?: string | null;
     }[];
     eventName: string;
     eventType?: string;

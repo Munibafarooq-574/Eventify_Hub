@@ -1,3 +1,4 @@
+import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
 import ClientCancellationReview from '../cancellation/ClientCancellationReview';
 import createConversation from '@/services/createConversation';
@@ -1467,17 +1468,20 @@ const MyEventsScreen = () => {
                           return (
                             <View
                               key={vendor?._id || `inactive-${index}`}
-                              style={styles.inactiveHistoryRow}
+                              style={{ paddingVertical: 10 }}
                             >
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.inactiveHistoryVendor}>{vendorName}</Text>
-                                <Text style={styles.inactiveHistoryService}>
-                                  {vendor?.serviceName || 'Service'}
-                                </Text>
+                              <View style={styles.inactiveHistoryRow}>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.inactiveHistoryVendor}>{vendorName}</Text>
+                                  <Text style={styles.inactiveHistoryService}>
+                                    {vendor?.serviceName || 'Service'}
+                                  </Text>
+                                </View>
+                                <View style={styles.inactiveHistoryChip}>
+                                  <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
+                                </View>
                               </View>
-                              <View style={styles.inactiveHistoryChip}>
-                                <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
-                              </View>
+                              <BookingCancellationDetails booking={vendor} />
                             </View>
                           );
                         })}

@@ -454,7 +454,7 @@ export class AdminService {
         const payments =
             await this.paymentModel
                 .find({
-                    vendorOrderId,
+                    vendorOrderId: vendorOrder._id,
                 })
                 .sort({
                     createdAt: -1,
@@ -464,14 +464,14 @@ export class AdminService {
         const payout =
             await this.payoutModel
                 .findOne({
-                    vendorOrderId,
+                    vendorOrderId: vendorOrder._id,
                 })
                 .lean();
 
         const refund =
             await this.refundModel
                 .findOne({
-                    vendorOrderId,
+                    vendorOrderId: vendorOrder._id,
                 })
                 .lean();
 

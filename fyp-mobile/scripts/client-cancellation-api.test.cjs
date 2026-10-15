@@ -48,3 +48,17 @@ test('legacy vendor status helper authenticates before its backend ownership che
   const { api, calls } = load('patchUpdateOrderStatus'); await api.patchUpdateVendorOrderStatus('booking', 'completed');
   assert.equal(calls[0].headers.Authorization, 'Bearer session-token'); assert.equal(calls[0].data.status, 'completed');
 });
+
+for (const [actor, expected] of [['organizer', 'Client'], ['client', 'Client'], ['vendor', 'Vendor'], ['admin', 'Admin'], [undefined, 'Not recorded']]) {
+  test(`cancellation history identifies ${actor || 'missing actor'} without guessing`, () => {
+    const { api } = load('../utils/bookingCancellation');
+    const details = api.bookingCancellation({ status: 'cancelled', cancelledBy: actor, cancellationReason: '  Testing purpose  ', cancelledAt: '2030-01-01T12:00:00Z' });
+    assert.equal(details.cancelledBy, expected); assert.equal(details.reason, 'Testing purpose'); assert.notEqual(details.cancelledAt, 'Not recorded');
+  });
+}
+test('legacy vendor cancellation and absent reason/time remain explicit', () => {
+  const { api } = load('../utils/bookingCancellation');
+  const details = api.bookingCancellation({ status: 'cancelled_by_vendor', cancellationReason: ' ', cancelledAt: 'invalid' });
+  assert.equal(details.cancelledBy, 'Vendor'); assert.equal(details.reason, 'No reason provided'); assert.equal(details.cancelledAt, 'Not recorded');
+  assert.equal(api.bookingCancellation({ status: 'pending' }), null);
+});

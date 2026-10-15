@@ -85,3 +85,10 @@ Verification (use a disposable test booking):
 5. Check Refundable, Partially refundable and Non-refundable test cases, plus legacy/completed/fully paid restrictions. A test with a pending reschedule must be blocked until resolved.
 
 Automated checks: backend saved-policy unit tests, real-JWT HTTP guard/DTO tests and existing policy/snapshot/order regression tests. Transaction rollback tests use a session mock; they do not replace a deployed MongoDB replica-set runtime check. Mobile API tests verify authentication and the preview/confirm payload boundary. Focused mobile lint must pass; whole-project TypeScript diagnostics are compared with the pre-change baseline because the repository already contains unrelated errors.
+
+
+### Cancellation history visibility
+
+Client booking history and vendor order cards display persisted cancelledBy, cancellationReason and cancelledAt through one shared mobile presentation component. Vendor details remain visible on collapsed cancelled cards. Both cancellation statuses are classified consistently. Legacy missing actors are shown as Not recorded, missing reasons as No reason provided, and no cancellation facts are fabricated.
+
+Admin booking details show cancellation actor/name, reason and time above the event details. Refund Management places cancellation details beside the booking, identifies the cancelling party and links directly to the canonical vendor booking ID. Booking-detail financial lookups use the ID of the loaded booking; payment history reads the existing Payment.type field while retaining the legacy paymentType display fallback. These are read/display changes and do not recreate a cancellation or refund or alter saved rules/amounts. Existing live records must be refreshed after deployment to verify the booking-detail display.

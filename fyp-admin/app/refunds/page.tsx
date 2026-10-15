@@ -414,6 +414,10 @@ export default async function RefundsPage({
                           Booking
                         </th>
 
+                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Cancellation
+                        </th>
+
                         <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-wide text-slate-500">
                           Booking Total
                         </th>
@@ -438,9 +442,7 @@ export default async function RefundsPage({
                           Policy
                         </th>
 
-                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                          Cancellation
-                        </th>
+
 
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                           Status
@@ -497,8 +499,10 @@ export default async function RefundsPage({
                               </p>
                             </td>
 
-                            <td className="px-5 py-4">
-                              <p className="font-semibold text-slate-900">
+                            <td className="min-w-[240px] px-5 py-4">
+                              <Link href={`/bookings/${encodeURIComponent(refund.vendorOrderId)}`} className="font-semibold text-blue-700 underline">Open booking</Link>
+                              <p className="mt-1 break-all text-xs text-slate-500">{refund.vendorOrderId}</p>
+                              <p className="mt-2 font-semibold text-slate-900">
                                 {refund
                                   .booking
                                   ?.serviceName ??
@@ -510,6 +514,24 @@ export default async function RefundsPage({
                                   refund
                                     .booking
                                     ?.status,
+                                )}
+                              </p>
+                            </td>
+
+                            <td className="min-w-[240px] max-w-[320px] break-words px-5 py-4">
+                              <p className="mb-2 text-sm font-semibold text-slate-900">Cancelled by {refund.initiatedBy === 'ORGANIZER_CANCELLED' ? `Client — ${refund.client?.name || 'Name unavailable'}` : `Vendor — ${refund.vendor?.name || 'Name unavailable'}`}</p>
+                              <p className="text-sm text-slate-700">
+                                {refund
+                                  .booking
+                                  ?.cancellationReason ??
+                                  "No reason provided"}
+                              </p>
+
+                              <p className="mt-1 text-xs text-slate-500">
+                                {formatDateTime(
+                                  refund
+                                    .booking
+                                    ?.cancelledAt,
                                 )}
                               </p>
                             </td>
@@ -563,22 +585,7 @@ export default async function RefundsPage({
                               </p>
                             </td>
 
-                            <td className="max-w-[280px] px-5 py-4">
-                              <p className="text-sm text-slate-700">
-                                {refund
-                                  .booking
-                                  ?.cancellationReason ??
-                                  "—"}
-                              </p>
 
-                              <p className="mt-1 text-xs text-slate-500">
-                                {formatDateTime(
-                                  refund
-                                    .booking
-                                    ?.cancelledAt,
-                                )}
-                              </p>
-                            </td>
 
                             <td className="px-5 py-4">
                               <span

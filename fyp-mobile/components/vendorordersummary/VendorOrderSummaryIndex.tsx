@@ -1,3 +1,4 @@
+import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorOrders from "@/services/getVendorOrders";
@@ -67,7 +68,9 @@ const PAYMENT_EXPIRED_STATUS = "payment_expired";
 const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
     replacementOutcome === "NO_LONGER_ASSIGNED"
         ? "no_longer_assigned"
-        : status === "accepted"
+        : status === "cancelled_by_vendor"
+            ? "cancelled"
+            : status === "accepted"
             ? "confirmed"
             : status;
 
@@ -637,7 +640,11 @@ const OrderSummary = () => {
                                             <Text style={styles.detailText}>Rs. {vendorTotal}</Text>
                                         </View>
 
-                                                                                {/* Expanded order details - shown only when the card is tapped */}
+                                        {(item.vendorOrders || []).map((booking: any) => (
+                                            <BookingCancellationDetails key={booking._id} booking={booking} />
+                                        ))}
+
+                                        {/* Expanded order details - shown only when the card is tapped */}
                                         {isExpanded && (
                                             <View style={styles.expandedBlock}>
                                                 {/* Order ID - highlighted, always first */}

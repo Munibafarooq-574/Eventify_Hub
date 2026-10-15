@@ -81,6 +81,7 @@ type Payment = {
   _id?: string;
   amount?: number;
   status?: string;
+  type?: string;
   paymentType?: string;
   createdAt?: string;
 };
@@ -316,6 +317,13 @@ export default async function BookingDetailsPage({
               />
             </div>
 
+            {['cancelled', 'cancelled_by_vendor'].includes(vendorOrder.status || '') && <Card title="Cancellation details">
+              <InfoRow label="Cancelled by" value={['organizer', 'client'].includes(vendorOrder.cancelledBy || '') ? `Client — ${text(client?.name)}` : vendorOrder.cancelledBy === 'vendor' || (!vendorOrder.cancelledBy && vendorOrder.status === 'cancelled_by_vendor') ? `Vendor — ${text(vendor?.name)}` : vendorOrder.cancelledBy === 'admin' ? 'Admin' : 'Not recorded'} />
+              <InfoRow label="Reason" value={vendorOrder.cancellationReason?.trim() || 'No reason provided'} />
+              <InfoRow label="Cancelled at" value={formatDateTime(vendorOrder.cancelledAt)} />
+              <Link href="/refunds" className="mt-3 inline-block text-sm font-semibold text-blue-700 underline">Review refund records</Link>
+            </Card>}
+
             <div className="grid gap-6 xl:grid-cols-2">
               <Card title="Event Information">
                 <InfoRow
@@ -500,7 +508,7 @@ export default async function BookingDetailsPage({
                           </TableCell>
 
                           <TableCell>
-                            {text(payment.paymentType)}
+                            {text(payment.type ?? payment.paymentType)}
                           </TableCell>
 
                           <TableCell>
@@ -578,7 +586,9 @@ export default async function BookingDetailsPage({
 
               <Card title="Refund">
                 {!data.refund ? (
-                  <EmptyMessage message="No refund exists for this booking." />
+                  <div><EmptyMessage message="No refund record was returned for this booking." />
+                    <Link href="/refunds" className="mt-3 inline-block text-sm text-blue-700 underline">Check Refund Management for this booking</Link>
+                  </div>
                 ) : (
                   <>
                     <InfoRow
