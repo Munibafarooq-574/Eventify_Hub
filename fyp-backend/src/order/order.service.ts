@@ -1525,6 +1525,7 @@ async getOrderStats(type: string, userId: string) {
       totalOrders,
       pending,
       processing,
+      confirmed,
       completed,
       cancelled,
       paymentExpired,
@@ -1535,9 +1536,22 @@ async getOrderStats(type: string, userId: string) {
         ...vQuery,
         status: 'pending',
       }),
+      // Processing = vendor accepted, but the required down payment is still due.
+      // Keep booking status "accepted"; paymentStatus is the authoritative split.
       this.vendorOrderModel.countDocuments({
         ...vQuery,
         status: 'accepted',
+        paymentStatus: 'PAYMENT_REQUIRED',
+        replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+      }),
+      // Confirmed = booking is financially secured after down payment.
+      // PARTIALLY_PAID and PAID stay separate payment states; no new booking
+      // status is introduced, so existing acceptance/payment logic is preserved.
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        status: 'accepted',
+        paymentStatus: { $in: ['PARTIALLY_PAID', 'PAID'] },
+        replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
       }),
       this.vendorOrderModel.countDocuments({
         ...vQuery,
@@ -1561,6 +1575,7 @@ async getOrderStats(type: string, userId: string) {
       totalOrders,
       pending,
       processing,
+      confirmed,
       completed,
       cancelled,
       paymentExpired,
@@ -1571,6 +1586,7 @@ async getOrderStats(type: string, userId: string) {
       totalOrders,
       pending,
       processing,
+      confirmed,
       completed,
       cancelled,
       paymentExpired,
