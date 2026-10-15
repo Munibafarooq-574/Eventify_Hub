@@ -8,7 +8,7 @@ import patchUpdateOrderStatus, {
 import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
@@ -108,6 +108,7 @@ const OrderSummary = () => {
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
     const [isRefreshingScreen, setIsRefreshingScreen] = useState(false);
+    const summaryScrollRef = useRef<ScrollView>(null);
 
     const refreshScreenData = async () => {
         const user = await getUserData();
@@ -128,6 +129,16 @@ const OrderSummary = () => {
         const validTabs: FilterType[] = ["All", "Pending", "Processing", "Completed", "Cancelled", "Payment Expired", "No Longer Assigned"];
         if (tab && validTabs.includes(tab as FilterType)) {
             setSelectedFilter(tab as FilterType);
+
+            // Keep the selected summary card visible when this screen is opened
+            // from the dashboard. The filter logic remains unchanged.
+            const tabIndex = validTabs.indexOf(tab as FilterType);
+            requestAnimationFrame(() => {
+                summaryScrollRef.current?.scrollTo({
+                    x: Math.max(0, tabIndex * 168 - 16),
+                    animated: true,
+                });
+            });
         }
     }, [selectedTab]);
 
@@ -439,6 +450,7 @@ const OrderSummary = () => {
 
                                 {/* Order Status Summary */}
                 <ScrollView
+                    ref={summaryScrollRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.summaryScroll}
