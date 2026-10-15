@@ -60,3 +60,28 @@ Local runtime verification:
 5. Restore any temporary policy edits. No payment or cancellation is required for this check.
 
 Automated tests cover legacy absence, deep-copy isolation, vendor label sources, schema persistence/immutability, multi-vendor checkout, replacement checkout, forged client policy input, and invalid policy rejection before booking writes.
+
+
+## Step 4: client cancellation preview and confirmation
+
+Reuses CancellationService, Refund and VendorOrder. No duplicate service or refund collection is introduced.
+
+Client My Events → open an event → confirmed vendor (accepted + PARTIALLY_PAID) → Cancel Booking opens a read-only review. It shows successful amount paid, saved policy/revision, notice, applicable refund percentage, refund and retained amounts. Keep Booking performs no mutation. Confirm Cancellation sends only the signed preview token and optional reason; all amounts and ownership are determined on the server.
+
+GET `/cancellation/vendor-order/:id/calculate-refund` and PATCH `/cancellation/vendor-order/:id/organizer-cancel-confirmed` require JWT authentication. Current database user role and parent Order organizer ownership are checked. Vendor cancellation and penalty history also require the appropriate authenticated vendor ownership (Admin may view penalty history). The pending-request cancellation and generic vendor status endpoints now authenticate their actor; generic paid cancellation and event-wide status cancellation cannot bypass this review.
+
+The client calculation uses only the immutable saved clientRefunds array selected by the saved policy label and SUCCESS Payment records belonging to that organizer/order. It never reads current Admin settings or current vendor business details. Exact fractional service hours choose the saved threshold; amounts are rounded to minor currency units. The vendor penalty tiers are independent and not used for client refunds.
+
+Fully paid, completed, started, unassigned, unpaid/unsecured, missing/invalid snapshot, unresolved reschedule, existing refund, pending payment and inconsistent payment records cannot use normal cancellation. Legacy bookings without snapshots require Support review; they are never assigned today's rules. The Contact Support interface and vendor review flow remain separate later steps.
+
+Eligible previews are HMAC signed, tied to organizer/booking and reviewed financial terms, and expire in five minutes. Confirm rechecks eligibility and amounts. Any changed tier, payment, service time or saved terms requires a new explicit review. Booking cancellation and the existing PENDING Refund record are written in one MongoDB transaction using snapshot read concern and majority writes. A retry of the same committed preview returns the existing result, including after token expiry, instead of creating a duplicate. A failed refund write rolls back the booking cancellation. Sibling bookings and parent composition are not rewritten. A zero refund keeps an audit record with an explanatory note; it does not represent money being returned. This step records the refund request; it does not add gateway settlement or claim a refund is already paid.
+
+Verification (use a disposable test booking):
+
+1. Deploy this backend commit on Render and verify Live. Pull the same mobile code and reload the app. Admin can remain local, pointed at the same Render backend.
+2. Create a new booking with a saved policy, accept it as its vendor and complete the required test down payment. Use a future service date. Open Client My Events → event → that vendor → Cancel Booking.
+3. Compare preview amount paid/rate/revision with the booking's saved terms in local Admin. Keep Booking must preserve the booking and create no refund.
+4. Reopen and confirm once. Only that vendor must appear cancelled in booking history; siblings stay active. Local Admin refund history must show one PENDING request with the calculated amounts. Refresh/retry must not duplicate it.
+5. Check Refundable, Partially refundable and Non-refundable test cases, plus legacy/completed/fully paid restrictions. A test with a pending reschedule must be blocked until resolved.
+
+Automated checks: backend saved-policy unit tests, real-JWT HTTP guard/DTO tests and existing policy/snapshot/order regression tests. Transaction rollback tests use a session mock; they do not replace a deployed MongoDB replica-set runtime check. Mobile API tests verify authentication and the preview/confirm payload boundary. Focused mobile lint must pass; whole-project TypeScript diagnostics are compared with the pre-change baseline because the repository already contains unrelated errors.

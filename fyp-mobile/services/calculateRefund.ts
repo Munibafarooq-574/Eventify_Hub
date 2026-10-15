@@ -1,14 +1,31 @@
-// fyp-mobile/services/calculateRefund.ts
-import axios, { AxiosRequestConfig } from "axios";
+import axios from 'axios';
+import { getSecureData } from '../store';
 
-export default async function calculateRefund(vendorOrderId: string) {
-    const url = `https://eventify-hub.onrender.com/cancellation/vendor-order/${vendorOrderId}/calculate-refund`;
-    const config: AxiosRequestConfig = { method: "GET", url };
-    try {
-        const response = await axios(config);
-        return response.data;
-    } catch (error) {
-        console.error("Error calculating refund:", error);
-        throw error;
-    }
+export interface ClientCancellationPreview {
+  vendorOrderId: string;
+  eligible: boolean;
+  restrictionCode?: string;
+  message?: string;
+  serviceName: string;
+  eventStartDateTime: string | null;
+  amountPaid: number;
+  refundAmount: number | null;
+  withheldAmount: number | null;
+  refundPercentage: number | null;
+  daysBeforeEvent: number | null;
+  hoursBeforeEvent: number | null;
+  tier: string | null;
+  cancellationPolicyApplied: string | null;
+  policyRevision: number | null;
+  previewToken?: string;
+  expiresAt?: string;
+}
+
+export default async function calculateRefund(vendorOrderId: string): Promise<ClientCancellationPreview> {
+  const token = await getSecureData('token');
+  if (!token) throw new Error('Please sign in again to review cancellation.');
+  const response = await axios.get(`https://eventify-hub.onrender.com/cancellation/vendor-order/${encodeURIComponent(vendorOrderId)}/calculate-refund`, {
+    headers: { Authorization: `Bearer ${token}` }, timeout: 20000,
+  });
+  return response.data;
 }

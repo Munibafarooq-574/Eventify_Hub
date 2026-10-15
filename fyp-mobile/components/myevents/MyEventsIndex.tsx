@@ -1,4 +1,5 @@
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
+import ClientCancellationReview from '../cancellation/ClientCancellationReview';
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
 import getPaymentStatus from '@/services/getPaymentStatus';
@@ -7,7 +8,7 @@ import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -61,12 +62,6 @@ const deleteEventPlaceholder = async (_eventId: string) => {
   return { success: true };
 };
 
-const statusStyleMap: Record<string, { bg: string; text: string; icon: any }> = {
-  Upcoming: { bg: '#E7F0FF', text: '#007AFF', icon: 'time-outline' },
-  Completed: { bg: '#E6F7EA', text: '#28a745', icon: 'checkmark-circle-outline' },
-  Cancelled: { bg: '#FDEAEC', text: '#dc3545', icon: 'close-circle-outline' },
-};
-
 const vendorStatusStyleMap: Record<string, { bg: string; text: string; icon: any }> = {
   pending: { bg: '#FFF3CD', text: '#B8860B', icon: 'time-outline' },
   accepted: { bg: '#E7F0FF', text: '#007AFF', icon: 'checkmark-circle-outline' },
@@ -92,7 +87,7 @@ const isActiveVendorOrder = (vendor: any) => {
   const replacementOutcome = String(vendor?.replacementOutcome || '').toUpperCase();
 
   return (
-    !['cancelled', 'rejected', 'expired'].includes(status) &&
+    !['cancelled', 'cancelled_by_vendor', 'rejected', 'expired'].includes(status) &&
     replacementOutcome !== 'NO_LONGER_ASSIGNED'
   );
 };
@@ -104,7 +99,7 @@ const smoothLayout = () =>
 
 /** One-time soft entrance for each event card. */
 const FadeInUp = ({ index, children }: { index: number; children: React.ReactNode }) => {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -167,6 +162,7 @@ const DetailRow = ({ label, value }: { label: string; value: string }) => (
 
 const MyEventsScreen = () => {
   const insets = useSafeAreaInsets();
+  const [cancellingBooking, setCancellingBooking] = useState<{ id: string; name: string } | null>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -500,7 +496,7 @@ const MyEventsScreen = () => {
             <View style={[styles.stateIconWrap, { backgroundColor: '#FDEAEC' }]}>
               <Ionicons name="alert-circle-outline" size={40} color={COLORS.danger} />
             </View>
-            <Text style={styles.emptyTitle}>Couldn't load events</Text>
+            <Text style={styles.emptyTitle}>Couldn&apos;t load events</Text>
             <Text style={styles.centerStateText}>{errorMsg}</Text>
             <TouchableOpacity
               style={styles.retryButton}
@@ -1264,6 +1260,17 @@ const MyEventsScreen = () => {
                             </TouchableOpacity>
                           </View>
 
+                          {vendorStatus === 'accepted' && paymentStatus === 'PARTIALLY_PAID' && (
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              style={[styles.receiptButton, { borderColor: COLORS.danger, marginTop: 12 }]}
+                              onPress={() => setCancellingBooking({ id: vendor._id, name: vendorBrandName })}
+                            >
+                              <Ionicons name="close-circle-outline" size={15} color={COLORS.danger} />
+                              <Text style={[styles.receiptButtonText, { color: COLORS.danger }]}>Cancel Booking</Text>
+                            </TouchableOpacity>
+                          )}
+
                           {/* ───── Payment panel ───── */}
                           {(vendorStatus === 'accepted' || vendorStatus === 'completed') && (
                             <View style={styles.paymentBox}>
@@ -1451,7 +1458,7 @@ const MyEventsScreen = () => {
                           const historyLabel =
                             replacementOutcome === 'NO_LONGER_ASSIGNED'
                               ? 'No longer assigned'
-                              : status === 'cancelled'
+                              : ['cancelled', 'cancelled_by_vendor'].includes(status)
                                 ? 'Cancelled'
                                 : status === 'rejected'
                                   ? 'Rejected'
@@ -1497,6 +1504,13 @@ const MyEventsScreen = () => {
         )}
       </ScrollView>
 
+      {cancellingBooking && <ClientCancellationReview
+        key={cancellingBooking.id}
+        vendorOrderId={cancellingBooking.id}
+        vendorName={cancellingBooking.name}
+        onClose={() => setCancellingBooking(null)}
+        onCancelled={fetchData}
+      />}
       <BottomNavigationFinal />
     </View>
   );

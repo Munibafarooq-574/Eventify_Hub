@@ -51,6 +51,13 @@ export class Refund extends Document {
     })
     status: string;
 
+    // Audit of the server-confirmed saved-policy calculation.
+    @Prop({ type: Number }) policyRevision?: number;
+    @Prop({ type: Number }) refundPercentage?: number;
+    @Prop({ type: String }) policyConfigId?: string;
+    @Prop({ type: Date }) calculatedAt?: Date;
+    @Prop({ type: String }) confirmationKey?: string;
+
     @Prop({ type: Date, default: null })
     processedAt?: Date | null;
 

@@ -133,13 +133,16 @@ async placeOrder(
     }
 
     @Patch('vendor-order/:id/status')
+    @UseGuards(JwtAuthGuard)
 async updateVendorOrderStatus(
     @Param('id') vendorOrderId: string,
     @Body()
     body: {
         status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
     },
+    @Request() req: any,
 ) {
+    await this.orderService.assertVendorBookingOwner(vendorOrderId, req.user);
     return this.orderService.updateVendorOrderStatus(
         vendorOrderId,
         body.status,
@@ -153,13 +156,16 @@ async updateVendorOrderStatus(
 
         // NEW (Phase 4): organizer cancels a still-pending (REQUESTED) item
     @Patch('vendor-order/:id/cancel-request')
+    @UseGuards(JwtAuthGuard)
     async cancelRequest(
         @Param('id') vendorOrderId: string,
         @Body() body: { reason?: string },
+        @Request() req: any,
     ) {
         return this.orderService.cancelVendorOrderByOrganizer(
             vendorOrderId,
             body?.reason,
+            req.user,
         );
     }
 

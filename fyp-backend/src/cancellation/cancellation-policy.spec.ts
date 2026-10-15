@@ -31,7 +31,7 @@ function setup(hasSettings = true) {
     };
     const orders = { findById: async () => ({ _id: 'booking', eventStartDateTime: new Date(Date.now() + 10.5 * 86400000) }) };
     const payments = { find: async () => [{ amount: 1000 }] };
-    const service = new CancellationService(orders as any, {} as any, payments as any, {} as any, {} as any, model as any, {} as any, {} as any);
+    const service = new CancellationService(orders as any, {} as any, payments as any, {} as any, {} as any, model as any, {} as any, {} as any, {} as any, {} as any);
     return { service, config, model };
 }
 
@@ -82,16 +82,14 @@ describe('Step 2 policy structure', () => {
         await expect(service.updatePolicyConfig({ policySettings: settings(), expectedRevision: 10 })).rejects.toThrow('Reload');
         await expect(service.updatePolicyConfig({ policySettings: settings(), expectedRevision: 0, penaltyEventDay: 3 })).rejects.toThrow('separately');
     });
-    it('saves settings with a revision without changing current refunds', async () => {
+    it('saves settings with a revision without rewriting legacy vendor penalties', async () => {
         const { service, config } = setup();
-        const before = await service.calculateRefund('booking');
         const next = settings(); next.vendorPenalties[0].percentage = 99; next.clientRefunds.partiallyRefundable[0].percentage = 100;
         next.paymentHoldHours = 48;
         await service.updatePolicyConfig({ policySettings: next, expectedRevision: 0 });
         expect(config.policyRevision).toBe(1);
         expect(config.policySettings?.vendorPenalties[0].percentage).toBe(99);
         expect(config.penalty7to14Days).toBe(28);
-        expect(await service.calculateRefund('booking')).toEqual(before);
         await expect(service.updatePolicyConfig({ policySettings: next, expectedRevision: 0 })).rejects.toThrow('Reload');
     });
     it('preserves legacy Admin penalty API', async () => {

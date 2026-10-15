@@ -3,10 +3,13 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { ClientSession, Connection, Model, Types } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { BookingPolicySnapshot, VendorOrder } from 'src/schemas/vendor-order.schema';
@@ -18,7 +21,8 @@ import { CancellationPolicyConfig } from 'src/schemas/cancellation-policy.schema
 import { User } from 'src/schemas/user.schema';
 import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { CancellationPolicySettingsDto, UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
-import { RefundCalculationResult } from './cancellation.types';
+import { CancellationActor, ClientCancellationPreview } from './cancellation.types';
+import { ConfirmClientCancellationDto } from './dto/cancel-booking.dto';
 
 @Injectable()
 export class CancellationService {
@@ -46,9 +50,11 @@ export class CancellationService {
 
         @InjectModel(RescheduleRequest.name)
         private readonly rescheduleRequestModel: Model<RescheduleRequest>,
+        private readonly configService: ConfigService,
+        @InjectConnection() private readonly connection: Connection,
     ) {}
 
-    // Admin settings also supply Step 3 snapshots; current cancellation/payment behavior stays unchanged.
+    // Admin settings supply new booking snapshots; existing snapshots remain authoritative.
     async getPolicyConfig() {
         let config = await this.policyConfigModel.findOne();
         if (!config) config = await this.policyConfigModel.create({});
@@ -184,32 +190,133 @@ export class CancellationService {
         return payments.reduce((sum, p) => sum + p.amount, 0);
     }
 
-    // ===== Reusable refund calculation, used by both cancel paths =====
-    async calculateRefund(vendorOrderId: string): Promise<RefundCalculationResult> {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
-        if (!vendorOrder) {
-            throw new NotFoundException('Vendor order not found');
+    async hasSuccessfulPayment(vendorOrderId: string) {
+        return !!await this.paymentModel.exists({ vendorOrderId, status: 'SUCCESS' });
+    }
+
+    private requireClient(actor: CancellationActor) {
+        if (!actor?.id || !Types.ObjectId.isValid(actor.id) || !['client', 'organizer'].includes(String(actor.role).toLowerCase())) {
+            throw new ForbiddenException('Only an authenticated Client can cancel their booking.');
         }
-        if (!vendorOrder.eventStartDateTime) {
-            throw new ConflictException('Event start time not set for this booking.');
+    }
+
+    // Shared ownership authority for preview, confirmation and pending requests.
+    async assertClientBookingOwner(vendorOrderId: string, actor: CancellationActor, session?: ClientSession) {
+        this.requireClient(actor);
+        if (!Types.ObjectId.isValid(vendorOrderId)) throw new BadRequestException('Invalid vendor booking ID.');
+        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId).session(session ?? null);
+        if (!vendorOrder) throw new NotFoundException('Vendor booking not found.');
+        const order = vendorOrder.orderId
+            ? await this.orderModel.findById(vendorOrder.orderId).session(session ?? null)
+            : await this.orderModel.findOne({ vendorOrders: vendorOrder._id }).session(session ?? null);
+        if (!order || String(order.organizerId) !== actor.id) throw new ForbiddenException('You do not own this booking.');
+        return { vendorOrder, order };
+    }
+
+    async assertVendorBookingOwner(vendorOrderId: string, actor: CancellationActor) {
+        if (!actor?.id || String(actor.role).toLowerCase() !== 'vendor') throw new ForbiddenException('Vendor access required.');
+        if (!Types.ObjectId.isValid(vendorOrderId)) throw new BadRequestException('Invalid vendor booking ID.');
+        const booking = await this.vendorOrderModel.findById(vendorOrderId);
+        if (!booking) throw new NotFoundException('Vendor booking not found.');
+        if (String(booking.vendorId) !== actor.id) throw new ForbiddenException('You do not own this vendor booking.');
+        return booking;
+    }
+
+    private previewSignature(payload: string) {
+        return createHmac('sha256', this.configService.getOrThrow<string>('JWT_SECRET'))
+            .update(`client-cancellation-preview-v1:${payload}`).digest('base64url');
+    }
+
+    private readPreviewToken(token: string, vendorOrderId: string, actor: CancellationActor) {
+        if (typeof token !== 'string' || token.length > 2048) throw new BadRequestException('A valid cancellation preview is required.');
+        const parts = token.split('.');
+        if (parts.length !== 2) throw new BadRequestException('A valid cancellation preview is required.');
+        const expected = Buffer.from(this.previewSignature(parts[0]));
+        const supplied = Buffer.from(parts[1]);
+        if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) throw new BadRequestException('Invalid cancellation preview. Reload the preview.');
+        let decoded: { vendorOrderId: string; organizerId: string; fingerprint: string; exp: number };
+        try { decoded = JSON.parse(Buffer.from(parts[0], 'base64url').toString()); }
+        catch { throw new BadRequestException('Invalid cancellation preview.'); }
+        if (decoded.vendorOrderId !== vendorOrderId || decoded.organizerId !== actor.id || typeof decoded.fingerprint !== 'string' || !Number.isFinite(decoded.exp)) {
+            throw new BadRequestException('Cancellation preview does not match this booking.');
         }
+        return decoded;
+    }
 
-        const config = await this.getPolicyConfig();
-        const daysBeforeEvent = this.daysBeforeEvent(vendorOrder.eventStartDateTime);
-        const { tier, percentage } = this.getPenaltyPercentage(daysBeforeEvent, config);
-
-        const amountPaid = await this.getAmountPaid(vendorOrder._id);
-        const withheldAmount = Math.round((amountPaid * percentage) / 100);
-        const refundAmount = amountPaid - withheldAmount;
-
-        return {
-            daysBeforeEvent,
-            tier,
-            penaltyPercentage: percentage,
-            amountPaid,
-            refundAmount,
-            withheldAmount,
+    private async clientRefundReview(vendorOrder: VendorOrder, order: Order, now: Date, session?: ClientSession) {
+        const payments = await this.paymentModel.find({ vendorOrderId: vendorOrder._id, status: 'SUCCESS' }).session(session ?? null);
+        let paidMinor = 0;
+        for (const payment of payments) {
+            if (!Number.isFinite(payment.amount) || payment.amount < 0 || String(payment.organizerId) !== String(order.organizerId) || String(payment.orderId) !== String(order._id)) {
+                throw new ConflictException('Payment records need Support review before cancellation.');
+            }
+            paidMinor += Math.round(payment.amount * 100);
+        }
+        if (!Number.isSafeInteger(paidMinor)) throw new ConflictException('Payment total needs Support review.');
+        const result: ClientCancellationPreview = {
+            vendorOrderId: String(vendorOrder._id), eligible: false, serviceName: vendorOrder.serviceName,
+            eventStartDateTime: vendorOrder.eventStartDateTime && Number.isFinite(vendorOrder.eventStartDateTime.getTime()) ? vendorOrder.eventStartDateTime.toISOString() : null,
+            amountPaid: paidMinor / 100, refundAmount: null, withheldAmount: null, refundPercentage: null,
+            daysBeforeEvent: null, hoursBeforeEvent: null, tier: null,
+            cancellationPolicyApplied: vendorOrder.policySnapshot?.selectedPolicy ?? null,
+            policyRevision: vendorOrder.policySnapshot?.policyRevision ?? null,
         };
+        const blocked = (restrictionCode: string, message: string) => ({ result: { ...result, restrictionCode, message }, fingerprint: '' });
+        if (vendorOrder.status === 'completed') return blocked('COMPLETED', 'Completed bookings cannot be cancelled. Contact Support for a service issue.');
+        if (vendorOrder.status !== 'accepted') return blocked('NOT_CONFIRMED', 'Only a confirmed booking can be cancelled here.');
+        if (vendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED' || !order.vendorOrders.some(id => String(id) === String(vendorOrder._id))) return blocked('NO_LONGER_ASSIGNED', 'This vendor is no longer assigned to the event.');
+        const bookingAmount = Number(vendorOrder.finalAmount ?? vendorOrder.price);
+        if (!Number.isFinite(bookingAmount) || bookingAmount < 0) return blocked('PAYMENT_REVIEW', 'Booking amount needs Support review.');
+        if (vendorOrder.paymentStatus === 'PAID' || (bookingAmount > 0 && paidMinor >= Math.round(bookingAmount * 100))) return blocked('FULLY_PAID', 'Fully paid bookings require Support review. Normal cancellation is unavailable.');
+        if (vendorOrder.paymentStatus !== 'PARTIALLY_PAID') return blocked('NOT_CONFIRMED', 'The required down payment has not secured this booking.');
+        const requiredDownPayment = vendorOrder.downPaymentAmount;
+        if (typeof requiredDownPayment !== 'number' || !Number.isFinite(requiredDownPayment) || requiredDownPayment < 0 || paidMinor < Math.round(requiredDownPayment * 100)) return blocked('PAYMENT_REVIEW', 'Down payment records need Support review.');
+        if (await this.paymentModel.exists({ vendorOrderId: vendorOrder._id, status: 'PENDING' }).session(session ?? null)) return blocked('PAYMENT_PENDING', 'A payment is awaiting confirmation. Resolve it before cancelling.');
+        if (await this.refundModel.exists({ vendorOrderId: vendorOrder._id }).session(session ?? null)) return blocked('REFUND_EXISTS', 'This booking already has a refund record. Contact Support.');
+        if (await this.rescheduleRequestModel.exists({ orderId: order._id, resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] } }).session(session ?? null)) return blocked('RESCHEDULE_PENDING', 'Resolve the date/time change before cancelling this booking.');
+        if (!vendorOrder.eventStartDateTime || !Number.isFinite(vendorOrder.eventStartDateTime.getTime())) return blocked('SERVICE_TIME_MISSING', 'Service time is unavailable. Contact Support.');
+        const hours = (vendorOrder.eventStartDateTime.getTime() - now.getTime()) / 3600000;
+        if (hours <= 0) return blocked('SERVICE_STARTED', 'Service has started. Contact Support instead of cancelling.');
+        const snapshot = vendorOrder.policySnapshot;
+        if (!snapshot) return blocked('LEGACY_SUPPORT_REQUIRED', 'This booking has no saved refund policy. Contact Support so its original terms can be reviewed.');
+        try {
+            if (snapshot.schemaVersion !== 1 || !Number.isInteger(snapshot.policyRevision) || snapshot.policyRevision < 0) throw new Error();
+            this.validatePolicySettings(JSON.parse(JSON.stringify(snapshot.settings)));
+        } catch { return blocked('POLICY_INVALID', 'Saved policy needs Support review.'); }
+        const tiers = snapshot.selectedPolicy === 'REFUNDABLE' ? snapshot.settings.clientRefunds.refundable
+            : snapshot.selectedPolicy === 'PARTIALLY REFUNDABLE' ? snapshot.settings.clientRefunds.partiallyRefundable
+            : snapshot.selectedPolicy === 'NON-REFUNDABLE' ? snapshot.settings.clientRefunds.nonRefundable : null;
+        if (!tiers) return blocked('POLICY_INVALID', 'Saved policy needs Support review.');
+        let tierIndex = 0;
+        for (let index = 1; index < tiers.length; index++) if (hours >= tiers[index].minHoursBeforeEvent) tierIndex = index;
+        const tier = tiers[tierIndex];
+        const refundMinor = Math.round(paidMinor * tier.percentage / 100);
+        Object.assign(result, {
+            eligible: true, refundPercentage: tier.percentage, refundAmount: refundMinor / 100,
+            withheldAmount: (paidMinor - refundMinor) / 100, hoursBeforeEvent: hours, daysBeforeEvent: Math.floor(hours / 24),
+            tier: `${tier.minHoursBeforeEvent} hours${tierIndex + 1 < tiers.length ? ` to under ${tiers[tierIndex + 1].minHoursBeforeEvent} hours` : ' or more'}`,
+        });
+        const fingerprint = createHash('sha256').update(JSON.stringify({
+            vendorOrderId: result.vendorOrderId, organizerId: String(order.organizerId),
+            status: vendorOrder.status, paymentStatus: vendorOrder.paymentStatus, eventStart: result.eventStartDateTime,
+            amountPaid: result.amountPaid, refundAmount: result.refundAmount, withheldAmount: result.withheldAmount,
+            tier: result.tier, snapshot: JSON.parse(JSON.stringify(snapshot)),
+        })).digest('hex');
+        return { result, fingerprint };
+    }
+
+    // Read-only preview: rates and amounts come exclusively from the saved terms and ledger.
+    async calculateRefund(vendorOrderId: string, actor: CancellationActor): Promise<ClientCancellationPreview> {
+        const { vendorOrder, order } = await this.assertClientBookingOwner(vendorOrderId, actor);
+        const now = new Date();
+        const { result, fingerprint } = await this.clientRefundReview(vendorOrder, order, now);
+        if (result.eligible) {
+            const exp = now.getTime() + 5 * 60 * 1000;
+            const payload = Buffer.from(JSON.stringify({ vendorOrderId, organizerId: actor.id, fingerprint, exp })).toString('base64url');
+            result.previewToken = `${payload}.${this.previewSignature(payload)}`;
+            result.expiresAt = new Date(exp).toISOString();
+        }
+        return result;
     }
 
     // ===== Get vendor's own cancellationPolicy label (reused, not duplicated) =====
@@ -234,85 +341,54 @@ export class CancellationService {
     // ================================================================
     // PATH 1: Organizer cancels a CONFIRMED (paid) booking
     // ================================================================
-    async organizerCancelConfirmedBooking(vendorOrderId: string, reason?: string) {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
-        if (!vendorOrder) {
-            throw new NotFoundException('Vendor order not found');
-        }
-
-        if (!['accepted', 'completed'].includes(vendorOrder.status)) {
-            throw new ConflictException(
-                'Only a confirmed (accepted) booking can be cancelled this way.',
-            );
-        }
-        if (vendorOrder.status === 'completed') {
-            throw new ConflictException('Completed bookings cannot be cancelled.');
-        }
-
-        const vendorUser = await this.userModel.findById(vendorOrder.vendorId).lean();
-        const policy = this.getVendorCancellationPolicy(vendorUser);
-
-        let refundCalc: RefundCalculationResult;
-
-        if (policy === 'NON-REFUNDABLE') {
-            const amountPaid = await this.getAmountPaid(vendorOrder._id);
-            refundCalc = {
-                daysBeforeEvent: vendorOrder.eventStartDateTime
-                    ? this.daysBeforeEvent(vendorOrder.eventStartDateTime)
-                    : 0,
-                tier: 'NON-REFUNDABLE policy',
-                penaltyPercentage: 100,
-                amountPaid,
-                refundAmount: 0,
-                withheldAmount: amountPaid,
-            };
-        } else if (policy === 'REFUNDABLE') {
-            const amountPaid = await this.getAmountPaid(vendorOrder._id);
-            refundCalc = {
-                daysBeforeEvent: vendorOrder.eventStartDateTime
-                    ? this.daysBeforeEvent(vendorOrder.eventStartDateTime)
-                    : 0,
-                tier: 'REFUNDABLE policy',
-                penaltyPercentage: 0,
-                amountPaid,
-                refundAmount: amountPaid,
-                withheldAmount: 0,
-            };
-        } else {
-            // PARTIALLY REFUNDABLE — use the tiered days-based calculation
-            refundCalc = await this.calculateRefund(vendorOrderId);
-        }
-
-        vendorOrder.status = 'cancelled';
-        vendorOrder.cancelledBy = 'organizer';
-        vendorOrder.cancelledAt = new Date();
-        vendorOrder.cancellationReason = reason || null;
-        await vendorOrder.save();
-
-        const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
-
-        const refund = await this.refundModel.create({
-            vendorOrderId: vendorOrder._id,
-            orderId: order?._id,
-            organizerId: order?.organizerId,
-            vendorId: vendorOrder.vendorId,
-            amountPaid: refundCalc.amountPaid,
-            refundAmount: refundCalc.refundAmount,
-            withheldAmount: refundCalc.withheldAmount,
-            initiatedBy: 'ORGANIZER_CANCELLED',
-            daysBeforeEvent: refundCalc.daysBeforeEvent,
-            cancellationPolicyApplied: policy,
-            status: 'PENDING',
-        });
-
-        return { vendorOrder, refund, refundCalc };
+    async organizerCancelConfirmedBooking(vendorOrderId: string, actor: CancellationActor, dto: ConfirmClientCancellationDto) {
+        this.requireClient(actor);
+        if (!Types.ObjectId.isValid(vendorOrderId)) throw new BadRequestException('Invalid vendor booking ID.');
+        const token = this.readPreviewToken(dto.previewToken, vendorOrderId, actor);
+        const confirmationKey = createHash('sha256').update(dto.previewToken).digest('hex');
+        const session = await this.connection.startSession();
+        try {
+            let response: any;
+            await session.withTransaction(async () => {
+                const { vendorOrder, order } = await this.assertClientBookingOwner(vendorOrderId, actor, session);
+                if (vendorOrder.status === 'cancelled' && vendorOrder.cancelledBy === 'organizer') {
+                    const existing = await this.refundModel.findOne({ vendorOrderId: vendorOrder._id, initiatedBy: 'ORGANIZER_CANCELLED', confirmationKey }).session(session);
+                    if (existing) { response = { vendorOrder, refund: existing, alreadyCancelled: true }; return; }
+                }
+                if (token.exp <= Date.now()) throw new ConflictException('Cancellation preview expired. Reload it before confirming.');
+                const now = new Date();
+                const { result, fingerprint } = await this.clientRefundReview(vendorOrder, order, now, session);
+                if (!result.eligible) throw new ConflictException(result.message);
+                if (fingerprint !== token.fingerprint) throw new ConflictException('Booking, payment or refund terms changed. Review a fresh preview before confirming.');
+                const updated = await this.vendorOrderModel.findOneAndUpdate(
+                    { _id: vendorOrder._id, status: 'accepted', paymentStatus: 'PARTIALLY_PAID' },
+                    { $set: { status: 'cancelled', cancelledBy: 'organizer', cancelledAt: now, cancellationReason: dto.reason?.trim() || null } },
+                    { new: true, session },
+                );
+                if (!updated) throw new ConflictException('Booking changed. Reload the cancellation preview.');
+                const [refund] = await this.refundModel.create([{
+                    vendorOrderId: vendorOrder._id, orderId: order._id, organizerId: order.organizerId, vendorId: vendorOrder.vendorId,
+                    amountPaid: result.amountPaid, refundAmount: result.refundAmount, withheldAmount: result.withheldAmount,
+                    initiatedBy: 'ORGANIZER_CANCELLED', daysBeforeEvent: result.daysBeforeEvent,
+                    cancellationPolicyApplied: result.cancellationPolicyApplied, policyRevision: result.policyRevision,
+                    refundPercentage: result.refundPercentage, policyConfigId: vendorOrder.policySnapshot!.policyConfigId,
+                    calculatedAt: now, confirmationKey, status: 'PENDING',
+                    notes: result.refundAmount === 0 ? 'No monetary refund is due under the saved policy.' : null,
+                }], { session });
+                response = { vendorOrder: updated, refund, refundCalc: result, alreadyCancelled: false };
+            }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+            return response;
+        } catch (error: any) {
+            if (error?.code === 11000) throw new ConflictException('A cancellation/refund already exists. Refresh this booking.');
+            throw error;
+        } finally { await session.endSession(); }
     }
 
     // ================================================================
     // PATH 2: Vendor cancels a CONFIRMED booking (incurs penalty)
     // ================================================================
-    async vendorCancelConfirmedBooking(vendorOrderId: string, reason?: string) {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
+    async vendorCancelConfirmedBooking(vendorOrderId: string, reason: string | undefined, actor: CancellationActor) {
+        const vendorOrder = await this.assertVendorBookingOwner(vendorOrderId, actor);
         if (!vendorOrder) {
             throw new NotFoundException('Vendor order not found');
         }
@@ -326,6 +402,8 @@ export class CancellationService {
         if (!vendorOrder.eventStartDateTime) {
             throw new ConflictException('Event start time not set for this booking.');
         }
+
+        if (vendorOrder.paymentStatus === 'PAID') throw new ConflictException('Fully paid bookings require Support review.');
 
         // Vendor cancellation => organizer gets FULL refund of whatever was
         // paid (vendor's fault), regardless of the vendor's own refund policy.
@@ -398,7 +476,11 @@ export class CancellationService {
     }
 
     // ===== Vendor penalty history / reliability inputs =====
-    async getVendorPenalties(vendorId: string) {
+    async getVendorPenalties(vendorId: string, actor: CancellationActor) {
+        if (!actor?.id || !((String(actor.role).toLowerCase() === 'vendor' && actor.id === vendorId) || String(actor.role).toLowerCase() === 'admin')) {
+            throw new ForbiddenException('You cannot view this vendor penalty history.');
+        }
+        if (!Types.ObjectId.isValid(vendorId)) throw new BadRequestException('Invalid vendor ID.');
         return this.vendorPenaltyModel
             .find({ vendorId })
             .sort({ issuedAt: -1 })

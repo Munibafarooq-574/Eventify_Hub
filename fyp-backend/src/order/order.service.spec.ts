@@ -28,6 +28,7 @@ describe('OrderService - Unit Tests', () => {
     let orderModel: any;
     let vendorOrderModel: any;
     let notificationModel: any;
+    let cancellation: any;
     const validObjectId = '507f191e810c19729de860ea';
 
     beforeEach(async () => {
@@ -78,10 +79,12 @@ describe('OrderService - Unit Tests', () => {
             create: jest.fn().mockResolvedValue({}),
         };
 
+        cancellation = { hasSuccessfulPayment: jest.fn().mockResolvedValue(false), assertClientBookingOwner: jest.fn() };
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 OrderService,
-                { provide: CancellationService, useValue: {} },
+                { provide: CancellationService, useValue: cancellation },
                 { provide: getModelToken(User.name), useValue: userModel },
                 { provide: getModelToken(Order.name), useValue: orderModel },
                 { provide: getModelToken(VendorOrder.name), useValue: vendorOrderModel },
@@ -157,6 +160,30 @@ describe('OrderService - Unit Tests', () => {
         jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
         const updated = await service.updateStatus('o123', { status: 'completed' });
         expect(updated.organizerId).toBe(validObjectId);
+    });
+
+    it('blocks event-wide cancellation before any status write', async () => {
+        await expect(service.updateStatus(validObjectId, { status: 'cancelled' })).rejects.toThrow('individual vendor');
+        expect(orderModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+    it.each(['PARTIALLY_PAID', 'PAID', 'UNPAID'])('blocks legacy cancellation of a paid %s booking', async paymentStatus => {
+        vendorOrderModel.findById = jest.fn(() => ({ lean: async () => ({ status: 'accepted', paymentStatus }) }));
+        cancellation.hasSuccessfulPayment.mockResolvedValue(true);
+        vendorOrderModel.findByIdAndUpdate = jest.fn();
+        await expect(service.updateVendorOrderStatus(validObjectId, 'cancelled')).rejects.toThrow('dedicated cancellation');
+        expect(vendorOrderModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+    it('prevents a pending request race from overwriting acceptance', async () => {
+        const booking = { _id: validObjectId, status: 'pending', paymentStatus: 'UNPAID' };
+        cancellation.assertClientBookingOwner.mockResolvedValue({ vendorOrder: booking });
+        vendorOrderModel.findOneAndUpdate = jest.fn().mockResolvedValue(null);
+        await expect(service.cancelVendorOrderByOrganizer(validObjectId, undefined, { id: validObjectId, role: 'client' })).rejects.toThrow('Booking changed');
+        expect(vendorOrderModel.findOneAndUpdate.mock.calls[0][0]).toEqual({ _id: validObjectId, status: 'pending', paymentStatus: 'UNPAID' });
+    });
+    it.each(['cancelled', 'cancelled_by_vendor'])('preserves %s booking history across acceptance and completion', async status => {
+        vendorOrderModel.findById = jest.fn().mockResolvedValue({ status });
+        await expect(service.updateVendorResponse(validObjectId, 'accepted')).rejects.toThrow('Cancelled bookings');
+        await expect(service.completeVendorOrder(validObjectId)).rejects.toThrow('Cancelled bookings');
     });
 
     it('should get order stats', async () => {

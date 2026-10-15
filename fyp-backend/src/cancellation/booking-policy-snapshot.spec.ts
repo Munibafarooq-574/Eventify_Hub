@@ -15,7 +15,7 @@ function config() {
         vendorPenalties: [{ minHoursBeforeEvent: 0, percentage: 25 }], paymentHoldHours: 24, postServiceIssueWindowHours: 72,
     } };
 }
-function cancellation() { return new CancellationService(...Array(8).fill({}) as [any, any, any, any, any, any, any, any]); }
+function cancellation() { return new CancellationService(...Array(10).fill({}) as [any, any, any, any, any, any, any, any, any, any]); }
 const VendorModel = model('Step3VendorOrderTest', VendorOrderSchema);
 
 describe('Booking policy snapshot', () => {

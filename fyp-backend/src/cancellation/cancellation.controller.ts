@@ -1,9 +1,9 @@
 // fyp-backend/src/cancellation/cancellation.controller.ts
-import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminRoleGuard } from '../auth/admin-role.guard';
 import { CancellationService } from './cancellation.service';
-import { CancelBookingDto } from './dto/cancel-booking.dto';
+import { CancelBookingDto, ConfirmClientCancellationDto } from './dto/cancel-booking.dto';
 import { UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
 
 @Controller('cancellation')
@@ -24,36 +24,44 @@ export class CancellationController {
 
     // Preview refund before actually cancelling
     @Get('vendor-order/:id/calculate-refund')
-    calculateRefund(@Param('id') vendorOrderId: string) {
-        return this.cancellationService.calculateRefund(vendorOrderId);
+    @UseGuards(JwtAuthGuard)
+    calculateRefund(@Param('id') vendorOrderId: string, @Request() req: any) {
+        return this.cancellationService.calculateRefund(vendorOrderId, req.user);
     }
 
     // Organizer cancels a confirmed booking
     @Patch('vendor-order/:id/organizer-cancel-confirmed')
+    @UseGuards(JwtAuthGuard)
     organizerCancel(
         @Param('id') vendorOrderId: string,
-        @Body() dto: CancelBookingDto,
+        @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })) dto: ConfirmClientCancellationDto,
+        @Request() req: any,
     ) {
         return this.cancellationService.organizerCancelConfirmedBooking(
             vendorOrderId,
-            dto.reason,
+            req.user,
+            dto,
         );
     }
 
     // Vendor cancels a confirmed booking
     @Patch('vendor-order/:id/vendor-cancel-confirmed')
+    @UseGuards(JwtAuthGuard)
     vendorCancel(
         @Param('id') vendorOrderId: string,
         @Body() dto: CancelBookingDto,
+        @Request() req: any,
     ) {
         return this.cancellationService.vendorCancelConfirmedBooking(
             vendorOrderId,
             dto.reason,
+            req.user,
         );
     }
 
     @Get('vendor/:vendorId/penalties')
-    getVendorPenalties(@Param('vendorId') vendorId: string) {
-        return this.cancellationService.getVendorPenalties(vendorId);
+    @UseGuards(JwtAuthGuard)
+    getVendorPenalties(@Param('vendorId') vendorId: string, @Request() req: any) {
+        return this.cancellationService.getVendorPenalties(vendorId, req.user);
     }
 }

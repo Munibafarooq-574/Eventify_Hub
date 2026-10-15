@@ -62,7 +62,7 @@ export default function CancellationPolicyForm() {
       const data = await response.json();
       if (!response.ok) throw new Error(errorMessage(data));
       const updated = readPolicy(data);
-      setConfig(updated); setSettings(updated.policySettings); setSuccess("Policy draft saved. Current bookings and payment deadlines are unchanged.");
+      setConfig(updated); setSettings(updated.policySettings); setSuccess("Policy saved for new bookings. Existing saved booking terms and payment deadlines are unchanged.");
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to save policy."); }
     finally { setBusy(false); }
   }
@@ -72,14 +72,14 @@ export default function CancellationPolicyForm() {
     <div><h1 className="text-2xl font-bold text-slate-950">Cancellation policy</h1><p className="mt-2 text-sm text-slate-600">Configure client refunds, vendor cancellation protection and policy durations.</p></div>
     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 space-y-2">
       <p className="font-semibold">Policy settings — saved with new bookings</p>
-      <p>New vendor bookings save a copy of these rules. Later changes do not rewrite those saved terms. Refund, penalty and duration enforcement will be connected in the cancellation rollout.</p>
-      <p>Refund percentages apply to the amount paid. Vendor penalties apply separately to the vendor booking price. Each tier applies from its minimum notice until the next threshold; the final tier has no upper limit. The 0-hour tier also covers events that have started.</p>
+      <p>New vendor bookings save a copy of these rules. Client cancellation uses the rules saved with that booking. Later changes do not rewrite those terms. Vendor cancellation rules and durations remain pending their separate rollout.</p>
+      <p>Refund percentages apply to the amount paid. Vendor penalties apply separately to the vendor booking price. Each tier applies from its minimum notice until the next threshold; the final tier has no upper limit. Normal client cancellation is unavailable once service has started.</p>
     </div>
     {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}<button type="button" disabled={busy} className="ml-3 underline" onClick={() => setRetry(value => value + 1)}>Reload saved policy</button></div>}
     {success && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{success}</p>}
     {!settings ? <p className="text-slate-600">{error ? "Settings unavailable." : "Loading policy…"}</p> : <form onSubmit={save} className="space-y-5">
-      <p className="text-xs text-slate-500">Draft revision {config?.policyRevision}. A day equals 24 hours.</p>
-      {([['refundable', 'Refundable'], ['partiallyRefundable', 'Partially refundable'], ['nonRefundable', 'Non-refundable']] as const).map(([key, label]) => <TierEditor key={key} title={`Client cancellation — ${label}`} description="Percentage refunded when the client chooses to cancel under this package policy." tiers={settings.clientRefunds[key]} disabled={busy} onChange={tiers => change({ ...settings, clientRefunds: { ...settings.clientRefunds, [key]: tiers } })} />)}
+      <p className="text-xs text-slate-500">Policy revision {config?.policyRevision}. A day equals 24 hours.</p>
+      {([['refundable', 'Refundable'], ['partiallyRefundable', 'Partially refundable'], ['nonRefundable', 'Non-refundable']] as const).map(([key, label]) => <TierEditor key={key} title={`Client cancellation — ${label}`} description="Percentage refunded when the client chooses to cancel under the policy saved with their booking." tiers={settings.clientRefunds[key]} disabled={busy} onChange={tiers => change({ ...settings, clientRefunds: { ...settings.clientRefunds, [key]: tiers } })} />)}
       <TierEditor title="Vendor cancellation — client protection" description="Percentage refunded when the vendor cancels, independent of the package refund policy." tiers={settings.vendorCausedClientRefunds} disabled={busy} onChange={tiers => change({ ...settings, vendorCausedClientRefunds: tiers })} />
       <TierEditor title="Vendor cancellation — vendor penalty" description="Separate penalty percentage of the vendor booking price." tiers={settings.vendorPenalties} disabled={busy} onChange={tiers => change({ ...settings, vendorPenalties: tiers })} />
       <fieldset disabled={busy} className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4"><legend className="px-2 font-semibold">Durations</legend>
@@ -87,7 +87,7 @@ export default function CancellationPolicyForm() {
         <label className="flex flex-wrap items-center gap-3 text-sm">Post-service issue window (hours)<input type="number" required min="1" max="8760" step="1" value={settings.postServiceIssueWindowHours} onChange={event => change({ ...settings, postServiceIssueWindowHours: Number(event.target.value) })} className="w-28 rounded-lg border border-slate-300 p-2" /></label>
         <p className="text-xs text-slate-500">The initial 72-hour issue window is an editable draft value. It is not enforced until the issue-reporting rollout.</p>
       </fieldset>
-      <div className="flex gap-3"><button disabled={!dirty || busy} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : "Save draft"}</button><button type="button" disabled={!dirty || busy} onClick={() => { setSettings(config?.policySettings ?? null); setError(""); setSuccess(""); }} className="rounded-xl border border-slate-300 px-5 py-3 text-sm disabled:opacity-40">Discard changes</button></div>
+      <div className="flex gap-3"><button disabled={!dirty || busy} className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : "Save policy"}</button><button type="button" disabled={!dirty || busy} onClick={() => { setSettings(config?.policySettings ?? null); setError(""); setSuccess(""); }} className="rounded-xl border border-slate-300 px-5 py-3 text-sm disabled:opacity-40">Discard changes</button></div>
     </form>}
   </div>;
 }

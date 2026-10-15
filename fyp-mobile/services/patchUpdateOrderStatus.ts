@@ -25,6 +25,7 @@ export default async function patchUpdateOrderStatus(orderId: string, status: 'p
 // fyp-mobile/services/patchUpdateOrderStatus.ts
 
 import axios, { AxiosRequestConfig } from "axios";
+import { getSecureData } from "../store";
 
 export default async function patchUpdateOrderStatus(
     orderId: string,
@@ -55,6 +56,8 @@ export async function patchUpdateVendorOrderStatus(
     vendorOrderId: string,
     status: "pending" | "confirmed" | "completed" | "cancelled"
 ) {
+    const token = await getSecureData("token");
+    if (!token) throw new Error("Please sign in again.");
     const url = `https://eventify-hub.onrender.com/orders/vendor-order/${vendorOrderId}/status`;
 
     const config: AxiosRequestConfig = {
@@ -63,6 +66,7 @@ export async function patchUpdateVendorOrderStatus(
         data: { status },
         headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
         },
     };
 

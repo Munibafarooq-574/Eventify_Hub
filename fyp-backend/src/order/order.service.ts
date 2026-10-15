@@ -8,6 +8,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Connection, Model, Types } from 'mongoose';
+import { CancellationActor } from '../cancellation/cancellation.types';
 import { CancellationService } from '../cancellation/cancellation.service';
 import { BookingPolicySnapshot } from '../schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
@@ -1665,6 +1666,9 @@ async getOrderStats(type: string, userId: string) {
     }
 
        async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {
+        if (dto.status === 'cancelled') {
+            throw new ConflictException('Cancel an individual vendor booking through its cancellation review. Event-wide status cancellation is unavailable.');
+        }
         const updated = await this.orderModel.findByIdAndUpdate(
             orderId,
             { status: dto.status },
@@ -1687,7 +1691,7 @@ async getOrderStats(type: string, userId: string) {
         const mappedStatus = vendorOrderStatusMap[dto.status];
         if (mappedStatus) {
             await this.vendorOrderModel.updateMany(
-                { _id: { $in: updated.vendorOrders } },
+                { _id: { $in: updated.vendorOrders }, status: { $nin: ['cancelled', 'cancelled_by_vendor'] } },
                 { $set: { status: mappedStatus } },
             );
         }
@@ -1698,6 +1702,10 @@ async getOrderStats(type: string, userId: string) {
             console.log(error);
         }
         return updated;
+    }
+
+    async assertVendorBookingOwner(vendorOrderId: string, actor: CancellationActor) {
+        return this.cancellationService.assertVendorBookingOwner(vendorOrderId, actor);
     }
 
     async updateVendorOrderStatus(
@@ -1741,6 +1749,11 @@ async getOrderStats(type: string, userId: string) {
             vendorOrderId,
             'accepted',
         );
+    }
+
+    if (status === 'cancelled' && (['PARTIALLY_PAID', 'PAID'].includes(existingVendorOrder.paymentStatus) ||
+        await this.cancellationService.hasSuccessfulPayment(vendorOrderId))) {
+        throw new ConflictException('Paid bookings must use the dedicated cancellation review.');
     }
 
     const vendorOrder = await this.vendorOrderModel.findByIdAndUpdate(
@@ -1842,6 +1855,10 @@ async getOrderStats(type: string, userId: string) {
 
         if (!vendorOrder) {
             throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
+        }
+
+        if (['cancelled', 'cancelled_by_vendor'].includes(vendorOrder.status)) {
+            throw new ConflictException('Cancelled bookings cannot be accepted or rejected again.');
         }
 
         if (vendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED') {
@@ -2078,11 +2095,10 @@ vendorOrder.vendorNetAmount =
     }
 
     // ===== NEW (Phase 4): organizer cancels a still-REQUESTED (pending) item =====
-    async cancelVendorOrderByOrganizer(vendorOrderId: string, reason?: string) {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
-
-        if (!vendorOrder) {
-            throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
+    async cancelVendorOrderByOrganizer(vendorOrderId: string, reason: string | undefined, actor: CancellationActor) {
+        const { vendorOrder } = await this.cancellationService.assertClientBookingOwner(vendorOrderId, actor);
+        if (vendorOrder.paymentStatus !== 'UNPAID' || await this.cancellationService.hasSuccessfulPayment(vendorOrderId)) {
+            throw new ConflictException('Paid bookings must use the cancellation review.');
         }
 
         if (vendorOrder.status !== 'pending') {
@@ -2091,12 +2107,12 @@ vendorOrder.vendorNetAmount =
             );
         }
 
-        vendorOrder.status = 'cancelled';
-        vendorOrder.cancelledBy = 'organizer';
-        vendorOrder.cancelledAt = new Date();
-        vendorOrder.cancellationReason = reason || null;
-
-        const saved = await vendorOrder.save();
+        const saved = await this.vendorOrderModel.findOneAndUpdate(
+            { _id: vendorOrder._id, status: 'pending', paymentStatus: 'UNPAID' },
+            { $set: { status: 'cancelled', cancelledBy: 'organizer', cancelledAt: new Date(), cancellationReason: reason || null } },
+            { new: true },
+        );
+        if (!saved) throw new ConflictException('Booking changed. Refresh before cancelling.');
 
         try {
             await this.sendPushNotification(
@@ -2190,6 +2206,10 @@ async completeVendorOrder(vendorOrderId: string) {
         throw new NotFoundException(
             `Vendor Order with ID ${vendorOrderId} not found`,
         );
+    }
+
+    if (['cancelled', 'cancelled_by_vendor'].includes(vendorOrder.status)) {
+        throw new ConflictException('Cancelled bookings cannot be completed.');
     }
 
     vendorOrder.status = 'completed';
