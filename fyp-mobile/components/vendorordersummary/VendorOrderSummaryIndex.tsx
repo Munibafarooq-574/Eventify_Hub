@@ -97,6 +97,21 @@ const OrderSummary = () => {
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
+    const [isRefreshingScreen, setIsRefreshingScreen] = useState(false);
+
+    const refreshScreenData = async () => {
+        const user = await getUserData();
+        if (!user) throw new Error("user not found");
+
+        // Re-read both sources together so dates/times, statuses, stats and
+        // reschedule cards always represent the latest backend state.
+        const [ordersData, requests] = await Promise.all([
+            getVendorOrders("Vendor", user._id),
+            getRescheduleRequests(),
+        ]);
+        setOrders(ordersData || []);
+        setRescheduleRequests(Array.isArray(requests) ? requests : []);
+    };
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
@@ -107,29 +122,10 @@ const OrderSummary = () => {
     }, [selectedTab]);
 
     useEffect(() => {
-        // Fetch orders on mount. Stats are derived live from `orders` below,
-        // so they always match the current list (no separate stale stats call needed).
-        const fetchData = async () => {
-            try {
-                const user = await getUserData();
-                if (!user) {
-                    throw "user not found";
-                }
-                const ordersData = await getVendorOrders("Vendor", user._id); // Fetch all orders
-                console.log(ordersData);
-                setOrders(ordersData || []);
-                try {
-                    const requests = await getRescheduleRequests();
-                    setRescheduleRequests(Array.isArray(requests) ? requests : []);
-                } catch (error) {
-                    console.error("Error fetching reschedule requests:", error);
-                    setRescheduleRequests([]);
-                }
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
-        };
-        fetchData();
+        // Initial authoritative load. Stats remain derived from `orders`.
+        refreshScreenData().catch((error) => {
+            console.error("Error fetching order summary data:", error);
+        });
     }, []);
 
     const handleRescheduleResponse = async (
@@ -139,12 +135,13 @@ const OrderSummary = () => {
         const perform = async () => {
             try {
                 setRespondingRequestId(requestId);
-                const updated = await respondToRescheduleRequest(requestId, status);
-                setRescheduleRequests((current) =>
-                    current.map((request) =>
-                        request._id === requestId ? { ...request, ...updated } : request
-                    )
-                );
+                await respondToRescheduleRequest(requestId, status);
+
+                // Acceptance may finalize the whole reschedule and update the
+                // parent order/event. Refresh the complete screen instead of
+                // patching only the request locally, preventing stale dates/times.
+                setIsRefreshingScreen(true);
+                await refreshScreenData();
                 Alert.alert(
                     status === "ACCEPTED" ? "Schedule response saved" : "Thanks for letting us know 💜",
                     status === "ACCEPTED"
@@ -155,6 +152,7 @@ const OrderSummary = () => {
                 Alert.alert("Could not respond", error?.message || "Please try again.");
             } finally {
                 setRespondingRequestId(null);
+                setIsRefreshingScreen(false);
             }
         };
 
@@ -388,6 +386,23 @@ const OrderSummary = () => {
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
+                {isRefreshingScreen && (
+                    <View
+                        style={{
+                            ...StyleSheet.absoluteFillObject,
+                            zIndex: 1000,
+                            elevation: 1000,
+                            backgroundColor: "rgba(255,255,255,0.78)",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <View style={{ alignItems: "center", padding: 20, borderRadius: 16, backgroundColor: "#FFFFFF" }}>
+                            <ActivityIndicator size="large" color={PRIMARY} />
+                            <Text style={{ marginTop: 10, color: PRIMARY, fontWeight: "700" }}>Updating order summary…</Text>
+                        </View>
+                    </View>
+                )}
                 {/* Header */}
                 <View style={styles.header}>
                     <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.push('/vendordashboard')}>
