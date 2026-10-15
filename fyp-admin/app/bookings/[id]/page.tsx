@@ -103,6 +103,7 @@ type Refund = {
   status?: string;
   createdAt?: string;
   paidAt?: string | null;
+  closedAt?: string | null;
 };
 
 type BookingDetailResponse = {
@@ -593,7 +594,7 @@ export default async function BookingDetailsPage({
                   <>
                     <InfoRow
                       label="Status"
-                      value={text(data.refund.status)}
+                      value={data.refund.status === "NO_REFUND_DUE" ? "Closed — No refund due" : text(data.refund.status)}
                     />
 
                     <InfoRow

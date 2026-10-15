@@ -7,16 +7,19 @@ type RefundStatus =
   | "PENDING"
   | "PROCESSING"
   | "REFUNDED"
-  | "REJECTED";
+  | "REJECTED"
+  | "NO_REFUND_DUE";
 
 type Props = {
   refundId: string;
   currentStatus: RefundStatus;
+  refundAmount: number;
 };
 
 export default function RefundStatusActions({
   refundId,
   currentStatus,
+  refundAmount,
 }: Props) {
   const router = useRouter();
 
@@ -31,6 +34,10 @@ export default function RefundStatusActions({
     }
 
     let message = "";
+
+    if (status === "NO_REFUND_DUE") {
+      message = "Close this case as No refund due? The refund is Rs. 0. No money will be marked as returned; the cancellation and retained amount stay unchanged.";
+    }
 
     if (status === "PROCESSING") {
       message =
@@ -96,6 +103,12 @@ export default function RefundStatusActions({
   };
 
   const disabled = loadingStatus !== null;
+
+  if (currentStatus === "NO_REFUND_DUE") return <p className="text-xs font-semibold text-slate-700">Closed — No refund due. No money returned.</p>;
+  if (refundAmount === 0 && currentStatus !== "REFUNDED") return <div className="flex min-w-[190px] flex-col gap-2">
+    <p className="text-xs text-slate-600">Refund is Rs. 0 under the recorded rules.</p>
+    <button type="button" disabled={disabled} onClick={() => updateStatus("NO_REFUND_DUE")} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{loadingStatus ? "Closing…" : "Close case — No refund due"}</button>
+  </div>;
 
   return (
     <div className="flex min-w-[190px] flex-col gap-2">

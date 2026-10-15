@@ -46,10 +46,14 @@ export class Refund extends Document {
             'PROCESSING',
             'REFUNDED',
             'REJECTED',
+            'NO_REFUND_DUE',
         ],
         default: 'PENDING',
     })
     status: string;
+
+    @Prop({ type: Date, default: null }) closedAt?: Date | null;
+    @Prop({ type: Types.ObjectId, ref: 'User', default: null }) closedBy?: Types.ObjectId | null;
 
     // Audit of the server-confirmed saved-policy calculation.
     @Prop({ type: Number }) policyRevision?: number;

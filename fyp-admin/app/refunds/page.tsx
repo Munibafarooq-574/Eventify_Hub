@@ -27,7 +27,8 @@ type RefundStatus =
   | "PENDING"
   | "PROCESSING"
   | "REFUNDED"
-  | "REJECTED";
+  | "REJECTED"
+  | "NO_REFUND_DUE";
 
 type AdminRefundRow = {
   refundId: string;
@@ -53,6 +54,7 @@ type AdminRefundRow = {
 
   status: RefundStatus;
 
+  closedAt?: string | null;
   processedAt?: string | null;
   refundedAt?: string | null;
   rejectedAt?: string | null;
@@ -163,6 +165,7 @@ export default async function RefundsPage({
     "PROCESSING",
     "REFUNDED",
     "REJECTED",
+    "NO_REFUND_DUE",
   ];
 
   const requestedStatus = String(
@@ -270,6 +273,7 @@ export default async function RefundsPage({
       label: "Rejected",
       value: "REJECTED",
     },
+    { label: "No refund due", value: "NO_REFUND_DUE" },
   ];
 
   return (
@@ -607,6 +611,8 @@ export default async function RefundsPage({
                                 </p>
                               ) : null}
 
+                              {refund.status === "NO_REFUND_DUE" && <p className="mt-2 text-xs text-slate-500">Closed {formatDateTime(refund.closedAt)} · No money returned</p>}
+
                               {refund.status ===
                               "REJECTED" ? (
                                 <p className="mt-2 whitespace-nowrap text-xs text-slate-500">
@@ -631,6 +637,7 @@ export default async function RefundsPage({
                                 currentStatus={
                                   refund.status
                                 }
+                                refundAmount={refund.refundAmount}
                               />
                             </td>
                           </tr>

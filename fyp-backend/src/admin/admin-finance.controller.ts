@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 
 import {
@@ -36,12 +37,14 @@ class UpdateRefundStatusDto {
     'PROCESSING',
     'REFUNDED',
     'REJECTED',
+    'NO_REFUND_DUE',
   ])
   status!:
     | 'PENDING'
     | 'PROCESSING'
     | 'REFUNDED'
-    | 'REJECTED';
+    | 'REJECTED'
+    | 'NO_REFUND_DUE';
 }
 
 class ReviewSubscriptionPaymentDto {
@@ -154,13 +157,15 @@ getRecentTransactions(
     @Param('id')
     id: string,
 
-    @Body()
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
     dto: UpdateRefundStatusDto,
+    @Req() req: any,
   ) {
     return this.service
       .updateRefundStatus(
         id,
         dto.status,
+        req.user.id,
       );
   }
 

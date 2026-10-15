@@ -2,6 +2,7 @@
 
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
 } from '@nestjs/common';
 
@@ -11,6 +12,7 @@ import {
 
 import {
   Model,
+  Types,
 } from 'mongoose';
 
 import {
@@ -1489,6 +1491,9 @@ if (status !== 'ALL') {
         status:
           refund.status,
 
+        closedAt: refund.closedAt ?? null,
+        closedBy: refund.closedBy ? String(refund.closedBy) : null,
+
         processedAt:
           refund.processedAt ??
           null,
@@ -1519,77 +1524,52 @@ if (status !== 'ALL') {
 
   async updateRefundStatus(
     refundId: string,
-
-    status:
-      | 'PENDING'
-      | 'PROCESSING'
-      | 'REFUNDED'
-      | 'REJECTED',
+    status: 'PENDING' | 'PROCESSING' | 'REFUNDED' | 'REJECTED' | 'NO_REFUND_DUE',
+    adminId?: string,
   ) {
-    const refund =
-      await this.refundModel
-        .findById(
-          refundId,
-        );
-
-    if (!refund) {
-      return null;
+    if (!Types.ObjectId.isValid(refundId)) throw new BadRequestException('Invalid refund ID.');
+    if (!['PENDING', 'PROCESSING', 'REFUNDED', 'REJECTED', 'NO_REFUND_DUE'].includes(status)) {
+      throw new BadRequestException('Invalid refund status.');
     }
-
-    refund.status =
-      status;
-
-    if (
-      status ===
-      'PENDING'
-    ) {
-      refund.processedAt =
-        null;
-
-      refund.refundedAt =
-        null;
-
-      refund.rejectedAt =
-        null;
+    const refund = await this.refundModel.findById(refundId);
+    if (!refund) return null;
+    const amount = refund.refundAmount;
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0) {
+      throw new ConflictException('Invalid refund amount. Review the financial record before updating.');
     }
-
-    if (
-      status ===
-      'PROCESSING'
-    ) {
-      refund.processedAt =
-        new Date();
-
-      refund.refundedAt =
-        null;
-
-      refund.rejectedAt =
-        null;
+    if (status === 'NO_REFUND_DUE' && amount !== 0) {
+      throw new ConflictException('A positive refund cannot be closed as no refund due.');
     }
-
-    if (
-      status ===
-      'REFUNDED'
-    ) {
-      refund.refundedAt =
-        new Date();
-
-      refund.rejectedAt =
-        null;
+    if (amount === 0 && ['PROCESSING', 'REFUNDED', 'REJECTED'].includes(status)) {
+      throw new ConflictException('No refund is due. Use Close case instead of processing, refunding or rejecting it.');
     }
-
-    if (
-      status ===
-      'REJECTED'
-    ) {
-      refund.rejectedAt =
-        new Date();
-
-      refund.refundedAt =
-        null;
+    if (refund.status === status) return refund;
+    if (['REFUNDED', 'NO_REFUND_DUE'].includes(refund.status)) {
+      throw new ConflictException('This refund case is already closed.');
     }
-
-    return refund.save();
+    if (status === 'REFUNDED' && refund.status !== 'PROCESSING') {
+      throw new ConflictException('Process and verify repayment before confirming the refund.');
+    }
+    const now = new Date();
+    const changes: Record<string, unknown> = { status };
+    if (status === 'NO_REFUND_DUE') {
+      if (!adminId || !Types.ObjectId.isValid(adminId)) throw new BadRequestException('Authenticated Admin identity is required to close the case.');
+      Object.assign(changes, { closedAt: now, closedBy: new Types.ObjectId(adminId), refundedAt: null, rejectedAt: null, paidAt: null });
+    } else if (status === 'PENDING') {
+      Object.assign(changes, { processedAt: null, refundedAt: null, rejectedAt: null });
+    } else if (status === 'PROCESSING') {
+      Object.assign(changes, { processedAt: now, refundedAt: null, rejectedAt: null });
+    } else if (status === 'REFUNDED') {
+      Object.assign(changes, { refundedAt: now, rejectedAt: null });
+    } else if (status === 'REJECTED') {
+      Object.assign(changes, { rejectedAt: now, refundedAt: null });
+    }
+    const updated = await this.refundModel.findOneAndUpdate(
+      { _id: refund._id, status: refund.status, refundAmount: amount },
+      { $set: changes }, { new: true, runValidators: true },
+    );
+    if (!updated) throw new ConflictException('Refund changed. Refresh before updating it.');
+    return updated;
   }
 
   // =========================================================

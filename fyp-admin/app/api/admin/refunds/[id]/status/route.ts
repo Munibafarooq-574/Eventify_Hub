@@ -8,6 +8,7 @@ const ALLOWED_STATUSES = [
   "PROCESSING",
   "REFUNDED",
   "REJECTED",
+  "NO_REFUND_DUE",
 ] as const;
 
 type RefundStatus =
