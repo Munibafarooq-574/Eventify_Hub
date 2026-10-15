@@ -503,7 +503,7 @@ const OrderSummary = () => {
                     </TouchableOpacity>
                     
                     <TouchableOpacity
-                        onPress={() => handleSummaryCardClick("Confirmed")
+                        onPress={() => handleSummaryCardClick("Confirmed")}
                         activeOpacity={0.7}
                     >
                         <SummaryCard
