@@ -31,6 +31,7 @@ export const config = {
     "/analytics/:path*",
     "/bookings/:path*",
     "/campaigns/:path*",
+    "/cancellation-policy/:path*",
     "/categories/:path*",
     "/clients/:path*",
     "/disputes/:path*",

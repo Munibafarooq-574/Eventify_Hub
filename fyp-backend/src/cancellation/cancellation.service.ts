@@ -1,5 +1,6 @@
 // fyp-backend/src/cancellation/cancellation.service.ts
 import {
+    BadRequestException,
     ConflictException,
     Injectable,
     NotFoundException,
@@ -45,22 +46,70 @@ export class CancellationService {
         private readonly rescheduleRequestModel: Model<RescheduleRequest>,
     ) {}
 
-    // ===== Admin: get/update global penalty config =====
+    // Step 2 prepares settings only; cancellation/payment behavior stays unchanged.
     async getPolicyConfig() {
         let config = await this.policyConfigModel.findOne();
-        if (!config) {
-            config = await this.policyConfigModel.create({});
+        if (!config) config = await this.policyConfigModel.create({});
+        if (!config.policySettings) {
+            const tiers = [
+                { minHoursBeforeEvent: 0, percentage: config.penaltyEventDay },
+                { minHoursBeforeEvent: 24, percentage: config.penaltyUnder7Days },
+                { minHoursBeforeEvent: 168, percentage: config.penalty7to14Days },
+                { minHoursBeforeEvent: 360, percentage: config.penalty15to29Days },
+                { minHoursBeforeEvent: 720, percentage: config.penalty30PlusDays },
+            ];
+            const configuredHold = Number(process.env.BOOKING_HOLD_HOURS);
+            await this.policyConfigModel.updateOne(
+                { _id: config._id, policySettings: { $exists: false } },
+                { $set: { policyRevision: 0, policySettings: {
+                    clientRefunds: {
+                        refundable: [{ minHoursBeforeEvent: 0, percentage: 100 }],
+                        partiallyRefundable: tiers.map(tier => ({ ...tier, percentage: 100 - tier.percentage })),
+                        nonRefundable: [{ minHoursBeforeEvent: 0, percentage: 0 }],
+                    },
+                    vendorCausedClientRefunds: [{ minHoursBeforeEvent: 0, percentage: 100 }],
+                    vendorPenalties: tiers,
+                    paymentHoldHours: Number.isInteger(configuredHold) && configuredHold >= 1 && configuredHold <= 8760 ? configuredHold : 24,
+                    // Initial editable draft value, not an active reporting restriction.
+                    postServiceIssueWindowHours: 72,
+                } } },
+            );
+            return this.policyConfigModel.findById(config._id).orFail();
         }
         return config;
     }
 
     async updatePolicyConfig(dto: UpdateCancellationPolicyDto) {
-        let config = await this.policyConfigModel.findOne();
-        if (!config) {
-            config = new this.policyConfigModel({});
+        const config = await this.getPolicyConfig();
+        if (dto.policySettings) {
+            if (dto.expectedRevision === undefined) throw new BadRequestException('expectedRevision is required for policy settings.');
+            if (Object.keys(dto).some(key => !['policySettings', 'expectedRevision'].includes(key))) {
+                throw new BadRequestException('Save new policy settings separately from legacy penalty settings.');
+            }
+            const settings = dto.policySettings;
+            for (const tiers of [settings.clientRefunds.refundable, settings.clientRefunds.partiallyRefundable,
+                settings.clientRefunds.nonRefundable, settings.vendorCausedClientRefunds, settings.vendorPenalties]) {
+                // Each threshold begins a range ending at the next threshold.
+                // Requiring 0 and strictly ascending thresholds prevents gaps/overlaps.
+                if (tiers[0].minHoursBeforeEvent !== 0 || tiers.some((tier, index) => index > 0 && tier.minHoursBeforeEvent <= tiers[index - 1].minHoursBeforeEvent)) {
+                    throw new BadRequestException('Each tier list must start at 0 hours with strictly increasing thresholds.');
+                }
+            }
+            const updated = await this.policyConfigModel.findOneAndUpdate(
+                { _id: config._id, policyRevision: dto.expectedRevision },
+                { $set: { policySettings: settings }, $inc: { policyRevision: 1 } },
+                { new: true, runValidators: true },
+            );
+            if (!updated) throw new ConflictException('Policy changed. Reload before saving.');
+            return updated;
         }
-        Object.assign(config, dto);
-        return config.save();
+        if (dto.expectedRevision !== undefined) throw new BadRequestException('policySettings is required with expectedRevision.');
+        // Preserve the existing legacy Admin API without mass assignment.
+        const changes: Record<string, number> = {};
+        for (const key of ['penalty30PlusDays', 'penalty15to29Days', 'penalty7to14Days', 'penaltyUnder7Days', 'penaltyEventDay'] as const) {
+            if (dto[key] !== undefined) changes[key] = dto[key]!;
+        }
+        return this.policyConfigModel.findByIdAndUpdate(config._id, { $set: changes }, { new: true, runValidators: true }).orFail();
     }
 
     // ===== Reusable: how many whole days before the event is "now"? =====

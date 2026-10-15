@@ -1,5 +1,7 @@
 // fyp-backend/src/cancellation/cancellation.controller.ts
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminRoleGuard } from '../auth/admin-role.guard';
 import { CancellationService } from './cancellation.service';
 import { CancelBookingDto } from './dto/cancel-booking.dto';
 import { UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
@@ -15,7 +17,8 @@ export class CancellationController {
     }
 
     @Patch('policy-config')
-    updatePolicyConfig(@Body() dto: UpdateCancellationPolicyDto) {
+    @UseGuards(JwtAuthGuard, AdminRoleGuard)
+    updatePolicyConfig(@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })) dto: UpdateCancellationPolicyDto) {
         return this.cancellationService.updatePolicyConfig(dto);
     }
 

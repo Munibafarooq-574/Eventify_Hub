@@ -36,6 +36,7 @@ const navigation = [
   title: "MANAGEMENT",
   items: [
     { label: "Disputes", href: "/disputes" },
+    { label: "Cancellation Policy", href: "/cancellation-policy" },
     { label: "Reviews", href: "/reviews" },
     { label: "Campaigns", href: "/campaigns" },
     { label: "Vendor Subscriptions", href: "/vendor-subscriptions" },

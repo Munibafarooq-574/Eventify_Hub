@@ -1,4 +1,5 @@
 // fyp-backend/src/cancellation/cancellation.module.ts
+import { AuthModule } from '../auth/auth.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { VendorOrder, VendorOrderSchema } from 'src/schemas/vendor-order.schema';
@@ -17,6 +18,7 @@ import { CancellationController } from './cancellation.controller';
 
 @Module({
     imports: [
+        AuthModule,
         MongooseModule.forFeature([
             { name: VendorOrder.name, schema: VendorOrderSchema },
             { name: Order.name, schema: OrderSchema },
