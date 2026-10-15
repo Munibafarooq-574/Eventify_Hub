@@ -20,7 +20,7 @@ interface Order {
     date: string;
     package: string;
     price: string;
-    status: "Pending" | "Processing" | "Completed";
+    status: "Pending" | "Processing" | "Confirmed" | "Completed";
 }
 
 const { width } = Dimensions.get('window');
@@ -37,7 +37,9 @@ const getCardColor = (label: string) => {
         case "Pending":
             return "#E8A23A"; // amber - order placed, not yet confirmed
         case "Processing":
-            return "#4A84BD"; // blue - confirmed, work in progress
+            return "#4A84BD"; // blue - accepted, payment still due
+        case "Confirmed":
+            return "#8F6CCF"; // financially secured after down payment
         case "Completed":
             return "#63BE63"; // green - done
         case "Cancelled":
@@ -55,7 +57,8 @@ const getCardColor = (label: string) => {
 // completed  -> "Completed"
 // cancelled  -> excluded everywhere except explicitly shown
 const PENDING_STATUS = "pending";
-const PROCESSING_STATUS = "confirmed";
+const PROCESSING_STATUS = "processing";
+const CONFIRMED_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 const PAYMENT_EXPIRED_STATUS = "payment_expired";
@@ -82,23 +85,26 @@ const formatTimeOnly = (value: string | Date) => {
 // active, so the parent flips to "confirmed").
 const getVendorStatus = (order: any) => {
     const vOrders = order.vendorOrders || [];
-    if (vOrders.length === 0) return order.status; // fallback safety
+    if (vOrders.length === 0) return order.status;
 
-    // Payment expiry is a distinct historical outcome. Prefer the backend's
-    // authoritative paymentStatus instead of deriving expiry from device time.
     if (vOrders.every((v: any) => String(v?.paymentStatus || "").toUpperCase() === "PAYMENT_EXPIRED")) {
         return PAYMENT_EXPIRED_STATUS;
     }
 
     const statuses = vOrders.map((v: any) => mapVendorStatus(v.status, v.replacementOutcome));
-    if (statuses.every((s: string) => s === "no_longer_assigned")) return "no_longer_assigned";
-    if (statuses.every((s: string) => s === "completed")) return "completed";
-    if (statuses.every((s: string) => s === "cancelled")) return "cancelled";
-    if (statuses.some((s: string) => s === "confirmed" || s === "completed")) return "confirmed";
+    if (statuses.every((x: string) => x === "no_longer_assigned")) return "no_longer_assigned";
+    if (statuses.every((x: string) => x === "completed")) return "completed";
+    if (statuses.every((x: string) => x === "cancelled")) return "cancelled";
+
+    const accepted = vOrders.filter((v: any) => mapVendorStatus(v.status, v.replacementOutcome) === "confirmed");
+    if (accepted.some((v: any) => ["PARTIALLY_PAID", "PAID"].includes(String(v?.paymentStatus || "").toUpperCase()))) return CONFIRMED_STATUS;
+    if (accepted.some((v: any) => String(v?.paymentStatus || "").toUpperCase() === "PAYMENT_REQUIRED")) return PROCESSING_STATUS;
+    if (accepted.length > 0) return PROCESSING_STATUS;
+
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled" | "Payment Expired" | "No Longer Assigned";
+type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Cancelled" | "Payment Expired" | "No Longer Assigned";
 
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
@@ -126,7 +132,7 @@ const OrderSummary = () => {
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
-        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Completed", "Cancelled", "Payment Expired", "No Longer Assigned"];
+        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Confirmed", "Completed", "Cancelled", "Payment Expired", "No Longer Assigned"];
         if (tab && validTabs.includes(tab as FilterType)) {
             setSelectedFilter(tab as FilterType);
 
@@ -197,6 +203,7 @@ const OrderSummary = () => {
         const orderStats = useMemo(() => {
         const pending = orders.filter((o) => getVendorStatus(o) === PENDING_STATUS).length;
         const processing = orders.filter((o) => getVendorStatus(o) === PROCESSING_STATUS).length;
+        const confirmed = orders.filter((o) => getVendorStatus(o) === CONFIRMED_STATUS).length;
         const completed = orders.filter((o) => getVendorStatus(o) === COMPLETED_STATUS).length;
         const cancelled = orders.filter((o) => getVendorStatus(o) === CANCELLED_STATUS).length;
         const paymentExpired = orders.filter((o) => getVendorStatus(o) === PAYMENT_EXPIRED_STATUS).length;
@@ -205,6 +212,7 @@ const OrderSummary = () => {
             totalOrders: orders.length, // matches dashboard's total (includes every status)
             pending,
             processing,
+            confirmed,
             completed,
             cancelled,
             paymentExpired,
@@ -241,6 +249,7 @@ const OrderSummary = () => {
             if (selectedFilter === "All") return true;
             if (selectedFilter === "Pending") return getVendorStatus(order) === PENDING_STATUS;
             if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
+            if (selectedFilter === "Confirmed") return getVendorStatus(order) === CONFIRMED_STATUS;
             if (selectedFilter === "Completed") return getVendorStatus(order) === COMPLETED_STATUS;
             if (selectedFilter === "Cancelled") return getVendorStatus(order) === CANCELLED_STATUS;
             if (selectedFilter === "Payment Expired") return getVendorStatus(order) === PAYMENT_EXPIRED_STATUS;
@@ -490,6 +499,18 @@ const OrderSummary = () => {
                             value={orderStats.processing}
                             icon="hourglass-outline"
                             isActive={selectedFilter === "Processing"}
+                        />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                        onPress={() => handleSummaryCardClick("Confirmed")
+                        activeOpacity={0.7}
+                    >
+                        <SummaryCard
+                            label="Confirmed"
+                            value={orderStats.confirmed}
+                            icon="shield-checkmark-outline"
+                            isActive={selectedFilter === "Confirmed"}
                         />
                     </TouchableOpacity>
                     
