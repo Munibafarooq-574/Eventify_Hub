@@ -24,6 +24,7 @@ import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { CreateRescheduleRequestDto, RespondRescheduleRequestDto } from './dto/reschedule-request.dto';
 import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { ChatService } from '../chat/chat.service';
+import { Cron } from '@nestjs/schedule';
 
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
@@ -2078,10 +2079,10 @@ vendorOrder.vendorNetAmount =
         return saved;
     }
 
-    // ===== NEW (Phase 5 scaffold): expire stale accepted-but-unpaid holds =====
-    // Not wired to a cron job yet — call manually / via admin endpoint until
-    // Phase 6 (payment) exists, so no currently-accepted booking is affected
-    // unintentionally.
+    // Expire accepted-but-unpaid holds on the backend. The frontend is
+    // presentation only; the server remains authoritative for payment expiry.
+    // Runs every minute so an expired slot is released promptly.
+    @Cron('0 * * * * *')
     async expireStaleHolds() {
     const now = new Date();
 
