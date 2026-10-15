@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { VendorOrder } from 'src/schemas/vendor-order.schema';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
+import { BookingPolicySnapshot, VendorOrder } from 'src/schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
 import { Payment } from 'src/schemas/payment.schema';
 import { Refund } from 'src/schemas/refund.schema';
@@ -15,7 +17,7 @@ import { VendorPenalty } from 'src/schemas/vendor-penalty.schema';
 import { CancellationPolicyConfig } from 'src/schemas/cancellation-policy.schema';
 import { User } from 'src/schemas/user.schema';
 import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
-import { UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
+import { CancellationPolicySettingsDto, UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
 import { RefundCalculationResult } from './cancellation.types';
 
 @Injectable()
@@ -46,7 +48,7 @@ export class CancellationService {
         private readonly rescheduleRequestModel: Model<RescheduleRequest>,
     ) {}
 
-    // Step 2 prepares settings only; cancellation/payment behavior stays unchanged.
+    // Admin settings also supply Step 3 snapshots; current cancellation/payment behavior stays unchanged.
     async getPolicyConfig() {
         let config = await this.policyConfigModel.findOne();
         if (!config) config = await this.policyConfigModel.create({});
@@ -87,14 +89,7 @@ export class CancellationService {
                 throw new BadRequestException('Save new policy settings separately from legacy penalty settings.');
             }
             const settings = dto.policySettings;
-            for (const tiers of [settings.clientRefunds.refundable, settings.clientRefunds.partiallyRefundable,
-                settings.clientRefunds.nonRefundable, settings.vendorCausedClientRefunds, settings.vendorPenalties]) {
-                // Each threshold begins a range ending at the next threshold.
-                // Requiring 0 and strictly ascending thresholds prevents gaps/overlaps.
-                if (tiers[0].minHoursBeforeEvent !== 0 || tiers.some((tier, index) => index > 0 && tier.minHoursBeforeEvent <= tiers[index - 1].minHoursBeforeEvent)) {
-                    throw new BadRequestException('Each tier list must start at 0 hours with strictly increasing thresholds.');
-                }
-            }
+            this.validatePolicySettings(settings);
             const updated = await this.policyConfigModel.findOneAndUpdate(
                 { _id: config._id, policyRevision: dto.expectedRevision },
                 { $set: { policySettings: settings }, $inc: { policyRevision: 1 } },
@@ -110,6 +105,47 @@ export class CancellationService {
             if (dto[key] !== undefined) changes[key] = dto[key]!;
         }
         return this.policyConfigModel.findByIdAndUpdate(config._id, { $set: changes }, { new: true, runValidators: true }).orFail();
+    }
+
+    private validatePolicySettings(settings: CancellationPolicySettingsDto) {
+        const errors = validateSync(plainToInstance(CancellationPolicySettingsDto, settings), {
+            whitelist: true, forbidNonWhitelisted: true,
+        });
+        if (errors.length) throw new BadRequestException('Admin cancellation policy settings are incomplete or invalid.');
+        for (const tiers of [settings.clientRefunds.refundable, settings.clientRefunds.partiallyRefundable,
+            settings.clientRefunds.nonRefundable, settings.vendorCausedClientRefunds, settings.vendorPenalties]) {
+            // Each threshold begins a range ending at the next threshold.
+            // Requiring 0 and strictly ascending thresholds prevents gaps/overlaps.
+            if (tiers[0].minHoursBeforeEvent !== 0 || tiers.some((tier, index) => index > 0 && tier.minHoursBeforeEvent <= tiers[index - 1].minHoursBeforeEvent)) {
+                throw new BadRequestException('Each tier list must start at 0 hours with strictly increasing thresholds.');
+            }
+        }
+    }
+
+    // Uses the existing business-policy source, never a client-supplied label/rate.
+    // Pure copy: no booking writes and no reference to the mutable Admin document.
+    buildBookingPolicySnapshot(vendorUser: any, config: CancellationPolicyConfig): BookingPolicySnapshot {
+        if (!config.policySettings || !Number.isInteger(config.policyRevision) || config.policyRevision < 0 || !config._id) {
+            throw new ConflictException('Cancellation policy is not configured for new bookings.');
+        }
+        const settings: CancellationPolicySettingsDto = JSON.parse(JSON.stringify(config.policySettings));
+        this.validatePolicySettings(settings);
+        const rawLabel = this.getVendorCancellationPolicy(vendorUser, true);
+        if (typeof rawLabel !== 'string') throw new ConflictException('Vendor cancellation policy is invalid.');
+        const label = rawLabel
+            .trim().toUpperCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+        const selectedPolicy = label === 'NON REFUNDABLE' ? 'NON-REFUNDABLE' : label;
+        if (!['REFUNDABLE', 'PARTIALLY REFUNDABLE', 'NON-REFUNDABLE'].includes(selectedPolicy)) {
+            throw new ConflictException('Vendor cancellation policy is invalid. Ask the vendor to update their business details.');
+        }
+        return {
+            schemaVersion: 1,
+            policyConfigId: String(config._id),
+            policyRevision: config.policyRevision,
+            capturedAt: new Date(),
+            selectedPolicy,
+            settings,
+        };
     }
 
     // ===== Reusable: how many whole days before the event is "now"? =====
@@ -177,7 +213,7 @@ export class CancellationService {
     }
 
     // ===== Get vendor's own cancellationPolicy label (reused, not duplicated) =====
-    private getVendorCancellationPolicy(vendorUser: any): string {
+    private getVendorCancellationPolicy(vendorUser: any, includeGeneric = false): string {
         const businessDetails =
             vendorUser?.photographerBusinessDetails ||
             vendorUser?.cateringBusinessDetails ||
@@ -185,7 +221,8 @@ export class CancellationService {
             vendorUser?.salonBusinessDetails ||
             vendorUser?.cakeBusinessDetails ||
             vendorUser?.mehndiBusinessDetails ||
-            vendorUser?.soundBusinessDetails;
+            vendorUser?.soundBusinessDetails ||
+            (includeGeneric ? vendorUser?.genericBusinessDetails : undefined);
 
         return (
             businessDetails?.cancellationPolicy ||

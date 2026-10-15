@@ -1,3 +1,4 @@
+import { CancellationModule } from '../cancellation/cancellation.module';
 import { MongooseModule } from "@nestjs/mongoose";
 import { Order, OrderSchema } from "../schemas/order.schema";
 import { VendorOrder, VendorOrderSchema } from "../schemas/vendor-order.schema";
@@ -20,6 +21,7 @@ import { ChatModule } from '../chat/chat.module';
 
 @Module({
     imports: [
+        CancellationModule,
         MongooseModule.forFeature([
             { name: Order.name, schema: OrderSchema },
             { name: User.name, schema: UserSchema },

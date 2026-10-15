@@ -3,9 +3,37 @@
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { CancellationPolicySettings, CancellationPolicySettingsSchema } from './cancellation-policy.schema';
+
+@Schema({ _id: false })
+export class BookingPolicySnapshot {
+    @Prop({ required: true, enum: [1], immutable: true })
+    schemaVersion: number;
+
+    @Prop({ required: true, immutable: true })
+    policyConfigId: string;
+
+    @Prop({ required: true, min: 0, immutable: true })
+    policyRevision: number;
+
+    @Prop({ type: Date, required: true, immutable: true })
+    capturedAt: Date;
+
+    @Prop({ required: true, enum: ['REFUNDABLE', 'PARTIALLY REFUNDABLE', 'NON-REFUNDABLE'], immutable: true })
+    selectedPolicy: string;
+
+    @Prop({ type: CancellationPolicySettingsSchema, required: true, immutable: true })
+    settings: CancellationPolicySettings;
+}
+const BookingPolicySnapshotSchema = SchemaFactory.createForClass(BookingPolicySnapshot);
 
 @Schema({ timestamps: true })
 export class VendorOrder extends Document {
+    // Server-generated once at booking creation. Absent on legacy bookings.
+    // Acceptance, payment and rescheduling must not replace these terms.
+    @Prop({ type: BookingPolicySnapshotSchema, immutable: true })
+    policySnapshot?: BookingPolicySnapshot;
+
     @Prop({ type: Types.ObjectId, required: true, ref: 'Order' })
     orderId: Types.ObjectId;
 

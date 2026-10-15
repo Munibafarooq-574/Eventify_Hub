@@ -44,14 +44,14 @@ export class CancellationPolicySettings {
     @Prop({ required: true, min: 1, max: 8760 })
     postServiceIssueWindowHours: number;
 }
-const PolicySettingsSchema = SchemaFactory.createForClass(CancellationPolicySettings);
+export const CancellationPolicySettingsSchema = SchemaFactory.createForClass(CancellationPolicySettings);
 
 // Admin-configurable penalty tiers based on days-remaining-before-event.
 // Single global config document (not per-vendor) — simplest starting point.
 @Schema({ timestamps: true })
 export class CancellationPolicyConfig extends Document {
     // Prepared in Step 2. Runtime activation requires booking snapshots (Step 3).
-    @Prop({ type: PolicySettingsSchema })
+    @Prop({ type: CancellationPolicySettingsSchema })
     policySettings?: CancellationPolicySettings;
 
     @Prop({ default: 0, min: 0 })

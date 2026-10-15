@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BookingPolicySnapshot, { type SavedBookingPolicy } from "@/components/BookingPolicySnapshot";
 import { notFound, redirect } from "next/navigation";
 
 import LogoutButton from "@/components/LogoutButton";
@@ -20,6 +21,7 @@ type Person = {
 };
 
 type VendorOrder = {
+  policySnapshot?: SavedBookingPolicy;
   _id?: string;
   vendorId?: Person;
   serviceName?: string;
@@ -461,6 +463,8 @@ export default async function BookingDetailsPage({
                 />
               </Card>
             </div>
+
+            <BookingPolicySnapshot snapshot={vendorOrder.policySnapshot} />
 
             <div className="grid gap-6 xl:grid-cols-2">
               <Card title="Client Information">

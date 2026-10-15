@@ -26,7 +26,7 @@ Save the complete draft using `{ expectedRevision, policySettings }`. The backen
 
 ## Deliberate activation boundary
 
-Step 2 stores editable policy structure only. New settings are drafts and are not consumed by current refund, vendor penalty, payment deadline or issue-reporting paths. The existing cancellation calculation bodies remain unchanged. Booking snapshots and downstream policy enforcement belong to Steps 3–8. Those steps must consume this structure in the same service, preserve existing booking terms, and enforce authenticated ownership before cancellation mutations. The UI clearly labels the settings as drafts.
+Step 2 stores editable policy structure only. New settings are drafts and are not consumed by current refund, vendor penalty, payment deadline or issue-reporting paths. The existing cancellation calculation bodies remain unchanged. Step 3 now captures these settings for new bookings (see below). Downstream policy enforcement belongs to Steps 4–8. Those steps must consume this structure in the same service, preserve existing booking terms, and enforce authenticated ownership before cancellation mutations. The UI clearly labels the settings as drafts.
 
 No booking statuses, acceptance/reschedule logic, payments, refunds or penalty records are rewritten by this step. Fully paid restrictions, exceptional Admin resolution and completed-order issue submission are not implemented here.
 
@@ -37,3 +37,26 @@ No booking statuses, acceptance/reschedule logic, payments, refunds or penalty r
 - Admin: focused ESLint and `npm run build`
 
 After backend and Admin deployment, sign in as Admin, open Cancellation Policy, save/reload draft values, test independent tier editing and a stale-tab save. Confirm existing booking refund previews and payment deadlines remain unchanged. Verify unauthorized policy writes return 401/403. Live verification requires the deployed services; local builds do not prove Render is Live.
+
+
+## Step 3: booking policy snapshots
+
+Every new VendorOrder now receives an embedded, server-generated `policySnapshot` in the existing order creation transaction. Normal and replacement bookings share this path. One Admin config revision is read per checkout; each vendor receives an independent deep copy. All policies are validated before any Order/VendorOrder is created.
+
+Snapshot fields: schemaVersion (1), policyConfigId, policyRevision, capturedAt, selectedPolicy, settings. Settings reuse the Step 2 embedded schema rather than creating a duplicate configuration model. Full rules and durations are retained for the later enforcement steps.
+
+The selected label comes from existing vendor business details, including photographer covidRefundPolicy and generic business cancellationPolicy. Common case/underscore/hyphen variations normalize to the existing three labels. Missing labels retain the existing partially refundable fallback; unknown nonempty labels reject booking rather than silently inventing terms. No new package-policy field or editor is introduced because package policy storage does not currently exist.
+
+Frontend policy payloads are ignored. Snapshot fields are immutable in the Mongoose schema, and acceptance, payment and rescheduling do not write them. Legacy VendorOrders keep the field absent: there is no migration that retroactively assigns today's rules to old bookings. Existing cancellation calculation bodies retain their legacy behavior until Step 4 introduces snapshot-based cancellation with ownership enforcement. Payment hold and issue reporting are not activated by this step.
+
+Admin Bookings → open a vendor booking → Saved booking policy shows the policy, saved revision, capture time and expandable saved terms. Legacy bookings display a message that no saved snapshot is available.
+
+Local runtime verification:
+
+1. Start updated backend and Admin app; existing local URLs can stay unchanged.
+2. Make one new normal booking from the client app. Open it in Admin Bookings → Saved booking policy.
+3. Record its saved revision and a percentage. Edit/save the Admin policy draft, then refresh the booking details: its saved revision and terms must stay unchanged.
+4. Create another booking with a different event ID; it must capture the new revision/terms.
+5. Restore any temporary policy edits. No payment or cancellation is required for this check.
+
+Automated tests cover legacy absence, deep-copy isolation, vendor label sources, schema persistence/immutability, multi-vendor checkout, replacement checkout, forged client policy input, and invalid policy rejection before booking writes.

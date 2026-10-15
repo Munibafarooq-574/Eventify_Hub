@@ -1,3 +1,6 @@
+// Isolate scheduling: these tests exercise booking logic, not cron registration.
+jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
+import { CancellationService } from '../cancellation/cancellation.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderService } from './order.service';
 import { getConnectionToken, getModelToken } from '@nestjs/mongoose';
@@ -78,6 +81,7 @@ describe('OrderService - Unit Tests', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 OrderService,
+                { provide: CancellationService, useValue: {} },
                 { provide: getModelToken(User.name), useValue: userModel },
                 { provide: getModelToken(Order.name), useValue: orderModel },
                 { provide: getModelToken(VendorOrder.name), useValue: vendorOrderModel },
@@ -150,6 +154,7 @@ describe('OrderService - Unit Tests', () => {
     });
 
     it('should update order status', async () => {
+        jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
         const updated = await service.updateStatus('o123', { status: 'completed' });
         expect(updated.organizerId).toBe(validObjectId);
     });

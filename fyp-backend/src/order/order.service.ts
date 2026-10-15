@@ -8,6 +8,8 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Connection, Model, Types } from 'mongoose';
+import { CancellationService } from '../cancellation/cancellation.service';
+import { BookingPolicySnapshot } from '../schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -63,6 +65,7 @@ export class OrderService {
     private readonly cityService: CityService,
     private readonly discountService: DiscountService,
     private readonly chatService: ChatService,
+    private readonly cancellationService: CancellationService,
 ) { }
 
 
@@ -337,6 +340,10 @@ export class OrderService {
     const eventCityObjectId =
         new Types.ObjectId(eventCityId);
 
+    // Capture one Admin revision per checkout, outside the booking transaction.
+    // Initialize legacy config through the existing service; no backfill of bookings.
+    const bookingPolicyConfig = await this.cancellationService.getPolicyConfig();
+
     const session =
         await this.connection.startSession();
 
@@ -427,7 +434,7 @@ export class OrderService {
                                     eventCityObjectId,
                             })
                             .select(
-                                '_id buisnessCategory packages availabilitySettings serviceLocationCityIds',
+                                '_id buisnessCategory packages availabilitySettings serviceLocationCityIds photographerBusinessDetails cateringBusinessDetails venueBusinessDetails salonBusinessDetails cakeBusinessDetails mehndiBusinessDetails soundBusinessDetails genericBusinessDetails',
                             )
                             .session(session)
                             .lean();
@@ -483,6 +490,7 @@ export class OrderService {
                     }
 
                     type ValidatedService = {
+                        policySnapshot: BookingPolicySnapshot;
                         serviceIndex: number;
                         vendorId: string;
                         packageId: string;
@@ -981,6 +989,7 @@ export class OrderService {
                         validatedServices.push(
                             {
                                 serviceIndex,
+                                policySnapshot: this.cancellationService.buildBookingPolicySnapshot(vendor, bookingPolicyConfig),
                                 vendorId:
                                     String(
                                         service.vendorId,
@@ -1108,6 +1117,7 @@ export class OrderService {
                                 .create(
                                     [
                                         {
+                                            policySnapshot: validatedService.policySnapshot,
                                             orderId:
                                                 order._id,
                                             vendorId:

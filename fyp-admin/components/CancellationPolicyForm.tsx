@@ -71,8 +71,8 @@ export default function CancellationPolicyForm() {
   return <div className="space-y-6">
     <div><h1 className="text-2xl font-bold text-slate-950">Cancellation policy</h1><p className="mt-2 text-sm text-slate-600">Configure client refunds, vendor cancellation protection and policy durations.</p></div>
     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950 space-y-2">
-      <p className="font-semibold">Draft settings — not active for bookings yet</p>
-      <p>These settings are prepared for the booking policy snapshot rollout. Saving this draft does not change current refunds, penalties, payment deadlines or issue reporting.</p>
+      <p className="font-semibold">Policy settings — saved with new bookings</p>
+      <p>New vendor bookings save a copy of these rules. Later changes do not rewrite those saved terms. Refund, penalty and duration enforcement will be connected in the cancellation rollout.</p>
       <p>Refund percentages apply to the amount paid. Vendor penalties apply separately to the vendor booking price. Each tier applies from its minimum notice until the next threshold; the final tier has no upper limit. The 0-hour tier also covers events that have started.</p>
     </div>
     {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}<button type="button" disabled={busy} className="ml-3 underline" onClick={() => setRetry(value => value + 1)}>Reload saved policy</button></div>}
