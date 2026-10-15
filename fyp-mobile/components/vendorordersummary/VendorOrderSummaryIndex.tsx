@@ -42,6 +42,8 @@ const getCardColor = (label: string) => {
             return "#63BE63"; // green - done
         case "Cancelled":
             return "#D9534F"; // red - cancelled
+        case "Payment Expired":
+            return "#C47A2C"; // warm amber - payment hold expired
         default:
             return PRIMARY;
     }
@@ -56,6 +58,7 @@ const PENDING_STATUS = "pending";
 const PROCESSING_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
+const PAYMENT_EXPIRED_STATUS = "payment_expired";
 
 // VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
 const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
@@ -80,6 +83,13 @@ const formatTimeOnly = (value: string | Date) => {
 const getVendorStatus = (order: any) => {
     const vOrders = order.vendorOrders || [];
     if (vOrders.length === 0) return order.status; // fallback safety
+
+    // Payment expiry is a distinct historical outcome. Prefer the backend's
+    // authoritative paymentStatus instead of deriving expiry from device time.
+    if (vOrders.every((v: any) => String(v?.paymentStatus || "").toUpperCase() === "PAYMENT_EXPIRED")) {
+        return PAYMENT_EXPIRED_STATUS;
+    }
+
     const statuses = vOrders.map((v: any) => mapVendorStatus(v.status, v.replacementOutcome));
     if (statuses.every((s: string) => s === "no_longer_assigned")) return "no_longer_assigned";
     if (statuses.every((s: string) => s === "completed")) return "completed";
@@ -88,7 +98,7 @@ const getVendorStatus = (order: any) => {
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled" | "No Longer Assigned";
+type FilterType = "All" | "Pending" | "Processing" | "Completed" | "Cancelled" | "Payment Expired" | "No Longer Assigned";
 
 const OrderSummary = () => {
     const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
@@ -115,7 +125,7 @@ const OrderSummary = () => {
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
-        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Completed", "Cancelled", "No Longer Assigned"];
+        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Completed", "Cancelled", "Payment Expired", "No Longer Assigned"];
         if (tab && validTabs.includes(tab as FilterType)) {
             setSelectedFilter(tab as FilterType);
         }
@@ -178,6 +188,7 @@ const OrderSummary = () => {
         const processing = orders.filter((o) => getVendorStatus(o) === PROCESSING_STATUS).length;
         const completed = orders.filter((o) => getVendorStatus(o) === COMPLETED_STATUS).length;
         const cancelled = orders.filter((o) => getVendorStatus(o) === CANCELLED_STATUS).length;
+        const paymentExpired = orders.filter((o) => getVendorStatus(o) === PAYMENT_EXPIRED_STATUS).length;
         const noLongerAssigned = orders.filter((o) => getVendorStatus(o) === "no_longer_assigned").length;
         return {
             totalOrders: orders.length, // matches dashboard's total (includes every status)
@@ -185,6 +196,7 @@ const OrderSummary = () => {
             processing,
             completed,
             cancelled,
+            paymentExpired,
             noLongerAssigned,
         };
     }, [orders]);
@@ -199,6 +211,8 @@ const OrderSummary = () => {
                 return "#5CB85C";
             case "cancelled":
                 return "#D9534F";
+            case "payment_expired":
+                return "#C47A2C";
             case "no_longer_assigned":
                 return "#8B6B82";
             default:
@@ -218,6 +232,7 @@ const OrderSummary = () => {
             if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
             if (selectedFilter === "Completed") return getVendorStatus(order) === COMPLETED_STATUS;
             if (selectedFilter === "Cancelled") return getVendorStatus(order) === CANCELLED_STATUS;
+            if (selectedFilter === "Payment Expired") return getVendorStatus(order) === PAYMENT_EXPIRED_STATUS;
             if (selectedFilter === "No Longer Assigned") return getVendorStatus(order) === "no_longer_assigned";
             return true;
         });
@@ -491,6 +506,18 @@ const OrderSummary = () => {
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                        onPress={() => handleSummaryCardClick("Payment Expired")}
+                        activeOpacity={0.7}
+                    >
+                        <SummaryCard
+                            label="Payment Expired"
+                            value={orderStats.paymentExpired}
+                            icon="timer-outline"
+                            isActive={selectedFilter === "Payment Expired"}
+                        />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                         onPress={() => handleSummaryCardClick("No Longer Assigned")}
                         activeOpacity={0.7}
                     >
@@ -551,7 +578,7 @@ const OrderSummary = () => {
                                             <Text style={styles.orderName}>{item.organizerId?.name}</Text>
                                         </View>
                                         <View style={styles.statusBadge}>
-                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item)}</Text>
+                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item)}</Text>
                                         </View>
                                         <Ionicons
                                             name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -728,7 +755,7 @@ const OrderSummary = () => {
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item)}</Text>
+                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item)}</Text>
                                                     </View>
                                                 )}
 
@@ -761,12 +788,18 @@ const OrderSummary = () => {
                                         )}
                                     </View>
 
-                                                                        {getVendorStatus(item) === "no_longer_assigned" ? (
+                                                                        {getVendorStatus(item) === "no_longer_assigned" || getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? (
                                         <View style={styles.closedBookingBox}>
                                             <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
                                             <View style={{ flex: 1 }}>
-                                                <Text style={styles.closedBookingTitle}>This booking is closed</Text>
-                                                <Text style={styles.closedBookingText}>This record is available for your history only. No further actions are required.</Text>
+                                                <Text style={styles.closedBookingTitle}>
+                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment window expired" : "This booking is closed"}
+                                                </Text>
+                                                <Text style={styles.closedBookingText}>
+                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS
+                                                        ? "The client did not complete the required payment before the deadline. This booking is now history only and the reserved slot has been released."
+                                                        : "This record is available for your history only. No further actions are required."}
+                                                </Text>
                                             </View>
                                         </View>
                                     ) : (
