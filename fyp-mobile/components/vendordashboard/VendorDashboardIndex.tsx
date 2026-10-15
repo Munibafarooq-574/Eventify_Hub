@@ -911,7 +911,7 @@ if (!hasValidSubscription) {
                             icon="archive-outline"
                             value={orderStats.noLongerAssigned}
                             label="No Longer Assigned"
-                            accent="#7D0C72"
+                            accent="#D7A7CE"
                             onPress={() =>
                                 router.push({
                                     pathname: "/vendorordersummary",
