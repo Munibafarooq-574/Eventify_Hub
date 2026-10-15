@@ -2,9 +2,15 @@ import Link from "next/link";
 import BookingPolicySnapshot, { type SavedBookingPolicy } from "@/components/BookingPolicySnapshot";
 import { notFound, redirect } from "next/navigation";
 
-import LogoutButton from "@/components/LogoutButton";
+import AdminSidebar from "@/components/AdminSidebar";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+
+type City = { name?: string; stateProvinceName?: string; countryName?: string };
+const cityLabel = (city?: City | string | null) => {
+  if (!city || typeof city === "string") return "";
+  return [city.name, city.stateProvinceName, city.countryName].filter(Boolean).join(", ");
+};
 
 type Person = {
   _id?: string;
@@ -12,11 +18,21 @@ type Person = {
   email?: string;
   phone?: string;
   phone_number?: string;
+  buisnessCategory?: { name?: string } | string;
+  serviceLocationCityIds?: (City | string)[];
+  businessCityId?: City | string | null;
+  businessAddress?: string;
   contactDetails?: {
     brandName?: string;
     bookingEmail?: string;
     contactNumber?: string;
     city?: string;
+    contactNumberSecondary?: string;
+    website?: string;
+    facebookLink?: string;
+    instagramLink?: string;
+    officialAddress?: string;
+    officialGoogleLink?: string;
   };
 };
 
@@ -228,16 +244,6 @@ export default async function BookingDetailsPage({
   const vendor = vendorOrder.vendorId;
   const client = order?.organizerId;
 
-  const vendorName =
-    vendor?.contactDetails?.brandName?.trim() ||
-    vendor?.name?.trim() ||
-    "N/A";
-
-  const vendorEmail =
-    vendor?.contactDetails?.bookingEmail?.trim() ||
-    vendor?.email?.trim() ||
-    "N/A";
-
   const vendorPhone =
     vendor?.contactDetails?.contactNumber?.trim() ||
     vendor?.phone_number?.trim() ||
@@ -255,58 +261,10 @@ export default async function BookingDetailsPage({
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-          <div className="border-b border-slate-200 px-6 py-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Eventify Hub
-            </p>
-
-            <h1 className="mt-2 text-xl font-bold">
-              Admin Console
-            </h1>
-          </div>
-
-          <nav className="flex-1 space-y-2 px-4 py-6">
-            <Link
-              href="/dashboard"
-              className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
-            >
-              Dashboard
-            </Link>
-
-            <Link
-              href="/bookings"
-              className="block rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
-            >
-              Bookings
-            </Link>
-
-            <div className="rounded-xl px-4 py-3 text-sm text-slate-400">
-              Vendors
-            </div>
-
-            <div className="rounded-xl px-4 py-3 text-sm text-slate-400">
-              Clients
-            </div>
-
-            <div className="rounded-xl px-4 py-3 text-sm text-slate-400">
-              Categories
-            </div>
-
-            <div className="rounded-xl px-4 py-3 text-sm text-slate-400">
-              Finance
-            </div>
-
-            <div className="rounded-xl px-4 py-3 text-sm text-slate-400">
-              Disputes
-            </div>
-          </nav>
-
-          <div className="border-t border-slate-200 p-4">
-            <LogoutButton />
-          </div>
-        </aside>
+      <div className="flex min-h-screen flex-col lg:flex-row">
+        <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
+          <AdminSidebar />
+        </div>
 
         <section className="min-w-0 flex-1">
           <header className="border-b border-slate-200 bg-white px-5 py-5 md:px-8">
@@ -491,38 +449,22 @@ export default async function BookingDetailsPage({
               </Card>
 
               <Card title="Vendor Information">
-                <InfoRow
-                  label="Business / Brand"
-                  value={vendorName}
-                />
-
-                <InfoRow
-                  label="Account name"
-                  value={text(vendor?.name)}
-                />
-
-                <InfoRow
-                  label="Email"
-                  value={vendorEmail}
-                />
-
-                <InfoRow
-                  label="Phone"
-                  value={vendorPhone}
-                />
-
-                <InfoRow
-                  label="City"
-                  value={text(
-                    vendor?.contactDetails?.city,
-                  )}
-                />
-
-                <InfoRow
-                  label="Vendor ID"
-                  value={text(vendor?._id)}
-                  mono
-                />
+                <p className="mb-4 text-xs text-slate-500">Current vendor profile and contact details.</p>
+                <InfoRow label="Vendor name" value={text(vendor?.name)} />
+                <InfoRow label="Brand name" value={text(vendor?.contactDetails?.brandName)} />
+                <InfoRow label="Category" value={text(typeof vendor?.buisnessCategory === "object" ? vendor.buisnessCategory?.name : undefined)} />
+                <InfoRow label="Service cities" value={(vendor?.serviceLocationCityIds ?? []).map(cityLabel).filter(Boolean).join("; ") || "N/A"} />
+                <InfoRow label="Business city" value={cityLabel(vendor?.businessCityId) || text(vendor?.contactDetails?.city)} />
+                <InfoRow label="Phone" value={vendorPhone} />
+                <InfoRow label="Secondary phone" value={text(vendor?.contactDetails?.contactNumberSecondary)} />
+                <InfoRow label="Booking email" value={text(vendor?.contactDetails?.bookingEmail)} />
+                <InfoRow label="Account email" value={text(vendor?.email)} />
+                <InfoRow label="Website" value={<WebLink value={vendor?.contactDetails?.website} />} />
+                <InfoRow label="Facebook" value={<WebLink value={vendor?.contactDetails?.facebookLink} />} />
+                <InfoRow label="Instagram" value={<WebLink value={vendor?.contactDetails?.instagramLink} />} />
+                <InfoRow label="Official office address" value={vendor?.businessAddress?.trim() || text(vendor?.contactDetails?.officialAddress)} />
+                <InfoRow label="Office map" value={<WebLink value={vendor?.contactDetails?.officialGoogleLink} />} />
+                <InfoRow label="Vendor ID" value={text(vendor?._id)} mono />
               </Card>
             </div>
 
@@ -758,7 +700,7 @@ function InfoRow({
   mono = false,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   mono?: boolean;
 }) {
   return (
@@ -831,4 +773,18 @@ function TableCell({
       {children}
     </td>
   );
+}
+
+function WebLink({ value }: { value?: string }) {
+  const label = value?.trim();
+  if (!label) return <>N/A</>;
+  let href: string | null = null;
+  try {
+    const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(label);
+    const url = new URL(label.startsWith("//") ? `https:${label}` : hasScheme ? label : `https://${label}`);
+    if (["http:", "https:"].includes(url.protocol)) href = url.href;
+  } catch {
+    href = null;
+  }
+  return href ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-blue-700 underline">{label}</a> : <>{label}</>;
 }

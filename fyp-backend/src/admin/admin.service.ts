@@ -420,15 +420,15 @@ export class AdminService {
                 .findById(
                     vendorOrderId,
                 )
-                .populate(
-                    'vendorId',
-                    [
-                        'name',
-                        'email',
-                        'phone_number',
-                        'contactDetails',
-                    ].join(' '),
-                )
+                .populate({
+                    path: 'vendorId',
+                    select: 'name email phone_number contactDetails buisnessCategory serviceLocationCityIds businessCityId businessAddress',
+                    populate: [
+                        { path: 'buisnessCategory', select: 'name' },
+                        { path: 'serviceLocationCityIds', select: 'name stateProvinceName countryName' },
+                        { path: 'businessCityId', select: 'name stateProvinceName countryName' },
+                    ],
+                })
                 .lean();
 
         if (!vendorOrder) {
