@@ -210,37 +210,67 @@ const MyEventsScreen = () => {
 
     return priority.find(status => statuses.includes(status)) || statuses[0] || order?.status;
   }, [getOwnVendorOrders]);
+
+  /**
+   * ACTIVE SCHEDULE ONLY
+   *
+   * My Events is the vendor's working calendar, not booking history.
+   * Cancelled/rejected/expired assignments and replacement assignments that
+   * are no longer assigned stay in Order Summary/history, but must not keep
+   * appearing as calendar events.
+   */
+  const scheduleOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const ownVendorOrders = getOwnVendorOrders(order);
+
+      if (ownVendorOrders.length > 0) {
+        return ownVendorOrders.some((vendorOrder: any) => {
+          const status = String(vendorOrder?.status || "").toLowerCase();
+          const replacementOutcome = String(vendorOrder?.replacementOutcome || "").toUpperCase();
+
+          return (
+            !["cancelled", "rejected", "expired"].includes(status) &&
+            replacementOutcome !== "NO_LONGER_ASSIGNED"
+          );
+        });
+      }
+
+      return !["cancelled", "rejected", "expired"].includes(
+        String(order?.status || "").toLowerCase(),
+      );
+    });
+  }, [orders, getOwnVendorOrders]);
   
   /**
  * STATS
  */
 const stats = useMemo(() => {
   const now = new Date();
-  const thisMonth = orders.filter((order) => {
+  const thisMonth = scheduleOrders.filter((order) => {
     if (!order?.eventDate) return false;
     const d = new Date(order.eventDate);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const upcoming = orders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey);
-  const pending = orders.filter((order) => String(getVendorStatus(order) || "").toLowerCase() === "pending");
-  return { total: orders.length, thisMonth: thisMonth.length, upcoming: upcoming.length, pending: pending.length };
-}, [orders, todayKey, getVendorStatus]);
+  const upcoming = scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey);
+  const pending = scheduleOrders.filter((order) => String(getVendorStatus(order) || "").toLowerCase() === "pending");
+  return { total: scheduleOrders.length, thisMonth: thisMonth.length, upcoming: upcoming.length, pending: pending.length };
+}, [scheduleOrders, todayKey, getVendorStatus]);
 
 /**
  * EVENTS FILTER
  */
 const events = useMemo(() => {
   const now = new Date();
-  if (viewMode === "day") return orders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
-  if (viewMode === "upcoming") return orders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey).sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  if (viewMode === "month") return orders.filter((order) => {
+  if (viewMode === "day") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
+  if (viewMode === "upcoming") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey).sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+  if (viewMode === "month") return scheduleOrders.filter((order) => {
     if (!order?.eventDate) return false;
     const d = new Date(order.eventDate);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-  if (viewMode === "past") return orders.filter((order) => order?.eventDate && toKey(order.eventDate) < todayKey).sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+  if (viewMode === "past") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) < todayKey).sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
   return [];
-}, [orders, viewMode, selectedDate, todayKey]);
+}, [scheduleOrders, viewMode, selectedDate, todayKey]);
 
 /**
  * AVAILABILITY HELPERS
@@ -271,8 +301,8 @@ const isWorkingDay = useCallback((date: string) => {
  * SELECTED DAY BOOKINGS
  */
 const selectedDayBookings = useMemo(() => {
-  return orders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
-}, [orders, selectedDate]);
+  return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
+}, [scheduleOrders, selectedDate]);
 
 /**
  * SELECTED DAY WINDOWS
@@ -333,7 +363,7 @@ const dayAvailability = useMemo(() => {
 const markedDates = useMemo(() => {
   const marks: Record<string, any> = {};
 
-  orders.forEach((order) => {
+  scheduleOrders.forEach((order) => {
     const key = order?.eventDate && toKey(order.eventDate);
     if (key) marks[key] = { customStyles: { container: { backgroundColor: ACCENT, borderRadius: 9 }, text: { color: "#FFFFFF", fontWeight: "800" } } };
   });
@@ -345,7 +375,7 @@ const markedDates = useMemo(() => {
 
   marks[selectedDate] = { customStyles: { container: { backgroundColor: PRIMARY, borderRadius: 9, borderWidth: 2, borderColor: "#FFFFFF" }, text: { color: "#FFFFFF", fontWeight: "800" } } };
   return marks;
-}, [orders, selectedDate, availability]);
+}, [scheduleOrders, selectedDate, availability]);
 
 /**
  * MONTH
