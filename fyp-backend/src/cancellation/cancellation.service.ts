@@ -203,31 +203,6 @@ export class CancellationService {
         vendorOrder.cancellationReason = reason || null;
         await vendorOrder.save();
 
-        // If the vendor cancels while an event date/time change is awaiting
-        // their response, close that request immediately. The already accepted
-        // responses from other vendors remain untouched and the client can
-        // continue through the existing replacement flow.
-        const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
-            vendorOrderId: vendorOrder._id,
-            status: 'CHANGE_REQUESTED',
-        });
-        if (pendingReschedule) {
-            pendingReschedule.status = 'CANCELLED_BY_VENDOR';
-            pendingReschedule.respondedAt = new Date();
-            pendingReschedule.responseMessage =
-                'This vendor cancelled the booking before responding to the schedule change.';
-            pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
-            pendingReschedule.resolvedAt = new Date();
-            await pendingReschedule.save();
-
-            // Keep the whole request group in the same replacement-required
-            // state without changing any vendor's accepted response.
-            await this.rescheduleRequestModel.updateMany(
-                { requestGroupId: pendingReschedule.requestGroupId },
-                { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: new Date() } },
-            );
-        }
-
         const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
 
         const refund = await this.refundModel.create({
@@ -276,6 +251,31 @@ export class CancellationService {
         vendorOrder.cancelledAt = new Date();
         vendorOrder.cancellationReason = reason || null;
         await vendorOrder.save();
+
+        // If the vendor cancels while an event date/time change is awaiting
+        // their response, close that request immediately. The already accepted
+        // responses from other vendors remain untouched and the client can
+        // continue through the existing replacement flow.
+        const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
+            vendorOrderId: vendorOrder._id,
+            status: 'CHANGE_REQUESTED',
+        });
+        if (pendingReschedule) {
+            pendingReschedule.status = 'CANCELLED_BY_VENDOR';
+            pendingReschedule.respondedAt = new Date();
+            pendingReschedule.responseMessage =
+                'This vendor cancelled the booking before responding to the schedule change.';
+            pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
+            pendingReschedule.resolvedAt = new Date();
+            await pendingReschedule.save();
+
+            // Keep the whole request group in the same replacement-required
+            // state without changing any vendor's accepted response.
+            await this.rescheduleRequestModel.updateMany(
+                { requestGroupId: pendingReschedule.requestGroupId },
+                { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: new Date() } },
+            );
+        }
 
         const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
 
