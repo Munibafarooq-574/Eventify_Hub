@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const ALLOWED_STATUSES = [
   "PENDING",
@@ -107,8 +108,7 @@ export async function PATCH(
       return NextResponse.json(
         {
           message:
-            data?.message ||
-            "Unable to update refund status.",
+            apiErrorMessage(data, "Unable to update refund status."),
         },
         {
           status: response.status,

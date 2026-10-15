@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiErrorMessage } from "@/lib/api-error";
 
 type RefundStatus =
   | "PENDING"
@@ -85,8 +86,7 @@ export default function RefundStatusActions({
 
       if (!response.ok) {
         throw new Error(
-          data?.message ||
-            "Unable to update refund status.",
+          `Refund update failed (HTTP ${response.status}): ${apiErrorMessage(data, "Unable to update refund status.")}`,
         );
       }
 
