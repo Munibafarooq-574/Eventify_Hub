@@ -1,7 +1,7 @@
 ﻿import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
-import { getSecureData } from "@/store";
+import { getUserData } from "@/store";
 import { Alert , View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { FontAwesome5 } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -111,7 +111,11 @@ const CakeBusinessDetailsScreen: React.FC = () => {
         }
 
         try {
-            const user = JSON.parse(await getSecureData("user") || "");
+            const user = await getUserData();
+            if (typeof user?._id !== 'string' || !user._id.trim()) {
+                Alert.alert("Sign in required", "Please sign in again to save your business details.");
+                return;
+            }
 
             const dto = {
                 cakeTypes: selectedCakeTypes,
