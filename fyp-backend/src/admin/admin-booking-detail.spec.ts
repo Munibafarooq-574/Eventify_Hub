@@ -28,3 +28,22 @@ describe('Admin booking cancellation and financial detail', () => {
         expect(paymentModel.find).not.toHaveBeenCalled();
     });
 });
+
+describe('Admin booking type display metadata', () => {
+    it('resolves only the booked package type and loads the event city timezone', async () => {
+        const bookingId = new Types.ObjectId();
+        const booking = { _id: bookingId, packageId: 'delivery', vendorId: { packages: [{ _id: 'other', bookingType: 'DURATION_BASED' }, { _id: 'delivery', bookingType: 'DELIVERY_BASED' }] } };
+        const orderQuery = query({ eventTime: '13:00', eventDurationMinutes: 180, eventCityId: { timeZone: 'Asia/Karachi' } });
+        const service = new AdminService({ findById: () => query(booking) } as any, { findOne: () => orderQuery } as any, { find: () => query([]) } as any, { findOne: () => query(null) } as any, { findOne: () => query(null) } as any, {} as any);
+        const result = await service.getBookingDetail(bookingId.toString());
+        expect(result?.vendorOrder.bookingType).toBe('DELIVERY_BASED');
+        expect(orderQuery.populate).toHaveBeenCalledWith({ path: 'eventCityId', select: 'name timeZone' });
+        expect(result?.order?.eventDurationMinutes).toBe(180);
+    });
+    it('leaves an unknown legacy package type unspecified instead of guessing delivery', async () => {
+        const bookingId = new Types.ObjectId();
+        const booking = { _id: bookingId, packageId: 'deleted-package', vendorId: { packages: [] } };
+        const service = new AdminService({ findById: () => query(booking) } as any, { findOne: () => query({}) } as any, { find: () => query([]) } as any, { findOne: () => query(null) } as any, { findOne: () => query(null) } as any, {} as any);
+        expect((await service.getBookingDetail(bookingId.toString()))?.vendorOrder.bookingType).toBeNull();
+    });
+});

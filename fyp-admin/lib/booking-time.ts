@@ -30,3 +30,24 @@ export function eventDurationLabel(order?: {
   return order?.eventDuration != null && String(order.eventDuration).trim()
     ? String(order.eventDuration) : 'N/A';
 }
+
+export function formatEventTime(value?: string | null): string {
+  if (!value) return 'N/A';
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (!match) return 'N/A';
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = match[3]?.toUpperCase();
+  if (minute > 59 || hour > (period ? 12 : 23) || (period && hour < 1)) return 'N/A';
+  return `${hour % 12 || 12}:${match[2]} ${period || (hour >= 12 ? 'PM' : 'AM')}`;
+}
+export function serviceTimingRows(booking: {
+  bookingType?: string | null;
+  eventStartDateTime?: string | null;
+  eventEndDateTime?: string | null;
+}) {
+  return booking.bookingType === 'DELIVERY_BASED'
+    ? [{ label: 'Delivery at', value: booking.eventStartDateTime }]
+    : [{ label: 'Service starts', value: booking.eventStartDateTime },
+       { label: 'Service ends', value: booking.eventEndDateTime }];
+}

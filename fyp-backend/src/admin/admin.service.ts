@@ -422,7 +422,7 @@ export class AdminService {
                 )
                 .populate({
                     path: 'vendorId',
-                    select: 'name email phone_number contactDetails buisnessCategory serviceLocationCityIds businessCityId businessAddress',
+                    select: 'name email phone_number contactDetails buisnessCategory serviceLocationCityIds businessCityId businessAddress packages._id packages.bookingType',
                     populate: [
                         { path: 'buisnessCategory', select: 'name' },
                         { path: 'serviceLocationCityIds', select: 'name stateProvinceName countryName' },
@@ -449,6 +449,7 @@ export class AdminService {
                         'phone_number',
                     ].join(' '),
                 )
+                .populate({ path: 'eventCityId', select: 'name timeZone' })
                 .lean();
 
         const payments =
@@ -475,8 +476,16 @@ export class AdminService {
                 })
                 .lean();
 
+        const vendor = (vendorOrder as any).vendorId;
+        const selectedPackage = Array.isArray(vendor?.packages)
+            ? vendor.packages.find((pkg: any) => String(pkg._id) === String(vendorOrder.packageId))
+            : undefined;
+
         return {
-            vendorOrder,
+            vendorOrder: {
+                ...vendorOrder,
+                bookingType: (vendorOrder as any).bookingType || selectedPackage?.bookingType || null,
+            },
             order,
             payments,
             payout,

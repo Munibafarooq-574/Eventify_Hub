@@ -56,3 +56,36 @@ test('policy editor edits days/hours but emits exact backend hours', () => {
   fields[0].props.onChange({target:{value:'2'}});assert.equal(changed,51);
   fields[1].props.onChange({target:{value:'4'}});assert.equal(changed,28);
 });
+
+test('event time displays twelve-hour time including midnight and noon', () => {
+  for (const [raw, expected] of [['13:00','1:00 PM'],['00:00','12:00 AM'],['12:00','12:00 PM'],['09:05','9:05 AM'],['23:59','11:59 PM'],['1:00 pm','1:00 PM']]) assert.equal(helpers.formatEventTime(raw),expected);
+  assert.equal(helpers.formatEventTime('25:00'),'N/A');
+});
+test('delivery gets one scheduled timestamp while other booking types retain their range', () => {
+  const timestamps={eventStartDateTime:'2026-11-09T07:00:00Z',eventEndDateTime:'2026-11-09T09:00:00Z'};
+  const delivery=helpers.serviceTimingRows({...timestamps,bookingType:'DELIVERY_BASED'});
+  assert.equal(delivery.length,1);assert.equal(delivery[0].label,'Delivery at');assert.equal(delivery[0].value,timestamps.eventStartDateTime);
+  for (const bookingType of ['DURATION_BASED','SETUP_BASED','CUSTOM','TIME_SLOT_BASED',null]) {
+    const rows=helpers.serviceTimingRows({...timestamps,bookingType});assert.equal(rows.length,2);assert.equal(rows[1].label,'Service ends');
+  }
+});
+test('rendered Admin page shows 1 PM event and only a 12 PM delivery in event-city timezone', async () => {
+  const booking={_id:'booking',status:'accepted',bookingType:'DELIVERY_BASED',eventStartDateTime:'2026-11-09T07:00:00Z',eventEndDateTime:'2026-11-09T09:00:00Z'};
+  const data={vendorOrder:booking,order:{eventName:'Birthday',eventTime:'13:00',eventDurationMinutes:180,eventCityId:{name:'Lahore',timeZone:'Asia/Karachi'}},payments:[]};
+  const imports={
+    '@/lib/booking-time':helpers,
+    'next/link':{default:({children,href})=>React.createElement('a',{href},children)},
+    'next/navigation':{notFound(){throw Error('Not found')},redirect(){throw Error('Redirect')}},
+    '@/components/BookingPolicySnapshot':{default:()=>null},
+    '@/components/AdminSidebar':{default:()=>null},
+    '@/lib/auth':{getAdminToken:async()=>'test-token'},
+    '@/lib/backend':{backendFetch:async()=>({ok:true,status:200,json:async()=>data})},
+  };
+  const Page=load('app/bookings/[id]/page.tsx',imports).default;
+  const html=renderToStaticMarkup(await Page({params:Promise.resolve({id:'booking'})}));
+  assert.match(html,/1:00 PM/);assert.match(html,/3 hours/);assert.match(html,/Delivery at/);assert.match(html,/12:00 pm/i);
+  assert.doesNotMatch(html,/Service starts|Service ends/);
+  data.vendorOrder={...booking,bookingType:'DURATION_BASED'};
+  const range=renderToStaticMarkup(await Page({params:Promise.resolve({id:'booking'})}));
+  assert.match(range,/Service starts/);assert.match(range,/Service ends/);assert.doesNotMatch(range,/Delivery at/);
+});

@@ -1,4 +1,4 @@
-import { eventDurationLabel } from '@/lib/booking-time';
+import { eventDurationLabel, formatEventTime, serviceTimingRows } from '@/lib/booking-time';
 import Link from "next/link";
 import BookingPolicySnapshot, { type SavedBookingPolicy } from "@/components/BookingPolicySnapshot";
 import { notFound, redirect } from "next/navigation";
@@ -7,7 +7,7 @@ import AdminSidebar from "@/components/AdminSidebar";
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
 
-type City = { name?: string; stateProvinceName?: string; countryName?: string };
+type City = { timeZone?: string; name?: string; stateProvinceName?: string; countryName?: string };
 const cityLabel = (city?: City | string | null) => {
   if (!city || typeof city === "string") return "";
   return [city.name, city.stateProvinceName, city.countryName].filter(Boolean).join(", ");
@@ -38,6 +38,7 @@ type Person = {
 };
 
 type VendorOrder = {
+  bookingType?: string | null;
   policySnapshot?: SavedBookingPolicy;
   _id?: string;
   vendorId?: Person;
@@ -64,6 +65,7 @@ type VendorOrder = {
 };
 
 type Order = {
+  eventCityId?: City | string;
   _id?: string;
   organizerId?: Person;
 
@@ -148,7 +150,7 @@ const formatDate = (value?: string | null) => {
   }).format(date);
 };
 
-const formatDateTime = (value?: string | null) => {
+const formatDateTime = (value?: string | null, timeZone?: string) => {
   if (!value) return "N/A";
 
   const date = new Date(value);
@@ -157,13 +159,12 @@ const formatDateTime = (value?: string | null) => {
     return "N/A";
   }
 
-  return new Intl.DateTimeFormat("en-PK", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  try {
+    return new Intl.DateTimeFormat("en-PK", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true, timeZone,
+    }).format(date);
+  } catch { return "N/A"; }
 };
 
 const statusClass = (status?: string | null) => {
@@ -348,7 +349,7 @@ export default async function BookingDetailsPage({
 
                 <InfoRow
                   label="Event time"
-                  value={text(order?.eventTime)}
+                  value={formatEventTime(order?.eventTime)}
                 />
 
                 <InfoRow
@@ -388,19 +389,12 @@ export default async function BookingDetailsPage({
                   value={text(vendorOrder.paymentStatus)}
                 />
 
-                <InfoRow
-                  label="Service starts"
-                  value={formatDateTime(
-                    vendorOrder.eventStartDateTime,
-                  )}
-                />
-
-                <InfoRow
-                  label="Service ends"
-                  value={formatDateTime(
-                    vendorOrder.eventEndDateTime,
-                  )}
-                />
+                {serviceTimingRows(vendorOrder).map(row => (
+                  <InfoRow key={row.label} label={row.label} value={formatDateTime(
+                    row.value,
+                    typeof order?.eventCityId === 'object' ? order.eventCityId?.timeZone : undefined,
+                  )} />
+                ))}
 
                 <InfoRow
                   label="Accepted at"
