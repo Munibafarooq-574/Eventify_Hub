@@ -1,3 +1,4 @@
+import { eventDurationLabel } from '@/lib/booking-time';
 import Link from "next/link";
 import BookingPolicySnapshot, { type SavedBookingPolicy } from "@/components/BookingPolicySnapshot";
 import { notFound, redirect } from "next/navigation";
@@ -71,6 +72,9 @@ type Order = {
   eventDate?: string;
   eventTime?: string;
   eventDuration?: number | string;
+  eventDurationMinutes?: number | string;
+  eventStartDateTime?: string;
+  eventEndDateTime?: string;
   guests?: number;
 
   createdAt?: string;
@@ -349,12 +353,7 @@ export default async function BookingDetailsPage({
 
                 <InfoRow
                   label="Duration"
-                  value={
-                    order?.eventDuration !== undefined &&
-                    order?.eventDuration !== null
-                      ? String(order.eventDuration)
-                      : "N/A"
-                  }
+                  value={eventDurationLabel(order)}
                 />
 
                 <InfoRow
@@ -390,14 +389,14 @@ export default async function BookingDetailsPage({
                 />
 
                 <InfoRow
-                  label="Event starts"
+                  label="Service starts"
                   value={formatDateTime(
                     vendorOrder.eventStartDateTime,
                   )}
                 />
 
                 <InfoRow
-                  label="Event ends"
+                  label="Service ends"
                   value={formatDateTime(
                     vendorOrder.eventEndDateTime,
                   )}

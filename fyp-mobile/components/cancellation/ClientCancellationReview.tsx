@@ -1,3 +1,4 @@
+import { formatNoticeHours } from '@/utils/bookingCancellation';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import calculateRefund, { ClientCancellationPreview } from '@/services/calculateRefund';
@@ -79,7 +80,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
               <Row label="Amount paid" value={money(preview.amountPaid)} />
               <Row label="Saved policy" value={preview.cancellationPolicyApplied || 'Not available'} />
               {preview.eligible && <>
-                <Row label="Notice before service" value={`${Math.max(0, Math.floor(preview.hoursBeforeEvent ?? 0))} hours`} />
+                <Row label="Notice before service" value={formatNoticeHours(preview.hoursBeforeEvent)} />
                 <Row label="Applicable refund" value={`${preview.refundPercentage}%`} />
                 <Row label="Estimated refund" value={money(preview.refundAmount)} />
                 <Row label="Amount retained" value={money(preview.withheldAmount)} />

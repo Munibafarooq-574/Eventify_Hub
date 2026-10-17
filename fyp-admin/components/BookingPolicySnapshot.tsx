@@ -1,3 +1,4 @@
+import { formatNoticeHours as notice } from '@/lib/booking-time';
 import type { PolicySettings, PolicyTier } from "@/lib/cancellation-policy";
 
 export type SavedBookingPolicy = {
@@ -9,9 +10,6 @@ export type SavedBookingPolicy = {
   settings: PolicySettings;
 };
 
-function notice(hours: number) {
-  return hours > 0 && hours % 24 === 0 ? `${hours / 24} ${hours === 24 ? "day" : "days"}` : `${hours} ${hours === 1 ? "hour" : "hours"}`;
-}
 function refundSummary(tiers: PolicyTier[]) {
   const percentages = new Set(tiers.map(tier => tier.percentage));
   return percentages.size === 1 ? `${tiers[0].percentage}% of amount paid` : "Depends on notice before service";
