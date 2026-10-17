@@ -1,6 +1,7 @@
 // client side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
 
+import getCategoryById from '@/services/getCategoryByID';
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import getVendorReviewSummary from '@/services/getVendorReviewSummary';
 import postVendorReview from '@/services/postVendorReview';
@@ -430,6 +431,7 @@ const phase6AvailablePackageIds = useMemo(() => {
 
     const [vendorData, setVendorData] =
       useState<any>(null);
+    const [profileCategoryName, setProfileCategoryName] = useState('');
 
       const [publicCoupons, setPublicCoupons] =
   useState<any[]>([]);
@@ -1827,6 +1829,17 @@ Toast.show({
           const vendor =
             response.data;
 
+          // Resolve the saved category for the shared client/owner profile.
+          // Keep the vendor payload unchanged: booking/edit flows still use its ID.
+          const categoryReference = vendor?.buisnessCategory ?? vendor?.categoryId;
+          let loadedCategoryName = categoryReference?.name || categoryReference?.categoryName || vendor?.categoryName || '';
+          const savedCategoryId = typeof categoryReference === 'string'
+            ? categoryReference : categoryReference?._id;
+          if (!loadedCategoryName && savedCategoryId) {
+            const savedCategory = await getCategoryById(String(savedCategoryId));
+            loadedCategoryName = savedCategory?.name || '';
+          }
+          setProfileCategoryName(String(loadedCategoryName).trim());
           setVendorData(
             vendor,
           );
@@ -2500,6 +2513,18 @@ const serviceCityNamesFromIds =
                     </Text>
                   </View>
                 </View>
+
+                {!!profileCategoryName && (
+                  <View style={styles.profileCategoryRow}>
+                    <View style={styles.profileCategoryIcon}>
+                      <Ionicons name="grid-outline" size={15} color={PRIMARY} />
+                    </View>
+                    <Text testID="vendor-category" style={styles.profileCategoryText}>
+                      <Text style={styles.profileCategoryLabel}>Category: </Text>
+                      {profileCategoryName}
+                    </Text>
+                  </View>
+                )}
 
                 <View
                   style={
@@ -6112,6 +6137,31 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  profileCategoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+  },
+  profileCategoryIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: PRIMARY_SOFT,
+  },
+  profileCategoryText: {
+    flex: 1,
+    color: PRIMARY,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  profileCategoryLabel: {
+    color: TEXT_MUTED,
+    fontWeight: '500',
+  },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
