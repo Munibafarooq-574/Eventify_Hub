@@ -1,6 +1,7 @@
 // fyp-backend/src/payment/payment.types.ts
 export interface PaymentBreakdown {
     vendorOrderId: string;
+    organizerId: string;
 
     // Final backend-authoritative amount after discount/promotion.
     totalAmount: number;

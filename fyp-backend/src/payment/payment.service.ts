@@ -440,6 +440,7 @@ const latestSuccessfulPayment =
 
 return {
     vendorOrderId,
+    organizerId,
     totalAmount: bookingAmount,
 
     downPaymentType:

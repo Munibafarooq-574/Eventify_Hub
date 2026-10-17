@@ -1,16 +1,19 @@
+import getPaymentStatus from '@/services/getPaymentStatus';
+import { getCardOwnerId, assertCardOwner, listDemoCards, rememberDemoCard, removeDemoCard, type SavedDemoCard } from '@/services/demoSavedCards';
+import { DEMO_CARD_OPTIONS, formatCardNumber, formatExpiry, validateCardForm, cardPaymentAmount, isExpiryValid } from '@/utils/cardPaymentValidation';
 
 
 // fyp-mobile/components/creditcard/CreditCardIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
 import createPayment from '@/services/createPayment';
 import payRemainingAmount from '@/services/payRemainingAmount';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
   Animated,
   Easing,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -25,31 +28,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Large system font sizes ko limit karo taake layout na tootay
-(Text as any).defaultProps = {
-  ...((Text as any).defaultProps || {}),
-  maxFontSizeMultiplier: 1.2,
-};
-
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8E9F0';
 const ACCENT = '#B84B9A';
 const PRIMARY_DEEP = '#5A0848';
 
 const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
-
-// Groups digits into "1234 5678 9012 3456" as the user types.
-const formatCardNumber = (raw: string) => {
-  const digits = raw.replace(/\D/g, '').slice(0, 16);
-  return digits.replace(/(.{4})/g, '$1 ').trim();
-};
-
-// Auto-inserts the slash for "MM/YY".
-const formatExpiry = (raw: string) => {
-  const digits = raw.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-};
 
 // ───────────────────────── UI helpers ─────────────────────────
 
@@ -63,7 +47,7 @@ const FadeInUp = ({
   children: React.ReactNode;
   style?: any;
 }) => {
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -101,6 +85,7 @@ type FieldProps = TextInputProps & {
   label: string;
   icon: any;
   valid?: boolean;
+  error?: string;
   containerStyle?: any;
 };
 
@@ -111,6 +96,7 @@ const Field = React.forwardRef<TextInput, FieldProps>(
       label,
       icon,
       valid,
+      error,
       containerStyle,
       onFocus,
       onBlur,
@@ -135,6 +121,9 @@ const Field = React.forwardRef<TextInput, FieldProps>(
 
           <TextInput
             ref={ref}
+            autoCorrect={false}
+            autoComplete="off"
+            importantForAutofill="no"
             placeholderTextColor="#B9A6B3"
             style={styles.input}
             {...rest}
@@ -150,6 +139,7 @@ const Field = React.forwardRef<TextInput, FieldProps>(
             />
           )}
         </View>
+        {!!error && <Text accessibilityRole="alert" style={styles.fieldError}>{error}</Text>}
       </View>
     );
   },
@@ -157,7 +147,7 @@ const Field = React.forwardRef<TextInput, FieldProps>(
 Field.displayName = 'Field';
 
 const CreditCardPaymentScreen = () => {
-  const { vendorOrderId, amount, paymentType } = useLocalSearchParams<{
+  const { vendorOrderId, paymentType } = useLocalSearchParams<{
     vendorOrderId?: string;
     amount?: string;
     paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
@@ -177,15 +167,76 @@ const CreditCardPaymentScreen = () => {
   const cardHeight = cardWidth / 1.586;
   const cardNumberFont = Math.max(15, Math.min(22, cardWidth * 0.058));
 
-  const amountPayable = Number(amount || 0);
+  const paymentKind = paymentType || 'DOWN_PAYMENT';
+  const [amountPayable, setAmountPayable] = useState<number | null>(null);
 
   const [cardholderName, setCardholderName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [rememberCard, setRememberCard] = useState(false);
-  const [sendReceipt, setSendReceipt] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<SavedDemoCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [screenError, setScreenError] = useState('');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const generation = useRef(0);
+  const paymentLock = useRef(false);
+  const clearForm = useCallback(() => {
+    setCardholderName(''); setCardNumber(''); setExpiry(''); setCvv('');
+    setRememberCard(false); setTouched({});
+  }, []);
+  const loadScreen = useCallback(async () => {
+    const request = ++generation.current;
+    setLoading(true); setScreenError(''); setOwnerId(null); setSavedCards([]); setAmountPayable(null);
+    try {
+      if (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId)) throw new Error('Open card payment from your booking.');
+      const id = await getCardOwnerId();
+      const financials = await getPaymentStatus(vendorOrderId);
+      const payable = cardPaymentAmount(financials, paymentKind, id);
+      const cards = await listDemoCards(id);
+      await assertCardOwner(id);
+      if (request === generation.current) { setOwnerId(id); setSavedCards(cards); setAmountPayable(payable); }
+    } catch (error) {
+      if (request === generation.current) setScreenError(error instanceof Error ? error.message : 'Could not load payment details.');
+    } finally { if (request === generation.current) setLoading(false); }
+  }, [vendorOrderId, paymentKind]);
+  useFocusEffect(useCallback(() => {
+    clearForm(); void loadScreen();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') { ++generation.current; clearForm(); setOwnerId(null); setSavedCards([]); }
+      else void loadScreen();
+    });
+    return () => { ++generation.current; subscription.remove(); clearForm(); };
+  }, [loadScreen, clearForm]));
+
+  async function selectSavedCard(card: SavedDemoCard) {
+    if (!ownerId || paymentLock.current) return;
+    const request = generation.current;
+    try {
+      await assertCardOwner(ownerId);
+      const financials = await getPaymentStatus(vendorOrderId!);
+      cardPaymentAmount(financials, paymentKind, ownerId);
+      if (request !== generation.current) return;
+      if (!isExpiryValid(card.expiry)) { Alert.alert('Expired test card', 'Remove this shortcut and enter a new expiry.'); return; }
+      const demo = DEMO_CARD_OPTIONS.find(item => item.id === card.demoCardId)!;
+      setCardholderName(card.name); setCardNumber(formatCardNumber(demo.number));
+      setExpiry(card.expiry); setCvv(''); setRememberCard(true); setTouched({});
+      cvvRef.current?.focus();
+    } catch (error) { clearForm(); setSavedCards([]); setOwnerId(null); setScreenError(error instanceof Error ? error.message : 'Reload payment details.'); }
+  }
+  async function removeSavedCard(card: SavedDemoCard) {
+    if (!ownerId || paymentLock.current) return;
+    const request = generation.current;
+    try {
+      const financials = await getPaymentStatus(vendorOrderId!);
+      cardPaymentAmount(financials, paymentKind, ownerId);
+      const cards = await removeDemoCard(ownerId, card.demoCardId);
+      if (request === generation.current) setSavedCards(cards);
+    } catch { Alert.alert('Unable to remove card', 'Please reload and try again.'); }
+  }
+
 
   const nameRef = useRef<TextInput>(null);
   const numberRef = useRef<TextInput>(null);
@@ -193,7 +244,7 @@ const CreditCardPaymentScreen = () => {
   const cvvRef = useRef<TextInput>(null);
 
   // Card flip (CVV focus shows the back of the card)
-  const flip = useRef(new Animated.Value(0)).current;
+  const [flip] = useState(() => new Animated.Value(0));
   const flipTo = (value: 0 | 1) =>
     Animated.timing(flip, {
       toValue: value,
@@ -205,71 +256,57 @@ const CreditCardPaymentScreen = () => {
   const frontRotate = flip.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] });
   const backRotate = flip.interpolate({ inputRange: [0, 1], outputRange: ['180deg', '360deg'] });
 
-  const nameValid = cardholderName.trim().length > 1;
-  const numberValid = cardNumber.replace(/\s/g, '').length === 16;
-  const expiryValid = /^\d{2}\/\d{2}$/.test(expiry);
-  const cvvValid = cvv.length >= 3;
-
-  const isValid = useMemo(() => {
-    return (
-      cardholderName.trim().length > 1 &&
-      cardNumber.replace(/\s/g, '').length === 16 &&
-      /^\d{2}\/\d{2}$/.test(expiry) &&
-      cvv.length >= 3
-    );
-  }, [cardholderName, cardNumber, expiry, cvv]);
-
-  // Preview text for the card face
-  const previewNumber = cardNumber
-    .replace(/\s/g, '')
-    .padEnd(16, '•')
-    .replace(/(.{4})/g, '$1 ')
-    .trim();
-
+  const validation = validateCardForm({ name: cardholderName, number: cardNumber, expiry, cvv });
+  const nameValid = !validation.errors.name;
+  const numberValid = !validation.errors.number;
+  const expiryValid = !validation.errors.expiry;
+  const cvvValid = !validation.errors.cvv;
+  const isValid = validation.valid;
+  const previewNumber = cardNumber.replace(/\D/g, '').length >= 4
+    ? `•••• •••• •••• ${cardNumber.replace(/\D/g, '').slice(-4)}` : '•••• •••• •••• ••••';
   const handlePayNow = async () => {
-    if (!isValid || submitting || !vendorOrderId) {
-      return;
-    }
-
+    const current = validateCardForm({ name: cardholderName, number: cardNumber, expiry, cvv });
+    setTouched({ name: true, number: true, expiry: true, cvv: true });
+    if (!current.valid || paymentLock.current || loading || !ownerId || !vendorOrderId || amountPayable == null) return;
+    paymentLock.current = true;
+    const request = generation.current;
+    setSubmitting(true);
+    let initiated = false;
     try {
-      setSubmitting(true);
-
-      const payment =
-        paymentType === 'REMAINING'
-          ? await payRemainingAmount(vendorOrderId, 'card')
-          : await createPayment(vendorOrderId, 'card');
-
-      Alert.alert(
-        'Payment Initiated',
-        paymentType === 'REMAINING'
-          ? 'Your remaining payment request has been created and is awaiting confirmation.'
-          : 'Your down payment request has been created and is awaiting confirmation.',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.replace('/myevents'),
-          },
-        ],
-      );
-
-      console.log('[Payment Initiated]', payment);
+      await assertCardOwner(ownerId);
+      const latest = await getPaymentStatus(vendorOrderId);
+      const payable = cardPaymentAmount(latest, paymentKind, ownerId);
+      await assertCardOwner(ownerId);
+      if (request !== generation.current) return;
+      if (payable !== amountPayable) {
+        setAmountPayable(payable);
+        Alert.alert('Amount updated', 'Your booking amount changed. Review it before submitting again.'); return;
+      }
+      // Phase 12A submits only the method. No card number, expiry or CVV leaves this form.
+      if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId, 'card');
+      else await createPayment(vendorOrderId, 'card');
+      initiated = true;
+      let saveNotice = '';
+      if (rememberCard && current.demo && request === generation.current) {
+        try {
+          const cards = await rememberDemoCard(ownerId, { demoCardId: current.demo.id, name: cardholderName.trim(), expiry });
+          if (request === generation.current) setSavedCards(cards);
+        } catch { saveNotice = ' The request was created, but the test-card shortcut could not be saved.'; }
+      }
+      if (request === generation.current) {
+        clearForm(); setOwnerId(null);
+        Alert.alert('Test payment request created',
+          'Your request is awaiting Admin confirmation. No real card has been charged.' + saveNotice,
+          [{ text: 'OK', onPress: () => router.replace('/myevents') }]);
+      }
     } catch (error: any) {
-      console.error('Payment initiation failed:', error);
-
-      const rawMessage = error?.response?.data?.message;
-
-      const safeMessage =
-        typeof rawMessage === 'string'
-          ? rawMessage
-          : typeof rawMessage?.message === 'string'
-            ? rawMessage.message
-            : typeof error?.message === 'string'
-              ? error.message
-              : 'Could not initiate payment. Please try again.';
-
-      Alert.alert('Payment Failed', safeMessage);
+      if (request === generation.current && !initiated) {
+        const raw = error?.response?.data?.message;
+        Alert.alert('Payment request failed', typeof raw === 'string' ? raw : typeof error?.message === 'string' ? error.message : 'Could not initiate payment. Please try again.');
+      }
     } finally {
-      setSubmitting(false);
+      paymentLock.current = false;
+      setCvv(''); setSubmitting(false);
     }
   };
 
@@ -308,11 +345,7 @@ const CreditCardPaymentScreen = () => {
               style={{ transform: [{ rotate: '90deg' }] }}
             />
             <View style={styles.brandChip}>
-              <Image
-                source={require('@/assets/images/mastercard.png')}
-                style={styles.cardBrandIcon}
-                resizeMode="contain"
-              />
+              <Text style={{ color: PRIMARY, fontWeight: '700', fontSize: 11 }}>{validation.demo?.brand || 'TEST'}</Text>
             </View>
           </View>
         </View>
@@ -355,7 +388,7 @@ const CreditCardPaymentScreen = () => {
             <Text style={styles.cvvBoxText}>{cvv ? '•'.repeat(cvv.length) : '•••'}</Text>
           </View>
         </View>
-        <Text style={styles.cvvHint}>3-digit security code (CVV)</Text>
+        <Text style={styles.cvvHint}>{validation.demo?.cvvLength || 3}-digit security code (CVV)</Text>
       </Animated.View>
     </View>
   );
@@ -364,16 +397,40 @@ const CreditCardPaymentScreen = () => {
     <View style={styles.secureNote}>
       <Ionicons name="shield-checkmark-outline" size={15} color="#278A4B" />
       <Text style={styles.secureNoteText}>
-        Your card details are encrypted and never stored on our servers
+        Test payments only. Card details are not sent to our API. CVV is never saved.
       </Text>
     </View>
   );
 
   const formSection = (
     <View>
+      <View style={styles.testNotice}>
+        <Text style={styles.switchTitle}>Test payment — no real money is charged</Text>
+        <Text style={styles.switchSubtitle}>Use a test card below, a current/future expiry and a correctly sized test CVV. These checks do not verify a card with a bank.</Text>
+        <View style={styles.testOptions}>{DEMO_CARD_OPTIONS.map(card => <TouchableOpacity key={card.id} disabled={submitting || loading || !ownerId} style={styles.testOption} onPress={() => { setCardNumber(formatCardNumber(card.number)); setCvv(''); setTouched({}); expiryRef.current?.focus(); }}><Text style={styles.switchSubtitle}>{card.brand} test</Text></TouchableOpacity>)}</View>
+      </View>
+      {loading && <Text style={styles.label}>Loading payment details…</Text>}
+      {!!screenError && <View style={styles.testNotice}><Text accessibilityRole="alert" style={styles.fieldError}>{screenError}</Text><TouchableOpacity disabled={submitting} onPress={loadScreen}><Text style={styles.switchTitle}>Reload payment details</Text></TouchableOpacity></View>}
+      {!!ownerId && savedCards.length > 0 && <View style={styles.switchCard}>
+        <Text style={styles.label}>Saved test cards</Text>
+        {savedCards.map(card => {
+          const demo = DEMO_CARD_OPTIONS.find(item => item.id === card.demoCardId)!;
+          return <View key={card.demoCardId} style={styles.savedRow}>
+            <TouchableOpacity disabled={submitting} style={{ flex: 1, paddingVertical: 12 }} accessibilityRole="button" onPress={() => selectSavedCard(card)}>
+              <Text style={styles.switchTitle}>{demo.brand} •••• {demo.number.slice(-4)}</Text>
+              <Text style={styles.switchSubtitle}>{card.name} · {card.expiry}{!isExpiryValid(card.expiry) ? ' · Expired' : ''}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={submitting} accessibilityRole="button" accessibilityLabel={`Remove saved ${demo.brand} test card`} style={{ padding: 12 }} onPress={() => removeSavedCard(card)}><Ionicons name="trash-outline" size={20} color={PRIMARY} /></TouchableOpacity>
+          </View>;
+        })}
+      </View>}
       <Field
         ref={nameRef}
         label="Cardholder Name"
+        editable={!submitting && !loading && !!ownerId}
+        maxLength={80}
+        onBlur={() => setTouched(value => ({ ...value, name: true }))}
+        error={touched.name ? validation.errors.name : undefined}
         icon="person-outline"
         placeholder="Name as shown on card"
         value={cardholderName}
@@ -387,7 +444,10 @@ const CreditCardPaymentScreen = () => {
 
       <Field
         ref={numberRef}
-        label="Card Number"
+        label="Test Card Number"
+        editable={!submitting && !loading && !!ownerId}
+        onBlur={() => setTouched(value => ({ ...value, number: true }))}
+        error={touched.number ? validation.errors.number : undefined}
         icon="card-outline"
         placeholder="1234 5678 9012 3456"
         keyboardType="numeric"
@@ -395,9 +455,9 @@ const CreditCardPaymentScreen = () => {
         onChangeText={(t) => {
           const formatted = formatCardNumber(t);
           setCardNumber(formatted);
-          if (formatted.length === 19) expiryRef.current?.focus();
+          setCvv('');
         }}
-        maxLength={19}
+        maxLength={23}
         valid={numberValid}
         containerStyle={styles.fieldGap}
       />
@@ -406,6 +466,9 @@ const CreditCardPaymentScreen = () => {
         <Field
           ref={expiryRef}
           label="Expiry"
+          editable={!submitting && !loading && !!ownerId}
+          onBlur={() => setTouched(value => ({ ...value, expiry: true }))}
+          error={touched.expiry ? validation.errors.expiry : undefined}
           icon="calendar-outline"
           placeholder="MM/YY"
           keyboardType="numeric"
@@ -423,15 +486,17 @@ const CreditCardPaymentScreen = () => {
         <Field
           ref={cvvRef}
           label="CVV"
+          editable={!submitting && !loading && !!ownerId}
+          error={touched.cvv ? validation.errors.cvv : undefined}
           icon="lock-closed-outline"
           placeholder="CVV"
           keyboardType="numeric"
           secureTextEntry
           value={cvv}
-          onChangeText={(t) => setCvv(t.replace(/\D/g, '').slice(0, 4))}
-          maxLength={4}
+          onChangeText={(t) => setCvv(t.replace(/\D/g, '').slice(0, validation.demo?.cvvLength || 3))}
+          maxLength={validation.demo?.cvvLength || 3}
           onFocus={() => flipTo(1)}
-          onBlur={() => flipTo(0)}
+          onBlur={() => { flipTo(0); setTouched(value => ({ ...value, cvv: true })); }}
           valid={cvvValid}
           containerStyle={{ flex: 1 }}
         />
@@ -443,10 +508,11 @@ const CreditCardPaymentScreen = () => {
             <Ionicons name="bookmark-outline" size={16} color={PRIMARY} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.switchTitle}>Remember this card</Text>
-            <Text style={styles.switchSubtitle}>Save for faster checkout next time</Text>
+            <Text style={styles.switchTitle}>Remember this test card</Text>
+            <Text style={styles.switchSubtitle}>Save a shortcut for this account. CVV must be entered again.</Text>
           </View>
           <Switch
+            disabled={submitting || loading || !ownerId}
             value={rememberCard}
             onValueChange={setRememberCard}
             trackColor={{ false: '#E3D3DD', true: ACCENT }}
@@ -455,22 +521,7 @@ const CreditCardPaymentScreen = () => {
         </View>
 
         <View style={styles.switchDivider} />
-
-        <View style={styles.switchRow}>
-          <View style={styles.switchIcon}>
-            <Ionicons name="mail-outline" size={16} color={PRIMARY} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.switchTitle}>Email me a receipt</Text>
-            <Text style={styles.switchSubtitle}>Sent right after payment succeeds</Text>
-          </View>
-          <Switch
-            value={sendReceipt}
-            onValueChange={setSendReceipt}
-            trackColor={{ false: '#E3D3DD', true: ACCENT }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
+        <Text style={styles.switchSubtitle}>A receipt is emailed after payment confirmation.</Text>
       </View>
     </View>
   );
@@ -478,7 +529,7 @@ const CreditCardPaymentScreen = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* ───── Header ───── */}
       <View style={[styles.header, { paddingTop: topPad }]}>
@@ -496,7 +547,7 @@ const CreditCardPaymentScreen = () => {
 
           <View style={styles.headerTitleWrap}>
             <Text style={styles.headerTitle}>Card Payment</Text>
-            <Text style={styles.headerSubtitle}>Secure card checkout</Text>
+            <Text style={styles.headerSubtitle}>Test card checkout</Text>
           </View>
 
           <View style={styles.headerIconBtn}>
@@ -567,22 +618,18 @@ const CreditCardPaymentScreen = () => {
       </View>
 
       <Text style={styles.amountValue}>
-        {formatCurrency(
-          amountPayable,
-        )}
+        {amountPayable == null ? '—' : formatCurrency(amountPayable)}
       </Text>
     </View>
 
     <TouchableOpacity
       style={[
         styles.payButton,
-        !isValid &&
-          styles.payButtonDisabled,
+        (!isValid || submitting || loading || !ownerId) && styles.payButtonDisabled,
       ]}
       onPress={handlePayNow}
       disabled={
-        !isValid ||
-        submitting
+        !isValid || submitting || loading || !ownerId || amountPayable == null
       }
       activeOpacity={0.85}
     >
@@ -592,9 +639,7 @@ const CreditCardPaymentScreen = () => {
       >
         {submitting
           ? 'Processing...'
-          : `Pay ${formatCurrency(
-              amountPayable,
-            )}`}
+          : 'Submit test payment'}
       </Text>
 
       {!submitting && (
@@ -792,6 +837,11 @@ const styles = StyleSheet.create({
   },
 
   // ── Form
+  fieldError: { color: '#A9273B', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  testNotice: { padding: 14, borderRadius: 12, backgroundColor: '#FFF4DE', marginBottom: 16, gap: 8 },
+  testOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  testOption: { padding: 10, borderWidth: 1, borderColor: '#D9C4D1', borderRadius: 10, backgroundColor: '#fff' },
+  savedRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderColor: '#F0DDEA', marginBottom: 8 },
   fieldGap: { marginBottom: 14 },
   row: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   label: { fontSize: 12, fontWeight: '700', color: '#5A4A54', marginBottom: 6 },
