@@ -60,7 +60,11 @@ const VendorCategoriesIndex = () => {
     await saveSecureData('categoryName', item.name);
     router.push({
           pathname: "/categoryvendorlisting",
-          params: { bookingMode: "browse" },
+          params: {
+            bookingMode: "browse",
+            categoryIds: JSON.stringify([item._id]),
+            categoryNames: JSON.stringify([item.name]),
+          },
         });
   };
 

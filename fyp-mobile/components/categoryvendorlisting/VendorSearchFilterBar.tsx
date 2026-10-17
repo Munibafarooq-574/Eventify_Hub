@@ -1,11 +1,13 @@
 // fyp-mobile/components/categoryvendorlisting/VendorSearchFilterBar.tsx
 import React from "react";
-import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
 import { COLORS, scale } from "./theme";
 
 interface VendorSearchFilterBarProps {
+  disabled?: boolean;
+  activeFilterCount?: number;
   searchQuery: string;
   onChangeSearchQuery: (text: string) => void;
   onSubmitSearch: () => void;
@@ -15,6 +17,8 @@ interface VendorSearchFilterBarProps {
 }
 
 export default function VendorSearchFilterBar({
+  disabled = false,
+  activeFilterCount = 0,
   searchQuery,
   onChangeSearchQuery,
   onSubmitSearch,
@@ -54,6 +58,7 @@ export default function VendorSearchFilterBar({
 
       <TouchableOpacity
         testID="filter-button"
+        disabled={disabled}
         onPress={() => {
           router.push({
             pathname: filterRoute,
@@ -63,6 +68,7 @@ export default function VendorSearchFilterBar({
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <MaterialIcons name="tune" size={scale(22)} color={COLORS.primary} />
+        {activeFilterCount > 0 && <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 11, textAlign: 'center' }}>{activeFilterCount}</Text>}
       </TouchableOpacity>
     </View>
   );
