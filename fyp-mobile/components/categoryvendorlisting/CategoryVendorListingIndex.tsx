@@ -223,6 +223,10 @@ const getServiceWindowLabel = (
 
       if (singleCategoryId) {
         categoryIds = [singleCategoryId];
+        const singleCategoryName = await getSecureData("categoryName");
+        if (singleCategoryName) {
+          setCategoryIdToName({ [singleCategoryId]: singleCategoryName });
+        }
       }
     }
 
@@ -383,14 +387,6 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     const vendorName = item?.name || item?.vendorName || item?.ownerName || "Vendor";
     const categoryName = item?.buisnessCategory?.name || item?.buisnessCategory?.categoryName || item?.category?.name || item?.categoryName || item?.serviceName || categoryIdToName[item?._matchedCategoryId] || "Category";
     const businessCity = item?.businessCityId;
-    const subscriptionBadge =
-  item?.marketplaceSubscription?.subscriptionBadge;
-
-      const isPremium =
-        subscriptionBadge === "Premium";
-
-      const isGrowth =
-        subscriptionBadge === "Growth";
     const city =
       businessCity?.name
         ? [
@@ -435,29 +431,6 @@ router.push({
     {brandName}
   </Text>
 
-  {isPremium ? (
-    <View style={[styles.subscriptionBadge, styles.premiumBadge]}>
-      <Ionicons
-        name="diamond-outline"
-        size={scale(11)}
-        color="#7A4B00"
-      />
-      <Text style={styles.premiumBadgeText}>
-        Premium
-      </Text>
-    </View>
-  ) : isGrowth ? (
-    <View style={[styles.subscriptionBadge, styles.growthBadge]}>
-      <Ionicons
-        name="trending-up-outline"
-        size={scale(11)}
-        color={COLORS.primary}
-      />
-      <Text style={styles.growthBadgeText}>
-        Growth
-      </Text>
-    </View>
-  ) : null}
 </View>
             <Text style={styles.vendorName} numberOfLines={1}>{vendorName}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{categoryName}</Text>
@@ -488,11 +461,12 @@ router.push({
 
 <View style={styles.cardDivider} />
 
+      {!!eventTiming && !!requiredServiceWindow?.startDateTime && !!requiredServiceWindow?.endDateTime && (
       <View style={styles.availabilitySection}>
         <View style={styles.availabilityRow}>
           <Ionicons name="checkmark-circle" size={scale(16)} color={COLORS.success} />
           <View style={styles.availabilityTextContainer}>
-            <Text style={styles.availableText}>Available</Text>
+            <Text style={styles.availableText}>Available for your event</Text>
             {requiredServiceWindow?.startDateTime &&
           requiredServiceWindow?.endDateTime && (
             <Text style={styles.selectedTimeText}>
@@ -505,6 +479,8 @@ router.push({
           </View>
         </View>
       </View>
+
+      )}
 
       <View style={styles.cardBottomRow}>
         <View style={styles.priceSection}>
@@ -638,38 +614,6 @@ brandName: {
   flexShrink: 1,
 },
 
-subscriptionBadge: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: scale(3),
-  paddingHorizontal: scale(7),
-  paddingVertical: scale(3),
-  borderRadius: scale(10),
-},
-
-premiumBadge: {
-  backgroundColor: "#FFF3D6",
-  borderWidth: 1,
-  borderColor: "#E7C46A",
-},
-
-premiumBadgeText: {
-  fontSize: scale(10),
-  fontWeight: "800",
-  color: "#7A4B00",
-},
-
-growthBadge: {
-  backgroundColor: COLORS.primarySoft,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-},
-
-growthBadgeText: {
-  fontSize: scale(10),
-  fontWeight: "800",
-  color: COLORS.primary,
-},
   vendorName: { fontSize: scale(12), color: COLORS.inkMuted, marginBottom: scale(4) },
 
   // Loading banner
