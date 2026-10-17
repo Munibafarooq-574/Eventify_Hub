@@ -110,4 +110,11 @@ describe('Client cancellation saved-policy review and confirmation', () => {
         const f = fixture(); const quote = await f.preview(); f.refunds.create.mockRejectedValueOnce(new Error('database write failed'));
         await expect(f.confirm(quote.previewToken!)).rejects.toThrow('database write failed'); expect(f.booking.status).toBe('accepted'); expect(f.state.refund).toBeNull(); expect(f.session.endSession).toHaveBeenCalled();
     });
+    it.each(['', '   ', 'x'.repeat(501)])('rejects an invalid required reason before any cancellation write', async reason => {
+        const f = fixture(); const quote = await f.preview();
+        await expect(f.service.organizerCancelConfirmedBooking(f.booking._id, f.actor, { previewToken: quote.previewToken!, reason })).rejects.toThrow('reason');
+        expect(f.vendorModel.findOneAndUpdate).not.toHaveBeenCalled();
+        expect(f.refunds.create).not.toHaveBeenCalled();
+    });
+
 });

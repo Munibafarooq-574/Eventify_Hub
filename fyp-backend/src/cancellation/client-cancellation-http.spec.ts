@@ -44,11 +44,11 @@ describe('Cancellation HTTP authentication and confirmation validation', () => {
         await request(app.getHttpServer()).get(`${path()}/calculate-refund`).set('Authorization', auth()).expect(200);
         expect(service.calculateRefund).toHaveBeenCalledWith(booking, { id: client._id, role: 'client' });
     });
-    it.each([{}, { previewToken: '' }, { previewToken: 'quote', refundAmount: 999 }, { previewToken: 'quote', organizerId: client._id }, { previewToken: 'quote', reason: 'x'.repeat(501) }])('rejects missing preview or client-controlled financial/identity fields', async body => {
+    it.each([{}, { previewToken: 'quote' }, { previewToken: 'quote', reason: '' }, { previewToken: 'quote', reason: '   ' }, { previewToken: '' }, { previewToken: 'quote', refundAmount: 999 }, { previewToken: 'quote', organizerId: client._id }, { previewToken: 'quote', reason: 'x'.repeat(501) }])('rejects missing preview or client-controlled financial/identity fields', async body => {
         await request(app.getHttpServer()).patch(`${path()}/organizer-cancel-confirmed`).set('Authorization', auth()).send(body).expect(400);
         expect(service.organizerCancelConfirmedBooking).not.toHaveBeenCalled();
     });
-    it('accepts only the preview token and optional reason', async () => {
+    it('accepts only the preview token and required reason', async () => {
         await request(app.getHttpServer()).patch(`${path()}/organizer-cancel-confirmed`).set('Authorization', auth()).send({ previewToken: 'signed-quote', reason: 'Changed plans' }).expect(200);
         expect(service.organizerCancelConfirmedBooking).toHaveBeenCalledWith(booking, { id: client._id, role: 'client' }, expect.objectContaining({ previewToken: 'signed-quote', reason: 'Changed plans' }));
     });

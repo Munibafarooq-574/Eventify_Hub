@@ -62,3 +62,9 @@ test('legacy vendor cancellation and absent reason/time remain explicit', () => 
   assert.equal(details.cancelledBy, 'Vendor'); assert.equal(details.reason, 'No reason provided'); assert.equal(details.cancelledAt, 'Not recorded');
   assert.equal(api.bookingCancellation({ status: 'pending' }), null);
 });
+
+test('client cancellation rejects missing and whitespace-only reasons before any request', async () => {
+  const { api, calls } = load('cancelConfirmedBooking');
+  for (const reason of [undefined, '', '   ']) await assert.rejects(api.default('booking', 'organizer', reason, 'signed-preview'), /reason for cancellation/);
+  assert.equal(calls.length, 0);
+});

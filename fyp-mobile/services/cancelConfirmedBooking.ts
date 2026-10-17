@@ -10,10 +10,11 @@ export default async function cancelConfirmedBooking(
   const token = await getSecureData('token');
   if (!token) throw new Error('Please sign in again to cancel a booking.');
   if (role === 'organizer' && !previewToken) throw new Error('Review the cancellation before confirming.');
+  if (role === 'organizer' && !reason?.trim()) throw new Error('Please enter a reason for cancellation.');
   const endpoint = role === 'organizer' ? 'organizer-cancel-confirmed' : 'vendor-cancel-confirmed';
   const response = await axios.patch(
     `https://eventify-hub.onrender.com/cancellation/vendor-order/${encodeURIComponent(vendorOrderId)}/${endpoint}`,
-    { reason, ...(role === 'organizer' ? { previewToken } : {}) },
+    { reason: reason?.trim(), ...(role === 'organizer' ? { previewToken } : {}) },
     { headers: { Authorization: `Bearer ${token}` }, timeout: 20000 },
   );
   return response.data;

@@ -5,11 +5,11 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const ts=require('typescript');
 const path=require('node:path');
-function screen({width=390,height=844,fontScale=1,os='android'}={}) {
+function screen({width=390,height=844,fontScale=1,os='android',reason='Typing a reason'}={}) {
   const effects=[],listeners={},scrolls=[],refs=[],cleanups=[];
   let stateIndex=0,frameId=0,cancelCalls=0;
   const preview={eligible:true,previewToken:'signed',amountPaid:1500,cancellationPolicyApplied:'REFUNDABLE',hoursBeforeEvent:548,refundPercentage:100,refundAmount:1500,withheldAmount:0,policyRevision:2};
-  const states=[preview,false,false,'','Typing a reason',0];
+  const states=[preview,false,false,'',reason,0];
   const React={createElement:(type,props,...children)=>({type,props:{...props,children}}),useState:initial=>[stateIndex<states.length?states[stateIndex++]:initial,()=>{}],useRef:value=>{const ref={current:value};refs.push(ref);return ref;},useCallback:fn=>fn,useEffect:fn=>effects.push(fn)};
   const native=Object.fromEntries(['ActivityIndicator','KeyboardAvoidingView','Modal','ScrollView','Text','TextInput','TouchableOpacity','View'].map(name=>[name,name]));
   Object.assign(native,{Platform:{OS:os},useWindowDimensions:()=>({width,height,fontScale}),StyleSheet:{create:value=>value,hairlineWidth:1},Alert:{alert(){}},Keyboard:{dismiss(){},addListener:(name,callback)=>{listeners[name]=callback;return{remove(){delete listeners[name]}}}}});
@@ -59,4 +59,12 @@ for(const os of ['android','ios'])test(`${os}: keyboard appearance and viewport 
   assert.equal(s.scrolls.length,3);for(const call of s.scrolls)assert.equal(call.y,528);
   input.props.onBlur();s.listeners.keyboardDidShow();assert.equal(s.scrolls.length,3);
   assert.equal(s.cancelCalls(),0);
+});
+
+test('confirmation remains disabled until the required reason contains text', () => {
+  for (const reason of ['', '   ', 'Plans changed']) {
+    const s=screen({reason});
+    const button=s.nodes.find(n=>n.type==='TouchableOpacity'&&n.props.children.flat(Infinity).some(c=>c?.props?.children?.includes('Confirm Cancellation')));
+    assert.equal(button.props.disabled,!reason.trim());
+  }
 });

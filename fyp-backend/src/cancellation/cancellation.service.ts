@@ -343,6 +343,9 @@ export class CancellationService {
     // ================================================================
     async organizerCancelConfirmedBooking(vendorOrderId: string, actor: CancellationActor, dto: ConfirmClientCancellationDto) {
         this.requireClient(actor);
+        if (typeof dto.reason !== 'string' || !dto.reason.trim() || dto.reason.trim().length > 500) {
+            throw new BadRequestException('A cancellation reason between 1 and 500 characters is required.');
+        }
         if (!Types.ObjectId.isValid(vendorOrderId)) throw new BadRequestException('Invalid vendor booking ID.');
         const token = this.readPreviewToken(dto.previewToken, vendorOrderId, actor);
         const confirmationKey = createHash('sha256').update(dto.previewToken).digest('hex');

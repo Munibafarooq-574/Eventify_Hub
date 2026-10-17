@@ -66,7 +66,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
   }, [vendorOrderId, retry]);
 
   async function confirm() {
-    if (confirming.current || !preview?.eligible || !preview.previewToken) return;
+    if (confirming.current || !preview?.eligible || !preview.previewToken || !reason.trim()) return;
     Keyboard.dismiss();
     confirming.current = true; setBusy(true); setError('');
     try {
@@ -124,7 +124,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
             {!preview.eligible && <Text style={styles.errorText}>{preview.message || 'This booking cannot be cancelled here.'}</Text>}
             {preview.eligible && <>
               <View style={styles.reason} onLayout={event => { reasonTop.current = event.nativeEvent.layout.y; }}>
-                <Text style={styles.label}>Reason for cancellation (optional)</Text>
+                <Text style={styles.label}>Reason for cancellation (required)</Text>
                 <TextInput accessibilityLabel="Reason for cancellation" value={reason} onChangeText={setReason} maxLength={500} multiline scrollEnabled editable={!busy} style={styles.input} placeholder="Tell us why you are cancelling" placeholderTextColor="#887781" textAlignVertical="top" onFocus={() => { reasonFocused.current = true; revealReason(); }} onBlur={() => { reasonFocused.current = false; }} />
                 <Text style={styles.counter}>{reason.length}/500</Text>
               </View>
@@ -132,7 +132,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
             </>}
           </>}
           {!loading && !busy && (!preview || !preview.eligible || !!error) && <TouchableOpacity accessibilityRole="button" style={styles.secondary} onPress={() => setRetry(value => value + 1)}><Text style={styles.secondaryText}>Reload preview</Text></TouchableOpacity>}
-          {preview?.eligible && <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busy || loading }} disabled={busy || loading} style={[styles.primary, busy && styles.disabled]} onPress={confirm}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Confirm Cancellation</Text>}</TouchableOpacity>}
+          {preview?.eligible && <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busy || loading || !reason.trim() }} disabled={busy || loading || !reason.trim()} style={[styles.primary, (busy || loading || !reason.trim()) && styles.disabled]} onPress={confirm}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Confirm Cancellation</Text>}</TouchableOpacity>}
           <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={onClose}><Text style={styles.secondaryText}>Keep Booking</Text></TouchableOpacity>
         </ScrollView>
       </View>
