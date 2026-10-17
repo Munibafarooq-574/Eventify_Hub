@@ -83,6 +83,7 @@ type BookingFinancials = {
   fullyPaid: boolean;
   paymentStatus: string;
   paymentDeadline?: string | null;
+  remainingPaymentDeadline?: string | null;
 
   serviceName?: string;
 };
@@ -282,8 +283,10 @@ const PaymentMethodScreen = () => {
   }, [financials, paidPercent, progressAnim]);
 
   const deadlineText = (() => {
-    if (!financials?.paymentDeadline) return null;
-    const d = new Date(financials.paymentDeadline);
+    const deadline = isRemainingPayment ? financials?.remainingPaymentDeadline
+      : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(normalizedPaymentStatus) ? financials?.paymentDeadline : null;
+    if (!deadline) return null;
+    const d = new Date(deadline);
     return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
   })();
 
@@ -482,7 +485,7 @@ const PaymentMethodScreen = () => {
             {!!deadlineText && (
               <View style={styles.heroDeadline}>
                 <Ionicons name="alarm-outline" size={13} color="rgba(255,255,255,0.85)" />
-                <Text style={styles.heroDeadlineText}>Pay before {deadlineText}</Text>
+                <Text style={styles.heroDeadlineText}>{isRemainingPayment ? 'Remaining payment due by ' : 'Down payment due by '}{deadlineText}</Text>
               </View>
             )}
           </View>

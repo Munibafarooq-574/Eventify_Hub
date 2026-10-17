@@ -18,6 +18,7 @@ export interface PaymentBreakdown {
 
     paymentStatus: string;
 paymentDeadline: Date | null;
+remainingPaymentDeadline: Date | null;
 
 pendingPayment: {
     paymentId: string;

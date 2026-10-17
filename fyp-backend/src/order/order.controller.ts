@@ -150,7 +150,9 @@ async updateVendorOrderStatus(
 }
 
     @Patch('complete-vendor/:id')
-    async completeVendor(@Param('id') vendorOrderId: string) {
+    @UseGuards(JwtAuthGuard)
+    async completeVendor(@Param('id') vendorOrderId: string, @Request() req: any) {
+        await this.orderService.assertVendorBookingOwner(vendorOrderId, req.user);
         return this.orderService.completeVendorOrder(vendorOrderId);
     }
 

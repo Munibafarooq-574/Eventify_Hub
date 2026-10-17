@@ -1756,7 +1756,9 @@ async getOrderStats(type: string, userId: string) {
         throw new ConflictException('Paid bookings must use the dedicated cancellation review.');
     }
 
-    const vendorOrder = await this.vendorOrderModel.findByIdAndUpdate(
+    const vendorOrder = mappedStatus === 'completed'
+        ? await this.completeVendorOrder(vendorOrderId)
+        : await this.vendorOrderModel.findByIdAndUpdate(
         vendorOrderId,
         { status: mappedStatus },
         { new: true },
@@ -2212,9 +2214,28 @@ async completeVendorOrder(vendorOrderId: string) {
         throw new ConflictException('Cancelled bookings cannot be completed.');
     }
 
-    vendorOrder.status = 'completed';
-
-    const saved = await vendorOrder.save();
+    if (vendorOrder.status === 'completed') return vendorOrder;
+    if (vendorOrder.status !== 'accepted' || !['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
+        throw new ConflictException('Only confirmed bookings with their required payment secured can be completed.');
+    }
+    const vendor = await this.userModel.findById(vendorOrder.vendorId).select('packages');
+    const bookedPackage = vendor?.packages?.find((pkg: any) => String(pkg._id) === String(vendorOrder.packageId));
+    const completionTime = bookedPackage?.bookingType === 'DELIVERY_BASED'
+        ? vendorOrder.eventStartDateTime : vendorOrder.eventEndDateTime;
+    if (!completionTime || !Number.isFinite(new Date(completionTime).getTime()) || new Date(completionTime).getTime() > Date.now()) {
+        throw new ConflictException('Service cannot be completed before its scheduled delivery or service end time.');
+    }
+    // Atomic transition: retries must never extend the final payment window.
+    const saved = await this.vendorOrderModel.findOneAndUpdate(
+        { _id: vendorOrderId, status: 'accepted', paymentStatus: vendorOrder.paymentStatus },
+        { $set: {
+            status: 'completed', paymentDeadline: null,
+            remainingPaymentDeadline: vendorOrder.paymentStatus === 'PARTIALLY_PAID'
+                ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
+        } },
+        { new: true },
+    );
+    if (!saved) throw new ConflictException('Booking changed. Refresh before completing it.');
 
     try {
         if (saved.paymentStatus === 'PAID') {

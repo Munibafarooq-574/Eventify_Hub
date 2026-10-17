@@ -469,6 +469,7 @@ return {
 
     paymentDeadline:
     vendorOrder.paymentDeadline ?? null,
+    remainingPaymentDeadline: vendorOrder.remainingPaymentDeadline ?? null,
 
 pendingPayment: pendingPayment
     ? {
@@ -1204,6 +1205,11 @@ vendorOrder.remainingAmount = Math.max(
     bookingAmount - paidSoFar,
     0,
 );
+if (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
+    vendorOrder.paymentDeadline = null;
+    vendorOrder.holdExpiresAt = null;
+}
+if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline = null;
 
        await vendorOrder.save();
 
@@ -1714,6 +1720,7 @@ const paidSoFar =
                 vendorOrder.paymentStatus,
             paymentDeadline:
                 vendorOrder.paymentDeadline ?? null,
+    remainingPaymentDeadline: vendorOrder.remainingPaymentDeadline ?? null,
         };
     }
 

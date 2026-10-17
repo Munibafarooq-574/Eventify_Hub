@@ -190,7 +190,10 @@ downPaymentType?: string | null;
     })
     paymentStatus: string;
 
-    // Mirrors holdExpiresAt when payment becomes due.
+    @Prop({ type: Date, default: null })
+    remainingPaymentDeadline?: Date | null;
+
+    // Initial down-payment deadline only.
     @Prop({ type: Date, default: null })
     paymentDeadline?: Date | null;
 

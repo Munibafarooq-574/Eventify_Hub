@@ -1,3 +1,4 @@
+jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
 
 //fyp-backend/src/order/order.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
@@ -13,6 +14,7 @@ describe('OrderController - Unit Tests', () => {
     service = {
       createOrder: jest.fn().mockResolvedValue({ _id: 'order123' }),
       updateVendorResponse: jest.fn().mockResolvedValue({ status: 'accepted' }),
+      assertVendorBookingOwner: jest.fn().mockResolvedValue(undefined),
       completeVendorOrder: jest.fn().mockResolvedValue({ status: 'completed' }),
       confirmOrderCompletion: jest.fn().mockResolvedValue({ status: 'completed' }),
       updateStatus: jest.fn().mockResolvedValue({ status: 'completed' }),
@@ -71,7 +73,7 @@ describe('OrderController - Unit Tests', () => {
   });
 
   it('should complete vendor order', async () => {
-    const res = await controller.completeVendor('v123');
+    const res = await controller.completeVendor('v123', { user: { id: validObjectId, role: 'Vendor' } });
     expect(res.status).toBe('completed');
   });
 
@@ -107,4 +109,10 @@ describe('OrderController - Unit Tests', () => {
     const res = await controller.deleteOrder('o123');
     expect(res).toEqual({});
   });
+  it('rejects completion when vendor ownership fails', async () => {
+    service.assertVendorBookingOwner.mockRejectedValueOnce(new Error('Forbidden'));
+    await expect(controller.completeVendor('v123', { user: { id: 'other' } })).rejects.toThrow('Forbidden');
+    expect(service.completeVendorOrder).not.toHaveBeenCalled();
+  });
+
 });

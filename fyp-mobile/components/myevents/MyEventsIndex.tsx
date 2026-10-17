@@ -1051,9 +1051,12 @@ const MyEventsScreen = () => {
                         vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
                       );
 
-                      const paymentDeadline = vendor?.paymentDeadline
-                        ? new Date(vendor.paymentDeadline)
-                        : null;
+                      const isRemainingDue = paymentStatus === 'PARTIALLY_PAID' && vendorStatus === 'completed';
+                      const deadlineValue = isRemainingDue ? vendor?.remainingPaymentDeadline
+                        : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(paymentStatus) ? vendor?.paymentDeadline : null;
+                      const paymentDeadline = deadlineValue && Number.isFinite(new Date(deadlineValue).getTime())
+                        ? new Date(deadlineValue) : null;
+                      const paymentOverdue = !!paymentDeadline && paymentDeadline.getTime() < Date.now();
 
                       const paymentBreakdown = paymentBreakdowns[vendor._id];
 
@@ -1322,7 +1325,8 @@ const MyEventsScreen = () => {
                                 <View style={styles.deadlineRow}>
                                   <Ionicons name="alarm-outline" size={12} color="#B8860B" />
                                   <Text style={styles.paymentDeadlineText}>
-                                    Pay before {paymentDeadline.toLocaleString()}
+                                    {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
+                                    {paymentDeadline.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
                                   </Text>
                                 </View>
                               )}

@@ -216,4 +216,26 @@ describe('OrderService - Unit Tests', () => {
         const result = await service.getOrderStatsForVendor(validObjectId);
         expect(result.length).toBe(6);
     });
+    it('starts a separate 24-hour balance window exactly once at completion', async () => {
+        const booking: any = { _id: validObjectId, vendorId: validObjectId, packageId: 'cake', status: 'accepted', paymentStatus: 'PARTIALLY_PAID', eventStartDateTime: new Date(Date.now()-1000), eventEndDateTime: new Date(Date.now()+3600000) };
+        vendorOrderModel.findById = jest.fn().mockResolvedValue(booking);
+        userModel.findById = jest.fn(() => ({ select: jest.fn().mockResolvedValue({ packages: [{ _id: 'cake', bookingType: 'DELIVERY_BASED' }] }) }));
+        vendorOrderModel.findOneAndUpdate = jest.fn(async (_filter, update) => ({ ...booking, ...update.$set }));
+        const before = Date.now();
+        const result = await service.completeVendorOrder(validObjectId);
+        expect(result.paymentDeadline).toBeNull();
+        expect(result.remainingPaymentDeadline!.getTime()).toBeGreaterThanOrEqual(before+86400000);
+        expect(result.remainingPaymentDeadline!.getTime()).toBeLessThanOrEqual(Date.now()+86400000);
+        vendorOrderModel.findById.mockResolvedValue(result);
+        expect(await service.completeVendorOrder(validObjectId)).toBe(result);
+        expect(vendorOrderModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    });
+    it('blocks premature duration service completion and unpaid completion', async () => {
+        const booking: any = { status: 'accepted', paymentStatus: 'PARTIALLY_PAID', eventEndDateTime: new Date(Date.now()+3600000) };
+        vendorOrderModel.findById = jest.fn().mockResolvedValue(booking);
+        await expect(service.completeVendorOrder(validObjectId)).rejects.toThrow('scheduled');
+        booking.paymentStatus = 'PAYMENT_REQUIRED';
+        await expect(service.completeVendorOrder(validObjectId)).rejects.toThrow('required payment');
+    });
+
 });
