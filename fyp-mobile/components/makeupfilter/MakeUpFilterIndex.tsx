@@ -41,7 +41,8 @@ const MakeUpFilterIndex: React.FC = () => {
                         router.push({
                             pathname: "/categoryvendorlisting",
                             params: {
-                                name: searchQuery, // ✅ add this
+                                ...routeParams,
+                                name: searchQuery,
                                 city: selectedCity || "",
                                 minRating: selectedRating ? selectedRating.replace(/[^\d]/g, "") : "",
                                 staff: selectedStaff[0] || "",

@@ -42,6 +42,9 @@ export default function App() {
   durationMinutes: number;
 } | null>(null);
   const routeParams = useLocalSearchParams();
+  const isBrowseMode = (Array.isArray(routeParams.bookingMode)
+    ? routeParams.bookingMode[0]
+    : routeParams.bookingMode) === "browse";
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryIdToName, setCategoryIdToName] = useState<Record<string, string>>({});
 
@@ -51,6 +54,8 @@ export default function App() {
   }, []);
   
  const getEventTimingParams = async () => {
+  // Home category browsing must never inherit a saved event.
+  if (isBrowseMode) return null;
   const context =
     await getMarketplaceEventContext();
 
@@ -226,15 +231,14 @@ const getServiceWindowLabel = (
     const timing = await getEventTimingParams();
     setEventTiming(timing);
 
-    // Category browsing from the dashboard is valid even when the
-    // client has not planned an event yet. In that case use the existing
-    // discovery-city fallback; availability fields remain optional.
-    const marketplaceContext =
-      await getMarketplaceEventContext();
+    // Keep the existing event/city fallback for event selection only.
+    const marketplaceContext = isBrowseMode
+      ? null
+      : await getMarketplaceEventContext();
 
     const discoveryCityId =
       timing?.eventCityId ||
-      marketplaceContext.discoveryCityId;
+      marketplaceContext?.discoveryCityId;
 
     const staff = Array.isArray(routeParams?.staff)
       ? routeParams.staff[0]
@@ -577,7 +581,13 @@ return (
         <View style={styles.headerSpacer} />
       </View>
 
-      <VendorSearchFilterBar searchQuery={searchQuery} onChangeSearchQuery={setSearchQuery} onSubmitSearch={fetchData} onClearSearch={() => { setSearchQuery(""); fetchData(); }} />
+      <VendorSearchFilterBar searchQuery={searchQuery} onChangeSearchQuery={setSearchQuery} onSubmitSearch={fetchData} onClearSearch={() => { setSearchQuery(""); fetchData(); }}
+        extraFilterParams={Object.fromEntries(
+          Object.entries(routeParams).map(([key, value]) => [
+            key, Array.isArray(value) ? value[0] : value,
+          ]).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+        )}
+      />
 
       {checkingAvailability && (
         <View style={styles.loadingBanner}>
