@@ -690,7 +690,9 @@ private buildPaymentReceiptEmail(
         vendorEmail?: string | null;
         vendorAddress?: string | null;
 
-        serviceName?: string | null;
+        categoryName?: string | null;
+        bookingType?: string | null;
+        eventTimeZone?: string | null;
         packageName?: string | null;
 
         serviceStart?: Date | null;
@@ -706,36 +708,31 @@ private buildPaymentReceiptEmail(
     const money = (value: number) =>
         Number(value || 0).toLocaleString('en-PK');
 
-    const formatDate = (
-        value?: Date | null,
-    ) => {
-        if (!value) {
-            return 'N/A';
-        }
-
-        return new Date(value).toLocaleDateString(
-            'en-PK',
-            {
-                dateStyle: 'medium',
-            },
-        );
+    // eventDate is a calendar date; never shift it into another timezone.
+    const formatDate = (value?: Date | null) => {
+        if (!value || !Number.isFinite(new Date(value).getTime())) return 'N/A';
+        return new Date(value).toLocaleDateString('en-PK', { dateStyle: 'medium', timeZone: 'UTC' });
     };
-
-    const formatDateTime = (
-        value?: Date | null,
-    ) => {
-        if (!value) {
-            return 'N/A';
-        }
-
-        return new Date(value).toLocaleString(
-            'en-PK',
-            {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-            },
-        );
+    const formatEventTime = (value?: string | null) => {
+        const match = value?.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+        if (!match) return 'N/A';
+        const hour = Number(match[1]); const minute = Number(match[2]);
+        const period = match[3]?.toUpperCase();
+        if (minute > 59 || hour > (period ? 12 : 23) || (period && hour < 1)) return 'N/A';
+        return `${hour % 12 || 12}:${match[2]} ${period || (hour >= 12 ? 'PM' : 'AM')}`;
     };
+    const formatDateTime = (value?: Date | null) => {
+        if (!value || !Number.isFinite(new Date(value).getTime())) return 'N/A';
+        const timeZone = data.eventTimeZone || 'UTC';
+        try {
+            return `${new Date(value).toLocaleString('en-PK', {
+                dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone,
+            })} (${timeZone})`;
+        } catch { return 'N/A'; }
+    };
+    const serviceTimes = data.bookingType === 'DELIVERY_BASED'
+        ? [{ label: 'Delivery at', value: data.serviceStart }]
+        : [{ label: 'Service Start', value: data.serviceStart }, { label: 'Service End', value: data.serviceEnd }];
 
     const formatDuration = (
         minutes?: number | null,
@@ -894,7 +891,7 @@ private buildPaymentReceiptEmail(
         <div style="margin-top:8px;">
           <strong>Event Time:</strong>
           ${this.escapeHtml(
-              data.eventTime || 'N/A',
+              formatEventTime(data.eventTime),
           )}
         </div>
 
@@ -998,9 +995,9 @@ private buildPaymentReceiptEmail(
         "
       >
         <div>
-          <strong>Service:</strong>
+          <strong>Category:</strong>
           ${this.escapeHtml(
-              data.serviceName || 'N/A',
+              data.categoryName || 'N/A',
           )}
         </div>
 
@@ -1011,23 +1008,9 @@ private buildPaymentReceiptEmail(
           )}
         </div>
 
-        <div style="margin-top:8px;">
-          <strong>Service Start:</strong>
-          ${this.escapeHtml(
-              formatDateTime(
-                  data.serviceStart,
-              ),
-          )}
-        </div>
-
-        <div style="margin-top:8px;">
-          <strong>Service End:</strong>
-          ${this.escapeHtml(
-              formatDateTime(
-                  data.serviceEnd,
-              ),
-          )}
-        </div>
+        ${serviceTimes.map(row => `<div style="margin-top:8px;">
+          <strong>${row.label}:</strong> ${this.escapeHtml(formatDateTime(row.value))}
+        </div>`).join('')}
 
         <div style="margin-top:8px;">
           <strong>Booking Total:</strong>
@@ -1250,6 +1233,7 @@ try {
             .findById(
                 vendorOrder.orderId,
             )
+            .populate({ path: 'eventCityId', select: 'timeZone' })
             .lean(),
 
         this.userModel
@@ -1263,8 +1247,10 @@ try {
                 contactDetails
                 packages
                 businessAddress
+                buisnessCategory
                 `,
             )
+            .populate({ path: 'buisnessCategory', select: 'name' })
             .lean(),
     ]);
 
@@ -1392,9 +1378,9 @@ try {
                     vendor.businessAddress ||
                     null,
 
-                serviceName:
-                    vendorOrder.serviceName ??
-                    null,
+                categoryName: (vendor.buisnessCategory as any)?.name || null,
+                bookingType: (vendorOrder as any).bookingType || packageData?.bookingType || null,
+                eventTimeZone: (order.eventCityId as any)?.timeZone || null,
 
                 packageName:
                     packageData

@@ -8,8 +8,9 @@ describe('Payment deadline lifecycle', () => {
         const service: any = Object.create(PaymentService.prototype);
         service.paymentModel = { findById: jest.fn().mockResolvedValue(payment), find: jest.fn(() => ({ lean: async () => [{ amount: totalPaid }] })) };
         service.vendorOrderModel = { findById: jest.fn().mockResolvedValue(booking) };
-        service.userModel = { findById: () => ({ select: () => ({ lean: async () => null }) }) };
-        service.orderModel = { findById: () => ({ lean: async () => null }) };
+        const empty: any = { lean: async () => null }; empty.populate = () => empty;
+        service.userModel = { findById: () => ({ select: () => empty }) };
+        service.orderModel = { findById: () => empty };
         await service.confirmPayment('payment');
         expect(booking.paymentDeadline).toBeNull();
         expect(booking.holdExpiresAt).toBeNull();
