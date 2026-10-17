@@ -3,7 +3,7 @@ import { CreateGenericBusinessDetailsDto } from "@/dto/CreateGenericBusinessDeta
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import postGenericBusinessDetails from "@/services/postGenericBusinessDetails";
-import { getSecureData } from "@/store";
+import { getSecureData, getUserData } from "@/store";
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import {
@@ -308,27 +308,9 @@ const BDGenericIndex = () => {
         try {
             setIsLoading(true);
 
-            const storedUser =
-                await getSecureData("user");
-
-            if (!storedUser) {
-                Alert.alert(
-                    "Session Error",
-                    "User information was not found. Please login again."
-                );
-
-                return;
-            }
-
-            const user =
-                JSON.parse(storedUser);
-
-            if (!user?._id) {
-                Alert.alert(
-                    "Session Error",
-                    "User ID was not found."
-                );
-
+            const user = await getUserData();
+            if (typeof user?._id !== 'string' || !user._id.trim()) {
+                Alert.alert("Sign in required", "Please sign in again to save your business details.");
                 return;
             }
 
