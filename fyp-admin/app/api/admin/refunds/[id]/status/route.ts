@@ -70,6 +70,11 @@ export async function PATCH(
     );
   }
 
+  const rejectionReason = typeof body?.rejectionReason === 'string' ? body.rejectionReason.trim() : '';
+  if (status === 'REJECTED' && (!rejectionReason || rejectionReason.length > 500)) {
+    return NextResponse.json({ message: 'Enter a rejection reason between 1 and 500 characters.' }, { status: 400 });
+  }
+
   try {
     const response = await backendFetch(
       `/admin/finance/refunds/${encodeURIComponent(
@@ -82,6 +87,7 @@ export async function PATCH(
         },
         body: JSON.stringify({
           status,
+          ...(status === 'REJECTED' ? { rejectionReason } : {}),
         }),
       },
     );

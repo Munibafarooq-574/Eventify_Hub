@@ -60,6 +60,17 @@ export default function RefundStatusActions({
         "Move this refund back to Pending?";
     }
 
+    let rejectionReason: string | undefined;
+    if (status === 'REJECTED') {
+      const entered = window.prompt('Explain why this refund is being rejected. This reason will be shown to the client.');
+      if (entered === null) return;
+      rejectionReason = entered.trim();
+      if (!rejectionReason || rejectionReason.length > 500) {
+        window.alert('Enter a rejection reason between 1 and 500 characters.');
+        return;
+      }
+    }
+
     if (!window.confirm(message)) {
       return;
     }
@@ -76,6 +87,7 @@ export default function RefundStatusActions({
           },
           body: JSON.stringify({
             status,
+            ...(rejectionReason ? { rejectionReason } : {}),
           }),
         },
       );

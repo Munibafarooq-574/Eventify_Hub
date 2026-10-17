@@ -1,3 +1,4 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 ﻿// fyp-backend/src/admin/admin.module.ts
 
 import {
@@ -140,6 +141,7 @@ import {
 @Module({
   imports: [
 
+    NotificationsModule,
     AuthModule,
     CategoryModule,
     VendorGrowthModule,

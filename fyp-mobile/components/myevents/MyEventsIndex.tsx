@@ -1,3 +1,4 @@
+import getClientRefunds, { type ClientRefund } from '@/services/getClientRefunds';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
 import ClientCancellationReview from '../cancellation/ClientCancellationReview';
@@ -9,9 +10,10 @@ import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Animated,
   LayoutAnimation,
@@ -173,6 +175,26 @@ const MyEventsScreen = () => {
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({});
   const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
+  const [refunds, setRefunds] = useState<Record<string, ClientRefund>>({});
+  const [refundLoading, setRefundLoading] = useState(true);
+  const [refundError, setRefundError] = useState(false);
+  const refundRequest = useRef(0);
+  const loadRefunds = useCallback(async () => {
+    const request = ++refundRequest.current;
+    setRefundLoading(true);
+    try {
+      const records = await getClientRefunds();
+      if (request === refundRequest.current) {
+        setRefunds(Object.fromEntries(records.map(record => [record.vendorOrderId, record])));
+        setRefundError(false);
+      }
+    } catch {
+      if (request === refundRequest.current) setRefundError(true);
+    } finally {
+      if (request === refundRequest.current) setRefundLoading(false);
+    }
+  }, []);
+
 
   // Safely get the logged-in user, trying AsyncStorage first (where login
   // saves it via saveUserData), then falling back to SecureStore in case
@@ -192,6 +214,7 @@ const MyEventsScreen = () => {
   };
 
   const fetchData = useCallback(async () => {
+    void loadRefunds();
     setErrorMsg(null);
     try {
       const user = await resolveUser();
@@ -239,14 +262,24 @@ const MyEventsScreen = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loadRefunds]);
 
   // Refresh when returning from the reschedule form, so the request
   // details appear immediately without creating another request.
   useFocusEffect(
     useCallback(() => {
-      fetchData();
-    }, [fetchData]),
+      setRefunds({});
+      void fetchData();
+      const foreground = AppState.addEventListener('change', state => {
+        if (state === 'active') void loadRefunds();
+      });
+      const timer = setInterval(() => {
+        if (AppState.currentState === 'active') void loadRefunds();
+      }, 30000);
+      return () => {
+        clearInterval(timer); foreground.remove(); ++refundRequest.current;
+      };
+    }, [fetchData, loadRefunds]),
   );
 
   const toggleEventDetails = (eventId: string) => {
@@ -1485,7 +1518,7 @@ const MyEventsScreen = () => {
                                   <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
                                 </View>
                               </View>
-                              <BookingCancellationDetails booking={vendor} />
+                              <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                             </View>
                           );
                         })}

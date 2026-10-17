@@ -73,6 +73,9 @@ export class Refund extends Document {
     @Prop({ type: Date, default: null })
     refundedAt?: Date | null;
 
+    @Prop({ type: String, default: null, maxlength: 500 })
+    rejectionReason?: string | null;
+
     // Used when admin rejects a refund claim
     @Prop({ type: Date, default: null })
     rejectedAt?: Date | null;

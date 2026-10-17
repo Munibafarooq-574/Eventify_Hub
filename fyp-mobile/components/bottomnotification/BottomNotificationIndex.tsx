@@ -1,31 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 import getUserNotifications from '@/services/getNotifications';
-import { getSecureData } from '@/store';
+import { getSecureData, getUserData } from '@/store';
 
 const NotificationsScreen: React.FC = () => {
     const [notifications, setNotifications] = useState<any[]>([]);
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const user = await getSecureData("user") || ""; // Assuming full user object is stored
-                const parsedUser = JSON.parse(user);
-                const data = await getUserNotifications(parsedUser._id);
-                setNotifications(data);
-            } catch (error) {
-                console.error("Failed to fetch notifications:", error);
-            }
-        };
-
-        fetchNotifications();
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState('');
+    const requestId = useRef(0);
+    const loadNotifications = useCallback(async () => {
+        const request = ++requestId.current;
+        setRefreshing(true); setError('');
+        try {
+            const saved = await getUserData();
+            const raw = saved ? null : await getSecureData('user');
+            const user = saved || (raw ? JSON.parse(raw) : null);
+            if (!user?._id) throw new Error('Please sign in again.');
+            const data = await getUserNotifications(user._id);
+            if (request === requestId.current) setNotifications(Array.isArray(data) ? data : []);
+        } catch {
+            if (request === requestId.current) setError('Unable to load notifications. Pull down to retry.');
+        } finally {
+            if (request === requestId.current) setRefreshing(false);
+        }
     }, []);
+    useFocusEffect(useCallback(() => {
+        setNotifications([]);
+        void loadNotifications();
+        return () => { ++requestId.current; };
+    }, [loadNotifications]));
 
     const renderNotification = ({ item }: { item: any }) => {
         let icon;
         switch (item.type) {
+            case 'REFUND_UPDATE':
+                icon = <Ionicons name="receipt-outline" size={24} color="#7B2869" />;
+                break;
             case 'Trending':
                 icon = <MaterialCommunityIcons name="fire" size={24} color="orange" />;
                 break;
@@ -40,16 +53,16 @@ const NotificationsScreen: React.FC = () => {
         }
 
         return (
-            <View key={item._id} style={styles.notificationContainer}>
+            <TouchableOpacity key={item._id} style={styles.notificationContainer} disabled={item.type !== 'REFUND_UPDATE'} accessibilityRole={item.type === 'REFUND_UPDATE' ? 'button' : undefined} onPress={() => router.push('/myevents')}>
                 <View style={styles.iconContainer}>{icon}</View>
                 <View style={styles.textContainer}>
-                    <Text style={styles.notificationType}>{item.type}</Text>
+                    <Text style={styles.notificationType}>{item.title || item.type}</Text>
                     <Text style={styles.notificationDescription}>{item.body}</Text>
                 </View>
                 <Text style={styles.notificationTime}>
                     {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -64,8 +77,12 @@ const NotificationsScreen: React.FC = () => {
                 <Text style={styles.headerTitle}>Notifications</Text>
             </View>
 
+            {!!error && <Text accessibilityRole="alert" style={{ padding: 16, color: '#A9273B' }}>{error}</Text>}
             {/* Notifications List */}
             <FlatList
+                refreshing={refreshing}
+                onRefresh={loadNotifications}
+                ListEmptyComponent={!refreshing && !error ? <Text style={{ padding: 20 }}>No notifications yet.</Text> : null}
                 data={notifications}
                 renderItem={renderNotification}
                 keyExtractor={(item) => item._id}

@@ -46,7 +46,7 @@ export class NotificationService {
         return user.pushToken;
     }
 
-    async sendPushNotification(title: string, body: string, userId: string) {
+    async sendPushNotification(title: string, body: string, userId: string, timeout?: number) {
         const token = await this.getUserPushToken(userId);
         const message = {
             to: token,
@@ -57,6 +57,7 @@ export class NotificationService {
 
         try {
             const response = await axios.post('https://exp.host/--/api/v2/push/send', message, {
+                ...(timeout ? { timeout } : {}),
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -66,6 +67,14 @@ export class NotificationService {
             console.error('Expo push error:', error);
             throw error;
         }
+    }
+
+    // Keep the in-app update even when a device has no push token or Expo is unavailable.
+    async notifyUser(userId: string, title: string, body: string, type: string) {
+        const notification = await this.notificationModel.create({ userId, title, body, type });
+        try { await this.sendPushNotification(title, body, userId, 10000); }
+        catch { /* The persisted notification remains available in the app. */ }
+        return notification;
     }
 
     async getNotificationsByUserId(userId: string) {

@@ -1,3 +1,5 @@
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationController } from './notifications.controller';
 import { NotificationService } from './notifications.service';
@@ -41,14 +43,21 @@ describe('NotificationController', () => {
             const data = [{ msg: 'test' }];
             mockNotificationService.getNotificationsByUserId.mockResolvedValue(data);
 
-            const result = await controller.getNotificationsByUserId('user123');
+            const result = await controller.getNotificationsByUserId('user123', { user: { id: 'user123' } });
             expect(result.data).toEqual(data);
         });
 
-        it('should throw if no notifications found', async () => {
+        it('returns an empty list when there are no notifications', async () => {
             mockNotificationService.getNotificationsByUserId.mockResolvedValue([]);
 
-            await expect(controller.getNotificationsByUserId('noUser')).rejects.toThrow(NotFoundException);
+            expect((await controller.getNotificationsByUserId('noUser', { user: { id: 'noUser' } })).data).toEqual([]);
         });
     });
+    it('guards reads and blocks another user before querying notification storage', async () => {
+        expect(Reflect.getMetadata(GUARDS_METADATA, NotificationController.prototype.getNotificationsByUserId)).toContain(JwtAuthGuard);
+        mockNotificationService.getNotificationsByUserId.mockClear();
+        await expect(controller.getNotificationsByUserId('other-user', {user:{id:'client'}})).rejects.toThrow('your own');
+        expect(mockNotificationService.getNotificationsByUserId).not.toHaveBeenCalled();
+    });
+
 });

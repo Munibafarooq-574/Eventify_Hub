@@ -1,5 +1,5 @@
 // fyp-backend/src/cancellation/cancellation.controller.ts
-import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe, Request } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe, Request, Header } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminRoleGuard } from '../auth/admin-role.guard';
 import { CancellationService } from './cancellation.service';
@@ -20,6 +20,13 @@ export class CancellationController {
     @UseGuards(JwtAuthGuard, AdminRoleGuard)
     updatePolicyConfig(@Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })) dto: UpdateCancellationPolicyDto) {
         return this.cancellationService.updatePolicyConfig(dto);
+    }
+
+    @Get('refunds')
+    @Header('Cache-Control', 'private, no-store')
+    @UseGuards(JwtAuthGuard)
+    getClientRefunds(@Request() req: any) {
+        return this.cancellationService.getClientRefunds(req.user);
     }
 
     // Preview refund before actually cancelling

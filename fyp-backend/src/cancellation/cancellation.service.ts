@@ -200,6 +200,23 @@ export class CancellationService {
         }
     }
 
+    async getClientRefunds(actor: CancellationActor) {
+        this.requireClient(actor);
+        // Derive ownership from the verified session, never a supplied user ID.
+        const records = await this.refundModel.find({ organizerId: new Types.ObjectId(actor.id) })
+            .select('_id vendorOrderId amountPaid refundAmount withheldAmount status processedAt refundedAt paidAt rejectedAt closedAt updatedAt rejectionReason')
+            .sort({ createdAt: -1 }).lean();
+        return records.map(record => ({
+            _id: record._id, vendorOrderId: record.vendorOrderId,
+            amountPaid: record.amountPaid, refundAmount: record.refundAmount,
+            withheldAmount: record.withheldAmount, status: record.status,
+            processedAt: record.processedAt, refundedAt: record.refundedAt,
+            paidAt: record.paidAt, rejectedAt: record.rejectedAt, closedAt: record.closedAt,
+            updatedAt: (record as any).updatedAt,
+            rejectionReason: record.status === 'REJECTED' ? record.rejectionReason || null : null,
+        }));
+    }
+
     // Shared ownership authority for preview, confirmation and pending requests.
     async assertClientBookingOwner(vendorOrderId: string, actor: CancellationActor, session?: ClientSession) {
         this.requireClient(actor);

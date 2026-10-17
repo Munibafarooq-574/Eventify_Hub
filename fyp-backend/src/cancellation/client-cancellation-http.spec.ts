@@ -16,7 +16,7 @@ describe('Cancellation HTTP authentication and confirmation validation', () => {
     let app: INestApplication; let jwt: JwtService;
     const client = { _id: new Types.ObjectId().toString(), role: 'client' };
     const booking = new Types.ObjectId().toString();
-    const service = { calculateRefund: jest.fn(async () => ({ eligible: true })), organizerCancelConfirmedBooking: jest.fn(async () => ({ ok: true })), vendorCancelConfirmedBooking: jest.fn(), getVendorPenalties: jest.fn() };
+    const service = { getClientRefunds: jest.fn(async () => []), calculateRefund: jest.fn(async () => ({ eligible: true })), organizerCancelConfirmedBooking: jest.fn(async () => ({ ok: true })), vendorCancelConfirmedBooking: jest.fn(), getVendorPenalties: jest.fn() };
     beforeAll(async () => {
         const module = await Test.createTestingModule({
             imports: [PassportModule, JwtModule.register({ secret })], controllers: [CancellationController],
@@ -52,4 +52,10 @@ describe('Cancellation HTTP authentication and confirmation validation', () => {
         await request(app.getHttpServer()).patch(`${path()}/organizer-cancel-confirmed`).set('Authorization', auth()).send({ previewToken: 'signed-quote', reason: 'Changed plans' }).expect(200);
         expect(service.organizerCancelConfirmedBooking).toHaveBeenCalledWith(booking, { id: client._id, role: 'client' }, expect.objectContaining({ previewToken: 'signed-quote', reason: 'Changed plans' }));
     });
+    it('authenticates refund reads and ignores a supplied organizer identity', async () => {
+        await request(app.getHttpServer()).get('/cancellation/refunds').expect(401);
+        await request(app.getHttpServer()).get('/cancellation/refunds?organizerId=someone-else').set('Authorization',auth()).expect(200);
+        expect(service.getClientRefunds).toHaveBeenCalledWith({id:client._id,role:'client'});
+    });
+
 });

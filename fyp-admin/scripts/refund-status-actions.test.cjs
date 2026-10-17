@@ -52,3 +52,19 @@ test('close button shows the actual HTTP error and allows retry after failure', 
   assert.equal(payload.status, 'NO_REFUND_DUE'); assert.deepEqual(states, ['NO_REFUND_DUE', null]);
   assert.deepEqual(alerts, ['Refund update failed (HTTP 409): Refund changed. Refresh before updating it.']);
 });
+
+test('rejection sends a trimmed client-facing reason and blocks blank input', async () => {
+  for (const entered of ['   ', null, '  Duplicate claim  ']) {
+    const requests=[];const isolated={exports:{}};
+    vm.runInNewContext(code,{module:isolated,exports:isolated.exports,
+      require:name=>name==='@/lib/api-error'?helperModule.exports:name==='react'?{useState:()=>[null,()=>{}]}:name==='next/navigation'?{useRouter:()=>({refresh(){}})}:require(name),
+      window:{prompt:()=>entered,confirm:()=>true,alert(){}},
+      fetch:async(_url,options)=>{requests.push(JSON.parse(options.body));return{ok:true,status:200,json:async()=>({})}},
+    });
+    const element=isolated.exports.default({refundId:'refund',refundAmount:1500,currentStatus:'PENDING'});
+    function find(node){if(!node||typeof node!=='object')return; if(node.type==='button'&&node.props.children==='Reject')return node; for(const child of [node.props?.children].flat(Infinity)){const found=find(child);if(found)return found;}}
+    await find(element).props.onClick();
+    if(entered?.trim()) {assert.equal(requests.length,1);assert.equal(requests[0].rejectionReason,'Duplicate claim');}
+    else assert.equal(requests.length,0);
+  }
+});

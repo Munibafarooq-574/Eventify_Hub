@@ -1,9 +1,11 @@
+import { NotificationService } from '../notifications/notifications.service';
 // fyp-backend/src/admin/admin-finance.service.ts
 
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 
 import {
@@ -61,6 +63,7 @@ export class AdminFinanceService {
     // Do NOT duplicate subscription activation logic here.
     private readonly subscriptionService:
       SubscriptionService,
+    @Optional() private readonly notifications?: NotificationService,
   ) {}
 
     private getFinanceDateRange(
@@ -1526,6 +1529,7 @@ if (status !== 'ALL') {
     refundId: string,
     status: 'PENDING' | 'PROCESSING' | 'REFUNDED' | 'REJECTED' | 'NO_REFUND_DUE',
     adminId?: string,
+    rejectionReason?: string,
   ) {
     if (!Types.ObjectId.isValid(refundId)) throw new BadRequestException('Invalid refund ID.');
     if (!['PENDING', 'PROCESSING', 'REFUNDED', 'REJECTED', 'NO_REFUND_DUE'].includes(status)) {
@@ -1550,8 +1554,12 @@ if (status !== 'ALL') {
     if (status === 'REFUNDED' && refund.status !== 'PROCESSING') {
       throw new ConflictException('Process and verify repayment before confirming the refund.');
     }
+    const reason = typeof rejectionReason === 'string' ? rejectionReason.trim() : '';
+    if (status === 'REJECTED' && (!reason || reason.length > 500)) {
+      throw new BadRequestException('A client-facing rejection reason between 1 and 500 characters is required.');
+    }
     const now = new Date();
-    const changes: Record<string, unknown> = { status };
+    const changes: Record<string, unknown> = { status, rejectionReason: status === 'REJECTED' ? reason : null };
     if (status === 'NO_REFUND_DUE') {
       if (!adminId || !Types.ObjectId.isValid(adminId)) throw new BadRequestException('Authenticated Admin identity is required to close the case.');
       Object.assign(changes, { closedAt: now, closedBy: new Types.ObjectId(adminId), refundedAt: null, rejectedAt: null, paidAt: null });
@@ -1569,6 +1577,19 @@ if (status !== 'ALL') {
       { $set: changes }, { new: true, runValidators: true },
     );
     if (!updated) throw new ConflictException('Refund changed. Refresh before updating it.');
+    const messages: Record<string, string> = {
+      PENDING: 'Your refund request is pending review.',
+      PROCESSING: 'Your refund is being processed. Repayment has not yet been confirmed.',
+      REFUNDED: 'Your refund settlement has been confirmed.',
+      REJECTED: `Your refund request was rejected. Reason: ${reason}`,
+      NO_REFUND_DUE: 'Your case is closed. No refund is due under the recorded cancellation policy.',
+    };
+    if (this.notifications && updated.organizerId) {
+      try {
+        await this.notifications.notifyUser(String(updated.organizerId), 'Refund update',
+          `${messages[status]} Refund amount: Rs. ${amount.toLocaleString('en-PK')}. Open booking history for details.`, 'REFUND_UPDATE');
+      } catch { /* The committed refund status is authoritative even if notification storage is unavailable. */ }
+    }
     return updated;
   }
 

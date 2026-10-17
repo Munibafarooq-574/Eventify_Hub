@@ -32,6 +32,9 @@ import {
 } from '../auth/admin-role.guard';
 
 class UpdateRefundStatusDto {
+  @IsOptional() @IsString() @MaxLength(500)
+  rejectionReason?: string;
+
   @IsIn([
     'PENDING',
     'PROCESSING',
@@ -166,6 +169,7 @@ getRecentTransactions(
         id,
         dto.status,
         req.user.id,
+        dto.rejectionReason,
       );
   }
 
