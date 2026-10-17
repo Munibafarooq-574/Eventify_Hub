@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "https://eventify-hub.onrender.com";
+import { API_BASE_URL } from "./apiConfig";
 
 export interface ActiveCity {
   _id: string;
@@ -12,6 +12,6 @@ export interface ActiveCity {
 }
 
 export default async function getActiveCities(): Promise<ActiveCity[]> {
-  const response = await axios.get(`${API_URL}/cities`);
+  const response = await axios.get(`${API_BASE_URL}/cities`);
   return response.data;
 }

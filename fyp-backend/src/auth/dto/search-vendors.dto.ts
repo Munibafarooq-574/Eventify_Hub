@@ -1,5 +1,8 @@
+import { Transform } from 'class-transformer';
 import {
   IsMongoId,
+  IsArray,
+  IsIn,
   IsNumberString,
   IsOptional,
   IsString,
@@ -38,11 +41,32 @@ export class SearchVendorsDto {
   @IsNumberString()
   minRating?: string;
   @IsOptional()
-  staff?: 'MALE' | 'FEMALE' ;
+  staff?: 'MALE' | 'FEMALE';
 
   @IsOptional()
-  cancellationPolicy?:
-    | 'REFUNDABLE'
-    | 'NON-REFUNDABLE'
-    | 'PARTIALLY REFUNDABLE';
+  cancellationPolicy?: 'REFUNDABLE' | 'NON-REFUNDABLE' | 'PARTIALLY REFUNDABLE';
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray()
+  @IsMongoId({ each: true })
+  cityIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray()
+  @IsIn(['MALE', 'FEMALE'], { each: true })
+  staffOptions?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray()
+  @IsIn(['REFUNDABLE', 'NON-REFUNDABLE', 'PARTIALLY REFUNDABLE'], { each: true })
+  policies?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.split(',').filter(Boolean) : value)
+  @IsArray()
+  @IsIn(['1', '2', '3', '4', '5', 'unrated'], { each: true })
+  ratingBands?: string[];
 }

@@ -3,15 +3,17 @@
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { emptyVendorFilters, loadVendorFilters, saveVendorFilters, SORT_OPTIONS, sortVendorResults, vendorStartingPrice, VendorSearchPreferences } from '@/services/vendorSearchPreferences';
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { COLORS, scale, isSmallScreen } from "./theme";
 import VendorSearchFilterBar from "./VendorSearchFilterBar";
 import {
   ActivityIndicator,
+  ScrollView,
   FlatList,
   Image,
   Platform,
@@ -25,6 +27,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function App() {
+  const [preferences, setPreferences] = useState<VendorSearchPreferences>(emptyVendorFilters);
+  const [searchError, setSearchError] = useState(false);
+  const requestId = useRef(0);
   const [data, setData] = useState<any>([]);
   const [headerTitle, setHeaderTitle] = useState<string>("");
   const [checkingAvailability, setCheckingAvailability] = useState(false);
@@ -42,15 +47,20 @@ export default function App() {
   durationMinutes: number;
 } | null>(null);
   const routeParams = useLocalSearchParams();
+  const routeParamsKey = JSON.stringify(routeParams);
+  const isBrowseMode = (Array.isArray(routeParams.bookingMode)
+    ? routeParams.bookingMode[0]
+    : routeParams.bookingMode) === "browse";
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [categoryIdToName, setCategoryIdToName] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetchData();
     fetchCategoryName();
-  }, []);
+  }, [routeParamsKey]);
   
  const getEventTimingParams = async () => {
+  // Home category browsing must never inherit a saved event.
+  if (isBrowseMode) return null;
   const context =
     await getMarketplaceEventContext();
 
@@ -178,8 +188,14 @@ const getServiceWindowLabel = (
         : `Service: ${start} - ${end}`;
   }
 };
-  const fetchData = async () => {
+  const fetchData = async (query = searchQuery, override?: VendorSearchPreferences) => {
+  const currentRequest = ++requestId.current;
+  setCheckingAvailability(true);
+  setSearchError(false);
   try {
+    const savedFilters = override ?? await loadVendorFilters();
+    if (currentRequest !== requestId.current) return;
+    setPreferences(savedFilters);
     const categoryIdsRaw = Array.isArray(routeParams?.categoryIds)
       ? routeParams.categoryIds[0]
       : routeParams?.categoryIds;
@@ -218,6 +234,10 @@ const getServiceWindowLabel = (
 
       if (singleCategoryId) {
         categoryIds = [singleCategoryId];
+        const singleCategoryName = await getSecureData("categoryName");
+        if (singleCategoryName) {
+          setCategoryIdToName({ [singleCategoryId]: singleCategoryName });
+        }
       }
     }
 
@@ -226,42 +246,25 @@ const getServiceWindowLabel = (
     const timing = await getEventTimingParams();
     setEventTiming(timing);
 
-    // Category browsing from the dashboard is valid even when the
-    // client has not planned an event yet. In that case use the existing
-    // discovery-city fallback; availability fields remain optional.
-    const marketplaceContext =
-      await getMarketplaceEventContext();
+    // Keep the existing event/city fallback for event selection only.
+    const marketplaceContext = isBrowseMode
+      ? null
+      : await getMarketplaceEventContext();
 
     const discoveryCityId =
       timing?.eventCityId ||
-      marketplaceContext.discoveryCityId;
+      marketplaceContext?.discoveryCityId;
 
-    const staff = Array.isArray(routeParams?.staff)
-      ? routeParams.staff[0]
-      : routeParams?.staff;
-
-    const cancellationPolicy = Array.isArray(
-      routeParams?.cancellationPolicy
-    )
-      ? routeParams.cancellationPolicy[0]
-      : routeParams?.cancellationPolicy;
-
-    const minRatingStr = Array.isArray(routeParams?.minRating)
-      ? routeParams.minRating[0]
-      : routeParams?.minRating;
-
-    
-         const filters = {
-      name: searchQuery || undefined,
+    const filters = {
+      name: query.trim() || undefined,
       eventCityId: discoveryCityId || undefined,
+      cityIds: isBrowseMode ? savedFilters.cityIds : undefined,
       eventDate: timing?.eventDate,
       startTime: timing?.startTime,
       durationMinutes: timing?.durationMinutes,
-      staff: staff || undefined,
-      cancellationPolicy: cancellationPolicy || undefined,
-      minRating: minRatingStr
-        ? parseInt(minRatingStr, 10)
-        : undefined,
+      staffOptions: savedFilters.staffOptions,
+      policies: savedFilters.policies,
+      ratingBands: savedFilters.ratingBands,
     };
 
     const resultsPerCategory = await Promise.all(
@@ -287,6 +290,7 @@ console.log(
   JSON.stringify(resultsPerCategory, null, 2)
 );
 
+if (currentRequest !== requestId.current) return;
 const mergedResults = resultsPerCategory.flat();
     const uniqueVendorsMap = new Map<string, any>();
     mergedResults.forEach((vendor: any) => { if (vendor?._id) uniqueVendorsMap.set(vendor._id, vendor); });
@@ -303,35 +307,54 @@ const mergedResults = resultsPerCategory.flat();
       ? vendorResults.filter((vendor: any) => String(vendor?._id) !== excludedVendorId)
       : vendorResults;
     setData(visibleVendorResults);
-    fetchVendorDetails(visibleVendorResults);
+    await fetchVendorDetails(visibleVendorResults, currentRequest, savedFilters.sort);
   } catch (error) {
     console.error("Error fetching vendors:", error);
-    setData([]);
+    if (currentRequest === requestId.current) {
+      setData([]);
+      setSearchError(true);
+    }
+  } finally {
+    if (currentRequest === requestId.current) setCheckingAvailability(false);
   }
 };
 
-const fetchVendorDetails = async (vendors: any[]) => {
+  const latestFetchData = useRef(fetchData);
+  latestFetchData.current = fetchData;
+  useFocusEffect(useCallback(() => {
+    latestFetchData.current();
+    return () => { requestId.current += 1; };
+  }, [routeParamsKey]));
+
+const fetchVendorDetails = async (vendors: any[], currentRequest: number, sort: VendorSearchPreferences['sort']) => {
   try {
     setLoadingVendorDetails(true);
+    let reviewLoadFailed = false;
     const reviewsMap: Record<string, any> = {};
     const packagesMap: Record<string, any[]> = {};
 
     await Promise.all(
       vendors.map(async (vendor: any) => {
         try { reviewsMap[vendor._id] = await getVendorReviewSummary(vendor._id); }
-        catch (error) { console.error(`Failed to load reviews for vendor ${vendor._id}:`, error); reviewsMap[vendor._id] = { averageRating: 0, totalReviews: 0 }; }
+        catch (error) { reviewLoadFailed = true; console.error(`Failed to load reviews for vendor ${vendor._id}:`, error); reviewsMap[vendor._id] = { averageRating: 0, totalReviews: 0 }; }
 
         try { packagesMap[vendor._id] = (await getVendorPackagesList(vendor._id)) || []; }
         catch (error) { console.error(`Failed to load packages for vendor ${vendor._id}:`, error); packagesMap[vendor._id] = []; }
       })
     );
 
-    setVendorReviews(reviewsMap);
-    setVendorPackages(packagesMap);
+    if (reviewLoadFailed && (sort === 'rating' || sort === 'reviews')) {
+      throw new Error('Review summaries are required for this sort order. Please retry.');
+    }
+    if (currentRequest === requestId.current) {
+      setVendorReviews(reviewsMap);
+      setVendorPackages(packagesMap);
+    }
   } catch (error) {
     console.error("Failed to load vendor details:", error);
+    throw error;
   } finally {
-    setLoadingVendorDetails(false);
+    if (currentRequest === requestId.current) setLoadingVendorDetails(false);
   }
 };
 
@@ -339,7 +362,7 @@ const fetchCategoryName = async () => {
   const namesRaw = Array.isArray(routeParams?.categoryNames) ? routeParams.categoryNames[0] : routeParams?.categoryNames;
   try {
     const names = namesRaw ? JSON.parse(namesRaw) : [];
-    if (names.length > 0) { setHeaderTitle("Vendors"); return; }
+    if (names.length > 0) { setHeaderTitle(names.length === 1 ? names[0] : "Vendors"); return; }
   } catch (error) {
     console.error("Error parsing categoryNames:", error);
   }
@@ -347,7 +370,7 @@ const fetchCategoryName = async () => {
   setHeaderTitle(categoryName);
 };
 
-const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData(); setRefreshing(false); }, [searchQuery]);
+const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData(); setRefreshing(false); }, [searchQuery, routeParamsKey]);
 
   const resultsLabel = useMemo(() => {
     const count = data?.length ?? 0;
@@ -374,19 +397,11 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     const rating = review?.averageRating ? Number(review.averageRating).toFixed(1) : "0.0";
     const reviewCount = review?.totalReviews || 0;
 
-    const price = item?.cakeBusinessDetails?.minimumPrice || item?.mehndiBusinessDetails?.minimumPrice || item?.cateringBusinessDetails?.minimumPrice || item?.photographerBusinessDetails?.minimumPrice || item?.salonBusinessDetails?.minimumPrice || item?.venueBusinessDetails?.minimumPrice || item?.soundBusinessDetails?.minimumPrice || item?.BusinessDetails?.minimumPrice || item?.BusinessDetails?.minimumPricePerEvent;
+    const price = vendorStartingPrice(item);
     const brandName = item?.contactDetails?.brandName || item?.ContactDetails?.brandName || item?.BusinessDetails?.brandName || "Vendor";
     const vendorName = item?.name || item?.vendorName || item?.ownerName || "Vendor";
     const categoryName = item?.buisnessCategory?.name || item?.buisnessCategory?.categoryName || item?.category?.name || item?.categoryName || item?.serviceName || categoryIdToName[item?._matchedCategoryId] || "Category";
     const businessCity = item?.businessCityId;
-    const subscriptionBadge =
-  item?.marketplaceSubscription?.subscriptionBadge;
-
-      const isPremium =
-        subscriptionBadge === "Premium";
-
-      const isGrowth =
-        subscriptionBadge === "Growth";
     const city =
       businessCity?.name
         ? [
@@ -431,29 +446,6 @@ router.push({
     {brandName}
   </Text>
 
-  {isPremium ? (
-    <View style={[styles.subscriptionBadge, styles.premiumBadge]}>
-      <Ionicons
-        name="diamond-outline"
-        size={scale(11)}
-        color="#7A4B00"
-      />
-      <Text style={styles.premiumBadgeText}>
-        Premium
-      </Text>
-    </View>
-  ) : isGrowth ? (
-    <View style={[styles.subscriptionBadge, styles.growthBadge]}>
-      <Ionicons
-        name="trending-up-outline"
-        size={scale(11)}
-        color={COLORS.primary}
-      />
-      <Text style={styles.growthBadgeText}>
-        Growth
-      </Text>
-    </View>
-  ) : null}
 </View>
             <Text style={styles.vendorName} numberOfLines={1}>{vendorName}</Text>
             <Text style={styles.subtitle} numberOfLines={1}>{categoryName}</Text>
@@ -484,11 +476,12 @@ router.push({
 
 <View style={styles.cardDivider} />
 
+      {!!eventTiming && !!requiredServiceWindow?.startDateTime && !!requiredServiceWindow?.endDateTime && (
       <View style={styles.availabilitySection}>
         <View style={styles.availabilityRow}>
           <Ionicons name="checkmark-circle" size={scale(16)} color={COLORS.success} />
           <View style={styles.availabilityTextContainer}>
-            <Text style={styles.availableText}>Available</Text>
+            <Text style={styles.availableText}>Available for your event</Text>
             {requiredServiceWindow?.startDateTime &&
           requiredServiceWindow?.endDateTime && (
             <Text style={styles.selectedTimeText}>
@@ -502,10 +495,12 @@ router.push({
         </View>
       </View>
 
+      )}
+
       <View style={styles.cardBottomRow}>
         <View style={styles.priceSection}>
           <Text style={styles.priceText}>Starting from</Text>
-          <Text style={styles.price}>{price ? `Rs ${price}` : "N/A"}</Text>
+          <Text style={styles.price}>{price !== undefined ? `Rs ${price}` : "N/A"}</Text>
         </View>
 
         <TouchableOpacity style={styles.viewButton}
@@ -539,15 +534,30 @@ router.push({
   );
 };
 
+const activeChips = [
+  ...(isBrowseMode ? preferences.cityIds.map(value => ({ key: 'cityIds' as const, value, label: preferences.cityLabels[value] || 'Selected city' })) : []),
+  ...preferences.staffOptions.map(value => ({ key: 'staffOptions' as const, value, label: value === 'MALE' ? 'Male' : 'Female' })),
+  ...preferences.policies.map(value => ({ key: 'policies' as const, value, label: value.toLowerCase() })),
+  ...preferences.ratingBands.map(value => ({ key: 'ratingBands' as const, value, label: value === 'unrated' ? 'Not rated' : value === '5' ? '5 ★' : `${value}–<${Number(value) + 1} ★` })),
+  ...(preferences.sort !== 'default' ? [{ key: 'sort' as const, value: preferences.sort, label: SORT_OPTIONS.find(([value]) => value === preferences.sort)?.[1] || '' }] : []),
+];
+const updateFilters = async (next: VendorSearchPreferences) => {
+  try {
+    await saveVendorFilters(next);
+    await fetchData(searchQuery, next);
+  } catch { setSearchError(true); }
+};
+
 const renderEmptyState = () => {
-  if (checkingAvailability) return null;
+  if (checkingAvailability || searchError) return null;
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconWrap}>
         <Ionicons name="calendar-outline" size={scale(34)} color={COLORS.primary} />
       </View>
-      <Text style={styles.emptyTitle}>No vendors match right now</Text>
-      <Text style={styles.emptySubtitle}>Try adjusting your search or filters, or check a different date and time.</Text>
+      <Text style={styles.emptyTitle}>No vendors match these filters</Text>
+      <Text style={styles.emptySubtitle}>{eventTiming ? 'Try adjusting your filters or event date and time.' : 'Try adjusting your search or clearing filters.'}</Text>
+      {activeChips.length > 0 && <TouchableOpacity disabled={checkingAvailability} onPress={() => updateFilters(emptyVendorFilters())} style={{ padding: 14 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear filters</Text></TouchableOpacity>}
     </View>
   );
 };
@@ -577,17 +587,38 @@ return (
         <View style={styles.headerSpacer} />
       </View>
 
-      <VendorSearchFilterBar searchQuery={searchQuery} onChangeSearchQuery={setSearchQuery} onSubmitSearch={fetchData} onClearSearch={() => { setSearchQuery(""); fetchData(); }} />
+      <VendorSearchFilterBar searchQuery={searchQuery} onChangeSearchQuery={setSearchQuery} onSubmitSearch={() => fetchData()} onClearSearch={() => { setSearchQuery(""); fetchData(""); }}
+        extraFilterParams={{
+          bookingMode: isBrowseMode ? "browse" : "event",
+          eventCityId: isBrowseMode ? "" : eventTiming?.eventCityId || "",
+        }}
+        activeFilterCount={activeChips.length}
+        disabled={checkingAvailability}
+
+      />
+
+      {activeChips.length > 0 && <View style={{ marginBottom: scale(12) }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: scale(8), alignItems: 'center' }}>
+          {activeChips.map(chip => <TouchableOpacity key={`${chip.key}:${chip.value}`} accessibilityLabel={`Remove ${chip.label} filter`} disabled={checkingAvailability} onPress={() => updateFilters(chip.key === 'sort'
+            ? { ...preferences, sort: 'default' }
+            : { ...preferences, [chip.key]: preferences[chip.key].filter(value => value !== chip.value) })}
+            style={{ flexDirection: 'row', gap: 6, alignItems: 'center', padding: scale(9), borderRadius: 18, backgroundColor: COLORS.primarySoft }}>
+            <Text style={{ color: COLORS.primary, fontSize: scale(12) }}>{chip.label}</Text><Ionicons name="close" size={14} color={COLORS.primary} />
+          </TouchableOpacity>)}
+          <TouchableOpacity disabled={checkingAvailability} onPress={() => updateFilters(emptyVendorFilters())}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear all</Text></TouchableOpacity>
+        </ScrollView>
+      </View>}
+      {searchError && <TouchableOpacity onPress={() => fetchData()} style={{ padding: 12 }}><Text style={{ color: COLORS.primary }}>Could not load results. Tap to retry.</Text></TouchableOpacity>}
 
       {checkingAvailability && (
         <View style={styles.loadingBanner}>
           <ActivityIndicator size="small" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Checking vendor availability...</Text>
+          <Text style={styles.loadingText}>{eventTiming ? "Checking vendor availability..." : "Loading vendors..."}</Text>
         </View>
       )}
 
       <FlatList
-        data={data}
+        data={sortVendorResults(data, preferences.sort, vendorReviews)}
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={[styles.list, data?.length === 0 && { flexGrow: 1 }]}
@@ -628,38 +659,6 @@ brandName: {
   flexShrink: 1,
 },
 
-subscriptionBadge: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: scale(3),
-  paddingHorizontal: scale(7),
-  paddingVertical: scale(3),
-  borderRadius: scale(10),
-},
-
-premiumBadge: {
-  backgroundColor: "#FFF3D6",
-  borderWidth: 1,
-  borderColor: "#E7C46A",
-},
-
-premiumBadgeText: {
-  fontSize: scale(10),
-  fontWeight: "800",
-  color: "#7A4B00",
-},
-
-growthBadge: {
-  backgroundColor: COLORS.primarySoft,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-},
-
-growthBadgeText: {
-  fontSize: scale(10),
-  fontWeight: "800",
-  color: COLORS.primary,
-},
   vendorName: { fontSize: scale(12), color: COLORS.inkMuted, marginBottom: scale(4) },
 
   // Loading banner

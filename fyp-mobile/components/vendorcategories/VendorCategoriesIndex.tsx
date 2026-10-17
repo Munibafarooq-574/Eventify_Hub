@@ -58,7 +58,14 @@ const VendorCategoriesIndex = () => {
   const handlePress = async (item: ICategory) => {
     await saveSecureData('categoryId', item._id);
     await saveSecureData('categoryName', item.name);
-    router.push('/categoryvendorlisting');
+    router.push({
+          pathname: "/categoryvendorlisting",
+          params: {
+            bookingMode: "browse",
+            categoryIds: JSON.stringify([item._id]),
+            categoryNames: JSON.stringify([item.name]),
+          },
+        });
   };
 
   const renderItem = ({ item }: { item: ICategory }) => (

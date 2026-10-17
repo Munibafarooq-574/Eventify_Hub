@@ -1,6 +1,11 @@
 import axios from "axios";
+import { API_BASE_URL } from "./apiConfig";
 
 const searchVendorsWithFilters = async (filters: {
+  cityIds?: string[];
+  staffOptions?: string[];
+  policies?: string[];
+  ratingBands?: string[];
   name?: string;
   categoryId?: string;
   eventCityId?: string;
@@ -13,6 +18,9 @@ const searchVendorsWithFilters = async (filters: {
 }) => {
   try {
     const query = new URLSearchParams();
+    for (const key of ['cityIds', 'staffOptions', 'policies', 'ratingBands'] as const) {
+      if (filters[key]?.length) query.append(key, filters[key]!.join(','));
+    }
 
     if (filters.name) {
       query.append("name", filters.name);
@@ -75,7 +83,7 @@ if (filters.durationMinutes !== undefined) {
     }
 
     const response = await axios.get(
-      `https://eventify-hub.onrender.com/auth/vendor-search?${query.toString()}`,
+      `${API_BASE_URL}/auth/vendor-search?${query.toString()}`,
     );
 
     return response.data;
@@ -85,7 +93,7 @@ if (filters.durationMinutes !== undefined) {
       error,
     );
 
-    return [];
+    throw error;
   }
 };
 

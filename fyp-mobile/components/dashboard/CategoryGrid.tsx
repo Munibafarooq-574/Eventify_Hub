@@ -45,7 +45,14 @@ const CategoryItem: React.FC<{ item: ICategory }> = ({ item }) => (
       onPress={async () => {
         await saveSecureData("categoryId", item._id);
         await saveSecureData("categoryName", item.name); // Save category name
-        router.push("/categoryvendorlisting");
+        router.push({
+          pathname: "/categoryvendorlisting",
+          params: {
+            bookingMode: "browse",
+            categoryIds: JSON.stringify([item._id]),
+            categoryNames: JSON.stringify([item.name]),
+          },
+        });
       }}>
       <View style={styles.categoryIconWrap}>
         <Image

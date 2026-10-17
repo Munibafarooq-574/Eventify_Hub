@@ -14,7 +14,7 @@ import * as nodemailer from 'nodemailer';
 
 import { User } from '../schemas/user.schema';
 import { Category } from '../schemas/category.schema';
-import { Review } from '../schemas/review.schema';
+import { Review, ReviewModerationStatus } from '../schemas/review.schema';
 
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -777,13 +777,11 @@ async searchUsers(
     // =====================================================
 
     if (filters.name) {
-      query['name'] = {
-        $regex:
-          filters.name,
-
-        $options:
-          'i',
-      };
+      const escapedName = filters.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { name: { $regex: escapedName, $options: 'i' } },
+        { 'contactDetails.brandName': { $regex: escapedName, $options: 'i' } },
+      ];
     }
 
     // =====================================================
@@ -818,62 +816,40 @@ if (filters.eventCityId) {
     new Types.ObjectId(filters.eventCityId);
 }
 
-    // =====================================================
-    // STAFF
-    // =====================================================
-
-    if (filters.staff) {
-      query['$or'] = [
-        {
-          'photographerBusinessDetails.staff':
-            filters.staff,
-        },
-
-        {
-          'salonBusinessDetails.staffGender':
-            filters.staff,
-        },
-
-        {
-          'cateringBusinessDetails.staff':
-            filters.staff,
-        },
-
-        {
-          'venueBusinessDetails.staff':
-            filters.staff,
-        },
-      ];
+    // OR within one facet, AND between different facets.
+    const facets: any[] = [];
+    if (!filters.eventCityId && filters.cityIds?.length) {
+      await Promise.all(filters.cityIds.map(id => this.cityService.requireActiveCity(id)));
+      query.serviceLocationCityIds = { $in: filters.cityIds.map(id => new Types.ObjectId(id)) };
     }
-
-    // =====================================================
-    // CANCELLATION POLICY
-    // =====================================================
-
-    if (
-      filters.cancellationPolicy
-    ) {
-      if (!query['$or']) {
-        query['$or'] = [];
-      }
-
-      query['$or'].push(
-        {
-          'salonBusinessDetails.cancellationPolicy':
-            filters.cancellationPolicy,
-        },
-
-        {
-          'cateringBusinessDetails.cancellationPolicy':
-            filters.cancellationPolicy,
-        },
-
-        {
-          'venueBusinessDetails.cancellationPolicy':
-            filters.cancellationPolicy,
-        },
-      );
+    const staffOptions = filters.staffOptions?.length
+      ? filters.staffOptions : filters.staff ? [filters.staff] : [];
+    if (staffOptions.length) {
+      facets.push({ $or: [
+        'photographerBusinessDetails.staffGender',
+        'photographerBusinessDetails.staff',
+        'salonBusinessDetails.staffGender',
+        'cateringBusinessDetails.staff',
+        'venueBusinessDetails.staff',
+        'mehndiBusinessDetails.staffGender',
+        'soundBusinessDetails.staffGender',
+      ].map(field => ({ [field]: { $in: staffOptions } })) });
     }
+    const policies = filters.policies?.length
+      ? filters.policies : filters.cancellationPolicy ? [filters.cancellationPolicy] : [];
+    if (policies.length) {
+      facets.push({ $or: [
+        'photographerBusinessDetails.covidRefundPolicy',
+        'salonBusinessDetails.cancellationPolicy',
+        'cateringBusinessDetails.cancellationPolicy',
+        'venueBusinessDetails.cancellationPolicy',
+        'cakeBusinessDetails.cancellationPolicy',
+        'mehndiBusinessDetails.cancellationPolicy',
+        'soundBusinessDetails.cancellationPolicy',
+        'genericBusinessDetails.cancellationPolicy',
+      ].map(field => ({ [field]: { $in: policies } })) });
+    }
+    if (facets.length) query.$and = facets;
 
     const users =
       await this.userModel
@@ -903,8 +879,7 @@ if (filters.eventCityId) {
     : undefined;
 
 if (
-  minRating !== undefined &&
-  Number.isFinite(minRating)
+  (minRating !== undefined && Number.isFinite(minRating)) || filters.ratingBands?.length
 ) {
       const vendorIds =
         users.map(
@@ -921,6 +896,10 @@ if (
                   $in:
                     vendorIds,
                 },
+                $or: [
+                  { status: ReviewModerationStatus.VISIBLE },
+                  { status: { $exists: false } },
+                ],
               },
             },
 
@@ -935,6 +914,7 @@ if (
                 },
               },
             },
+            { $project: { avgRating: { $round: ['$avgRating', 1] } } },
           ],
         );
 
@@ -957,7 +937,11 @@ if (
               ) ?? 0;
 
             return (
-              avg >= minRating
+              (minRating === undefined || avg >= minRating) &&
+              (!filters.ratingBands?.length || filters.ratingBands.some(band =>
+                band === 'unrated' ? !ratingMap.has(user._id.toString()) :
+                avg >= Number(band) && (Number(band) === 5 ? avg <= 5 : avg < Number(band) + 1)
+              ))
             );
           },
         );
