@@ -125,25 +125,21 @@ const formatTime = (time?: string) => {
   return `${hour12}:${String(minutes).padStart(2, "0")}${period}`;
 };
 
-const formatServiceWindowTime = (dateTime?: string) => {
-  if (!dateTime) return "";
-
-  const match = dateTime.match(/T(\d{2}):(\d{2})/);
-
-  if (!match) return "";
-
-  const hour24 = Number(match[1]);
-  const minute = match[2];
-
-  const period = hour24 >= 12 ? "PM" : "AM";
-  const hour12 = hour24 % 12 || 12;
-
-  return `${hour12}:${minute} ${period}`;
+const formatServiceWindowTime = (dateTime?: string, timeZone?: string) => {
+  if (!dateTime || !timeZone) return "";
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone, hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(date);
+  } catch { return ""; }
 };
 
 const getServiceWindowLabel = (
   pkg: any,
-  requiredServiceWindow: any
+  requiredServiceWindow: any,
+  timeZone?: string,
 ) => {
   if (
     !requiredServiceWindow?.startDateTime ||
@@ -153,13 +149,16 @@ const getServiceWindowLabel = (
   }
 
   const start = formatServiceWindowTime(
-    requiredServiceWindow.startDateTime
+    requiredServiceWindow.startDateTime,
+    timeZone,
   );
 
   const end = formatServiceWindowTime(
-    requiredServiceWindow.endDateTime
+    requiredServiceWindow.endDateTime,
+    timeZone,
   );
 
+  if (!start || !end) return "";
   switch (pkg?.bookingType) {
     case "DELIVERY_BASED":
       return start === end
@@ -487,7 +486,8 @@ router.push({
             <Text style={styles.selectedTimeText}>
               {getServiceWindowLabel(
                 availablePackage,
-                requiredServiceWindow
+                requiredServiceWindow,
+                item?.eventTimeZone,
               )}
             </Text>
           )}

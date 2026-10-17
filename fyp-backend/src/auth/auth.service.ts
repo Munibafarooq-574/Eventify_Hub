@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -25,6 +26,7 @@ import { SearchVendorsDto } from './dto/search-vendors.dto';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { SubscriptionService } from '../vendor/growth/subscription/subscription.service';
 import { CityService } from '../city/city.service';
+import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { VendorAvailabilityService } from '../vendor-availability/vendor-availability.service';
 
 /**
@@ -966,25 +968,22 @@ if (
       filters.startTime &&
       filters.durationMinutes
     ) {
-      const [h, m] = filters.startTime
-        .split(':')
-        .map(Number);
-
-      const eventStartDateTime =
-        new Date(filters.eventDate);
-
-      eventStartDateTime.setHours(
-        h || 0,
-        m || 0,
-        0,
-        0,
+      if (!filters.eventCityId) {
+        throw new BadRequestException('Event city is required to check availability');
+      }
+      const durationMinutes = Number(filters.durationMinutes);
+      if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        throw new BadRequestException('Event duration must be a positive number');
+      }
+      const eventTimeZone = await this.cityService.requireCityTimeZone(filters.eventCityId);
+      const eventStartDateTime = eventLocalToUtc(
+        filters.eventDate,
+        filters.startTime,
+        eventTimeZone,
       );
-
-      const eventEndDateTime =
-        new Date(
-          eventStartDateTime.getTime() +
-            Number(filters.durationMinutes) * 60000,
-        );
+      const eventEndDateTime = new Date(
+        eventStartDateTime.getTime() + durationMinutes * 60000,
+      );
 
       const availabilityResults =
         await Promise.all(
@@ -1053,6 +1052,7 @@ if (
 
     return {
       ...result,
+      eventTimeZone,
 
       packages:
         Array.isArray(result.packages)
