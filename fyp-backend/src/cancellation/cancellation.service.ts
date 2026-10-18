@@ -393,8 +393,7 @@ export class CancellationService {
     // ================================================================
     // PATH 2: Vendor cancels a CONFIRMED booking (incurs penalty)
     // ================================================================
-    async vendorCancelConfirmedBooking(vendorOrderId: string, reason: string | undefined, actor: CancellationActor) {
-        const vendorOrder = await this.assertVendorBookingOwner(vendorOrderId, actor);
+    private async vendorCancellationCalculation(vendorOrder: VendorOrder) {
         if (!vendorOrder) {
             throw new NotFoundException('Vendor order not found');
         }
@@ -434,6 +433,32 @@ export class CancellationService {
         if (!Number.isSafeInteger(paidMinor) || !Number.isSafeInteger(bookingMinor)) throw new ConflictException('Payment amounts need Support review.');
         const refundAmount = Math.round(paidMinor * refundTier.percentage / 100) / 100;
         const penaltyAmount = Math.round(bookingMinor * penaltyTier.percentage / 100) / 100;
+
+        return { snapshot, calculatedAt, daysBeforeEvent, amountPaid, bookingAmount, paidMinor, refundAmount,
+            penaltyAmount, refundPercentage: refundTier.percentage, penaltyPercentage: penaltyTier.percentage,
+            hoursBeforeService };
+    }
+
+    async previewVendorCancellation(vendorOrderId: string, actor: CancellationActor) {
+        const booking = await this.assertVendorBookingOwner(vendorOrderId, actor);
+        const calculation = await this.vendorCancellationCalculation(booking);
+        const payments = await this.paymentModel.find({ vendorOrderId: booking._id, status: 'SUCCESS' })
+            .select('amount type method paidAt').lean();
+        return {
+            payments: payments.map(payment => ({ amount: payment.amount, type: payment.type, method: payment.method, paidAt: payment.paidAt })),
+            vendorOrderId: String(booking._id), calculatedAt: calculation.calculatedAt,
+            policyRevision: calculation.snapshot.policyRevision, amountPaid: calculation.amountPaid,
+            bookingAmount: calculation.bookingAmount, remainingAmount: Math.max(0, calculation.bookingAmount - calculation.amountPaid),
+            refundAmount: calculation.refundAmount, withheldAmount: (calculation.paidMinor - Math.round(calculation.refundAmount * 100)) / 100,
+            penaltyAmount: calculation.penaltyAmount, refundPercentage: calculation.refundPercentage,
+            penaltyPercentage: calculation.penaltyPercentage, hoursBeforeService: calculation.hoursBeforeService,
+        };
+    }
+
+    async vendorCancelConfirmedBooking(vendorOrderId: string, reason: string | undefined, actor: CancellationActor) {
+        const vendorOrder = await this.assertVendorBookingOwner(vendorOrderId, actor);
+        const { snapshot, calculatedAt, daysBeforeEvent, amountPaid, paidMinor, refundAmount, penaltyAmount,
+            refundPercentage, penaltyPercentage } = await this.vendorCancellationCalculation(vendorOrder);
 
         vendorOrder.status = 'cancelled_by_vendor' as any;
         vendorOrder.cancelledBy = 'vendor';
@@ -478,18 +503,18 @@ export class CancellationService {
             withheldAmount: (paidMinor - Math.round(refundAmount * 100)) / 100,
             policyRevision: snapshot.policyRevision,
             policyConfigId: snapshot.policyConfigId,
-            refundPercentage: refundTier.percentage,
+            refundPercentage,
             calculatedAt,
             initiatedBy: 'VENDOR_CANCELLED',
             daysBeforeEvent,
-            cancellationPolicyApplied: refundTier.percentage === 100 ? 'FULL_REFUND_VENDOR_FAULT' : 'SAVED_POLICY_VENDOR_CANCELLED',
+            cancellationPolicyApplied: refundPercentage === 100 ? 'FULL_REFUND_VENDOR_FAULT' : 'SAVED_POLICY_VENDOR_CANCELLED',
             status: 'PENDING',
         });
 
         const penalty = await this.vendorPenaltyModel.create({
             vendorId: vendorOrder.vendorId,
             vendorOrderId: vendorOrder._id,
-            penaltyPercentage: penaltyTier.percentage,
+            penaltyPercentage,
             penaltyAmount,
             daysBeforeEvent,
             reason: reason || `Vendor cancelled with ${daysBeforeEvent} days notice`,

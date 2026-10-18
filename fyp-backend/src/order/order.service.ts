@@ -1394,7 +1394,7 @@ export class OrderService {
 })
 .populate({
     path: 'eventCityId',
-    select: 'name',
+    select: 'name timeZone',
 })
 .populate({
     path: 'selectedCategoryIds',

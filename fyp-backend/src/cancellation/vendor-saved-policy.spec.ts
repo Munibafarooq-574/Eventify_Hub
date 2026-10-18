@@ -5,6 +5,7 @@ function fixture(hours=96) {
  const booking:any={_id:'booking',vendorId:'vendor',status:'accepted',paymentStatus:'PARTIALLY_PAID',price:6000,eventStartDateTime:new Date(now.getTime()+hours*3600000),policySnapshot:{schemaVersion:1,policyRevision:3,policyConfigId:'saved-config',selectedPolicy:'NON-REFUNDABLE',settings},save:jest.fn(async()=>{})};
  const s:any=Object.create(CancellationService.prototype);
  s.assertVendorBookingOwner=jest.fn(async()=>booking);s.getAmountPaid=jest.fn(async()=>3000);
+ s.paymentModel={find:()=>({select:()=>({lean:async()=>[{amount:3000,type:'DOWN_PAYMENT',method:'card',paidAt:now}]})})};
  s.getPolicyConfig=jest.fn(async()=>{throw new Error('Mutable Admin config must not be read')});
  s.rescheduleRequestModel={findOne:async()=>null};s.orderModel={findOne:async()=>({_id:'order',organizerId:'client'})};
  s.refundModel={create:jest.fn(async data=>data)};s.vendorPenaltyModel={create:jest.fn(async data=>data)};
@@ -33,5 +34,19 @@ describe('Vendor cancellation uses saved booking policy',()=>{
  });
  it('preserves fully-paid restriction and prevents repeating a completed cancellation',async()=>{
   const f=fixture();f.booking.paymentStatus='PAID';await expect(f.cancel()).rejects.toThrow('Support review');f.booking.paymentStatus='PARTIALLY_PAID';await f.cancel();await expect(f.cancel()).rejects.toThrow('Only a confirmed');expect(f.s.refundModel.create).toHaveBeenCalledTimes(1);expect(f.s.vendorPenaltyModel.create).toHaveBeenCalledTimes(1);
+ });
+});
+
+describe('Read-only vendor cancellation preview',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(now)});afterEach(()=>jest.useRealTimers());
+ it('uses the same amounts as confirmation without writing cancellation/refund/penalty',async()=>{
+  const f=fixture();const preview=await f.s.previewVendorCancellation('booking',{id:'vendor',role:'Vendor'});
+  expect(preview).toMatchObject({vendorOrderId:'booking',bookingAmount:6000,amountPaid:3000,remainingAmount:3000,refundAmount:3000,penaltyAmount:300,penaltyPercentage:5,policyRevision:3});
+  expect(f.booking.save).not.toHaveBeenCalled();expect(f.s.refundModel.create).not.toHaveBeenCalled();expect(f.s.vendorPenaltyModel.create).not.toHaveBeenCalled();
+  const result=await f.cancel();expect(result.refund.refundAmount).toBe(preview.refundAmount);expect(result.penalty.penaltyAmount).toBe(preview.penaltyAmount);
+ });
+ it('rejects an unauthorized vendor before calculating a preview',async()=>{
+  const f=fixture();f.s.assertVendorBookingOwner=jest.fn(async()=>{throw new Error('You do not own this vendor booking.')});
+  await expect(f.s.previewVendorCancellation('booking',{id:'other',role:'Vendor'})).rejects.toThrow('do not own');expect(f.s.getAmountPaid).not.toHaveBeenCalled();
  });
 });

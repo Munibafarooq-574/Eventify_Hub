@@ -51,6 +51,13 @@ export class CancellationController {
         );
     }
 
+    @Get('vendor-order/:id/vendor-cancellation-preview')
+    @Header('Cache-Control', 'private, no-store')
+    @UseGuards(JwtAuthGuard)
+    vendorPreview(@Param('id') vendorOrderId: string, @Request() req: any) {
+        return this.cancellationService.previewVendorCancellation(vendorOrderId, req.user);
+    }
+
     // Vendor cancels a confirmed booking
     @Patch('vendor-order/:id/vendor-cancel-confirmed')
     @UseGuards(JwtAuthGuard)

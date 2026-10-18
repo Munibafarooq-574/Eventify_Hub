@@ -34,6 +34,9 @@ describe('Cancellation HTTP authentication and confirmation validation', () => {
         const req = route === 'calculate-refund' ? request(app.getHttpServer()).get(`${path()}/${route}`) : request(app.getHttpServer()).patch(`${path()}/${route}`).send({});
         await req.expect(401);
     });
+    it('requires authentication for the read-only vendor cancellation preview',async()=>{
+        await request(app.getHttpServer()).get(`${path()}/vendor-cancellation-preview`).expect(401);
+    });
     it('rejects an expired or incorrectly signed JWT', async () => {
         for (const token of [jwt.sign({ id: client._id }, { expiresIn: -10 }), jwt.sign({ id: client._id }, { secret: 'wrong-key' })]) {
             await request(app.getHttpServer()).get(`${path()}/calculate-refund`).set('Authorization', `Bearer ${token}`).expect(401);

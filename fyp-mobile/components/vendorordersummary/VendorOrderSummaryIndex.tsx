@@ -1,3 +1,5 @@
+import getVendorCancellationPreview, { type VendorCancellationPreview } from '@/services/getVendorCancellationPreview';
+import VendorCancellationSummary from '../cancellation/VendorCancellationSummary';
 import cancelConfirmedBooking from '@/services/cancelConfirmedBooking';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
 import { canCompleteVendorBooking } from '@/utils/vendorCompletion';
@@ -125,6 +127,9 @@ const OrderSummary = () => {
     const [cancellationReason, setCancellationReason] = useState('');
     const [cancellationError, setCancellationError] = useState('');
     const [cancelling, setCancelling] = useState(false);
+    const [cancellationPreview, setCancellationPreview] = useState<VendorCancellationPreview | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const previewGeneration = useRef(0);
     const cancellationLock = useRef(false);
     const summaryScrollRef = useRef<ScrollView>(null);
 
@@ -290,7 +295,7 @@ const OrderSummary = () => {
         const booking = orders.find(order => order._id === orderId)?.vendorOrders?.find((item: any) => item._id === vendorOrderId);
         if (['PARTIALLY_PAID', 'PAID'].includes(booking?.paymentStatus)) {
             setCancellation({ orderId, vendorOrderId });
-            setCancellationReason(''); setCancellationError('');
+            setCancellationReason(''); setCancellationError(''); setCancellationPreview(null);
             return;
         }
 
@@ -336,12 +341,33 @@ const OrderSummary = () => {
     }
 };
 
+    const loadCancellationPreview = useCallback(async () => {
+        const request = ++previewGeneration.current;
+        if (!cancellation) { setCancellationPreview(null); return; }
+        setPreviewLoading(true); setCancellationError('');
+        try {
+            const result = await getVendorCancellationPreview(cancellation.vendorOrderId);
+            if (request === previewGeneration.current) setCancellationPreview(result);
+        } catch (error: any) {
+            if (request === previewGeneration.current) { setCancellationPreview(null); setCancellationError(error?.response?.data?.message || 'Unable to load cancellation details. Please retry.'); }
+        } finally { if (request === previewGeneration.current) setPreviewLoading(false); }
+    }, [cancellation]);
+    useFocusEffect(useCallback(() => {
+        void loadCancellationPreview();
+        return () => { ++previewGeneration.current; };
+    }, [loadCancellationPreview]));
+
     const confirmVendorCancellation = async () => {
-        if (!cancellation || cancellationLock.current) return;
+        if (!cancellation || cancellationLock.current || previewLoading) return;
         const reason = cancellationReason.trim();
         if (!reason) { setCancellationError('Please enter a cancellation reason.'); return; }
+        if (!cancellationPreview || cancellationPreview.vendorOrderId !== cancellation.vendorOrderId) { setCancellationError('Load and review the cancellation details first.'); return; }
         cancellationLock.current = true; setCancelling(true); setCancellationError('');
         try {
+            const latest = await getVendorCancellationPreview(cancellation.vendorOrderId);
+            if (['bookingAmount', 'amountPaid', 'refundAmount', 'penaltyAmount', 'refundPercentage', 'penaltyPercentage', 'policyRevision'].some(key => latest[key as keyof VendorCancellationPreview] !== cancellationPreview[key as keyof VendorCancellationPreview])) {
+                setCancellationPreview(latest); setCancellationError('Cancellation amounts changed. Review the updated details before confirming again.'); return;
+            }
             await cancelConfirmedBooking(cancellation.vendorOrderId, 'vendor', reason);
             setCancellation(null); setCancellationReason('');
             await Promise.allSettled([refreshScreenData(), loadRefunds()]);
@@ -946,13 +972,19 @@ const OrderSummary = () => {
                         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 14 }}>
                             <Text style={styles.cancellationTitle}>Cancel this booking?</Text>
                             <Text style={styles.cancellationText}>This cancels only your vendor booking. The client refund and any vendor penalty will be recorded by the server under the applicable cancellation rules.</Text>
+                            {previewLoading && <ActivityIndicator color={PRIMARY} />}
+                            {cancellationPreview && cancellation && <VendorCancellationSummary
+                                order={orders.find(order => order._id === cancellation.orderId)}
+                                booking={orders.find(order => order._id === cancellation.orderId)?.vendorOrders?.find((booking: any) => booking._id === cancellation.vendorOrderId)}
+                                preview={cancellationPreview} />}
+                            {!previewLoading && !cancellationPreview && <TouchableOpacity onPress={() => void loadCancellationPreview()}><Text style={{ color: PRIMARY, fontWeight: '700' }}>Reload cancellation details</Text></TouchableOpacity>}
                             <Text style={styles.cancellationText}>Reason for cancellation (required)</Text>
                             <TextInput accessibilityLabel="Vendor cancellation reason" style={styles.cancellationInput}
                                 value={cancellationReason} onChangeText={value => { setCancellationReason(value); setCancellationError(''); }}
                                 placeholder="Tell the client why you cannot provide the service" multiline maxLength={500} editable={!cancelling} textAlignVertical="top" />
                             {!!cancellationError && <Text accessibilityRole="alert" style={{ color: '#A9273B' }}>{cancellationError}</Text>}
-                            <TouchableOpacity accessibilityRole="button" disabled={cancelling || !cancellationReason.trim()}
-                                onPress={confirmVendorCancellation} style={[styles.cancellationConfirm, (cancelling || !cancellationReason.trim()) && { opacity: 0.5 }]}>
+                            <TouchableOpacity accessibilityRole="button" disabled={cancelling || previewLoading || !cancellationPreview || !cancellationReason.trim()}
+                                onPress={confirmVendorCancellation} style={[styles.cancellationConfirm, (cancelling || previewLoading || !cancellationPreview || !cancellationReason.trim()) && { opacity: 0.5 }]}>
                                 <Text style={styles.buttonText}>{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</Text>
                             </TouchableOpacity>
                             <TouchableOpacity accessibilityRole="button" disabled={cancelling} onPress={() => setCancellation(null)} style={styles.cancellationKeep}>
