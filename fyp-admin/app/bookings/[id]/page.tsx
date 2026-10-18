@@ -109,6 +109,7 @@ type Refund = {
   status?: string;
   createdAt?: string;
   paidAt?: string | null;
+  refundedAt?: string | null;
   closedAt?: string | null;
 };
 
@@ -612,9 +613,11 @@ export default async function BookingDetailsPage({
                     />
 
                     <InfoRow
-                      label="Paid at"
+                      label="Refund confirmed at"
                       value={formatDateTime(
-                        data.refund.paidAt,
+                        data.refund.status === "REFUNDED"
+                          ? data.refund.refundedAt ?? data.refund.paidAt
+                          : null,
                       )}
                     />
                   </>
