@@ -1,3 +1,4 @@
+import cancelConfirmedBooking from '@/services/cancelConfirmedBooking';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
 import { canCompleteVendorBooking } from '@/utils/vendorCompletion';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
@@ -12,7 +13,7 @@ import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, FlatList, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 // Order interface
@@ -119,7 +120,12 @@ const OrderSummary = () => {
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
     const [isRefreshingScreen, setIsRefreshingScreen] = useState(false);
-    const { refunds, refundLoading, refundError } = useRefundUpdates();
+    const { refunds, refundLoading, refundError, loadRefunds } = useRefundUpdates();
+    const [cancellation, setCancellation] = useState<{ orderId: string; vendorOrderId: string } | null>(null);
+    const [cancellationReason, setCancellationReason] = useState('');
+    const [cancellationError, setCancellationError] = useState('');
+    const [cancelling, setCancelling] = useState(false);
+    const cancellationLock = useRef(false);
     const summaryScrollRef = useRef<ScrollView>(null);
 
     const refreshScreenData = useCallback(async () => {
@@ -281,7 +287,14 @@ const OrderSummary = () => {
             return;
         }
 
-        // 1. Backend par vendor order cancel karo
+        const booking = orders.find(order => order._id === orderId)?.vendorOrders?.find((item: any) => item._id === vendorOrderId);
+        if (['PARTIALLY_PAID', 'PAID'].includes(booking?.paymentStatus)) {
+            setCancellation({ orderId, vendorOrderId });
+            setCancellationReason(''); setCancellationError('');
+            return;
+        }
+
+        // Unpaid bookings retain their existing cancellation path.
         await patchUpdateVendorOrderStatus(
             vendorOrderId,
             "cancelled"
@@ -317,15 +330,27 @@ const OrderSummary = () => {
 
         alert("Order Cancelled");
 
-    } catch (error) {
-        console.error(
-            "Error cancelling vendor order:",
-            error
-        );
-
-        alert("Failed to cancel order");
+    } catch (error: any) {
+        const message = error?.response?.data?.message;
+        Alert.alert('Unable to cancel booking', typeof message === 'string' ? message : 'Refresh this booking and try again.');
     }
 };
+
+    const confirmVendorCancellation = async () => {
+        if (!cancellation || cancellationLock.current) return;
+        const reason = cancellationReason.trim();
+        if (!reason) { setCancellationError('Please enter a cancellation reason.'); return; }
+        cancellationLock.current = true; setCancelling(true); setCancellationError('');
+        try {
+            await cancelConfirmedBooking(cancellation.vendorOrderId, 'vendor', reason);
+            setCancellation(null); setCancellationReason('');
+            await Promise.allSettled([refreshScreenData(), loadRefunds()]);
+            Alert.alert('Booking cancelled', 'The cancellation has been recorded. Check the refund and penalty details for this booking.');
+        } catch (error: any) {
+            const message = error?.response?.data?.message;
+            setCancellationError(typeof message === 'string' ? message : 'Unable to cancel this booking. Please try again.');
+        } finally { cancellationLock.current = false; setCancelling(false); }
+    };
     /*const mark = async (id: string, status: "completed" | "pending" | "confirmed" | "cancelled") => {
         console.log(id);
         await patchUpdateOrderStatus(id, status);
@@ -915,6 +940,28 @@ const OrderSummary = () => {
                     }}
                 />
             </View>
+            <Modal visible={!!cancellation} transparent animationType="slide" onRequestClose={() => { if (!cancelling) setCancellation(null); }}>
+                <KeyboardAvoidingView style={styles.cancellationOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                    <View style={styles.cancellationPanel}>
+                        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 14 }}>
+                            <Text style={styles.cancellationTitle}>Cancel this booking?</Text>
+                            <Text style={styles.cancellationText}>This cancels only your vendor booking. The client refund and any vendor penalty will be recorded by the server under the applicable cancellation rules.</Text>
+                            <Text style={styles.cancellationText}>Reason for cancellation (required)</Text>
+                            <TextInput accessibilityLabel="Vendor cancellation reason" style={styles.cancellationInput}
+                                value={cancellationReason} onChangeText={value => { setCancellationReason(value); setCancellationError(''); }}
+                                placeholder="Tell the client why you cannot provide the service" multiline maxLength={500} editable={!cancelling} textAlignVertical="top" />
+                            {!!cancellationError && <Text accessibilityRole="alert" style={{ color: '#A9273B' }}>{cancellationError}</Text>}
+                            <TouchableOpacity accessibilityRole="button" disabled={cancelling || !cancellationReason.trim()}
+                                onPress={confirmVendorCancellation} style={[styles.cancellationConfirm, (cancelling || !cancellationReason.trim()) && { opacity: 0.5 }]}>
+                                <Text style={styles.buttonText}>{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity accessibilityRole="button" disabled={cancelling} onPress={() => setCancellation(null)} style={styles.cancellationKeep}>
+                                <Text style={{ color: PRIMARY, fontWeight: '700' }}>Keep Booking</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
             <BottomNavigationFinal />
         </SafeAreaView>
     );
@@ -953,6 +1000,14 @@ const SummaryCard = ({
 );
 
 const styles = StyleSheet.create({
+    cancellationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    cancellationPanel: { width: '100%', maxWidth: 560, maxHeight: '85%', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20 },
+    cancellationTitle: { fontSize: 20, color: PRIMARY, fontWeight: '800' },
+    cancellationText: { fontSize: 14, lineHeight: 21, color: '#5F3041' },
+    cancellationInput: { minHeight: 110, borderWidth: 1, borderColor: '#DCC5D5', borderRadius: 12, padding: 12, color: '#1A1A1A' },
+    cancellationConfirm: { minHeight: 48, backgroundColor: '#C43848', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 12 },
+    cancellationKeep: { minHeight: 48, borderWidth: 1, borderColor: '#DCC5D5', alignItems: 'center', justifyContent: 'center', borderRadius: 12, padding: 12 },
+
     rescheduleCard: { marginTop: 14, padding: 13, borderRadius: 13, backgroundColor: '#FFF8FC', borderWidth: 1, borderColor: '#E8D4E1' },
     rescheduleHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 9 },
     rescheduleTitle: { color: PRIMARY, fontWeight: '800', fontSize: 14 },
