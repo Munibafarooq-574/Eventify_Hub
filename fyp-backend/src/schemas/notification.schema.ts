@@ -13,6 +13,12 @@ export class Notification extends Document {
     @Prop({ required: true })
     body: string;
 
+    @Prop({ type: String, default: null })
+    orderId?: string | null;
+
+    @Prop({ type: String, default: null })
+    vendorOrderId?: string | null;
+
     @Prop({ default: false })
     isRead: boolean;
 

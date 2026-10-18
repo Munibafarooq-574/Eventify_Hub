@@ -1,27 +1,27 @@
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 import getUserNotifications from '@/services/getNotifications';
-import { getSecureData } from '@/store';
+import { getUserData } from '@/store';
 
 const NotificationsScreen: React.FC = () => {
     const [notifications, setNotifications] = useState<any[]>([]);
-    useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const user = await getSecureData("user") || ""; // Assuming full user object is stored
-                const parsedUser = JSON.parse(user);
-                const data = await getUserNotifications(parsedUser._id);
-                setNotifications(data);
-            } catch (error) {
-                console.error("Failed to fetch notifications:", error);
-            }
-        };
-
-        fetchNotifications();
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState('');
+    const generation = useRef(0);
+    const load = useCallback(async () => {
+        const request = ++generation.current; setRefreshing(true); setError('');
+        try {
+            const user = await getUserData();
+            if (!user?._id) throw new Error('Please sign in again.');
+            const records = await getUserNotifications(user._id);
+            if (request === generation.current) setNotifications(Array.isArray(records) ? records : []);
+        } catch { if (request === generation.current) setError('Unable to load updates. Please reopen this screen to retry.'); }
+        finally { if (request === generation.current) setRefreshing(false); }
     }, []);
+    useFocusEffect(useCallback(() => { setNotifications([]); void load(); return () => { ++generation.current; }; }, [load]));
 
     const getIconConfig = (type: string) => {
         switch (type) {
@@ -52,20 +52,20 @@ const NotificationsScreen: React.FC = () => {
         const { icon, bg } = getIconConfig(item.type);
 
         return (
-            <View style={styles.notificationContainer}>
+            <TouchableOpacity style={styles.notificationContainer} disabled={item.type !== 'REFUND_UPDATE'} onPress={() => router.push({ pathname: '/vendorordersummary', params: { orderId: item.orderId || '' } })}>
                 <View style={[styles.iconContainer, { backgroundColor: bg }]}>
                     {icon}
                 </View>
                 <View style={styles.textContainer}>
-                    <Text style={styles.notificationType}>{item.type}</Text>
-                    <Text style={styles.notificationDescription} numberOfLines={2}>
+                    <Text style={styles.notificationType}>{item.title || item.type}</Text>
+                    <Text style={styles.notificationDescription} numberOfLines={item.type === 'REFUND_UPDATE' ? undefined : 2}>
                         {item.body}
                     </Text>
                 </View>
                 <Text style={styles.notificationTime}>
                     {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -85,6 +85,7 @@ const NotificationsScreen: React.FC = () => {
             </View>
 
             {/* Notifications List */}
+            {!!error && <Text>{error}</Text>}
             {notifications.length === 0 ? (
                 <View style={styles.emptyState}>
                     <View style={styles.emptyIconCircle}>
@@ -92,15 +93,15 @@ const NotificationsScreen: React.FC = () => {
                     </View>
                     <Text style={styles.emptyTitle}>No notifications yet</Text>
                     <Text style={styles.emptyText}>
-                        You'll see updates about trends, comments and
-                        upvotes here once they arrive.
+                        Booking and refund updates will appear here once they arrive.
                     </Text>
                 </View>
             ) : (
                 <FlatList
                     data={notifications}
                     renderItem={renderNotification}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item._id || item.id}
+                    refreshing={refreshing} onRefresh={() => void load()}
                     contentContainerStyle={styles.list}
                     showsVerticalScrollIndicator={false}
                 />

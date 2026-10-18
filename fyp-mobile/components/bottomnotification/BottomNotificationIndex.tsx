@@ -53,7 +53,7 @@ const NotificationsScreen: React.FC = () => {
         }
 
         return (
-            <TouchableOpacity key={item._id} style={styles.notificationContainer} disabled={item.type !== 'REFUND_UPDATE'} accessibilityRole={item.type === 'REFUND_UPDATE' ? 'button' : undefined} onPress={() => router.push('/myevents')}>
+            <TouchableOpacity key={item._id} style={styles.notificationContainer} disabled={item.type !== 'REFUND_UPDATE'} accessibilityRole={item.type === 'REFUND_UPDATE' ? 'button' : undefined} onPress={() => router.push({ pathname: '/myevents', params: { orderId: item.orderId || '' } })}>
                 <View style={styles.iconContainer}>{icon}</View>
                 <View style={styles.textContainer}>
                     <Text style={styles.notificationType}>{item.title || item.type}</Text>

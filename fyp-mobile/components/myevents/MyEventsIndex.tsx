@@ -1,4 +1,4 @@
-import getClientRefunds, { type ClientRefund } from '@/services/getClientRefunds';
+import useRefundUpdates from '@/hooks/useRefundUpdates';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
 import ClientCancellationReview from '../cancellation/ClientCancellationReview';
@@ -8,12 +8,11 @@ import getPaymentStatus from '@/services/getPaymentStatus';
 import { getRescheduleRequests, resolvePartialReschedule } from '@/services/rescheduleBooking';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  AppState,
   Alert,
   Animated,
   LayoutAnimation,
@@ -172,29 +171,12 @@ const MyEventsScreen = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
+  const { orderId: targetOrderId } = useLocalSearchParams<{ orderId?: string }>();
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
+  useFocusEffect(useCallback(() => { if (targetOrderId) setExpandedEvents(current => ({ ...current, [targetOrderId]: true })); }, [targetOrderId]));
   const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({});
   const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
-  const [refunds, setRefunds] = useState<Record<string, ClientRefund>>({});
-  const [refundLoading, setRefundLoading] = useState(true);
-  const [refundError, setRefundError] = useState(false);
-  const refundRequest = useRef(0);
-  const loadRefunds = useCallback(async () => {
-    const request = ++refundRequest.current;
-    setRefundLoading(true);
-    try {
-      const records = await getClientRefunds();
-      if (request === refundRequest.current) {
-        setRefunds(Object.fromEntries(records.map(record => [record.vendorOrderId, record])));
-        setRefundError(false);
-      }
-    } catch {
-      if (request === refundRequest.current) setRefundError(true);
-    } finally {
-      if (request === refundRequest.current) setRefundLoading(false);
-    }
-  }, []);
-
+  const { refunds, refundLoading, refundError, loadRefunds } = useRefundUpdates(false);
 
   // Safely get the logged-in user, trying AsyncStorage first (where login
   // saves it via saveUserData), then falling back to SecureStore in case
@@ -268,18 +250,8 @@ const MyEventsScreen = () => {
   // details appear immediately without creating another request.
   useFocusEffect(
     useCallback(() => {
-      setRefunds({});
       void fetchData();
-      const foreground = AppState.addEventListener('change', state => {
-        if (state === 'active') void loadRefunds();
-      });
-      const timer = setInterval(() => {
-        if (AppState.currentState === 'active') void loadRefunds();
-      }, 30000);
-      return () => {
-        clearInterval(timer); foreground.remove(); ++refundRequest.current;
-      };
-    }, [fetchData, loadRefunds]),
+    }, [fetchData]),
   );
 
   const toggleEventDetails = (eventId: string) => {

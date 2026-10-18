@@ -1584,11 +1584,20 @@ if (status !== 'ALL') {
       REJECTED: `Your refund request was rejected. Reason: ${reason}`,
       NO_REFUND_DUE: 'Your case is closed. No refund is due under the recorded cancellation policy.',
     };
-    if (this.notifications && updated.organizerId) {
+    const recipients = [...new Set([updated.organizerId, updated.vendorId].filter(Boolean).map(String))];
+    for (const recipient of recipients) {
+      if (!this.notifications) break;
+      const vendorRecipient = recipient === String(updated.vendorId);
+      const reference = `Booking ${String(updated.vendorOrderId).slice(-8).toUpperCase()}`;
+      const amountLabel = status === 'REJECTED' ? 'Requested refund' : 'Refund amount';
+      const message = vendorRecipient
+        ? `Admin refund update: ${status === 'REJECTED' ? `Rejected. Reason: ${reason}` : status}.`
+        : messages[status];
       try {
-        await this.notifications.notifyUser(String(updated.organizerId), 'Refund update',
-          `${messages[status]} Refund amount: Rs. ${amount.toLocaleString('en-PK')}. Open booking history for details.`, 'REFUND_UPDATE');
-      } catch { /* The committed refund status is authoritative even if notification storage is unavailable. */ }
+        await this.notifications.notifyUser(recipient, 'Refund update',
+          `${reference}: ${message} ${amountLabel}: Rs. ${amount.toLocaleString('en-PK')}. Open booking history for details.`, 'REFUND_UPDATE',
+          { orderId: updated.orderId ? String(updated.orderId) : undefined, vendorOrderId: String(updated.vendorOrderId) });
+      } catch { /* A notification failure cannot undo the decision or block the other recipient. */ }
     }
     return updated;
   }

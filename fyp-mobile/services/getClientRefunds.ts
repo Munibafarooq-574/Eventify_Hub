@@ -5,6 +5,7 @@ import { API_BASE_URL } from './apiConfig';
 export type ClientRefund = {
   _id: string; vendorOrderId: string;
   amountPaid: number; refundAmount: number; withheldAmount: number;
+  vendorPenalty?: { amount: number; percentage: number }[];
   status: string; rejectionReason?: string | null;
   processedAt?: string | null; refundedAt?: string | null; paidAt?: string | null;
   rejectedAt?: string | null; closedAt?: string | null; updatedAt?: string | null;

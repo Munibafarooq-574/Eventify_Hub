@@ -15,7 +15,7 @@ describe('Client refund updates',()=>{
     expect(result[0]).not.toHaveProperty('notes');expect(result[0]).not.toHaveProperty('confirmationKey');
     record.status='PROCESSING';expect((await s.getClientRefunds(actor))[0].rejectionReason).toBeNull();
   });
-  it.each(['Vendor','admin',''])('rejects %s users before any refund query',async role=>{
+  it.each(['admin',''])('rejects %s users before any refund query',async role=>{
     const s:any=Object.create(CancellationService.prototype);s.refundModel={find:jest.fn()};
     await expect(s.getClientRefunds({id:id(),role})).rejects.toThrow('authenticated Client');
     expect(s.refundModel.find).not.toHaveBeenCalled();
@@ -30,7 +30,7 @@ describe('Client refund updates',()=>{
   it('notifies only after a committed status transition and keeps retries idempotent',async()=>{
     const f=finance();await f.s.updateRefundStatus(f.record._id,'PROCESSING');await f.s.updateRefundStatus(f.record._id,'PROCESSING');
     expect(f.notifications.notifyUser).toHaveBeenCalledTimes(1);
-    expect(f.notifications.notifyUser.mock.calls[0]).toEqual([f.record.organizerId,'Refund update',expect.stringContaining('not yet been confirmed'),'REFUND_UPDATE']);
+    expect(f.notifications.notifyUser.mock.calls[0]).toEqual([f.record.organizerId,'Refund update',expect.stringContaining('not yet been confirmed'),'REFUND_UPDATE',{orderId:undefined,vendorOrderId:f.record.vendorOrderId}]);
     await f.s.updateRefundStatus(f.record._id,'REFUNDED');expect(f.record.refundedAt).toBeInstanceOf(Date);
     expect(f.notifications.notifyUser).toHaveBeenCalledTimes(2);
   });
@@ -52,4 +52,31 @@ describe('Client refund updates',()=>{
     await expect(s.notifyUser(id(),'Refund update','Processing','REFUND_UPDATE')).resolves.toMatchObject({type:'REFUND_UPDATE'});
     expect(model.create).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('Vendor refund visibility',()=>{
+ it('scopes vendor records and penalties to JWT identity and strips private fields',async()=>{
+  const vendor=id(),booking=id();
+  const query=(value:any)=>{const q:any={select:jest.fn(),sort:jest.fn(),lean:async()=>value};q.select.mockReturnValue(q);q.sort.mockReturnValue(q);return q;};
+  const s:any=Object.create(CancellationService.prototype);
+  s.refundModel={find:jest.fn(()=>query([{vendorOrderId:booking,status:'REJECTED',rejectionReason:'Shared reason',notes:'PRIVATE'}]))};
+  s.vendorPenaltyModel={find:jest.fn(()=>query([{vendorOrderId:booking,penaltyAmount:300,penaltyPercentage:5,reason:'PRIVATE'}]))};
+  const records=await s.getClientRefunds({id:vendor,role:'Vendor'});
+  expect(String(s.refundModel.find.mock.calls[0][0].vendorId)).toBe(vendor);
+  expect(s.refundModel.find.mock.calls[0][0]).not.toHaveProperty('organizerId');
+  expect(String(s.vendorPenaltyModel.find.mock.calls[0][0].vendorId)).toBe(vendor);
+  expect(records[0].vendorPenalty).toEqual([{amount:300,percentage:5}]);
+  expect(records[0]).not.toHaveProperty('notes');expect(records[0].rejectionReason).toBe('Shared reason');
+ });
+ it('notifies both participants once, even if one notification fails',async()=>{
+  const record:any={_id:id(),orderId:id(),vendorOrderId:id(),vendorId:id(),organizerId:id(),status:'PENDING',refundAmount:1500};
+  const refunds={findById:async()=>record,findOneAndUpdate:jest.fn(async(_f,change)=>Object.assign(record,change.$set))};
+  const notifications={notifyUser:jest.fn().mockRejectedValueOnce(new Error('push unavailable')).mockResolvedValue({})};
+  const s=new AdminFinanceService({} as any,refunds as any,{} as any,{} as any,{} as any,{} as any,notifications as any);
+  await s.updateRefundStatus(record._id,'REJECTED',id(),'Shared reason');
+  expect(notifications.notifyUser).toHaveBeenCalledTimes(2);
+  expect(notifications.notifyUser.mock.calls.map(c=>c[0])).toEqual([record.organizerId,record.vendorId]);
+  expect(notifications.notifyUser.mock.calls[1][4]).toEqual({orderId:record.orderId,vendorOrderId:record.vendorOrderId});
+  await s.updateRefundStatus(record._id,'REJECTED',id(),'Shared reason');expect(notifications.notifyUser).toHaveBeenCalledTimes(2);
+ });
 });

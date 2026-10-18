@@ -1,3 +1,4 @@
+import useRefundUpdates from '@/hooks/useRefundUpdates';
 import { canCompleteVendorBooking } from '@/utils/vendorCompletion';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 import createConversation from "@/services/createConversation";
@@ -9,8 +10,8 @@ import patchUpdateOrderStatus, {
 } from "@/services/patchUpdateOrderStatus";
 import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
@@ -111,16 +112,17 @@ const getVendorStatus = (order: any) => {
 type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Cancelled" | "Payment Expired" | "No Longer Assigned";
 
 const OrderSummary = () => {
-    const { selectedTab } = useLocalSearchParams(); // Read tab from navigation params
+    const { selectedTab, orderId: targetOrderId } = useLocalSearchParams(); // Read tab from navigation params
     const [selectedFilter, setSelectedFilter] = useState<FilterType>("All");
     const [orders, setOrders] = useState<any[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
     const [isRefreshingScreen, setIsRefreshingScreen] = useState(false);
+    const { refunds, refundLoading, refundError } = useRefundUpdates();
     const summaryScrollRef = useRef<ScrollView>(null);
 
-    const refreshScreenData = async () => {
+    const refreshScreenData = useCallback(async () => {
         const user = await getUserData();
         if (!user) throw new Error("user not found");
 
@@ -132,7 +134,7 @@ const OrderSummary = () => {
         ]);
         setOrders(ordersData || []);
         setRescheduleRequests(Array.isArray(requests) ? requests : []);
-    };
+    }, []);
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
@@ -152,12 +154,10 @@ const OrderSummary = () => {
         }
     }, [selectedTab]);
 
-    useEffect(() => {
-        // Initial authoritative load. Stats remain derived from `orders`.
-        refreshScreenData().catch((error) => {
-            console.error("Error fetching order summary data:", error);
-        });
-    }, []);
+    useFocusEffect(useCallback(() => {
+        void refreshScreenData().catch(() => {});
+        if (typeof targetOrderId === 'string' && targetOrderId) { setSelectedFilter('All'); setExpandedOrderId(targetOrderId); }
+    }, [targetOrderId, refreshScreenData]));
 
     const handleRescheduleResponse = async (
         requestId: string,
@@ -642,7 +642,7 @@ const OrderSummary = () => {
                                         </View>
 
                                         {(item.vendorOrders || []).map((booking: any) => (
-                                            <BookingCancellationDetails key={booking._id} booking={booking} />
+                                            <BookingCancellationDetails key={booking._id} booking={booking} audience="vendor" refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
                                         ))}
 
                                         {/* Expanded order details - shown only when the card is tapped */}

@@ -3,8 +3,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { ClientRefund } from '@/services/getClientRefunds';
 import { bookingCancellation, type CancellationRecord } from '@/utils/bookingCancellation';
 
-export default function BookingCancellationDetails({ booking, refundState }: {
+export default function BookingCancellationDetails({ booking, refundState, audience = 'client' }: {
   booking: CancellationRecord;
+  audience?: 'client' | 'vendor';
   refundState?: { record?: ClientRefund; loading: boolean; error: boolean };
 }) {
   const details = bookingCancellation(booking);
@@ -15,18 +16,18 @@ export default function BookingCancellationDetails({ booking, refundState }: {
     <Text style={styles.text}><Text style={styles.label}>Reason: </Text>{details.reason}</Text>
     <Text style={styles.text}><Text style={styles.label}>Cancelled at: </Text>{details.cancelledAt}</Text>
   </View>
-  {refundState && <RefundDetails {...refundState} />}
+  {refundState && <RefundDetails {...refundState} audience={audience} />}
   </>;
 }
-function RefundDetails({ record, loading, error }: { record?: ClientRefund; loading: boolean; error: boolean }) {
+function RefundDetails({ record, loading, error, audience }: { record?: ClientRefund; loading: boolean; error: boolean; audience: 'client' | 'vendor' }) {
   const status = record?.status;
-  const noRefund = record?.refundAmount === 0 && status !== 'REFUNDED';
+  const noRefund = record?.refundAmount === 0 && !['REFUNDED', 'REJECTED'].includes(status || '');
   const labels: Record<string, string> = { PENDING: 'Pending review', PROCESSING: 'Processing', REFUNDED: 'Refund confirmed', REJECTED: 'Rejected', NO_REFUND_DUE: 'No refund due' };
   const messages: Record<string, string> = {
-    PENDING: 'Your refund request has been received and is awaiting review.',
-    PROCESSING: 'Your refund is being processed. Repayment has not yet been confirmed.',
-    REFUNDED: 'Your refund settlement has been confirmed.',
-    REJECTED: 'Your refund request was rejected.',
+    PENDING: 'The client refund request has been received and is awaiting review.',
+    PROCESSING: 'The client refund is being processed. Repayment has not yet been confirmed.',
+    REFUNDED: 'The client refund settlement has been confirmed.',
+    REJECTED: 'The client refund request was rejected.',
     NO_REFUND_DUE: 'This case is closed. No money is refundable under the recorded cancellation policy.',
   };
   const money = (value: number) => Number.isFinite(value) ? `Rs. ${value.toLocaleString('en-PK')}` : 'Not available';
@@ -38,11 +39,18 @@ function RefundDetails({ record, loading, error }: { record?: ClientRefund; load
   }) : null;
   return <View style={styles.refundBox} accessibilityLiveRegion="polite">
     <Text style={styles.refundTitle}>Refund update</Text>
-    {!record ? <Text style={styles.text}>{loading ? 'Loading refund details…' : error ? 'Unable to load refund details. Pull down to retry.' : 'No refund record is available for this booking.'}</Text> : <>
+    {!record ? <Text style={styles.text}>{loading ? 'Loading refund details…' : error ? 'Unable to load refund details. Reopen this screen to retry.' : 'No refund record is available for this booking.'}</Text> : <>
       <Text style={[styles.status, status === 'REFUNDED' && styles.confirmed]}>{noRefund ? 'No refund due' : labels[status || ''] || 'Status unavailable'}</Text>
       <Text style={styles.text}><Text style={styles.label}>Amount paid: </Text>{money(record.amountPaid)}</Text>
-      <Text style={styles.text}><Text style={styles.label}>Refund amount: </Text>{money(record.refundAmount)}</Text>
-      <Text style={styles.text}><Text style={styles.label}>Amount retained: </Text>{money(record.withheldAmount)}</Text>
+      <Text style={styles.text}><Text style={styles.label}>{status === 'REJECTED' ? 'Requested refund: ' : 'Refund amount: '}</Text>{money(record.refundAmount)}</Text>
+      {status === 'REJECTED'
+        ? <Text style={styles.text}><Text style={styles.label}>Refund paid: </Text>{money(0)}</Text>
+        : <Text style={styles.text}><Text style={styles.label}>Amount retained: </Text>{money(record.withheldAmount)}</Text>}
+      {audience === 'vendor' && <>
+        {(record.vendorPenalty || []).map((penalty, index) => <Text key={index} style={styles.text}><Text style={styles.label}>Vendor penalty: </Text>{money(penalty.amount)} ({penalty.percentage}%)</Text>)}
+        {record.vendorPenalty?.length === 0 && <Text style={styles.text}>No vendor penalty is recorded for this booking.</Text>}
+        <Text style={styles.text}>This update does not confirm a vendor payout. Payout eligibility is checked separately.</Text>
+      </>}
       <Text style={styles.text}>{noRefund && status !== 'NO_REFUND_DUE'
         ? 'No refund is due under the recorded cancellation policy. Case closure is awaiting review.'
         : messages[status || ''] || 'Pull down to check the latest refund status.'}</Text>

@@ -70,8 +70,8 @@ export class NotificationService {
     }
 
     // Keep the in-app update even when a device has no push token or Expo is unavailable.
-    async notifyUser(userId: string, title: string, body: string, type: string) {
-        const notification = await this.notificationModel.create({ userId, title, body, type });
+    async notifyUser(userId: string, title: string, body: string, type: string, booking?: { orderId?: string; vendorOrderId?: string }) {
+        const notification = await this.notificationModel.create({ userId, title, body, type, ...(booking ? { orderId: booking.orderId, vendorOrderId: booking.vendorOrderId } : {}) });
         try { await this.sendPushNotification(title, body, userId, 10000); }
         catch { /* The persisted notification remains available in the app. */ }
         return notification;

@@ -201,13 +201,19 @@ export class CancellationService {
     }
 
     async getClientRefunds(actor: CancellationActor) {
-        this.requireClient(actor);
-        // Derive ownership from the verified session, never a supplied user ID.
-        const records = await this.refundModel.find({ organizerId: new Types.ObjectId(actor.id) })
+        const isVendor = String(actor?.role).toLowerCase() === 'vendor';
+        if (!isVendor) this.requireClient(actor);
+        else if (!actor?.id || !Types.ObjectId.isValid(actor.id)) throw new ForbiddenException('Authenticated Vendor required.');
+        const records = await this.refundModel.find({ [isVendor ? 'vendorId' : 'organizerId']: new Types.ObjectId(actor.id) })
             .select('_id vendorOrderId amountPaid refundAmount withheldAmount status processedAt refundedAt paidAt rejectedAt closedAt updatedAt rejectionReason')
             .sort({ createdAt: -1 }).lean();
+        const penalties = isVendor ? await this.vendorPenaltyModel.find({ vendorId: new Types.ObjectId(actor.id),
+            vendorOrderId: { $in: records.map(record => record.vendorOrderId) },
+        }).select('vendorOrderId penaltyAmount penaltyPercentage').lean() : [];
         return records.map(record => ({
             _id: record._id, vendorOrderId: record.vendorOrderId,
+            ...(isVendor ? { vendorPenalty: penalties.filter(p => String(p.vendorOrderId) === String(record.vendorOrderId))
+                .map(p => ({ amount: p.penaltyAmount, percentage: p.penaltyPercentage })) } : {}),
             amountPaid: record.amountPaid, refundAmount: record.refundAmount,
             withheldAmount: record.withheldAmount, status: record.status,
             processedAt: record.processedAt, refundedAt: record.refundedAt,
