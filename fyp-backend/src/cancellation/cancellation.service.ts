@@ -154,31 +154,11 @@ export class CancellationService {
         };
     }
 
-    // ===== Reusable: how many whole days before the event is "now"? =====
-    private daysBeforeEvent(eventStartDateTime: Date): number {
-        const now = new Date();
-        const diffMs = eventStartDateTime.getTime() - now.getTime();
-        return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    }
-
-    // ===== Reusable: pick the penalty tier % for a given days-remaining =====
-    private getPenaltyPercentage(daysBeforeEvent: number, config: any): {
-        tier: string;
-        percentage: number;
-    } {
-        if (daysBeforeEvent <= 0) {
-            return { tier: 'Event day', percentage: config.penaltyEventDay };
-        }
-        if (daysBeforeEvent < 7) {
-            return { tier: '<7 days', percentage: config.penaltyUnder7Days };
-        }
-        if (daysBeforeEvent <= 14) {
-            return { tier: '7-14 days', percentage: config.penalty7to14Days };
-        }
-        if (daysBeforeEvent <= 29) {
-            return { tier: '15-29 days', percentage: config.penalty15to29Days };
-        }
-        return { tier: '30+ days', percentage: config.penalty30PlusDays };
+    // Select once for refund and penalty using exact hours, including threshold equality.
+    private getSavedVendorTier(hours: number, tiers: CancellationPolicySettingsDto['vendorPenalties']) {
+        let selected = tiers[0];
+        for (const tier of tiers) if (hours >= tier.minHoursBeforeEvent) selected = tier;
+        return selected;
     }
 
     // ===== Total amount organizer has actually paid so far (down + remaining) =====
@@ -431,10 +411,29 @@ export class CancellationService {
 
         if (vendorOrder.paymentStatus === 'PAID') throw new ConflictException('Fully paid bookings require Support review.');
 
-        // Vendor cancellation => organizer gets FULL refund of whatever was
-        // paid (vendor's fault), regardless of the vendor's own refund policy.
+        const snapshot = vendorOrder.policySnapshot;
+        if (!snapshot) throw new ConflictException('This booking has no saved cancellation policy. Contact Support to review its original terms.');
+        try {
+            if (snapshot.schemaVersion !== 1 || !Number.isInteger(snapshot.policyRevision) || snapshot.policyRevision < 0) throw new Error();
+            this.validatePolicySettings(JSON.parse(JSON.stringify(snapshot.settings)));
+        } catch { throw new ConflictException('Saved cancellation policy is invalid. Contact Support.'); }
+        const calculatedAt = new Date();
+        const serviceTime = new Date(vendorOrder.eventStartDateTime).getTime();
+        if (!Number.isFinite(serviceTime)) throw new ConflictException('Service time needs Support review.');
+        const hoursBeforeService = (serviceTime - calculatedAt.getTime()) / 3600000;
+        const daysBeforeEvent = Math.floor(hoursBeforeService / 24);
+        const refundTier = this.getSavedVendorTier(hoursBeforeService, snapshot.settings.vendorCausedClientRefunds);
+        const penaltyTier = this.getSavedVendorTier(hoursBeforeService, snapshot.settings.vendorPenalties);
         const amountPaid = await this.getAmountPaid(vendorOrder._id);
-        const daysBeforeEvent = this.daysBeforeEvent(vendorOrder.eventStartDateTime);
+        const bookingAmount = Number(vendorOrder.finalAmount ?? vendorOrder.price);
+        if (!Number.isFinite(amountPaid) || amountPaid < 0 || !Number.isFinite(bookingAmount) || bookingAmount < 0) {
+            throw new ConflictException('Booking payment amounts need Support review.');
+        }
+        const paidMinor = Math.round(amountPaid * 100);
+        const bookingMinor = Math.round(bookingAmount * 100);
+        if (!Number.isSafeInteger(paidMinor) || !Number.isSafeInteger(bookingMinor)) throw new ConflictException('Payment amounts need Support review.');
+        const refundAmount = Math.round(paidMinor * refundTier.percentage / 100) / 100;
+        const penaltyAmount = Math.round(bookingMinor * penaltyTier.percentage / 100) / 100;
 
         vendorOrder.status = 'cancelled_by_vendor' as any;
         vendorOrder.cancelledBy = 'vendor';
@@ -475,27 +474,25 @@ export class CancellationService {
             organizerId: order?.organizerId,
             vendorId: vendorOrder.vendorId,
             amountPaid,
-            refundAmount: amountPaid, // full refund — vendor's fault
-            withheldAmount: 0,
+            refundAmount,
+            withheldAmount: (paidMinor - Math.round(refundAmount * 100)) / 100,
+            policyRevision: snapshot.policyRevision,
+            policyConfigId: snapshot.policyConfigId,
+            refundPercentage: refundTier.percentage,
+            calculatedAt,
             initiatedBy: 'VENDOR_CANCELLED',
             daysBeforeEvent,
-            cancellationPolicyApplied: 'FULL_REFUND_VENDOR_FAULT',
+            cancellationPolicyApplied: refundTier.percentage === 100 ? 'FULL_REFUND_VENDOR_FAULT' : 'SAVED_POLICY_VENDOR_CANCELLED',
             status: 'PENDING',
         });
-
-        // Vendor penalty — uses the same tiered config, but as a PENALTY
-        // against the vendor (not a refund calculation).
-        const config = await this.getPolicyConfig();
-        const { tier, percentage } = this.getPenaltyPercentage(daysBeforeEvent, config);
-        const penaltyAmount = Math.round((vendorOrder.price * percentage) / 100);
 
         const penalty = await this.vendorPenaltyModel.create({
             vendorId: vendorOrder.vendorId,
             vendorOrderId: vendorOrder._id,
-            penaltyPercentage: percentage,
+            penaltyPercentage: penaltyTier.percentage,
             penaltyAmount,
             daysBeforeEvent,
-            reason: reason || `Vendor cancelled with ${tier} notice`,
+            reason: reason || `Vendor cancelled with ${daysBeforeEvent} days notice`,
         });
 
         return { vendorOrder, refund, penalty };
