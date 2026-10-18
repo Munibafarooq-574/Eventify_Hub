@@ -1,3 +1,4 @@
+import { canCompleteVendorBooking } from '@/utils/vendorCompletion';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
@@ -876,22 +877,27 @@ const OrderSummary = () => {
                                                     <Ionicons name="time-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Processing</Text>
                                                 </TouchableOpacity>
-                                            ) : (
+                                            ) : canCompleteVendorBooking(item.vendorOrders?.[0]) ? (
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
                                                     //onPress={() => mark(item._id, "completed")}
-                                                    onPress={() =>
-                                                    mark(
-                                                        item._id,
-                                                        item.vendorOrders?.[0]?._id,
-                                                        "completed"
-                                                    )
-                                                }
+                                                    onPress={() => Alert.alert(
+                                                        "Complete booking?",
+                                                        "Have you provided the booked service?",
+                                                        [
+                                                            { text: "Keep Booking", style: "cancel" },
+                                                            { text: "Mark Completed", onPress: () => {
+                                                                if (canCompleteVendorBooking(item.vendorOrders?.[0])) {
+                                                                    void mark(item._id, item.vendorOrders?.[0]?._id, "completed");
+                                                                }
+                                                            } },
+                                                        ],
+                                                    )}
                                                 >
                                                     <Ionicons name="checkmark-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Completed</Text>
                                                 </TouchableOpacity>
-                                            )
+                                            ) : null
                                         )}
 
                                         <TouchableOpacity
