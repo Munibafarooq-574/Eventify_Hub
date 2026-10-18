@@ -1,7 +1,7 @@
 
 // fyp-mobile/services/getVendorPackagesList.ts
 
-import { growthApi } from './growthApiClient';
+import { growthApi, GrowthApiError } from './growthApiClient';
 
 export interface VendorPackageDuration {
   value: number;
@@ -54,7 +54,19 @@ export interface VendorPackageListItem {
 export async function getVendorPackagesList(
   vendorId: string,
 ): Promise<VendorPackageListItem[]> {
-  return growthApi.get<VendorPackageListItem[]>(
-    `/vendor/packages?userId=${vendorId}`,
-  );
+  // Retry transient failures only for this read; never replay a payment or write.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const packages = await growthApi.get<VendorPackageListItem[]>(
+        `/vendor/packages?userId=${encodeURIComponent(vendorId)}`,
+      );
+      if (!Array.isArray(packages)) throw new GrowthApiError('Unable to load package list.', 200);
+      return packages;
+    } catch (error) {
+      const transient = error instanceof TypeError || (error instanceof GrowthApiError &&
+        [502, 503, 504, 520, 521, 522, 523, 524].includes(error.status));
+      if (!transient || attempt >= 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
 }

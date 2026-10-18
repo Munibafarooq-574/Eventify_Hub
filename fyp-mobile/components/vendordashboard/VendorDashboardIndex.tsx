@@ -81,6 +81,7 @@ const DashboardScreen = () => {
     const [monthNameArray, setMonthNameArray] = useState<string[]>([]);
     const [avatar, setAvatar] = useState<string>("");
     const [packages, setPackages] = useState<any[]>([]);
+    const [packagesError, setPackagesError] = useState(false);
     const [hasNotifications, setHasNotifications] = useState<boolean>(true);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -272,17 +273,15 @@ if (!user?._id) {
 
         try {
     const vendorPackages = await getVendorPackagesList(user._id);
+    setPackagesError(false);
 
     setPackages(
         Array.isArray(vendorPackages)
             ? vendorPackages
             : []
     );
-} catch (packageError) {
-    console.error(
-        "Error fetching vendor packages:",
-        packageError
-    );
+} catch {
+    setPackagesError(true);
 
     // Fallback only if API fails
     setPackages(
@@ -1594,6 +1593,12 @@ if (!hasValidSubscription) {
                     </TouchableOpacity>
                     </View>
 
+                    {packagesError && <TouchableOpacity accessibilityRole="button" onPress={() => void fetchData()}
+                        style={{ marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 12, backgroundColor: '#FFF4DE' }}>
+                        <Text style={{ color: '#73501B', fontWeight: '600', lineHeight: 20 }}>
+                            Unable to refresh packages. Any packages shown are from saved account data. Tap to retry.
+                        </Text>
+                    </TouchableOpacity>}
                     {packages.length > 0 ? (
                         <View style={styles.packageContainer}>
                             {packages.slice(0, 6).map((pkg: any, index) => {
@@ -1632,7 +1637,7 @@ if (!hasValidSubscription) {
                     ) : (
                         <View style={styles.emptyPackages}>
                             <Ionicons name="pricetags-outline" size={26} color="#C9AFCF" />
-                            <Text style={styles.emptyStateText}>No active packages yet</Text>
+                            <Text style={styles.emptyStateText}>{packagesError ? 'Packages temporarily unavailable' : 'No active packages yet'}</Text>
                         </View>
                     )}
 
