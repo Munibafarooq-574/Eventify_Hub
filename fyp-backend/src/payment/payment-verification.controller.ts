@@ -68,6 +68,15 @@ export class PaymentVerificationController {
                 'en-PK',
             );
 
+        const paidAt = data.paidAt ? new Date(data.paidAt) : null;
+        const timeZone = data.eventTimeZone || 'UTC';
+        const paidAtLabel = paidAt && !Number.isNaN(paidAt.getTime())
+            ? `${paidAt.toLocaleString('en-GB', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true, timeZone,
+            })} (${timeZone})`
+            : 'N/A';
+
         return response
             .type('html')
             .send(`
@@ -144,18 +153,22 @@ export class PaymentVerificationController {
                 data.clientName,
             ],
             [
-                'Vendor',
+                'Vendor Name',
                 data.vendorName,
             ],
             [
-                'Service',
-                data.serviceName,
+                'Package Name',
+                data.packageName,
             ],
             [
                 'Amount Paid',
                 `Rs. ${money(
                     data.amountPaid,
                 )}`,
+            ],
+            [
+                'Payment Date & Time',
+                paidAtLabel,
             ],
             [
                 'Paid So Far',

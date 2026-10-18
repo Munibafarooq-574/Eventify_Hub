@@ -236,7 +236,7 @@ if (
             .findById(
                 payment.vendorId,
             )
-            .select('name')
+            .select('name packages._id packages.packageName')
             .lean(),
 
         this.paymentModel
@@ -279,8 +279,16 @@ if (
             0,
         );
 
+    const bookedPackage = vendor?.packages?.find(
+        (item: any) => String(item._id) === String(vendorOrder.packageId),
+    );
+    const order = await this.orderModel.findById(vendorOrder.orderId)
+        .select('eventCityId').populate({ path: 'eventCityId', select: 'timeZone' }).lean();
+
     return {
         verified: true,
+        packageName: bookedPackage?.packageName || vendorOrder.serviceName || 'N/A',
+        eventTimeZone: (order?.eventCityId as any)?.timeZone || 'UTC',
 
         bookingReference:
             `EH-${String(
