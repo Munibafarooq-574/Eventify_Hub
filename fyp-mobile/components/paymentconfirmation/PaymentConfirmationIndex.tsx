@@ -31,6 +31,10 @@ const SUCCESS = '#278A4B';
 const formatCurrency = (value: number) =>
   `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
 
+const escapeHtml = (value: string) => String(value).replace(/[&<>"']/g, character => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+})[character]!);
+
 const toOrderRef = (id?: string) => {
   if (!id) {
     return 'EH-N/A';
@@ -133,6 +137,9 @@ const PaymentConfirmationScreen = () => {
 
   const details = [
     { label: 'Order Reference', value: orderRef },
+    { label: 'Vendor Name', value: paymentData?.vendor?.name || 'N/A' },
+    { label: 'Brand Name', value: paymentData?.vendor?.brandName || 'N/A' },
+    { label: 'Vendor Email', value: paymentData?.vendor?.email || 'N/A' },
     { label: 'Payment Type', value: paymentTypeLabel },
     { label: 'Amount Paid', value: formatCurrency(amountPaid) },
     { label: 'Payment Method', value: paymentMethodLabel },
@@ -514,7 +521,7 @@ try {
                         : ''
                     }"
                   >
-                    ${detail.value}
+                    ${escapeHtml(detail.value)}
                   </div>
 
                 </div>

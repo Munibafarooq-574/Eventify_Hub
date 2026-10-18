@@ -438,9 +438,19 @@ const latestSuccessfulPayment =
 
 
 
+const vendor = vendorOrder.vendorId
+    ? await this.userModel.findById(vendorOrder.vendorId)
+        .select('name email contactDetails.brandName contactDetails.bookingEmail').lean()
+    : null;
+
 return {
     vendorOrderId,
     organizerId,
+    vendor: {
+        name: vendor?.name || null,
+        brandName: vendor?.contactDetails?.brandName || null,
+        email: vendor?.contactDetails?.bookingEmail || vendor?.email || null,
+    },
     totalAmount: bookingAmount,
 
     downPaymentType:

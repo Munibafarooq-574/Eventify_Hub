@@ -2,6 +2,7 @@
 export interface PaymentBreakdown {
     vendorOrderId: string;
     organizerId: string;
+    vendor: { name: string | null; brandName: string | null; email: string | null };
 
     // Final backend-authoritative amount after discount/promotion.
     totalAmount: number;
