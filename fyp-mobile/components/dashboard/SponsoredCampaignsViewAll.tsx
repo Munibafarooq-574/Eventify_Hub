@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import {
   recordCampaignClick,
   recordCampaignImpression,
@@ -111,7 +112,7 @@ return {
         setPage(targetPage);
         setHasMore(result.hasMore);
       } catch (error) {
-        console.error(
+        reportMarketplaceLoadError(
           "Sponsored campaigns page error:",
           error,
         );

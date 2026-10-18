@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/dashboard/SponsoredForYou.tsx
 
 import {
@@ -171,7 +172,7 @@ const [allLoading, setAllLoading] = useState(false);
         : [],
     );
   } catch (error) {
-    console.error(
+    reportMarketplaceLoadError(
       "Sponsored campaigns error:",
       error,
     );
@@ -658,7 +659,7 @@ const openViewAll = async () => {
 
     setAllCampaigns(Array.isArray(result) ? result : campaigns);
   } catch (error) {
-    console.error("Failed to load all campaigns:", error);
+    reportMarketplaceLoadError("Failed to load all campaigns:", error);
     setAllCampaigns(campaigns);
   } finally {
     setAllLoading(false);

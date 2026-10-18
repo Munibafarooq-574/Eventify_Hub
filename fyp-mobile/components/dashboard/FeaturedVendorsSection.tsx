@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedVendorsSection.tsx
 
 import React, { useEffect, useState } from 'react';
@@ -82,7 +83,7 @@ if (cancelled) {
 setVendors(featured);
 
     } catch (error) {
-      console.error(
+      reportMarketplaceLoadError(
         '[Featured Vendors] Failed to load:',
         error,
       );
@@ -142,7 +143,7 @@ setVendors(featured);
 
       setAllVendors(Array.isArray(result) ? result : vendors);
     } catch (error) {
-      console.error('[Featured Vendors] View all failed:', error);
+      reportMarketplaceLoadError('[Featured Vendors] View all failed:', error);
       setAllVendors(vendors);
     } finally {
       setAllLoading(false);

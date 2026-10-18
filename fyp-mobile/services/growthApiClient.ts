@@ -13,7 +13,7 @@ export class GrowthApiError extends Error {
     this.status = status;
   }
 }
-async function request<T>(
+async function requestOnce<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
@@ -42,11 +42,6 @@ if (!isFormData) {
 
   const url = `${API_BASE_URL}${path}`;
 
-  console.log('[Growth API] Request:', {
-    method: options.method ?? 'GET',
-    url,
-  });
-
   const response = await fetch(url, {
     ...options,
     headers,
@@ -55,16 +50,10 @@ if (!isFormData) {
   const contentType = response.headers.get('content-type') ?? '';
   const rawBody = await response.text();
 
-  console.log('[Growth API] Response:', {
-    status: response.status,
-    contentType,
-    bodyPreview: rawBody.slice(0, 300),
-  });
-
   if (!response.ok) {
-    let message = `Request failed (${response.status})`;
+    let message = 'Unable to load this information. Please try again.';
 
-    if (contentType.includes('application/json')) {
+    if (response.status < 500 && contentType.includes('application/json')) {
       try {
         const body = JSON.parse(rawBody);
 
@@ -76,8 +65,6 @@ if (!isFormData) {
       } catch {
         // Ignore invalid JSON.
       }
-    } else if (rawBody) {
-      message = `Request failed (${response.status}): ${rawBody.slice(0, 200)}`;
     }
 
     throw new GrowthApiError(message, response.status);
@@ -89,7 +76,7 @@ if (!isFormData) {
 
   if (!contentType.includes('application/json')) {
     throw new GrowthApiError(
-      `Expected JSON but received ${contentType || 'unknown content type'} from ${url}`,
+      'Unable to load this information. Please try again.',
       response.status,
     );
   }
@@ -98,9 +85,25 @@ if (!isFormData) {
     return JSON.parse(rawBody) as T;
   } catch {
     throw new GrowthApiError(
-      `Server returned invalid JSON from ${url}. Response starts with: ${rawBody.slice(0, 100)}`,
+      'Unable to load this information. Please try again.',
       response.status,
     );
+  }
+}
+
+// Only public marketplace reads are replayed. Writes and package-list retries stay unchanged.
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const retryRead = (options.method ?? 'GET') === 'GET' &&
+    /^\/vendor\/growth\/(?:discount\/coupon\/public|campaign\/public\/active|promotion\/featured-(?:vendor|package)\/active)(?:\?|$)/.test(path);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestOnce<T>(path, options);
+    } catch (error) {
+      const transient = error instanceof TypeError ||
+        (error instanceof GrowthApiError && [502, 503, 504, 520, 521, 522, 523, 524].includes(error.status));
+      if (!retryRead || !transient || attempt >= 2 || options.signal?.aborted) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+    }
   }
 }
 

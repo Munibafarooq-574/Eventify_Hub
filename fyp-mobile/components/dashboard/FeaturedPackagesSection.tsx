@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
 
 import React, { useEffect, useState } from 'react';
@@ -91,7 +92,7 @@ export function FeaturedPackagesSection() {
 
       setPackages(featured);
     } catch (error) {
-      console.error(
+      reportMarketplaceLoadError(
         '[Featured Packages] Failed to load:',
         error,
       );
@@ -154,7 +155,7 @@ export function FeaturedPackagesSection() {
 
       setAllPackages(Array.isArray(result) ? result : packages);
     } catch (error) {
-      console.error('[Featured Packages] View all failed:', error);
+      reportMarketplaceLoadError('[Featured Packages] View all failed:', error);
       setAllPackages(packages);
     } finally {
       setAllLoading(false);

@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getPopularVendors, { TopVendor } from '@/services/getPopularVendors';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -117,7 +118,7 @@ const App: React.FC = () => {
       const data = await getPopularVendors(5);
       setVendors(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Error fetching popular vendors:', err);
+      reportMarketplaceLoadError('Error fetching popular vendors:', err);
       setError(true);
       setVendors([]);
     } finally {

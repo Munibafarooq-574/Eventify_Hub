@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import searchVendors from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
@@ -74,7 +75,7 @@ const Header: React.FC = () => {
         )
       );
     } catch (error) {
-      console.error('Badge lookup failed:', error);
+      reportMarketplaceLoadError('Badge lookup failed:', error);
 
       // Badge failure should never break vendor search
       setBadgeMap({});
@@ -109,7 +110,7 @@ const Header: React.FC = () => {
       setUsername(user?.name || user?.username || 'Guest');
       setAvatar(user?.profileImage || '');
     } catch (error) {
-      console.error('fetchUsername error:', error);
+      reportMarketplaceLoadError('fetchUsername error:', error);
       setUsername('Guest');
       setAvatar('');
     }
@@ -147,7 +148,7 @@ const Header: React.FC = () => {
 
     setCartPackageCount(count);
   } catch (error) {
-    console.error(
+    reportMarketplaceLoadError(
       'Cart count error:',
       error,
     );

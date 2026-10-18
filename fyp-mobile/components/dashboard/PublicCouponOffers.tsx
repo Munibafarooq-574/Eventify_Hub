@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { getPublicDashboardCoupons } from '@/services/getPublicDashboardCoupons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -254,7 +255,7 @@ const PublicCouponOffers: React.FC = () => {
         const result = await getPublicDashboardCoupons(HOME_LIMIT);
         setCoupons(Array.isArray(result) ? result : []);
       } catch (error) {
-        console.error('Failed to load public coupons:', error);
+        reportMarketplaceLoadError('Failed to load public coupons:', error);
         setCoupons([]);
       } finally {
         setLoading(false);
@@ -311,7 +312,7 @@ const PublicCouponOffers: React.FC = () => {
       const result = await getPublicDashboardCoupons(ALL_LIMIT);
       setAllCoupons(Array.isArray(result) ? result : coupons);
     } catch (error) {
-      console.error('Failed to load all coupons:', error);
+      reportMarketplaceLoadError('Failed to load all coupons:', error);
       setAllCoupons(coupons);
     } finally {
       setAllLoading(false);

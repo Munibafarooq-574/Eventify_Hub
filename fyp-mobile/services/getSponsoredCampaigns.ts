@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { growthApi } from "./growthApiClient";
 
 export interface SponsoredCampaignPackage {
@@ -112,7 +113,7 @@ export async function getSponsoredCampaigns(
       ? response
       : [];
   } catch (error) {
-    console.error(
+    reportMarketplaceLoadError(
       "Failed to load sponsored campaigns:",
       error,
     );

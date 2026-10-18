@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
@@ -148,7 +149,7 @@ if (
         Object.fromEntries(reviewEntries),
       );
     } catch (error) {
-      console.error(
+      reportMarketplaceLoadError(
         "Failed to load recommended vendors:",
         error,
       );
