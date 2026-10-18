@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // client side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
 
@@ -669,8 +670,8 @@ const fetchPublicCoupons = async () => {
         : [],
     );
   } catch (error) {
-    console.error(
-      'Error fetching public coupons:',
+    reportMarketplaceLoadError(
+      'Public coupons unavailable:',
       error,
     );
 

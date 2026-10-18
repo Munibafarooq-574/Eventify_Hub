@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/orderreview/OrderReviewIndex.tsx
 import postPlaceOrder from '@/services/postPlaceOrder';
 import axios from 'axios';
@@ -650,8 +651,8 @@ const fetchPublicCouponsForPackage = async (
         : [],
     }));
   } catch (error) {
-    console.error(
-      'Error fetching public coupons:',
+    reportMarketplaceLoadError(
+      'Public coupons unavailable:',
       error,
     );
 
