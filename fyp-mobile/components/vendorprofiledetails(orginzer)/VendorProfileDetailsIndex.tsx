@@ -1,3 +1,4 @@
+import BookingReviewNotice from './BookingReviewNotice';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // client side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
@@ -423,6 +424,25 @@ const phase6AvailablePackageIds = useMemo(() => {
       useState<
         'Details' | 'Contact' | 'Packages' | 'Reviews'
       >('Details');
+
+    const [isClientView, setIsClientView] = useState(false);
+    const detailsTop = useRef(0);
+    const businessDetailsTop = useRef(0);
+    const pendingDetailsScroll = useRef(false);
+    const scrollToBusinessDetails = () => {
+      scrollViewRef.current?.scrollTo({
+        y: Math.max(0, detailsTop.current + businessDetailsTop.current - 16),
+        animated: true,
+      });
+    };
+    const openVendorDetails = () => {
+      if (activeTab === 'Details') {
+        scrollToBusinessDetails();
+      } else {
+        pendingDetailsScroll.current = true;
+        setActiveTab('Details');
+      }
+    };
 
     const [isOwnerView, setIsOwnerView] =
       useState(false);
@@ -1850,11 +1870,16 @@ Toast.show({
           // when the loaded profile belongs to the current user.
           try {
             const currentUser = await getUserData();
+            setIsClientView(
+              ['organizer', 'client'].includes(String(currentUser?.role || '').toLowerCase()) &&
+              String(currentUser?._id || '') !== String(vendor?._id || ''),
+            );
             setIsOwnerView(
               String(currentUser?._id || '') ===
                 String(vendor?._id || ''),
             );
           } catch {
+            setIsClientView(false);
             setIsOwnerView(false);
           }
 
@@ -2409,6 +2434,7 @@ const serviceCityNamesFromIds =
           {activeTab ===
             'Details' && (
             <View
+              onLayout={(event) => { detailsTop.current = event.nativeEvent.layout.y; }}
               style={
                 styles.detailsContainer
               }
@@ -2526,6 +2552,10 @@ const serviceCityNamesFromIds =
                     </Text>
                   </View>
                 )}
+                {isClientView && !isOwnerView && (
+                  <BookingReviewNotice kind="profile" onViewDetails={openVendorDetails} />
+                )}
+
 
                 <View
                   style={
@@ -2895,6 +2925,13 @@ const serviceCityNamesFromIds =
               </View>
 
               <View
+                onLayout={(event) => {
+                  businessDetailsTop.current = event.nativeEvent.layout.y;
+                  if (pendingDetailsScroll.current) {
+                    pendingDetailsScroll.current = false;
+                    requestAnimationFrame(scrollToBusinessDetails);
+                  }
+                }}
                 style={
                   styles.card
                 }
@@ -4153,6 +4190,10 @@ const serviceCityNamesFromIds =
                     </View>
                   )}
                 </View>
+              )}
+
+              {isClientView && !isOwnerView && (
+                <BookingReviewNotice kind="packages" onViewDetails={openVendorDetails} />
               )}
 
               {/* Packages title */}
