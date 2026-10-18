@@ -80,7 +80,7 @@ function checkout({kind='DOWN_PAYMENT',changedAmount=false,pending=false,saveFai
 test('checkout uses backend amount, blocks double taps and sends no card fields to payment APIs',async()=>{
  const c=checkout();await c.start();c.fill();c.nodes().find(n=>n.type==='Switch').props.onValueChange(true);c.render();
  assert.equal(c.pay().props.disabled,false);const pay=c.pay().props.onPress;await Promise.all([pay(),pay()]);c.render();
- assert.equal(c.calls.length,1);assert.deepEqual(c.calls[0].args,['b'.repeat(24),'card']);
+ assert.equal(c.calls.length,1);assert.deepEqual(c.calls[0].args,['b'.repeat(24),'card',true]);
  assert.deepEqual(Object.keys(c.remembered[0].card).sort(),['demoCardId','expiry','name']);
  assert.equal(c.field('CVV').props.value,'');assert.match(c.alerts[0][1],/No real card has been charged/);
  // On a later checkout, a shortcut fills only the synthetic details, never CVV.
@@ -90,5 +90,7 @@ test('checkout uses backend amount, blocks double taps and sends no card fields 
 });
 test('a saved-shortcut failure cannot re-submit an already created payment',async()=>{const c=checkout({saveFails:true});await c.start();c.fill();c.nodes().find(n=>n.type==='Switch').props.onValueChange(true);c.render();await c.pay().props.onPress();c.render();assert.equal(c.calls.length,1);assert.match(c.alerts[0][1],/request was created/);assert.equal(c.pay().props.disabled,true);});
 test('fresh pending payment or amount change blocks mutation until reviewed',async()=>{for(const options of [{pending:true},{changedAmount:true}]){const c=checkout(options);await c.start();c.fill();await c.pay().props.onPress();assert.equal(c.calls.length,0);assert.equal(c.alerts.length,1);}});
-test('remaining checkout preserves the existing remaining-payment endpoint',async()=>{const c=checkout({kind:'REMAINING'});await c.start();c.fill();await c.pay().props.onPress();assert.equal(c.calls[0].type,'remaining');assert.deepEqual(c.calls[0].args,['b'.repeat(24),'card']);});
+test('remaining checkout preserves the existing remaining-payment endpoint',async()=>{const c=checkout({kind:'REMAINING'});await c.start();c.fill();await c.pay().props.onPress();assert.equal(c.calls[0].type,'remaining');assert.deepEqual(c.calls[0].args,['b'.repeat(24),'card',true]);});
 test('backgrounding clears card entry and prevents use of the previous account context',async()=>{const c=checkout();await c.start();c.fill();c.events.change('background');c.render();assert.equal(c.field('CVV').props.value,'');assert.equal(c.field('Test Card Number').props.value,'');assert.equal(c.pay().props.disabled,true);});
+
+test('email receipt opt-out reaches the payment request',async()=>{const c=checkout();await c.start();c.fill();const toggle=c.nodes().find(n=>n.type==='Switch'&&n.props.accessibilityLabel==='Email me a receipt');assert.equal(toggle.props.value,true);toggle.props.onValueChange(false);c.render();await c.pay().props.onPress();assert.equal(c.calls[0].args[2],false);});

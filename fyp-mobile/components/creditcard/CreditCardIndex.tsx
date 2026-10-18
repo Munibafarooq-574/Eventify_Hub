@@ -175,6 +175,7 @@ const CreditCardPaymentScreen = () => {
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [rememberCard, setRememberCard] = useState(false);
+  const [sendReceipt, setSendReceipt] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [savedCards, setSavedCards] = useState<SavedDemoCard[]>([]);
@@ -283,8 +284,8 @@ const CreditCardPaymentScreen = () => {
         Alert.alert('Amount updated', 'Your booking amount changed. Review it before submitting again.'); return;
       }
       // Phase 12A submits only the method. No card number, expiry or CVV leaves this form.
-      if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId, 'card');
-      else await createPayment(vendorOrderId, 'card');
+      if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId, 'card', sendReceipt);
+      else await createPayment(vendorOrderId, 'card', sendReceipt);
       initiated = true;
       let saveNotice = '';
       if (rememberCard && current.demo && request === generation.current) {
@@ -521,7 +522,16 @@ const CreditCardPaymentScreen = () => {
         </View>
 
         <View style={styles.switchDivider} />
-        <Text style={styles.switchSubtitle}>A receipt is emailed after payment confirmation.</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchIcon}><Ionicons name="mail-outline" size={16} color={PRIMARY} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.switchTitle}>Email me a receipt</Text>
+            <Text style={styles.switchSubtitle}>Send to my account email after payment confirmation.</Text>
+          </View>
+          <Switch accessibilityLabel="Email me a receipt" disabled={submitting || loading || !ownerId}
+            value={sendReceipt} onValueChange={setSendReceipt}
+            trackColor={{ false: '#E3D3DD', true: ACCENT }} thumbColor="#FFFFFF" />
+        </View>
       </View>
     </View>
   );
@@ -634,7 +644,7 @@ const CreditCardPaymentScreen = () => {
       activeOpacity={0.85}
     >
       <Text
-        style={styles.payButtonText}
+        style={[styles.payButtonText, (!isValid || loading || !ownerId) && styles.payButtonTextDisabled]}
         numberOfLines={1}
       >
         {submitting
@@ -646,7 +656,7 @@ const CreditCardPaymentScreen = () => {
         <Ionicons
           name="lock-closed"
           size={16}
-          color="#FFFFFF"
+          color={!isValid || loading || !ownerId ? '#6C5363' : '#FFFFFF'}
         />
       )}
     </TouchableOpacity>
@@ -910,10 +920,10 @@ const styles = StyleSheet.create({
   // ── Footer
   footer: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    padding: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#EEDDE7',
     shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -938,8 +948,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: PRIMARY,
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 12,
+    minHeight: 52,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     shadowColor: PRIMARY,
     shadowOffset: { width: 0, height: 6 },
@@ -948,9 +959,10 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   payButtonDisabled: {
-    backgroundColor: '#D9C4D1',
+    backgroundColor: '#EADDE5',
     shadowOpacity: 0,
     elevation: 0,
   },
+  payButtonTextDisabled: { color: '#6C5363' },
   payButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14.5, flexShrink: 1 },
 });

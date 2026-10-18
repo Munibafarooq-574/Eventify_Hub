@@ -4,7 +4,8 @@ import { getSecureData } from "@/store";
 
 export default async function payRemainingAmount(
     vendorOrderId: string,
-    method: "card" | "jazzcash" | "easypaisa"
+    method: "card" | "jazzcash" | "easypaisa",
+    sendReceipt?: boolean
 ) {
     const url = `https://eventify-hub.onrender.com/payment/vendor-order/${vendorOrderId}/remaining/initiate`;
     const token = await getSecureData("token");
@@ -17,7 +18,7 @@ const config: AxiosRequestConfig = {
               Authorization: `Bearer ${token}`,
           }
         : {},
-    data: { method },
+    data: { method, ...(sendReceipt !== undefined ? { sendReceipt } : {}) },
 };
     try {
         const response = await axios(config);

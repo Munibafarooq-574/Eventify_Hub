@@ -39,19 +39,21 @@ describe('Payment receipt display',()=>{
         const html=service().buildPaymentReceiptEmail({...base,categoryName:'<script>bad</script>',packageName:'A & B',eventTimeZone:null});
         expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>');expect(html).toContain('A &amp; B');expect(html).toContain('(UTC)');
     });
-    it('confirmation loads the event-city timezone and category and sends only the booked package metadata',async()=>{
+    it.each([undefined,true,false])('confirmation respects receipt preference %s and keeps booked metadata',async(sendReceipt)=>{
         const s=service();const query=(value:any)=>{const q:any={lean:jest.fn(async()=>value),select:jest.fn(),populate:jest.fn()};q.select.mockReturnValue(q);q.populate.mockReturnValue(q);return q;};
         const vendor={name:'Vendor11',buisnessCategory:{name:'Cakes'},packages:[{_id:'other',packageName:'Wrong',bookingType:'DURATION_BASED'},{_id:'cake',packageName:'Cake package',bookingType:'DELIVERY_BASED'}]};
         const order=query({eventName:'Birthday',eventTime:'13:00',eventCityId:{timeZone:'Asia/Karachi'}});
         const vendorQuery=query(vendor);
         s.userModel={findById:(id:string)=>id==='client'?query({email:'test@example.invalid'}):vendorQuery};
         s.orderModel={findById:()=>order};
-        s.paymentModel={findById:async()=>({status:'PENDING',organizerId:'client',vendorOrderId:'booking',amount:1500,save:async()=>{}}),find:()=>query([{amount:1500}])};
+        s.paymentModel={findById:async()=>({status:'PENDING',sendReceipt,organizerId:'client',vendorOrderId:'booking',amount:1500,save:async()=>{}}),find:()=>query([{amount:1500}])};
         s.vendorOrderModel={findById:async()=>({_id:'booking',orderId:'event',vendorId:'vendor',packageId:'cake',price:3000,status:'accepted',eventStartDateTime:base.serviceStart,eventEndDateTime:base.serviceEnd,save:async()=>{}})};
         s.emailService={sendTransactionalEmail:jest.fn(async()=>{})};
         await s.confirmPayment('payment');
         expect(order.populate).toHaveBeenCalledWith({path:'eventCityId',select:'timeZone'});
         expect(vendorQuery.populate).toHaveBeenCalledWith({path:'buisnessCategory',select:'name'});
+        if(sendReceipt===false){expect(s.emailService.sendTransactionalEmail).not.toHaveBeenCalled();return;}
+        expect(s.emailService.sendTransactionalEmail).toHaveBeenCalledTimes(1);
         const content=text(s.emailService.sendTransactionalEmail.mock.calls[0][0].html);
         expect(content).toMatch(/Category: Cakes/);expect(content).toMatch(/Package: Cake package/);expect(content).toMatch(/Delivery at: .*12:00 pm/i);
         expect(content).not.toContain('Package: Wrong');

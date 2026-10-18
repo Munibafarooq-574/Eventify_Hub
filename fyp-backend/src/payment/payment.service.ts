@@ -529,6 +529,7 @@ pendingPayment: pendingPayment
     vendorOrderId: string,
     method: string,
     organizerId: string,
+    sendReceipt = true,
 ) {
         const vendorOrder =
             await this.vendorOrderModel.findById(vendorOrderId);
@@ -651,6 +652,7 @@ if (
             amount: requiredDownPayment,
             type: 'DOWN_PAYMENT',
             status: 'PENDING',
+            sendReceipt,
             method,
         });
 
@@ -1256,6 +1258,7 @@ try {
     ]);
 
     if (
+        payment.sendReceipt !== false &&
         client?.email &&
         order &&
         vendor
@@ -1524,6 +1527,7 @@ return payment;
     vendorOrderId: string,
     method: string,
     organizerId: string,
+    sendReceipt = true,
 ) {
         const vendorOrder =
             await this.vendorOrderModel.findById(
@@ -1633,6 +1637,7 @@ const paidSoFar =
                 amount: remaining,
                 type: 'REMAINING',
                 status: 'PENDING',
+                sendReceipt,
                 method,
             });
 

@@ -41,6 +41,7 @@ initiate(
         vendorOrderId,
         dto.method,
         req.user.id,
+        dto.sendReceipt,
     );
 }
 
@@ -67,6 +68,7 @@ initiateRemaining(
         vendorOrderId,
         dto.method,
         req.user.id,
+        dto.sendReceipt,
     );
 }
 

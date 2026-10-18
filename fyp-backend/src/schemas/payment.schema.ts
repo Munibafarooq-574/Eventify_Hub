@@ -32,6 +32,9 @@ export class Payment extends Document {
     @Prop({ type: String, default: null })
     method?: string | null; // 'card' | 'jazzcash' | 'easypaisa'
 
+    @Prop({ type: Boolean, default: true })
+    sendReceipt?: boolean;
+
     @Prop({ type: String, default: null })
     transactionRef?: string | null; // gateway reference once real gateway is wired
 
