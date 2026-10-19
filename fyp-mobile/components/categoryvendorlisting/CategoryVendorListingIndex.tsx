@@ -302,9 +302,12 @@ const mergedResults = resultsPerCategory.flat();
     }
 
     const excludedVendorId = String(Array.isArray(routeParams?.excludedVendorId) ? routeParams.excludedVendorId[0] : routeParams?.excludedVendorId || '');
+    let excludedVendorIds: string[] = [];
+    try { const excluded = JSON.parse(String(routeParams?.excludedVendorIds || '[]')); excludedVendorIds = Array.isArray(excluded) ? excluded.map(String) : []; } catch { /* Optional route filter. */ }
+    const eligibleVendorResults = vendorResults.filter((vendor: any) => !excludedVendorIds.includes(String(vendor?._id)));
     const visibleVendorResults = excludedVendorId
-      ? vendorResults.filter((vendor: any) => String(vendor?._id) !== excludedVendorId)
-      : vendorResults;
+      ? eligibleVendorResults.filter((vendor: any) => String(vendor?._id) !== excludedVendorId)
+      : eligibleVendorResults;
     setData(visibleVendorResults);
     await fetchVendorDetails(visibleVendorResults, currentRequest, savedFilters.sort);
   } catch (error) {

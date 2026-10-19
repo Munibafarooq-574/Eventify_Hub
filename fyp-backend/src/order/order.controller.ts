@@ -25,6 +25,18 @@ import { CreateRescheduleRequestDto, RespondRescheduleRequestDto, ResolveResched
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
+    @Get('vendor-order/:id/cancellation-replacement')
+    @UseGuards(JwtAuthGuard)
+    cancellationReplacement(@Param('id') id: string, @Request() req: any) {
+        return this.orderService.getCancellationReplacementContext(id, req.user);
+    }
+
+    @Patch('vendor-order/:id/continue-without')
+    @UseGuards(JwtAuthGuard)
+    continueWithout(@Param('id') id: string, @Request() req: any) {
+        return this.orderService.continueWithoutCancelledVendor(id, req.user);
+    }
+
       @Post()
 @UseGuards(JwtAuthGuard)
 async placeOrder(
@@ -41,6 +53,7 @@ async placeOrder(
     eventAddress: string;
     selectedCategoryIds?: string[];
     replacementRescheduleRequestId?: string;
+    replacementVendorOrderId?: string;
     services: {
     vendorId: string;
     serviceName: string;
@@ -110,6 +123,7 @@ async placeOrder(
                 body.selectedCategoryIds,
                 body.eventId,
                 body.replacementRescheduleRequestId,
+                body.replacementVendorOrderId,
             );
             
             return order;

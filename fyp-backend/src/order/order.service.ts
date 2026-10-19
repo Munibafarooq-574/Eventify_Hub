@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
-import { Connection, Model, Types } from 'mongoose';
+import { ClientSession, Connection, Model, Types } from 'mongoose';
 import { CancellationActor } from '../cancellation/cancellation.types';
 import { CancellationService } from '../cancellation/cancellation.service';
 import { BookingPolicySnapshot } from '../schemas/vendor-order.schema';
@@ -101,7 +101,20 @@ export class OrderService {
     selectedCategoryIds?: string[],
     eventId?: string,
     replacementRescheduleRequestId?: string,
+    replacementVendorOrderId?: string,
 ): Promise<Order> {
+    if (replacementVendorOrderId && replacementRescheduleRequestId) throw new BadRequestException('Choose one replacement flow.');
+    let cancellationReplacement: Awaited<ReturnType<OrderService['cancellationReplacementContext']>> | null = null;
+    if (replacementVendorOrderId) {
+        cancellationReplacement = await this.cancellationReplacementContext(replacementVendorOrderId, { id: organizerId, role: 'client' });
+        if (!Array.isArray(services) || services.length !== 1) throw new BadRequestException('Select exactly one replacement package.');
+        const original = cancellationReplacement.order;
+        // The original event, never checkout fields, is the scheduling authority.
+        eventDate = new Date(original.eventDate); eventTime = original.eventTime;
+        eventName = original.eventName; eventType = original.eventType; guests = original.guests;
+        durationMinutes = original.eventDurationMinutes!; eventCityId = String(original.eventCityId);
+        eventAddress = original.eventAddress; selectedCategoryIds = [cancellationReplacement.categoryId]; eventId = String(original.eventId || original._id);
+    }
     let replacementRequest: any = null;
     if (replacementRescheduleRequestId) {
         if (!Types.ObjectId.isValid(replacementRescheduleRequestId)) {
@@ -397,6 +410,21 @@ export class OrderService {
                         }
                     }
 
+                    if (replacementVendorOrderId) {
+                        cancellationReplacement = await this.cancellationReplacementContext(replacementVendorOrderId, { id: organizerId, role: 'client' }, session);
+                        if (String(cancellationReplacement.order.eventTime) !== eventTime ||
+                            Number(cancellationReplacement.order.eventDurationMinutes) !== Number(durationMinutes) ||
+                            String(cancellationReplacement.order.eventCityId) !== String(eventCityId) ||
+                            new Date(cancellationReplacement.order.eventDate).getTime() !== eventDate.getTime()) {
+                            throw new ConflictException('Event details changed. Reload the replacement search.');
+                        }
+                        const selectedVendorId = String(services[0].vendorId);
+                        if (selectedVendorId === String(cancellationReplacement.vendorOrder.vendorId) ||
+                            cancellationReplacement.active.some(booking => String(booking.vendorId) === selectedVendorId)) {
+                            throw new ConflictException('Choose a different vendor who is not already active in this event.');
+                        }
+                    }
+
                     // Idempotency check after locks are acquired.
                     const existingOrder =
                         await this.orderModel
@@ -412,7 +440,7 @@ export class OrderService {
                             .session(session)
                             .lean();
 
-                    if (existingOrder) {
+                    if (existingOrder && !cancellationReplacement) {
                         throw new ConflictException(
                             'This event has already been booked',
                         );
@@ -1026,6 +1054,9 @@ export class OrderService {
                     // -------------------------------------------------
                     // ALL VALIDATIONS PASSED — WRITES START HERE
                     // -------------------------------------------------
+                    if (cancellationReplacement && new Date(cancellationReplacement.order.eventStartDateTime!).getTime() <= Date.now()) {
+                        throw new ConflictException('Replacement is available only before the event starts.');
+                    }
                     const totalAmount =
                         validatedServices.reduce(
                             (
@@ -1059,7 +1090,7 @@ export class OrderService {
                             0,
                         );
 
-                    const [order] =
+                    const [order] = cancellationReplacement ? [cancellationReplacement.order] :
                         await this.orderModel.create(
                             [
                                 {
@@ -1160,7 +1191,7 @@ export class OrderService {
                                             replacementRescheduleRequestId:
                                                 replacementRequest?._id ?? null,
                                             replacesVendorOrderId:
-                                                replacementRequest?.vendorOrderId ?? null,
+                                                replacementVendorOrderId ?? replacementRequest?.vendorOrderId ?? null,
                                             status:
                                                 'pending',
                                             eventStartDateTime:
@@ -1177,8 +1208,17 @@ export class OrderService {
                         );
                     }
 
-                    order.vendorOrders =
-                        vendorOrderIds;
+                    if (cancellationReplacement) {
+                        // Preserve cancelled history and all sibling assignments.
+                        order.vendorOrders = [...order.vendorOrders, ...vendorOrderIds];
+                        order.totalAmount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.originalAmount ?? booking.price ?? 0), 0) + totalAmount;
+                        order.discount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.discountAmount ?? 0), 0) + totalDiscount;
+                        order.finalAmount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.finalAmount ?? booking.price ?? 0), 0) + finalAmount;
+                        cancellationReplacement.vendorOrder.cancellationReplacementChoice = null;
+                        await cancellationReplacement.vendorOrder.save({ session });
+                    } else {
+                        order.vendorOrders = vendorOrderIds;
+                    }
 
                     await order.save({
                         session,
@@ -1258,6 +1298,54 @@ export class OrderService {
     }
     }
 
+
+    private async cancellationReplacementContext(id: string, actor: CancellationActor, session?: ClientSession) {
+        const { vendorOrder, order } = await this.cancellationService.assertClientBookingOwner(id, actor, session);
+        if (vendorOrder.status !== 'cancelled_by_vendor' || vendorOrder.cancelledBy !== 'vendor') {
+            throw new ConflictException('Only a vendor-cancelled booking can be replaced this way.');
+        }
+        const start = new Date(order.eventStartDateTime as any).getTime();
+        if (!Number.isFinite(start) || start <= Date.now() || ['completed', 'cancelled'].includes(order.status)) {
+            throw new ConflictException('Replacement is available only before the event starts.');
+        }
+        if (await this.rescheduleRequestModel.exists({ orderId: order._id, resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] } }).session(session ?? null)) {
+            throw new ConflictException('Resolve the existing schedule change before replacing this vendor.');
+        }
+        if (await this.vendorOrderModel.exists({ orderId: order._id, replacesVendorOrderId: vendorOrder._id, status: 'cancelled_by_vendor' }).session(session ?? null)) {
+            throw new ConflictException('Use the latest cancelled replacement booking to find another vendor.');
+        }
+        const active = await this.vendorOrderModel.find({ orderId: order._id,
+            status: { $in: ['pending', 'accepted', 'completed'] }, paymentStatus: { $nin: ['EXPIRED', 'PAYMENT_EXPIRED'] },
+            replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' } }).session(session ?? null);
+        if (active.some(booking => String(booking.replacesVendorOrderId || '') === String(vendorOrder._id))) {
+            throw new ConflictException('A replacement request already exists for this booking.');
+        }
+        const vendor = await this.userModel.findById(vendorOrder.vendorId).select('buisnessCategory').session(session ?? null);
+        if (!vendor?.buisnessCategory) throw new ConflictException('The cancelled vendor category is unavailable.');
+        return { vendorOrder, order, categoryId: String(vendor.buisnessCategory), active };
+    }
+
+    async getCancellationReplacementContext(id: string, actor: CancellationActor) {
+        const context = await this.cancellationReplacementContext(id, actor);
+        const category = await this.categoryModel.findById(context.categoryId).select('name');
+        const timeZone = await this.cityService.requireCityTimeZone(String(context.order.eventCityId));
+        const eventDate = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(context.order.eventStartDateTime!));
+        return { categoryId: context.categoryId, categoryName: category?.name || 'Vendor',
+            excludedVendorIds: [String(context.vendorOrder.vendorId), ...context.active.map(booking => String(booking.vendorId))],
+            eventDetails: { eventId: String(context.order.eventId || context.order._id), eventName: context.order.eventName,
+                eventType: context.order.eventType, eventDate, startTime: context.order.eventTime,
+                durationMinutes: context.order.eventDurationMinutes, guests: context.order.guests,
+                eventCityId: String(context.order.eventCityId), eventAddress: context.order.eventAddress,
+                selectedCategoryIds: [context.categoryId], selectedServices: [category?.name || 'Vendor'],
+                replacementVendorOrderId: String(context.vendorOrder._id) }, orderId: String(context.order._id) };
+    }
+
+    async continueWithoutCancelledVendor(id: string, actor: CancellationActor) {
+        const context = await this.cancellationReplacementContext(id, actor);
+        context.vendorOrder.cancellationReplacementChoice = 'CONTINUE_WITHOUT';
+        await context.vendorOrder.save();
+        return { ok: true };
+    }
 
     private async attachReplacementOrder(
         temporaryOrder: any,
@@ -1837,6 +1925,12 @@ async getOrderStats(type: string, userId: string) {
 
         if (vendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED') {
             throw new ConflictException('This booking is no longer assigned to you and can’t be updated.');
+        }
+
+        if (status === 'accepted' && vendorOrder.replacesVendorOrderId && !vendorOrder.replacementRescheduleRequestId) {
+            const event = await this.orderModel.findById(vendorOrder.orderId);
+            const start = event?.eventStartDateTime ? new Date(event.eventStartDateTime).getTime() : NaN;
+            if (!Number.isFinite(start) || start <= Date.now()) throw new ConflictException('A replacement cannot be accepted after the event starts.');
         }
 
         vendorOrder.status = status;

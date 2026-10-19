@@ -102,6 +102,9 @@ packageId: string | null;
     @Prop({ type: Date, default: null })
     replacementFinalizedAt?: Date | null;
 
+    @Prop({ type: String, enum: ['CONTINUE_WITHOUT', null], default: null })
+    cancellationReplacementChoice?: 'CONTINUE_WITHOUT' | null;
+
     // IMPORTANT: Existing booking lifecycle — DO NOT CHANGE
     @Prop({ default: 'pending' })
 status:

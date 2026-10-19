@@ -1160,6 +1160,7 @@ const isInvalidCode =
       eventType: eventDetails?.eventType,
       replacementRescheduleRequestId:
         eventDetails?.replacementRescheduleRequestId,
+      replacementVendorOrderId: eventDetails?.replacementVendorOrderId,
     });
 
       if (response) {
@@ -1176,7 +1177,11 @@ const isInvalidCode =
         router.push('/OrderSummary');
       }
    } catch (error: any) {
-  console.error('Error placing order:', error);
+  if (eventDetails?.replacementVendorOrderId) {
+    reportMarketplaceLoadError('Replacement checkout unavailable', error);
+  } else {
+    console.error('Error placing order:', error);
+  }
   Toast.show({
     type: 'error',
     text1: 'Booking Failed',

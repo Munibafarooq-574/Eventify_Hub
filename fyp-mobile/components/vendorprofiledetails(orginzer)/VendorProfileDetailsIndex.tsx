@@ -1797,7 +1797,7 @@ Toast.show({
               eventDate: String(Array.isArray(eventDate) ? eventDate[0] : eventDate || ''),
               startTime: String(Array.isArray(startTime) ? startTime[0] : startTime || ''),
               endTime: String(Array.isArray(endTime) ? endTime[0] : endTime || ''),
-              durationMinutes: selectedDurationMinutes,
+              durationMinutes: existingEventDetails?.replacementVendorOrderId ? existingEventDetails.durationMinutes : selectedDurationMinutes,
               replacementMode: true,
               replacementRequestId: String(
                 Array.isArray(replacementRequestId)

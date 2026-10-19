@@ -43,6 +43,7 @@ export interface PlaceOrderPayload {
   eventAddress: string;
   selectedCategoryIds?: string[];
   replacementRescheduleRequestId?: string;
+  replacementVendorOrderId?: string;
 }
 
 /**
@@ -188,6 +189,8 @@ if (!orderData.eventAddress?.trim()) {
         ? { replacementRescheduleRequestId: orderData.replacementRescheduleRequestId }
         : {}),
 
+      ...(orderData.replacementVendorOrderId ? { replacementVendorOrderId: orderData.replacementVendorOrderId } : {}),
+
       services: orderData.services.map((service) => ({
         vendorId: service.vendorId,
         serviceName: service.serviceName,
@@ -240,6 +243,7 @@ if (!orderData.eventAddress?.trim()) {
     // -----------------------------------------------------
 
     if (axios.isAxiosError(error)) {
+      if (!orderData.replacementVendorOrderId) {
       console.error(
         "[Place Order API] Error:",
         {
@@ -249,6 +253,7 @@ if (!orderData.eventAddress?.trim()) {
           url: error.config?.url,
         }
       );
+      }
 
             // Backend error message — handle both flat and nested NestJS shapes
       const responseData = error.response?.data;

@@ -1,3 +1,4 @@
+import CancellationReplacementActions from '../booking/CancellationReplacementActions';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 //fyp-mobile/components/myevents/MyEventsIndex.tsx
@@ -1491,6 +1492,7 @@ const MyEventsScreen = () => {
                                 </View>
                               </View>
                               <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
+                              <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
                             </View>
                           );
                         })}
