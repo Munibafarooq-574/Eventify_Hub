@@ -643,8 +643,8 @@ const [availabilityCheck, setAvailabilityCheck] =
           setAvailabilityCheck(null);
         }
       } catch (error) {
-        console.error(
-          'Availability error:',
+        reportMarketplaceLoadError(
+          'Vendor availability unavailable:',
           error,
         );
 
@@ -652,7 +652,7 @@ const [availabilityCheck, setAvailabilityCheck] =
           setAvailabilityCheck({
             available: false,
             reason:
-              'Unable to verify vendor availability.',
+              'Unable to verify availability right now. Pull down to refresh and try again.',
           });
         }
       } finally {
