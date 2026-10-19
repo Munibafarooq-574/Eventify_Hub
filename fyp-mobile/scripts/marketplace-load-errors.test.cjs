@@ -15,3 +15,19 @@ test('reporter logs status only in development and is silent in production',()=>
 test('availability GET and read-only POST check recover temporary errors',async()=>{for(const method of ['get','post']){const c=client([response(520,'<html>proxy</html>','text/html'),response(200)]);const p=method==='get'?'/vendor-availability/vendor':'/vendor-availability/check';await c.growthApi[method](p,{vendorIds:['vendor']});assert.equal(c.calls.length,2);if(method==='post')assert.equal(c.calls[0].options.body,c.calls[1].options.body)}});
 test('availability writes never replay and failed checks remain bounded',async()=>{for(const method of ['post','patch','delete']){const c=client([response(520)]);await assert.rejects(c.growthApi[method]('/vendor-availability/vendor',{}));assert.equal(c.calls.length,1)}const c=client([response(520),response(520),response(520)]);await assert.rejects(c.growthApi.post('/vendor-availability/check',{}));assert.equal(c.calls.length,3)});
 test('availability 4xx and invalid JSON are not retried',async()=>{for(const r of [response(400),response(401),response(403),response(200,'invalid')]){const c=client([r]);await assert.rejects(c.growthApi.post('/vendor-availability/check',{}));assert.equal(c.calls.length,1)}});
+
+test('vendor profile transient reads recover but writes and 4xx never retry',async()=>{
+const p='/vendor?userId=vendor';
+const c=client([response(520,'<html>proxy</html>','text/html'),response(200,'{"_id":"vendor"}')]);
+assert.equal((await c.growthApi.get(p))._id,'vendor');assert.equal(c.calls.length,2);
+const exhausted=client([response(520),response(520),response(520)]);await assert.rejects(exhausted.growthApi.get(p));assert.equal(exhausted.calls.length,3);
+for(const method of ['post','patch','delete']){const w=client([response(520)]);await assert.rejects(w.growthApi[method](p,{}));assert.equal(w.calls.length,1)}
+for(const status of [401,403,404]){const w=client([response(status)]);await assert.rejects(w.growthApi.get(p));assert.equal(w.calls.length,1)}
+});
+test('profile load preserves existing data and exposes manual recovery without overlay',()=>{
+const text=fs.readFileSync('components/vendorprofiledetails(orginzer)/VendorProfileDetailsIndex.tsx','utf8');
+assert.doesNotMatch(text,/console\.error\(\s*'Error fetching vendor data:/);
+assert.match(text,/reportMarketplaceLoadError\('Vendor profile unavailable', error\)/);
+assert.match(text,/Try again/);
+assert.match(text,/growthApi\.get<any>\(/);
+});

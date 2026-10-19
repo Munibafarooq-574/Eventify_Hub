@@ -1,3 +1,4 @@
+import { growthApi } from '@/services/growthApiClient';
 import BookingReviewNotice from './BookingReviewNotice';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // client side detail section
@@ -1842,13 +1843,9 @@ Toast.show({
             return;
           }
 
-          const response =
-            await axios.get(
-              `https://eventify-hub.onrender.com/vendor?userId=${vendorId}`,
-            );
-
-          const vendor =
-            response.data;
+          const vendor = await growthApi.get<any>(
+            `/vendor?userId=${encodeURIComponent(vendorId)}`,
+          );
 
           // Resolve the saved category for the shared client/owner profile.
           // Keep the vendor payload unchanged: booking/edit flows still use its ID.
@@ -2004,10 +2001,7 @@ if (
             });
           }
         } catch (error) {
-          console.error(
-            'Error fetching vendor data:',
-            error,
-          );
+          reportMarketplaceLoadError('Vendor profile unavailable', error);
         } finally {
           if (!isRefresh) {
             setLoading(false);
@@ -2071,10 +2065,18 @@ if (
               styles.errorText
             }
           >
-            Failed to load vendor
-            details. Please try
-            again.
+            Unable to load vendor details. Please try again.
           </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => {
+              setLoading(true);
+              fetchVendorDetails();
+            }}
+            style={{ marginTop: 16, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, backgroundColor: PRIMARY }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Try again</Text>
+          </TouchableOpacity>
         </View>
       );
     }

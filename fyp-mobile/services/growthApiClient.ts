@@ -91,12 +91,13 @@ if (!isFormData) {
   }
 }
 
-// Retry public marketplace reads and the read-only availability check.
+// Retry public marketplace/profile reads and the read-only availability check.
 // Availability writes, payments and package-list retries stay unchanged.
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const retryAvailability = ((options.method ?? 'GET') === 'GET' && /^\/vendor-availability\/[^/?]+$/.test(path)) ||
     (options.method === 'POST' && path === '/vendor-availability/check');
-  const retryRead = retryAvailability || ((options.method ?? 'GET') === 'GET' &&
+  const retryProfile = (options.method ?? 'GET') === 'GET' && /^\/vendor\?userId=[^&]+$/.test(path);
+  const retryRead = retryProfile || retryAvailability || ((options.method ?? 'GET') === 'GET' &&
     /^\/vendor\/growth\/(?:discount\/coupon\/public|campaign\/public\/active|promotion\/featured-(?:vendor|package)\/active)(?:\?|$)/.test(path));
   for (let attempt = 0; ; attempt++) {
     try {
