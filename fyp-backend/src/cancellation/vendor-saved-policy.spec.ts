@@ -56,9 +56,9 @@ describe('Read-only vendor cancellation preview',()=>{
 
 describe('Phase 13A vendor cancellation coverage',()=>{
  beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(now)});afterEach(()=>jest.useRealTimers());
- it.each(['pending','accepted'])('reviews and cancels unpaid %s with zero refund and saved penalty',async status=>{
+ it.each(['pending','accepted'])('reviews and cancels unpaid %s with zero refund and zero penalty',async status=>{
   const f=fixture();f.booking.status=status;f.booking.paymentStatus='UNPAID';f.s.getAmountPaid=async()=>0;
-  const result=await f.cancel();expect(result.vendorOrder.status).toBe('cancelled_by_vendor');expect(result.refund.refundAmount).toBe(0);expect(result.penalty.penaltyAmount).toBe(300);
+  const result=await f.cancel();expect(result.vendorOrder.status).toBe('cancelled_by_vendor');expect(result.refund.refundAmount).toBe(0);expect(result.penalty.penaltyAmount).toBe(0);expect(result.penalty.penaltyPercentage).toBe(0);
  });
  it.each(['','   ', 'x'.repeat(501)])('rejects missing or invalid reason before any write',async reason=>{
   const f=fixture();await expect(f.s.vendorCancelConfirmedBooking('booking',reason,{id:'vendor',role:'Vendor'})).rejects.toThrow('reason');expect(f.booking.save).not.toHaveBeenCalled();
@@ -90,5 +90,18 @@ describe('Vendor ownership authority',()=>{
  });
  it('rejects a client calling vendor cancellation',async()=>{
   const s:any=Object.create(CancellationService.prototype);await expect(s.assertVendorBookingOwner('507f191e810c19729de860ea',{id:'client',role:'client'})).rejects.toThrow('Vendor access');
+ });
+});
+
+describe('Penalty eligibility uses acceptance and successful payments',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(now)});afterEach(()=>jest.useRealTimers());
+ it('never penalizes an unaccepted pending booking even if payment data exists',async()=>{
+  const f=fixture();f.booking.status='pending';const preview=await f.s.previewVendorCancellation('booking',{id:'vendor',role:'Vendor'});expect(preview.penaltyAmount).toBe(0);expect(preview.penaltyPercentage).toBe(0);const result=await f.cancel();expect(result.penalty.penaltyAmount).toBe(0);expect(result.refund.refundAmount).toBe(3000);
+ });
+ it.each(['UNPAID','PARTIALLY_PAID','PAID'])('does not trust the %s label without actual successful payment',async paymentStatus=>{
+  const f=fixture();f.booking.paymentStatus=paymentStatus;f.s.getAmountPaid=async()=>0;const result=await f.cancel();expect(result.penalty.penaltyAmount).toBe(0);expect(result.penalty.penaltyPercentage).toBe(0);
+ });
+ it.each(['UNPAID','PARTIALLY_PAID','PAID'])('uses saved tier for accepted booking with successful payment despite %s label',async paymentStatus=>{
+  const f=fixture();f.booking.paymentStatus=paymentStatus;const result=await f.cancel();expect(result.penalty.penaltyPercentage).toBe(5);expect(result.penalty.penaltyAmount).toBe(300);
  });
 });

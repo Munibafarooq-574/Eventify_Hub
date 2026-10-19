@@ -440,10 +440,13 @@ export class CancellationService {
         const bookingMinor = Math.round(bookingAmount * 100);
         if (!Number.isSafeInteger(paidMinor) || !Number.isSafeInteger(bookingMinor)) throw new ConflictException('Payment amounts need Support review.');
         const refundAmount = Math.round(paidMinor * refundTier.percentage / 100) / 100;
-        const penaltyAmount = Math.round(bookingMinor * penaltyTier.percentage / 100) / 100;
+        // Only an accepted booking with a successful monetary payment incurs a penalty.
+        // Pending requests and unpaid bookings retain their cancellation history at zero.
+        const penaltyPercentage = vendorOrder.status === 'accepted' && paidMinor > 0 ? penaltyTier.percentage : 0;
+        const penaltyAmount = Math.round(bookingMinor * penaltyPercentage / 100) / 100;
 
         return { snapshot, calculatedAt, daysBeforeEvent, amountPaid, bookingAmount, paidMinor, refundAmount,
-            penaltyAmount, refundPercentage: refundTier.percentage, penaltyPercentage: penaltyTier.percentage,
+            penaltyAmount, refundPercentage: refundTier.percentage, penaltyPercentage,
             hoursBeforeService };
     }
 
