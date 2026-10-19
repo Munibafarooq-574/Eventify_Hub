@@ -3,7 +3,7 @@ import { Body, Controller, Get, Param, Patch, UseGuards, ValidationPipe, Request
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminRoleGuard } from '../auth/admin-role.guard';
 import { CancellationService } from './cancellation.service';
-import { CancelBookingDto, ConfirmClientCancellationDto } from './dto/cancel-booking.dto';
+import { VendorCancelBookingDto, ConfirmClientCancellationDto } from './dto/cancel-booking.dto';
 import { UpdateCancellationPolicyDto } from './dto/cancellation-policy.dto';
 
 @Controller('cancellation')
@@ -63,7 +63,7 @@ export class CancellationController {
     @UseGuards(JwtAuthGuard)
     vendorCancel(
         @Param('id') vendorOrderId: string,
-        @Body() dto: CancelBookingDto,
+        @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })) dto: VendorCancelBookingDto,
         @Request() req: any,
     ) {
         return this.cancellationService.vendorCancelConfirmedBooking(

@@ -43,6 +43,13 @@ export class VendorPenalty extends Document {
   })
   reason?: string | null;
 
+  @Prop({ type: Number }) policyRevision?: number;
+  @Prop({ type: String }) policyConfigId?: string;
+  @Prop({ type: [{ minHoursBeforeEvent: Number, percentage: Number }], default: undefined })
+  penaltyPolicy?: { minHoursBeforeEvent: number; percentage: number }[];
+  @Prop({ type: Date }) calculatedAt?: Date;
+  @Prop({ type: Date }) cancelledAt?: Date;
+
   @Prop({
     type: Date,
     default: Date.now,

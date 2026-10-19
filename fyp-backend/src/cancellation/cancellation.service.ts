@@ -6,6 +6,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
+import { NotificationService } from '../notifications/notifications.service';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -52,6 +53,7 @@ export class CancellationService {
         private readonly rescheduleRequestModel: Model<RescheduleRequest>,
         private readonly configService: ConfigService,
         @InjectConnection() private readonly connection: Connection,
+        private readonly notifications?: NotificationService,
     ) {}
 
     // Admin settings supply new booking snapshots; existing snapshots remain authoritative.
@@ -162,11 +164,11 @@ export class CancellationService {
     }
 
     // ===== Total amount organizer has actually paid so far (down + remaining) =====
-    private async getAmountPaid(vendorOrderId: any): Promise<number> {
+    private async getAmountPaid(vendorOrderId: any, session?: ClientSession): Promise<number> {
         const payments = await this.paymentModel.find({
             vendorOrderId,
             status: 'SUCCESS',
-        });
+        }).session(session ?? null);
         return payments.reduce((sum, p) => sum + p.amount, 0);
     }
 
@@ -216,10 +218,10 @@ export class CancellationService {
         return { vendorOrder, order };
     }
 
-    async assertVendorBookingOwner(vendorOrderId: string, actor: CancellationActor) {
+    async assertVendorBookingOwner(vendorOrderId: string, actor: CancellationActor, session?: ClientSession) {
         if (!actor?.id || String(actor.role).toLowerCase() !== 'vendor') throw new ForbiddenException('Vendor access required.');
         if (!Types.ObjectId.isValid(vendorOrderId)) throw new BadRequestException('Invalid vendor booking ID.');
-        const booking = await this.vendorOrderModel.findById(vendorOrderId);
+        const booking = await this.vendorOrderModel.findById(vendorOrderId).session(session ?? null);
         if (!booking) throw new NotFoundException('Vendor booking not found.');
         if (String(booking.vendorId) !== actor.id) throw new ForbiddenException('You do not own this vendor booking.');
         return booking;
@@ -393,14 +395,18 @@ export class CancellationService {
     // ================================================================
     // PATH 2: Vendor cancels a CONFIRMED booking (incurs penalty)
     // ================================================================
-    private async vendorCancellationCalculation(vendorOrder: VendorOrder) {
+    private async vendorCancellationCalculation(vendorOrder: VendorOrder, session?: ClientSession) {
         if (!vendorOrder) {
             throw new NotFoundException('Vendor order not found');
         }
 
-        if (vendorOrder.status !== 'accepted') {
+        if (vendorOrder.replacementOutcome === 'NO_LONGER_ASSIGNED') {
+            throw new ConflictException('This booking is no longer assigned to you.');
+        }
+
+        if (!['pending', 'accepted'].includes(vendorOrder.status)) {
             throw new ConflictException(
-                'Only a confirmed (accepted) booking can be cancelled by the vendor this way.',
+                'Only a pending or confirmed booking can be cancelled by the vendor this way.',
             );
         }
 
@@ -408,7 +414,6 @@ export class CancellationService {
             throw new ConflictException('Event start time not set for this booking.');
         }
 
-        if (vendorOrder.paymentStatus === 'PAID') throw new ConflictException('Fully paid bookings require Support review.');
 
         const snapshot = vendorOrder.policySnapshot;
         if (!snapshot) throw new ConflictException('This booking has no saved cancellation policy. Contact Support to review its original terms.');
@@ -423,7 +428,10 @@ export class CancellationService {
         const daysBeforeEvent = Math.floor(hoursBeforeService / 24);
         const refundTier = this.getSavedVendorTier(hoursBeforeService, snapshot.settings.vendorCausedClientRefunds);
         const penaltyTier = this.getSavedVendorTier(hoursBeforeService, snapshot.settings.vendorPenalties);
-        const amountPaid = await this.getAmountPaid(vendorOrder._id);
+        if (await this.paymentModel.exists({ vendorOrderId: vendorOrder._id, status: 'PENDING' }).session(session ?? null)) {
+            throw new ConflictException('A payment is awaiting confirmation. Resolve it before cancelling.');
+        }
+        const amountPaid = await this.getAmountPaid(vendorOrder._id, session);
         const bookingAmount = Number(vendorOrder.finalAmount ?? vendorOrder.price);
         if (!Number.isFinite(amountPaid) || amountPaid < 0 || !Number.isFinite(bookingAmount) || bookingAmount < 0) {
             throw new ConflictException('Booking payment amounts need Support review.');
@@ -456,70 +464,103 @@ export class CancellationService {
     }
 
     async vendorCancelConfirmedBooking(vendorOrderId: string, reason: string | undefined, actor: CancellationActor) {
-        const vendorOrder = await this.assertVendorBookingOwner(vendorOrderId, actor);
-        const { snapshot, calculatedAt, daysBeforeEvent, amountPaid, paidMinor, refundAmount, penaltyAmount,
-            refundPercentage, penaltyPercentage } = await this.vendorCancellationCalculation(vendorOrder);
-
-        vendorOrder.status = 'cancelled_by_vendor' as any;
-        vendorOrder.cancelledBy = 'vendor';
-        vendorOrder.cancelledAt = new Date();
-        vendorOrder.cancellationReason = reason || null;
-        await vendorOrder.save();
-
-        // If the vendor cancels while an event date/time change is awaiting
-        // their response, close that request immediately. The already accepted
-        // responses from other vendors remain untouched and the client can
-        // continue through the existing replacement flow.
-        const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
-            vendorOrderId: vendorOrder._id,
-            status: 'CHANGE_REQUESTED',
-        });
-        if (pendingReschedule) {
-            pendingReschedule.status = 'CANCELLED_BY_VENDOR';
-            pendingReschedule.respondedAt = new Date();
-            pendingReschedule.responseMessage =
-                'This vendor cancelled the booking before responding to the schedule change.';
-            pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
-            pendingReschedule.resolvedAt = new Date();
-            await pendingReschedule.save();
-
-            // Keep the whole request group in the same replacement-required
-            // state without changing any vendor's accepted response.
-            await this.rescheduleRequestModel.updateMany(
-                { requestGroupId: pendingReschedule.requestGroupId },
-                { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: new Date() } },
-            );
+        if (typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
+            throw new BadRequestException('Please enter a cancellation reason (up to 500 characters).');
         }
+        reason = reason.trim();
+        // A transaction keeps cancellation, refund and penalty atomic and prevents
+        // concurrent confirmations from creating duplicate financial records.
+        const session = await this.connection.startSession();
+        let result: any;
+        try {
+            await session.withTransaction(async () => {
+                const vendorOrder = await this.assertVendorBookingOwner(vendorOrderId, actor, session);
+                const { snapshot, calculatedAt, daysBeforeEvent, amountPaid, paidMinor, refundAmount, penaltyAmount,
+                    refundPercentage, penaltyPercentage } = await this.vendorCancellationCalculation(vendorOrder, session);
 
-        const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
+                vendorOrder.status = 'cancelled_by_vendor' as any;
+                vendorOrder.cancelledBy = 'vendor';
+                vendorOrder.cancelledAt = new Date();
+                vendorOrder.cancellationReason = reason || null;
+                await vendorOrder.save({ session });
 
-        const refund = await this.refundModel.create({
-            vendorOrderId: vendorOrder._id,
-            orderId: order?._id,
-            organizerId: order?.organizerId,
-            vendorId: vendorOrder.vendorId,
-            amountPaid,
-            refundAmount,
-            withheldAmount: (paidMinor - Math.round(refundAmount * 100)) / 100,
-            policyRevision: snapshot.policyRevision,
-            policyConfigId: snapshot.policyConfigId,
-            refundPercentage,
-            calculatedAt,
-            initiatedBy: 'VENDOR_CANCELLED',
-            daysBeforeEvent,
-            cancellationPolicyApplied: refundPercentage === 100 ? 'FULL_REFUND_VENDOR_FAULT' : 'SAVED_POLICY_VENDOR_CANCELLED',
-            status: 'PENDING',
-        });
+                // If the vendor cancels while an event date/time change is awaiting
+                // their response, close that request immediately. The already accepted
+                // responses from other vendors remain untouched and the client can
+                // continue through the existing replacement flow.
+                const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
+                    vendorOrderId: vendorOrder._id,
+                    status: 'CHANGE_REQUESTED',
+                }).session(session);
+                if (pendingReschedule) {
+                    pendingReschedule.status = 'CANCELLED_BY_VENDOR';
+                    pendingReschedule.respondedAt = new Date();
+                    pendingReschedule.responseMessage =
+                        'This vendor cancelled the booking before responding to the schedule change.';
+                    pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
+                    pendingReschedule.resolvedAt = new Date();
+                    await pendingReschedule.save({ session });
 
-        const penalty = await this.vendorPenaltyModel.create({
-            vendorId: vendorOrder.vendorId,
-            vendorOrderId: vendorOrder._id,
-            penaltyPercentage,
-            penaltyAmount,
-            daysBeforeEvent,
-            reason: reason || `Vendor cancelled with ${daysBeforeEvent} days notice`,
-        });
+                    // Keep the whole request group in the same replacement-required
+                    // state without changing any vendor's accepted response.
+                    await this.rescheduleRequestModel.updateMany(
+                        { requestGroupId: pendingReschedule.requestGroupId },
+                        { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: new Date() } },
+                        { session },
+                    );
+                }
 
+                const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id }).session(session);
+
+                const [refund] = await this.refundModel.create([{
+                    vendorOrderId: vendorOrder._id,
+                    orderId: order?._id,
+                    organizerId: order?.organizerId,
+                    vendorId: vendorOrder.vendorId,
+                    amountPaid,
+                    refundAmount,
+                    withheldAmount: (paidMinor - Math.round(refundAmount * 100)) / 100,
+                    policyRevision: snapshot.policyRevision,
+                    policyConfigId: snapshot.policyConfigId,
+                    refundPercentage,
+                    calculatedAt,
+                    initiatedBy: 'VENDOR_CANCELLED',
+                    daysBeforeEvent,
+                    cancellationPolicyApplied: refundPercentage === 100 ? 'FULL_REFUND_VENDOR_FAULT' : 'SAVED_POLICY_VENDOR_CANCELLED',
+                    status: 'PENDING',
+                }], { session });
+
+                const [penalty] = await this.vendorPenaltyModel.create([{
+                    vendorId: vendorOrder.vendorId,
+                    vendorOrderId: vendorOrder._id,
+                    penaltyPercentage,
+                    penaltyAmount,
+                    daysBeforeEvent,
+                    reason,
+                    policyRevision: snapshot.policyRevision,
+                    policyConfigId: snapshot.policyConfigId,
+                    penaltyPolicy: snapshot.settings.vendorPenalties,
+                    calculatedAt,
+                    cancelledAt: vendorOrder.cancelledAt,
+                }], { session });
+
+                result = { vendorOrder, refund, penalty, order, refundAmount, penaltyAmount, penaltyPercentage };
+            }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+        } finally { await session.endSession(); }
+        const { vendorOrder, refund, penalty, order, refundAmount, penaltyAmount, penaltyPercentage } = result;
+        // Notify only after cancellation and financial records have been saved.
+        // A failed push must not undo cancellation or block the other recipient.
+        if (this.notifications) {
+            const recipients = [...new Set([order?.organizerId, vendorOrder.vendorId].filter(Boolean).map(String))];
+            for (const recipient of recipients) {
+                const isVendor = recipient === String(vendorOrder.vendorId);
+                try {
+                    await this.notifications.notifyUser(recipient, 'Booking cancelled by vendor',
+                        `Booking ${String(vendorOrder._id).slice(-8).toUpperCase()}: ${isVendor ? 'You cancelled this booking.' : 'The vendor cancelled this booking.'} Reason: ${reason}. Recorded refund: Rs. ${refundAmount.toLocaleString('en-PK')} (pending review).${isVendor ? ` Vendor penalty: Rs. ${penaltyAmount.toLocaleString('en-PK')} (${penaltyPercentage}%).` : ''}`,
+                        'REFUND_UPDATE', { orderId: order?._id ? String(order._id) : undefined, vendorOrderId: String(vendorOrder._id) });
+                } catch { /* Settlement remains pending; notifications are best effort. */ }
+            }
+        }
         return { vendorOrder, refund, penalty };
     }
 

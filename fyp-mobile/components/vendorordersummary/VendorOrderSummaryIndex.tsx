@@ -292,48 +292,8 @@ const OrderSummary = () => {
             return;
         }
 
-        const booking = orders.find(order => order._id === orderId)?.vendorOrders?.find((item: any) => item._id === vendorOrderId);
-        if (['PARTIALLY_PAID', 'PAID'].includes(booking?.paymentStatus)) {
-            setCancellation({ orderId, vendorOrderId });
-            setCancellationReason(''); setCancellationError(''); setCancellationPreview(null);
-            return;
-        }
-
-        // Unpaid bookings retain their existing cancellation path.
-        await patchUpdateVendorOrderStatus(
-            vendorOrderId,
-            "cancelled"
-        );
-
-        // 2. Local state bhi update karo
-        setOrders(prevOrders =>
-            prevOrders.map(order => {
-                if (order._id !== orderId) {
-                    return order;
-                }
-
-                return {
-                    ...order,
-
-                    // IMPORTANT:
-                    // Parent order ka status bhi update karo
-                    status: "cancelled",
-
-                    // Vendor order ka status bhi update karo
-                    vendorOrders: order.vendorOrders?.map(
-                        (vendorOrder: any) =>
-                            vendorOrder._id === vendorOrderId
-                                ? {
-                                    ...vendorOrder,
-                                    status: "cancelled",
-                                }
-                                : vendorOrder
-                    ),
-                };
-            })
-        );
-
-        alert("Order Cancelled");
+        setCancellation({ orderId, vendorOrderId });
+        setCancellationReason(''); setCancellationError(''); setCancellationPreview(null);
 
     } catch (error: any) {
         const message = error?.response?.data?.message;

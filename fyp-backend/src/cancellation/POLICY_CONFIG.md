@@ -101,3 +101,9 @@ Existing zero-value Refund audit records stay reviewable. Admin closes a PENDING
 ## Vendor cancellation saved-policy calculation
 
 Vendor cancellation now reads `vendorCausedClientRefunds` and `vendorPenalties` from that booking's validated policy snapshot. It selects each tier using exact hours before the stored service start, including threshold equality. Refund applies to successful payments; penalty applies to `finalAmount ?? price`, rounded to cents. Missing/invalid snapshots require Support review rather than applying today's Admin configuration. Fully paid restrictions and existing reschedule handling remain unchanged. Existing refund and penalty records are never recalculated. Refund records retain the policy revision, configuration reference, percentage and calculation time. Payment-hold and issue-window settings remain unenforced.
+
+## Phase 13A completion
+
+Vendor cancellation preview and confirmation use the same saved-policy calculation for pending and accepted bookings, whether unpaid, partially paid or fully paid. Completed and no-longer-assigned bookings cannot use this flow. A pending payment must be resolved first. All vendor cancellations require a trimmed reason (1–500 characters); the generic order-status endpoint cannot bypass this review.
+
+Cancellation, refund and vendor penalty are saved in one database transaction. The penalty ledger includes its policy revision, config reference, saved penalty tiers, calculation time and cancellation time. The event and sibling vendor bookings are preserved. After commit, client and vendor receive cancellation notifications through the existing notification service. Refund settlement continues through the existing Admin workflow; cancellation notification is not proof of repayment.

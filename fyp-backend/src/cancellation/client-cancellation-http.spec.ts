@@ -34,6 +34,10 @@ describe('Cancellation HTTP authentication and confirmation validation', () => {
         const req = route === 'calculate-refund' ? request(app.getHttpServer()).get(`${path()}/${route}`) : request(app.getHttpServer()).patch(`${path()}/${route}`).send({});
         await req.expect(401);
     });
+    it.each([{}, {reason:''}, {reason:'   '}, {reason:'x'.repeat(501)}, {reason:'Reason',penaltyAmount:0}])('rejects invalid vendor cancellation input before service execution: %j',async body=>{
+        await request(app.getHttpServer()).patch(`${path()}/vendor-cancel-confirmed`).set('Authorization',auth()).send(body).expect(400);
+        expect(service.vendorCancelConfirmedBooking).not.toHaveBeenCalled();
+    });
     it('requires authentication for the read-only vendor cancellation preview',async()=>{
         await request(app.getHttpServer()).get(`${path()}/vendor-cancellation-preview`).expect(401);
     });

@@ -17,3 +17,9 @@ export class ConfirmClientCancellationDto {
     @IsString() @MinLength(1, { message: 'Please enter a reason for cancellation.' }) @MaxLength(500)
     reason: string;
 }
+
+export class VendorCancelBookingDto {
+    @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+    @IsString() @MinLength(1, { message: 'Please enter a reason for cancellation.' }) @MaxLength(500)
+    reason: string;
+}

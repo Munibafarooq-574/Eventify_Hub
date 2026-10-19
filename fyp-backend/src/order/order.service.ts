@@ -1751,9 +1751,8 @@ async getOrderStats(type: string, userId: string) {
         );
     }
 
-    if (status === 'cancelled' && (['PARTIALLY_PAID', 'PAID'].includes(existingVendorOrder.paymentStatus) ||
-        await this.cancellationService.hasSuccessfulPayment(vendorOrderId))) {
-        throw new ConflictException('Paid bookings must use the dedicated cancellation review.');
+    if (status === 'cancelled') {
+        throw new ConflictException('Vendor bookings must use the dedicated cancellation review.');
     }
 
     const vendorOrder = mappedStatus === 'completed'
@@ -1766,33 +1765,6 @@ async getOrderStats(type: string, userId: string) {
 
     if (!vendorOrder) {
         throw new NotFoundException('Vendor order not found');
-    }
-
-    if (status === 'cancelled') {
-        const now = new Date();
-        vendorOrder.cancelledBy = 'vendor';
-        vendorOrder.cancelledAt = vendorOrder.cancelledAt || now;
-        await vendorOrder.save();
-
-        const pendingReschedule: any = await this.rescheduleRequestModel.findOne({
-            vendorOrderId: vendorOrder._id,
-            status: 'CHANGE_REQUESTED',
-        });
-
-        if (pendingReschedule) {
-            pendingReschedule.status = 'CANCELLED_BY_VENDOR';
-            pendingReschedule.respondedAt = now;
-            pendingReschedule.responseMessage =
-                'This vendor cancelled the booking before responding to the schedule change.';
-            pendingReschedule.resolutionStatus = 'REPLACEMENT_REQUIRED';
-            pendingReschedule.resolvedAt = now;
-            await pendingReschedule.save();
-
-            await this.rescheduleRequestModel.updateMany(
-                { requestGroupId: pendingReschedule.requestGroupId },
-                { $set: { resolutionStatus: 'REPLACEMENT_REQUIRED', resolvedAt: now } },
-            );
-        }
     }
 
         // Phase 8: if vendor order is completed and fully paid,
