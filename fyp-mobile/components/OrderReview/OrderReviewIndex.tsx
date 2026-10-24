@@ -1177,11 +1177,7 @@ const isInvalidCode =
         router.push('/OrderSummary');
       }
    } catch (error: any) {
-  if (eventDetails?.replacementVendorOrderId) {
-    reportMarketplaceLoadError('Replacement checkout unavailable', error);
-  } else {
-    console.error('Error placing order:', error);
-  }
+  reportMarketplaceLoadError('Booking checkout unavailable', error);
   Toast.show({
     type: 'error',
     text1: 'Booking Failed',

@@ -3,6 +3,7 @@
 // fyp-mobile/services/postPlaceOrder.ts
 
 import axios, { AxiosRequestConfig } from "axios";
+import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
 import { getSecureData } from "../store";
 
 /**
@@ -238,65 +239,24 @@ if (!orderData.eventAddress?.trim()) {
 
     return response.data;
   } catch (error: any) {
-    // -----------------------------------------------------
-    // Axios error
-    // -----------------------------------------------------
-
+    reportMarketplaceLoadError('Booking submission unavailable', error);
     if (axios.isAxiosError(error)) {
-      if (!orderData.replacementVendorOrderId) {
-      console.error(
-        "[Place Order API] Error:",
-        {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message,
-          url: error.config?.url,
-        }
-      );
+      const status = error.response?.status;
+      if (status === 401) throw new Error('Your session has expired. Please sign in again.');
+      if (status === 404) throw new Error('A selected vendor or package is no longer available. Please review your cart.');
+      if (!status || status >= 500) {
+        throw new Error('Booking could not be submitted right now. Your cart is saved. Please try again shortly.');
       }
-
-            // Backend error message — handle both flat and nested NestJS shapes
-      const responseData = error.response?.data;
-      let backendMessage: string | undefined;
-
-      if (responseData) {
-        if (typeof responseData.message === "string") {
-          // Flat shape: { message: "some text", statusCode }
-          backendMessage = responseData.message;
-        } else if (
-          responseData.message &&
-          typeof responseData.message === "object"
-        ) {
-          // Nested shape: { message: { message: "some text", error, statusCode } }
-          backendMessage =
-            responseData.message.message || responseData.message.error;
-        } else if (typeof responseData.error === "string") {
-          backendMessage = responseData.error;
-        } else if (Array.isArray(responseData.message)) {
-          backendMessage = responseData.message.join(", ");
-        }
+      const data = error.response?.data;
+      const rawMessage = typeof data?.message === 'object' && !Array.isArray(data?.message)
+        ? data.message?.message : data?.message;
+      const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;
+      if (typeof message === 'string' && message.trim() &&
+          message.length <= 500 && !/[<>]|https?:|AxiosError|stack trace/i.test(message)) {
+        throw new Error(message.trim());
       }
-
-      if (backendMessage) {
-        throw new Error(backendMessage);
-      }
-
-      throw new Error(
-        `Failed to place order. Server returned ${
-          error.response?.status || "an unknown error"
-        }.`
-      );
+      throw new Error('Unable to submit this booking. Please review your cart and try again.');
     }
-
-    // -----------------------------------------------------
-    // Unknown error
-    // -----------------------------------------------------
-
-    console.error(
-      "[Place Order API] Unexpected error:",
-      error
-    );
-
-    throw new Error("Something went wrong while placing the order.");
+    throw new Error('Unable to submit this booking. Please try again.');
   }
 }

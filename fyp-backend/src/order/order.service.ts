@@ -514,7 +514,7 @@ export class OrderService {
 
                     if (restrictedVendor) {
                         throw new ConflictException(
-                            'This vendor is currently unavailable for new bookings',
+                            'This vendor is currently unavailable for new bookings. Please choose another vendor. Your existing bookings remain valid.',
                         );
                     }
 

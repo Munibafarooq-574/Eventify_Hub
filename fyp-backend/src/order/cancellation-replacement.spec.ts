@@ -54,3 +54,13 @@ describe('Cancelled-vendor replacement restrictions and checkout',()=>{
  });
  it('cannot accept a pending replacement after event start',async()=>{const f=fixture();f.s.vendorOrderModel.findById=async()=>({...f.old,status:'pending',replacesVendorOrderId:id(),replacementRescheduleRequestId:null});f.s.orderModel.findById=async()=>({...f.order,eventStartDateTime:new Date(Date.now())});await expect(f.s.updateVendorResponse(String(id()),'accepted')).rejects.toThrow('after the event')});
 });
+
+describe('Subscription changes during replacement checkout',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-10-19T07:00:00Z'))});afterEach(()=>jest.useRealTimers());
+ it('blocks new checkout after expiry without mutating original booking price, payment or siblings',async()=>{
+  const f=fixture();const before=JSON.stringify(f.order);f.s.featureAccessService.hasActiveSubscription=async()=>false;
+  await expect(f.create()).rejects.toThrow('existing bookings remain valid');
+  expect(f.s.vendorOrderModel.create).not.toHaveBeenCalled();expect(f.order.save).not.toHaveBeenCalled();
+  expect(JSON.stringify(f.order)).toBe(before);expect(f.sibling.status).toBe('accepted');
+ });
+});
