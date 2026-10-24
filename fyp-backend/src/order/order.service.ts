@@ -2194,13 +2194,27 @@ vendorOrder.vendorNetAmount =
     // Runs every minute so an expired slot is released promptly.
     @Cron('0 * * * * *')
     async expireStaleHolds() {
-        const stale = await this.vendorOrderModel.find({ status: 'accepted', paymentStatus: { $in: ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'] } });
+        const stale = await this.vendorOrderModel.find({ $or: [
+            { status: 'accepted', paymentStatus: { $in: ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'] } },
+            { status: 'pending', eventStartDateTime: { $lte: new Date() } },
+        ] });
         const payments = this.connection.model(Payment.name);
         let expiredCount = 0;
         for (const candidate of stale) {
+            const unaccepted = candidate.status === 'pending';
             const changed = await withBookingPaymentLock(this.connection, this.vendorOrderModel, candidate._id, async session => {
                 const booking = await this.vendorOrderModel.findById(candidate._id).session(session);
-                if (!booking || booking.status !== 'accepted' || !['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(booking.paymentStatus)) return false;
+                if (!booking) return false;
+                if (booking.status === 'pending') {
+                    const start = new Date(booking.eventStartDateTime as any).getTime();
+                    if (!booking.eventStartDateTime || !Number.isFinite(start) || start > Date.now()) return false;
+                    if (['PARTIALLY_PAID', 'PAID'].includes(booking.paymentStatus)) return false;
+                    if (await payments.exists({ vendorOrderId: booking._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) return false;
+                    booking.status = 'expired';
+                    await booking.save({ session });
+                    return true;
+                }
+                if (booking.status !== 'accepted' || !['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(booking.paymentStatus)) return false;
                 if (booking.paymentPreparationMinutes == null) {
                     const vendor = await this.userModel.findById(booking.vendorId).select('availabilitySettings').lean();
                     const parent = await this.orderModel.findById(booking.orderId).lean();
@@ -2218,8 +2232,10 @@ vendorOrder.vendorNetAmount =
             try {
                 const order = await this.orderModel.findById(candidate.orderId);
                 for (const recipient of [order?.organizerId, candidate.vendorId].filter(Boolean)) {
-                    const title='Booking payment expired';
-                    const body=`The down-payment deadline for ${candidate.serviceName} passed. This unpaid vendor booking has expired.`;
+                    const title = unaccepted ? 'Booking request expired' : 'Booking payment expired';
+                    const body = unaccepted
+                        ? `The service start time for ${candidate.serviceName} passed before acceptance. This booking request has expired.`
+                        : `The down-payment deadline for ${candidate.serviceName} passed. This unpaid vendor booking has expired.`;
                     try { await this.sendPushNotification(title,body,String(recipient),'HOLD_EXPIRED'); }
                     catch { try { await this.saveNotification(String(recipient),title,body,'HOLD_EXPIRED'); } catch {} }
                 }
@@ -2494,6 +2510,9 @@ async completeVendorOrder(vendorOrderId: string) {
         const oldEventStart = order.eventStartDateTime
             ? new Date(order.eventStartDateTime)
             : new Date(order.eventDate);
+        if (!Number.isFinite(oldEventStart.getTime()) || oldEventStart.getTime() <= Date.now()) {
+            throw new ConflictException('This event has already started and cannot be rescheduled.');
+        }
         const oldEventEnd = order.eventEndDateTime
             ? new Date(order.eventEndDateTime)
             : new Date(oldEventStart.getTime() + Number(order.eventDurationMinutes || 60) * 60000);

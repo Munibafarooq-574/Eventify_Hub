@@ -31,3 +31,17 @@ describe('Down payment and expiry safety',()=>{
  it('remaining payment confirmation stays available after service completion',async()=>{const f=fixture();f.booking.status='completed';f.booking.paymentStatus='PARTIALLY_PAID';f.payments.push({_id:'remaining',type:'REMAINING',status:'PENDING',vendorOrderId:'booking',amount:6000,createdAt:new Date(),save:jest.fn()});jest.setSystemTime(new Date('2026-10-25T09:00:00Z'));f.s.payoutService={createPayoutIfEligible:async()=>{}};await f.s.confirmPayment('remaining');expect(f.booking.paymentStatus).toBe('PAID')});
 
 });
+
+
+describe('Past unaccepted booking safety',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-10-24T14:00:00Z'))});afterEach(()=>jest.useRealTimers());
+ it.each(['none','PENDING','SUCCESS','paid','future'])('expires only an elapsed unaccepted unpaid request (%s)',async state=>{
+  const f=fixture();f.booking.status='pending';if(state==='paid')f.booking.paymentStatus='PARTIALLY_PAID';if(state==='future')f.booking.eventStartDateTime=new Date('2026-10-25T14:00:00Z');if(['PENDING','SUCCESS'].includes(state))f.payments.push({status:state});
+  const order:any=Object.create(OrderService.prototype);Object.assign(order,{connection:f.connection,vendorOrderModel:f.bookingModel,orderModel:{findById:async()=>({organizerId:'client'})},sendPushNotification:jest.fn()});
+  const result=await order.expireStaleHolds();expect(result.expiredCount).toBe(state==='none'?1:0);expect(f.booking.status).toBe(state==='none'?'expired':'pending');if(state==='none'){expect(order.sendPushNotification.mock.calls[0][0]).toBe('Booking request expired');expect(f.booking.paymentStatus).toBe('PAYMENT_REQUIRED')}
+ });
+ it('rejects rescheduling a past original event even to a future date',async()=>{
+  const id='6abab19c35e1c2ca3c674c98';const order:any=Object.create(OrderService.prototype);Object.assign(order,{orderModel:{findById:()=>q({organizerId:id,status:'pending',eventCityId:id,eventStartDateTime:new Date('2026-10-19T10:00:00Z')})},cityService:{requireCityTimeZone:async()=>'Asia/Karachi'}});
+  await expect(order.requestEventReschedule(id,id,{eventDate:'2026-10-30',eventTime:'13:00',durationMinutes:60,reason:'Change timing'})).rejects.toThrow('already started');
+ });
+});

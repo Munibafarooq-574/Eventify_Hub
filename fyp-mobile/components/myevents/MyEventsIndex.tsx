@@ -91,6 +91,7 @@ const isActiveVendorOrder = (vendor: any) => {
 
   return (
     !['cancelled', 'cancelled_by_vendor', 'rejected', 'expired'].includes(status) &&
+    String(vendor?.paymentStatus || '').toUpperCase() !== 'PAYMENT_EXPIRED' &&
     replacementOutcome !== 'NO_LONGER_ASSIGNED'
   );
 };
@@ -450,7 +451,11 @@ const MyEventsScreen = () => {
       (Array.isArray(e.vendorOrders)
         ? e.vendorOrders.filter(
             (v: any) =>
-              String(v?.paymentStatus || '').toUpperCase() === 'PAYMENT_REQUIRED',
+              isActiveVendorOrder(v) &&
+              String(v?.status || '').toLowerCase() === 'accepted' &&
+              ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(v?.paymentStatus || '').toUpperCase()) &&
+              !paymentBreakdowns[v._id]?.pendingPayment &&
+              new Date(paymentBreakdowns[v._id]?.paymentDeadline ?? v?.paymentDeadline).getTime() > paymentNow,
           ).length
         : 0),
     0,
@@ -729,6 +734,8 @@ const MyEventsScreen = () => {
                     )}
 
                     {eventExpanded &&
+  new Date(event.eventStartDateTime || event.eventDate).getTime() > paymentNow &&
+  !['completed', 'cancelled'].includes(String(event.status || '').toLowerCase()) &&
   !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) &&
   !hasSuccessfulVendorPayment &&
   vendorOrders.some((vendor: any) =>
