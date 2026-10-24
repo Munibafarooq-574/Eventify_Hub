@@ -85,9 +85,10 @@ describe('OrderController - Unit Tests', () => {
     }
   });
 
-  it('should update order status', async () => {
-    const res = await controller.updateOrderStatus('o123', { status: 'completed' });
-    expect(res.status).toBe('completed');
+  it('propagates rejection of legacy event-wide status changes', async () => {
+    service.updateStatus.mockRejectedValueOnce(new Error('Update an individual vendor booking'));
+    await expect(controller.updateOrderStatus('o123', { status: 'completed' }))
+      .rejects.toThrow('individual vendor');
   });
 
   it('should get orders', async () => {

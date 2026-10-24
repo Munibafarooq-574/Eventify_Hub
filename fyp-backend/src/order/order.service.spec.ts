@@ -156,16 +156,21 @@ describe('OrderService - Unit Tests', () => {
         await expect(service.getUserPushToken(validObjectId)).rejects.toThrow();
     });
 
-    it('should update order status', async () => {
-        jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
-        const updated = await service.updateStatus('o123', { status: 'completed' });
-        expect(updated.organizerId).toBe(validObjectId);
-    });
-
-    it('blocks event-wide cancellation before any status write', async () => {
-        await expect(service.updateStatus(validObjectId, { status: 'cancelled' })).rejects.toThrow('individual vendor');
-        expect(orderModel.findByIdAndUpdate).not.toHaveBeenCalled();
-    });
+    it.each(['pending', 'confirmed', 'completed', 'cancelled'] as const)(
+        'blocks legacy event-wide %s changes without touching any booking',
+        async status => {
+            const bulkWrite = jest.fn();
+            vendorOrderModel.updateMany = bulkWrite;
+            vendorOrderModel.findByIdAndUpdate = jest.fn();
+            const notify = jest.spyOn(service, 'sendPushNotification');
+            await expect(service.updateStatus(validObjectId, { status }))
+                .rejects.toThrow('individual vendor');
+            expect(orderModel.findByIdAndUpdate).not.toHaveBeenCalled();
+            expect(bulkWrite).not.toHaveBeenCalled();
+            expect(vendorOrderModel.findByIdAndUpdate).not.toHaveBeenCalled();
+            expect(notify).not.toHaveBeenCalled();
+        },
+    );
     it.each(['PARTIALLY_PAID', 'PAID', 'UNPAID'])('blocks legacy cancellation of a paid %s booking', async paymentStatus => {
         vendorOrderModel.findById = jest.fn(() => ({ lean: async () => ({ status: 'accepted', paymentStatus }) }));
         cancellation.hasSuccessfulPayment.mockResolvedValue(true);

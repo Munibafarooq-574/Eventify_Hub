@@ -1753,43 +1753,12 @@ async getOrderStats(type: string, userId: string) {
         return order.save();
     }
 
-       async updateStatus(orderId: string, dto: UpdateOrderStatusDto) {
-        if (dto.status === 'cancelled') {
-            throw new ConflictException('Cancel an individual vendor booking through its cancellation review. Event-wide status cancellation is unavailable.');
-        }
-        const updated = await this.orderModel.findByIdAndUpdate(
-            orderId,
-            { status: dto.status },
-            { new: true },
+    // Legacy event-wide mutations must never overwrite independent vendor bookings.
+    // Parent status is maintained by the individual booking workflows.
+    async updateStatus(_orderId: string, _dto: UpdateOrderStatusDto) {
+        throw new ConflictException(
+            'Update an individual vendor booking through its status or cancellation review. Event-wide status updates are unavailable.',
         );
-
-        if (!updated) {
-            throw new NotFoundException('Order not found');
-        }
-
-        // Keep VendorOrder.status in sync with Order.status so that
-        // dashboard analytics (which reads from VendorOrder) reflects
-        // the same state as the Order Summary screen.
-        const vendorOrderStatusMap: Record<string, string> = {
-            pending: 'pending',
-            confirmed: 'accepted',
-            completed: 'completed',
-            cancelled: 'cancelled',
-        };
-        const mappedStatus = vendorOrderStatusMap[dto.status];
-        if (mappedStatus) {
-            await this.vendorOrderModel.updateMany(
-                { _id: { $in: updated.vendorOrders }, status: { $nin: ['cancelled', 'cancelled_by_vendor'] } },
-                { $set: { status: mappedStatus } },
-            );
-        }
-
-        try {
-            await this.sendPushNotification("Order Update", `Your order has been ${dto.status}`, updated.organizerId.toString(), "ORDER_UPDATE");
-        } catch (error) {
-            console.log(error);
-        }
-        return updated;
     }
 
     async assertVendorBookingOwner(vendorOrderId: string, actor: CancellationActor) {
