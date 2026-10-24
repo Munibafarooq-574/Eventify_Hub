@@ -1,3 +1,4 @@
+import { clearExpiredReplacementCart } from '@/services/clearExpiredReplacementCart';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/orderreview/OrderReviewIndex.tsx
 import postPlaceOrder from '@/services/postPlaceOrder';
@@ -1049,6 +1050,7 @@ const isInvalidCode =
     checkoutLock.current = true;
     setCheckoutError('');
     setPlacingOrder(true);
+    let submittedEvent: any = null;
 
     try {
       const user = await getUserData();
@@ -1058,6 +1060,7 @@ const isInvalidCode =
 
       const eventDetailsRaw = await getSecureData('eventDetails');
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
+      submittedEvent = eventDetails;
 
   const services = cartData.vendors.flatMap(
   (vendor: any) =>
@@ -1166,7 +1169,16 @@ const isInvalidCode =
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
-  setCheckoutError(error?.message || 'Failed to place order. Please try again.');
+  const message = error?.message || 'Failed to place order. Please try again.';
+  if (submittedEvent?.replacementVendorOrderId && /replacement.*only.*before.*event.*starts/i.test(message)) {
+    try {
+      await clearExpiredReplacementCart(cartData, submittedEvent);
+    } catch {
+      setCheckoutError(`${message} Cart cleanup could not finish. Please remove the expired package from My Cart.`);
+      return;
+    }
+  }
+  setCheckoutError(message);
 } finally {
       checkoutLock.current = false;
       setPlacingOrder(false);
