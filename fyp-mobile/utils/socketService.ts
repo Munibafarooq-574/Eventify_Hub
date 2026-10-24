@@ -1,3 +1,5 @@
+import { getSecureData } from '@/store';
+import { Alert } from 'react-native';
 // fyp-mobile/utils/socketService.ts
 
 
@@ -12,6 +14,7 @@ export function connectSocket(): Socket {
   if (socket) return socket;
 
   socket = io(SOCKET_URL);
+  socket.on('chatError', () => Alert.alert('Booking chat', 'Unable to open or send this conversation. Open an existing booking and tap Message. If the issue continues, sign in again.'));
 
   socket.on("connect", () => {
     // Re-announce identity on every (re)connect so the backend's presence
@@ -96,7 +99,7 @@ export function emitMessageSeen(conversationId: string, messageIds: string[], us
 // Conversation / message actions
 // ---------------------------------------------------------------------
 export function joinConversation(chatId: string, userId: string) {
-  socket?.emit("joinConversation", { chatId, userId });
+  void getSecureData('token').then(token => socket?.emit('joinConversation', { chatId, userId, token }));
 }
 
 export function sendChatMessage(payload: {
@@ -112,7 +115,7 @@ export function sendChatMessage(payload: {
   audioDurationMs?: number;    // 🆕 ADD
   repliedToMessageId?: string | null;
 }) {
-  socket?.emit("sendMessage", payload);
+  void getSecureData('token').then(token => socket?.emit('sendMessage', { ...payload, token }));
 }
 
 export function emitDeleteForMe(messageId: string, userId: string) {

@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getConversationMessages from "@/services/getConversationMessages";
 import getVendorContactDetails from "@/services/getVendorContactDetails";
 import getUserPresence from "@/services/getUserPresence";
@@ -588,7 +589,8 @@ useEffect(() => {
           joinConversation(chatIdValue, user._id);
         }
       } catch (error) {
-        console.error("Error fetching messages:", error);
+        reportMarketplaceLoadError('Booking chat unavailable', error);
+        Alert.alert('Conversation unavailable', 'Please open an existing booking and tap Message. If the issue continues, sign in again.');
       } finally {
         if (isMounted) setLoading(false);
       }

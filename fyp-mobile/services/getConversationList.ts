@@ -1,9 +1,14 @@
+import { getSecureData } from '../store';
+import { reportMarketplaceLoadError } from './reportMarketplaceLoadError';
 import axios, { AxiosRequestConfig } from "axios";
 
 export default async function getConversationList(userId: string) {
+    const token = await getSecureData('token');
+    if (!token) throw new Error('Your session has expired. Please sign in again.');
     const url = `https://eventify-hub.onrender.com/chat/${userId}`;
 
     const config: AxiosRequestConfig = {
+        headers: { Authorization: `Bearer ${token}` },
         maxBodyLength: Infinity,
         method: "GET",
         url,
@@ -30,7 +35,7 @@ export default async function getConversationList(userId: string) {
 
         return uniqueConversations;
     } catch (error) {
-        console.error("Error fetching conversation list:", error);
+        reportMarketplaceLoadError('Booking chat unavailable', error);
         throw error;
     }
 }

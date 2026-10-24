@@ -1,3 +1,5 @@
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ForbiddenException, Req, UseGuards } from '@nestjs/common';
 // fyp-backend/src/chat/chat.controller.ts
 
 import {
@@ -157,10 +159,13 @@ async uploadChatVideo(
   // ============================================================
 
   @Post(':userId/:vendorId')
+  @UseGuards(JwtAuthGuard)
   async createOrGetConversation(
     @Param('userId') userId: string,
     @Param('vendorId') vendorId: string,
+    @Req() req: any,
   ) {
+    if (String(req.user.id) !== userId) throw new ForbiddenException('This conversation does not belong to you.');
     const chatId = await this.chatService.createOrGetConversation(
       userId,
       vendorId,
@@ -176,9 +181,12 @@ async uploadChatVideo(
   // ============================================================
 
   @Get(':userId')
+  @UseGuards(JwtAuthGuard)
   async getConversationList(
     @Param('userId') userId: string,
+    @Req() req: any,
   ) {
+    if (String(req.user.id) !== userId) throw new ForbiddenException('This conversation list does not belong to you.');
     const conversations =
       await this.chatService.getUserConversations(userId);
 
@@ -192,10 +200,13 @@ async uploadChatVideo(
   // ============================================================
 
   @Get('messages/:chatId')
+  @UseGuards(JwtAuthGuard)
   async getConversationMessages(
     @Param('chatId') chatId: string,
     @Query('userId') userId: string,
+    @Req() req: any,
   ) {
+    if (String(req.user.id) !== userId) throw new ForbiddenException('This conversation does not belong to you.');
     const messages =
       await this.chatService.getConversationMessages(
         chatId,

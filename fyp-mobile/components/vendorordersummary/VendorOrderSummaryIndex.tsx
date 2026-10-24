@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getVendorCancellationPreview, { type VendorCancellationPreview } from '@/services/getVendorCancellationPreview';
 import VendorCancellationSummary from '../cancellation/VendorCancellationSummary';
 import cancelConfirmedBooking from '@/services/cancelConfirmedBooking';
@@ -429,7 +430,8 @@ const OrderSummary = () => {
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);
         } catch (error) {
-            console.error('Error initiating conversation:', error);
+            reportMarketplaceLoadError('Booking chat unavailable', error);
+            alert('Unable to open this booking chat. Please refresh your orders and try again.');
         }
     };
 

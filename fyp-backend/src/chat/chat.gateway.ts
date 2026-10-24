@@ -1,3 +1,5 @@
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
     // src/chat/chat.gateway.ts
 /*import {
@@ -537,9 +539,22 @@ export class ChatGateway
         new Map();
 
     constructor(
+        private readonly jwt: JwtService,
+        private readonly config: ConfigService,
         private chatService:
             ChatService,
     ) {}
+
+    private async verifyChatActor(client: Socket, token: string | undefined, userId: string): Promise<boolean> {
+        try {
+            const payload = await this.jwt.verifyAsync(token || '', { secret: this.config.get<string>('JWT_SECRET') });
+            if (String(payload.id) !== String(userId)) throw new Error('Invalid identity');
+            return true;
+        } catch {
+            client.emit('chatError', { message: 'Your session has expired. Please sign in again.' });
+            return false;
+        }
+    }
 
     // ============================================================
     // GATEWAY INIT
@@ -989,6 +1004,7 @@ export class ChatGateway
         client: Socket,
         payload: {
             user: string;
+            token?: string;
             receiverId: string;
             chatId: string;
             content: string;
@@ -1013,8 +1029,10 @@ export class ChatGateway
             `Received message from ${payload.user} in chatId: ${payload.chatId}`,
         );
 
-        const message: any =
-            await this.chatService
+        if (!(await this.verifyChatActor(client, payload.token, payload.user))) return;
+        let message: any;
+        try {
+        message = await this.chatService
                 .createMessage(
                     payload.chatId,
                     payload.user,
@@ -1035,6 +1053,11 @@ export class ChatGateway
                     payload.audioDurationMs ||
                         0,
                 );
+
+        } catch {
+            client.emit('chatError', { message: 'Unable to send. Open an existing booking and tap Message, or try again shortly.' });
+            return;
+        }
 
         // --------------------------------------------------------
         // RECEIVER CURRENTLY ONLINE
@@ -1109,8 +1132,12 @@ export class ChatGateway
         payload: {
             chatId: string;
             userId: string;
+            token?: string;
         },
     ) {
+        if (!(await this.verifyChatActor(client, payload.token, payload.userId))) return;
+        try { await this.chatService.assertBookingChatAccess(payload.chatId, payload.userId); }
+        catch { client.emit('chatError', { message: 'Open an existing booking and tap Message to contact its client.' }); return; }
         client.join(
             payload.chatId,
         );

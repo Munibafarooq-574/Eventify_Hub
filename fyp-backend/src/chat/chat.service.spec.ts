@@ -1,3 +1,4 @@
+import { BookingChatAccessService } from './booking-chat-access.service';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatService } from './chat.service';
@@ -16,11 +17,14 @@ const mockConversationModel = {
     updateOne: jest.fn(),
     find: jest.fn().mockReturnThis(),
     populate: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockReturnThis(),
     exec: jest.fn(),
     save: jest.fn(),
 };
 
 const mockMessageModel = {
+    populate: jest.fn().mockReturnThis(),
+    countDocuments: jest.fn().mockResolvedValue(0),
     find: jest.fn().mockReturnThis(),
     sort: jest.fn().mockReturnThis(),
     exec: jest.fn(),
@@ -43,6 +47,7 @@ describe('ChatService', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ChatService,
+                { provide: BookingChatAccessService, useValue: { assertPair:jest.fn(), assertList:jest.fn(), assertChat:jest.fn() } },
                 { provide: getModelToken(Conversation.name), useValue: mockConversationModel },
                 { provide: getModelToken(Message.name), useValue: mockMessageModel },
                 { provide: getModelToken(User.name), useValue: mockUserModel },
@@ -78,7 +83,7 @@ describe('ChatService', () => {
         mockConversationModel.exec.mockResolvedValue(mockConversations);
 
         const result = await service.getUserConversations('user1');
-        expect(result).toEqual(mockConversations);
+        expect(result).toEqual([{ id: 'c1', participants: [], unreadCount: 0 }]);
     });
 
     it('should return sorted messages', async () => {

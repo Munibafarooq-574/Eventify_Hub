@@ -1,5 +1,10 @@
+import { JwtModule } from '@nestjs/jwt';
+import { BookingChatAccessService } from './booking-chat-access.service';
+import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
+import { Order, OrderSchema } from '../schemas/order.schema';
+import { VendorOrder, VendorOrderSchema } from '../schemas/vendor-order.schema';
 // src/chat/chat.module.ts
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
@@ -12,14 +17,18 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
 
 @Module({
     imports: [
+        JwtModule.register({}),
+        forwardRef(() => VendorGrowthModule),
         MongooseModule.forFeature([
+            { name: Order.name, schema: OrderSchema },
+            { name: VendorOrder.name, schema: VendorOrderSchema },
             { name: Message.name, schema: MessageSchema },
             { name: Conversation.name, schema: ConversationSchema },
             { name: User.name, schema: UserSchema },
             { name: Notification.name, schema: NotificationSchema }
         ]),
     ],
-    providers: [ChatGateway, ChatService, FileUploadService],
+    providers: [BookingChatAccessService, ChatGateway, ChatService, FileUploadService],
     controllers: [ChatController],
     exports: [ChatService],
 })

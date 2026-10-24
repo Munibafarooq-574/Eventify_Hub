@@ -1,3 +1,4 @@
+import { BookingChatAccessService } from './booking-chat-access.service';
 
 // fyp-backend/src/chat/chat.service.ts
 import {
@@ -20,14 +21,20 @@ const REPLY_PREVIEW_FIELDS =
 @Injectable()
 export class ChatService {
     constructor(
+        private readonly bookingAccess: BookingChatAccessService,
         @InjectModel(Message.name) private messageModel: Model<Message>,
         @InjectModel(Conversation.name) private conversationModel: Model<Conversation>,
         @InjectModel(User.name) private userModel: Model<User>,
         @InjectModel(Notification.name) private notificationModel: Model<Notification>,
     ) { }
 
+    async assertBookingChatAccess(chatId: string, userId: string) {
+        await this.bookingAccess.assertChat(chatId, userId);
+    }
+
     // Create a new conversation
     async createConversation(participants: string[]): Promise<Conversation> {
+        await this.bookingAccess.assertPair(participants[0], participants[1]);
         const chatId = participants.sort().join('-');  // Chat ID can be a sorted combination of participant IDs
         const existingConversation = await this.conversationModel.findOne({ chatId });
         if (existingConversation) return existingConversation;
@@ -37,6 +44,7 @@ export class ChatService {
     }
 
     async createOrGetConversation(userId: string, vendorId: string): Promise<string> {
+        await this.bookingAccess.assertPair(userId, vendorId);
         // Sort userId and vendorId to always have a consistent chatId
         const participants = [userId, vendorId].sort();
         const chatId = participants.join('-'); // Unique chatId based on participants
@@ -58,6 +66,7 @@ export class ChatService {
 
     // Get all conversations for a user
     async getUserConversations(userId: string): Promise<Conversation[]> {
+        await this.bookingAccess.assertList(userId);
         const conversations = await this.conversationModel
             .find({ participants: userId })
             .populate({
@@ -114,6 +123,7 @@ export class ChatService {
 
     // Get all messages for a conversation (chatId)
     async getConversationMessages(chatId: string, userId?: string): Promise<Message[]> {
+        if (userId) await this.bookingAccess.assertChat(chatId, userId);
         const filter: any = { chatId };
         if (userId) {
             filter.deletedFor = { $ne: userId };
@@ -139,7 +149,10 @@ export class ChatService {
     audioDurationMs: number = 0,     // 🆕 ADD
 ): Promise<Message> {
 
-        console.log("CHAT SERVICE createMessage CALLED");
+        await this.bookingAccess.assertChat(chatId, senderId);
+        if ([senderId, receiverId].sort().join('-') !== chatId || senderId === receiverId) {
+            throw new ForbiddenException('This booking conversation is unavailable.');
+        }
 
         // 🟢 NEW (Reply feature) — only attach the reference if the
         // referenced message actually exists in THIS conversation. This

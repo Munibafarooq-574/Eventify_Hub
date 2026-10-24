@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getConversationList from '@/services/getConversationList';
 import { getSecureData, saveSecureData, getUserData } from '@/store';
 
@@ -388,10 +389,7 @@ const MessagesScreen: React.FC = () => {
                     return next;
                 });
             } catch (error) {
-                console.error(
-                    'Error fetching conversations:',
-                    error
-                );
+                reportMarketplaceLoadError('Conversations unavailable', error);
             } finally {
                 setLoading(false);
                 setRefreshing(false);
