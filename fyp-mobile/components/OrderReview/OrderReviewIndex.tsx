@@ -39,6 +39,7 @@ const OrderReviewScreen = () => {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const checkoutLock = useRef(false);
+  const replacementDeadlinePassed = /replacement.*only.*before.*event.*starts/i.test(checkoutError);
 
   const [publicCoupons, setPublicCoupons] =
   useState<Record<string, any[]>>({});
@@ -2344,7 +2345,7 @@ const packages =
 
           <TouchableOpacity
             style={[styles.bookButton, placingOrder && styles.bookButtonDisabled]}
-            onPress={handleCheckout}
+            onPress={replacementDeadlinePassed ? () => router.replace('/myevents') : handleCheckout}
             disabled={placingOrder}
             activeOpacity={0.85}
           >
@@ -2352,7 +2353,7 @@ const packages =
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <Text style={styles.bookButtonText}>Confirm & Book Now</Text>
+                <Text style={styles.bookButtonText}>{replacementDeadlinePassed ? 'Back to My Events' : 'Confirm & Book Now'}</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </>
             )}
