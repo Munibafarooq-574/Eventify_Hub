@@ -5,7 +5,7 @@ import axios from 'axios';
 import { deleteSecureData, getSecureData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +37,8 @@ const OrderReviewScreen = () => {
   const [cateringCategory, setCateringCategory] = useState<any>(null);
   const [guests, setGuests] = useState<number>(0);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const checkoutLock = useRef(false);
 
   const [publicCoupons, setPublicCoupons] =
   useState<Record<string, any[]>>({});
@@ -1042,30 +1044,16 @@ const isInvalidCode =
   // -----------------------------------------
 
   const handleCheckout = async () => {
-    if (placingOrder) return;
+    if (checkoutLock.current) return;
+    checkoutLock.current = true;
+    setCheckoutError('');
+    setPlacingOrder(true);
 
     try {
       const user = await getUserData();
 
-      if (!user?._id) {
-        Toast.show({
-          type: 'error',
-          text1: 'Organizer ID Missing',
-          text2: 'Please login again.',
-          position: 'bottom',
-        });
-        return;
-      }
-
-      if (!cartData?.vendors?.length) {
-        Toast.show({
-          type: 'error',
-          text1: 'Empty Cart',
-          text2: 'Your cart is empty. Please add items to proceed.',
-          position: 'bottom',
-        });
-        return;
-      }
+      if (!user?._id) throw new Error('Your session is unavailable. Please sign in again.');
+      if (!cartData?.vendors?.length) throw new Error('Your cart is empty. Please add a package before booking.');
 
       const eventDetailsRaw = await getSecureData('eventDetails');
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
@@ -1127,8 +1115,6 @@ const isInvalidCode =
     }),
 );
 
-      setPlacingOrder(true);
-
     const response = await postPlaceOrder({
       organizerId: user._id,
       eventId: eventDetails?.eventId,
@@ -1163,6 +1149,7 @@ const isInvalidCode =
       replacementVendorOrderId: eventDetails?.replacementVendorOrderId,
     });
 
+      if (!response) throw new Error('Booking confirmation was not received. Refresh My Events before trying again.');
       if (response) {
         Toast.show({
           type: 'success',
@@ -1178,12 +1165,9 @@ const isInvalidCode =
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
-  Alert.alert(
-    'Booking Failed',
-    error?.message || 'Failed to place order. Please try again.',
-    [{ text: 'OK' }],
-  );
+  setCheckoutError(error?.message || 'Failed to place order. Please try again.');
 } finally {
+      checkoutLock.current = false;
       setPlacingOrder(false);
     }
   };
@@ -2350,6 +2334,13 @@ const packages =
   Rs. {formatCurrency(finalTotal)}
 </Text>
           </View>
+
+          {checkoutError ? (
+            <View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ backgroundColor: '#FDEBEC', padding: 12, borderRadius: 12, marginBottom: 10 }}>
+              <Text style={{ color: '#9B2335', fontWeight: '700', marginBottom: 4 }}>Booking not submitted</Text>
+              <Text style={{ color: '#74202C', lineHeight: 20 }}>{checkoutError}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.bookButton, placingOrder && styles.bookButtonDisabled]}
