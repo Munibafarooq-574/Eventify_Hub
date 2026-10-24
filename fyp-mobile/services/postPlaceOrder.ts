@@ -142,6 +142,7 @@ if (!orderData.eventAddress?.trim()) {
   // -------------------------------------------------------
 
   const config: AxiosRequestConfig = {
+    timeout: 30000,
     method: "POST",
     url,
 

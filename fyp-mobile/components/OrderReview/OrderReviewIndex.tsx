@@ -1178,12 +1178,11 @@ const isInvalidCode =
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
-  Toast.show({
-    type: 'error',
-    text1: 'Booking Failed',
-    text2: error?.message || 'Failed to place order. Please try again.',
-    position: 'bottom',
-  });
+  Alert.alert(
+    'Booking Failed',
+    error?.message || 'Failed to place order. Please try again.',
+    [{ text: 'OK' }],
+  );
 } finally {
       setPlacingOrder(false);
     }
