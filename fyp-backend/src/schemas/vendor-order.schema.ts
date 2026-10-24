@@ -151,6 +151,13 @@ status:
     @Prop({ type: Date, default: null })
     holdExpiresAt?: Date | null;
 
+    @Prop({ type: Number, min: 0 })
+    paymentPreparationMinutes?: number;
+    @Prop({ type: Number, min: 0 })
+    paymentMinimumWindowMinutes?: number;
+    @Prop({ type: Date })
+    paymentServiceCutoff?: Date;
+
     // =========================================================
     // Phase 6: Payment fields
     // =========================================================

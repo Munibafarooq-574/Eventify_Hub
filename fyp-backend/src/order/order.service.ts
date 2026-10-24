@@ -1,3 +1,5 @@
+import { effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
+import { Payment } from '../schemas/payment.schema';
 //fyp-backend/src/order/order.service.ts
 import {
   BadRequestException,
@@ -32,6 +34,7 @@ import { Cron } from '@nestjs/schedule';
 // Phase 5 scaffold: how long a vendor's acceptance holds the slot before
 // payment is required. Configurable via env, not hardcoded.
 const DEFAULT_HOLD_HOURS = Number(process.env.BOOKING_HOLD_HOURS) || 24;
+
 
 @Injectable()
 export class OrderService {
@@ -1503,6 +1506,7 @@ export class OrderService {
             serviceLocationCityIds
             businessCityId
             packages
+            availabilitySettings
         `,
         populate: [
             {
@@ -1525,6 +1529,18 @@ export class OrderService {
 })
 .lean()
 .exec();
+
+    const visibleBookings = orders.flatMap((order:any) => order.vendorOrders || []);
+    if (visibleBookings.length) {
+        const pending = await this.connection.model(Payment.name).find({vendorOrderId:{$in:visibleBookings.map((v:any)=>v._id)},type:'DOWN_PAYMENT',status:'PENDING'}).lean();
+        const pendingIds = new Set(pending.map((p:any)=>String(p.vendorOrderId)));
+        for (const order of orders as any[]) for (const booking of order.vendorOrders || []) {
+            if (!['PAYMENT_REQUIRED','PAYMENT_FAILED'].includes(booking.paymentStatus)) continue;
+            applyLegacyPaymentWindow(booking,booking.vendorId?.availabilitySettings,order.eventCityId?.timeZone || 'UTC');
+            booking.paymentDeadline=effectiveDownPaymentDeadline(booking);
+            booking.paymentVerificationOverdue=paymentVerificationOverdue(booking,pendingIds.has(String(booking._id))?{type:'DOWN_PAYMENT'}:null);
+        }
+    }
 
        if (type === 'Vendor') {
     const historicalVendorOrders: any[] = await this.vendorOrderModel
@@ -1902,6 +1918,9 @@ async getOrderStats(type: string, userId: string) {
             if (!Number.isFinite(start) || start <= Date.now()) throw new ConflictException('A replacement cannot be accepted after the event starts.');
         }
 
+        const previousStatus = vendorOrder.status;
+        if (status === 'accepted' && vendorOrder.status === 'accepted') return vendorOrder;
+        if (vendorOrder.status === 'expired') throw new ConflictException('This booking has expired.');
         vendorOrder.status = status;
         if (message) {
             vendorOrder.message = message;
@@ -1909,12 +1928,6 @@ async getOrderStats(type: string, userId: string) {
 
         if (status === 'accepted') {
     const now = new Date();
-
-    vendorOrder.acceptedAt = now;
-
-    vendorOrder.holdExpiresAt = new Date(
-        now.getTime() + DEFAULT_HOLD_HOURS * 60 * 60000,
-    );
 
     // ===== NEW (Phase 6): compute + snapshot down payment =====
     const vendorUser = await this.userModel
@@ -2008,6 +2021,9 @@ if (downPaymentAmount === 0) {
         'PARTIALLY_PAID';
 
     vendorOrder.paymentDeadline = null;
+    vendorOrder.holdExpiresAt = null;
+    vendorOrder.acceptedAt = now;
+    if (!vendorOrder.eventStartDateTime || new Date(vendorOrder.eventStartDateTime).getTime() <= now.getTime()) throw new ConflictException('This service has already started and cannot be accepted.');
 }
     } else {
         // No down payment configured:
@@ -2022,8 +2038,9 @@ if (downPaymentAmount === 0) {
     vendorOrder.paymentStatus =
         'PAYMENT_REQUIRED';
 
-    vendorOrder.paymentDeadline =
-        vendorOrder.holdExpiresAt;
+    const parent = await this.orderModel.findById(vendorOrder.orderId).lean();
+    const zone = parent?.eventCityId ? await this.cityService.requireCityTimeZone(String(parent.eventCityId)) : 'UTC';
+    snapshotDownPaymentWindow(vendorOrder, (vendorUser as any)?.availabilitySettings, now, zone);
 }
 
     // ===== Phase 13: commission snapshot =====
@@ -2043,7 +2060,14 @@ vendorOrder.vendorNetAmount =
     vendorOrder.price - vendorOrder.commissionAmount;
 }
 
-        const saved = await vendorOrder.save();
+        if (status === 'accepted') vendorOrder.$where = { status: previousStatus };
+        let saved;
+        try { saved = await vendorOrder.save(); }
+        catch(error) {
+            if (error instanceof Error && error.name === 'DocumentNotFoundError') throw new ConflictException('This booking changed while accepting. Refresh before trying again.');
+            throw error;
+        }
+
 
         if (vendorOrder.replacementRescheduleRequestId) {
             const replacementRequest: any = await this.rescheduleRequestModel.findById(
@@ -2170,48 +2194,39 @@ vendorOrder.vendorNetAmount =
     // Runs every minute so an expired slot is released promptly.
     @Cron('0 * * * * *')
     async expireStaleHolds() {
-    const now = new Date();
-
-    const stale = await this.vendorOrderModel.find({
-    status: 'accepted',
-    holdExpiresAt: { $ne: null, $lt: now },
-
-    // Only bookings whose required down payment
-    // has NOT been successfully paid may expire.
-    paymentStatus: {
-        $in: [
-            'PAYMENT_REQUIRED',
-            'PAYMENT_FAILED',
-        ],
-    },
-});
-
-    for (const vendorOrder of stale) {
-        vendorOrder.status = 'expired';
-        vendorOrder.paymentStatus = 'PAYMENT_EXPIRED';
-
-        await vendorOrder.save();
-
-        try {
-            const order = await this.orderModel.findOne({
-                vendorOrders: vendorOrder._id,
+        const stale = await this.vendorOrderModel.find({ status: 'accepted', paymentStatus: { $in: ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'] } });
+        const payments = this.connection.model(Payment.name);
+        let expiredCount = 0;
+        for (const candidate of stale) {
+            const changed = await withBookingPaymentLock(this.connection, this.vendorOrderModel, candidate._id, async session => {
+                const booking = await this.vendorOrderModel.findById(candidate._id).session(session);
+                if (!booking || booking.status !== 'accepted' || !['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(booking.paymentStatus)) return false;
+                if (booking.paymentPreparationMinutes == null) {
+                    const vendor = await this.userModel.findById(booking.vendorId).select('availabilitySettings').lean();
+                    const parent = await this.orderModel.findById(booking.orderId).lean();
+                    const zone = parent?.eventCityId ? await this.cityService.requireCityTimeZone(String(parent.eventCityId)) : 'UTC';
+                    applyLegacyPaymentWindow(booking,(vendor as any)?.availabilitySettings,zone);
+                }
+                const deadline = effectiveDownPaymentDeadline(booking);
+                if (!deadline || deadline.getTime() > Date.now()) return false;
+                if (await payments.exists({ vendorOrderId: booking._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) return false;
+                booking.status = 'expired';booking.paymentStatus = 'PAYMENT_EXPIRED';booking.paymentDeadline = deadline;booking.holdExpiresAt = deadline;
+                await booking.save({session});return true;
             });
-
-            if (order) {
-                await this.sendPushNotification(
-                    'Booking hold expired',
-                    `Your accepted request for ${vendorOrder.serviceName} expired before payment.`,
-                    order.organizerId.toString(),
-                    'HOLD_EXPIRED',
-                );
-            }
-        } catch (error) {
-            console.log(error);
+            if (!changed) continue;
+            expiredCount++;
+            try {
+                const order = await this.orderModel.findById(candidate.orderId);
+                for (const recipient of [order?.organizerId, candidate.vendorId].filter(Boolean)) {
+                    const title='Booking payment expired';
+                    const body=`The down-payment deadline for ${candidate.serviceName} passed. This unpaid vendor booking has expired.`;
+                    try { await this.sendPushNotification(title,body,String(recipient),'HOLD_EXPIRED'); }
+                    catch { try { await this.saveNotification(String(recipient),title,body,'HOLD_EXPIRED'); } catch {} }
+                }
+            } catch(error) { console.log('Payment expiry notification unavailable'); }
         }
+        return { expiredCount };
     }
-
-    return { expiredCount: stale.length };
-}
 
     // ===== NEW (Phase 4): down payment info for vendor request details =====
     // Reuses the EXISTING per-category downPayment field — no duplicate field.

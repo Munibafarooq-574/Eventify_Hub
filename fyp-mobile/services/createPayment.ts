@@ -1,3 +1,4 @@
+import { bookingActionError } from './bookingActionError';
 // fyp-mobile/services/createPayment.ts
 import axios, { AxiosRequestConfig } from "axios";
 import { getSecureData } from "@/store";
@@ -24,7 +25,6 @@ const config: AxiosRequestConfig = {
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error("Error creating payment:", error);
-        throw error;
+        throw bookingActionError(error, "Unable to submit payment right now. Please refresh this booking and try again.");
     }
 }

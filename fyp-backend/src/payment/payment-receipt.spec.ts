@@ -1,3 +1,5 @@
+jest.mock('../common/utils/booking-payment-window',()=>({...jest.requireActual('../common/utils/booking-payment-window'),withBookingPaymentLock:async(_connection:any,_model:any,_id:any,work:any)=>work(null)}));
+function sessionQueries(model:any) { for(const method of ['findById','find']) {if(!model[method])continue; const original=model[method]; model[method]=(...args:any[])=>{const result=original(...args);result.session=()=>result;return result;};} }
 import { PaymentService } from './payment.service';
 const base = {
     amount:1500,paymentType:'DOWN_PAYMENT',method:'CARD',transactionRef:'test-ref',paidAt:new Date('2026-10-17T09:01:00Z'),
@@ -49,6 +51,7 @@ describe('Payment receipt display',()=>{
         s.paymentModel={findById:async()=>({status:'PENDING',sendReceipt,organizerId:'client',vendorOrderId:'booking',amount:1500,save:async()=>{}}),find:()=>query([{amount:1500}])};
         s.vendorOrderModel={findById:async()=>({_id:'booking',orderId:'event',vendorId:'vendor',packageId:'cake',price:3000,status:'accepted',eventStartDateTime:base.serviceStart,eventEndDateTime:base.serviceEnd,save:async()=>{}})};
         s.emailService={sendTransactionalEmail:jest.fn(async()=>{})};
+        sessionQueries(s.paymentModel);sessionQueries(s.vendorOrderModel);
         await s.confirmPayment('payment');
         expect(order.populate).toHaveBeenCalledWith({path:'eventCityId',select:'timeZone'});
         expect(vendorQuery.populate).toHaveBeenCalledWith({path:'buisnessCategory',select:'name'});

@@ -1,3 +1,5 @@
+import { effectiveDownPaymentDeadline, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue, servicePaymentCutoff } from '../common/utils/booking-payment-window';
+import { ClientSession } from 'mongoose';
 import {
     BadRequestException,
     ConflictException,
@@ -42,6 +44,14 @@ export class PaymentService {
         private readonly payoutService: PayoutService,
         private readonly configService: ConfigService,
     ) {}
+
+    private async normalizeLegacyPaymentWindow(booking:any) {
+        if(booking.paymentPreparationMinutes != null || !booking.eventStartDateTime)return;
+        const vendor=await this.userModel.findById(booking.vendorId).select('availabilitySettings').lean();
+        const order=await this.orderModel.findById(booking.orderId).lean();
+        const city=order?.eventCityId?await this.vendorOrderModel.db.model('City').findById(order.eventCityId).select('timeZone').lean():null;
+        applyLegacyPaymentWindow(booking,(vendor as any)?.availabilitySettings,(city as any)?.timeZone||'UTC');
+    }
 
     private getVerificationSecret(): string {
     const secret =
@@ -426,6 +436,7 @@ const paidAmount =
         .sort({ createdAt: -1 })
         .lean();
 
+await this.normalizeLegacyPaymentWindow(vendorOrder);
 const outstandingAmount = Math.max(
     bookingAmount - paidAmount,
     0,
@@ -483,11 +494,13 @@ return {
     paidAmount,
     outstandingAmount,
 
+    paymentVerificationOverdue: paymentVerificationOverdue(vendorOrder,pendingPayment),
+    paymentServiceCutoff: servicePaymentCutoff(vendorOrder),
     paymentStatus:
         vendorOrder.paymentStatus,
 
     paymentDeadline:
-    vendorOrder.paymentDeadline ?? null,
+    ['PAYMENT_REQUIRED','PAYMENT_FAILED'].includes(vendorOrder.paymentStatus) ? effectiveDownPaymentDeadline(vendorOrder) : null,
     remainingPaymentDeadline: vendorOrder.remainingPaymentDeadline ?? null,
 
 pendingPayment: pendingPayment
@@ -543,14 +556,20 @@ pendingPayment: pendingPayment
     }
 
     // ===== Organizer initiates the down payment =====
-    async initiatePayment(
+    async initiatePayment(vendorOrderId: string, method: string, organizerId: string, sendReceipt = true) {
+        return withBookingPaymentLock(this.vendorOrderModel.db, this.vendorOrderModel, vendorOrderId,
+            session => this.initiateDownPaymentLocked(vendorOrderId, method, organizerId, sendReceipt, session));
+    }
+
+    private async initiateDownPaymentLocked(
     vendorOrderId: string,
     method: string,
     organizerId: string,
     sendReceipt = true,
+    session: ClientSession,
 ) {
         const vendorOrder =
-            await this.vendorOrderModel.findById(vendorOrderId);
+            await this.vendorOrderModel.findById(vendorOrderId).session(session);
 
         if (!vendorOrder) {
             throw new NotFoundException('Vendor order not found');
@@ -587,16 +606,11 @@ pendingPayment: pendingPayment
             );
         }
 
-        if (
-            vendorOrder.paymentDeadline &&
-            vendorOrder.paymentDeadline < new Date()
-        ) {
-            vendorOrder.paymentStatus = 'PAYMENT_EXPIRED';
-            await vendorOrder.save();
-
-            throw new ConflictException(
-                'Payment window has expired for this booking.',
-            );
+        if (vendorOrder.status !== 'accepted') throw new ConflictException('This booking is not available for a down payment.');
+        await this.normalizeLegacyPaymentWindow(vendorOrder);
+        const deadline = effectiveDownPaymentDeadline(vendorOrder);
+        if (!deadline || deadline.getTime() <= Date.now()) {
+            throw new ConflictException('The down-payment deadline has passed. This unpaid vendor booking is no longer available for payment.');
         }
 
         const bookingAmount =
@@ -640,7 +654,7 @@ if (
                 vendorOrderId: vendorOrder._id,
                 type: 'DOWN_PAYMENT',
                 status: 'PENDING',
-            });
+            }).session(session);
 
         if (existingPendingPayment) {
             throw new ConflictException(
@@ -654,7 +668,7 @@ if (
                 vendorOrderId: vendorOrder._id,
                 type: 'DOWN_PAYMENT',
                 status: 'SUCCESS',
-            });
+            }).session(session);
 
         if (existingSuccessfulDownPayment) {
             throw new ConflictException(
@@ -662,7 +676,8 @@ if (
             );
         }
 
-        const payment = await this.paymentModel.create({
+        if (deadline.getTime() <= Date.now()) throw new ConflictException('The down-payment deadline has passed.');
+        const [payment] = await this.paymentModel.create([{
             vendorOrderId: vendorOrder._id,
             orderId: order._id,
             organizerId: order.organizerId,
@@ -672,8 +687,9 @@ if (
             status: 'PENDING',
             sendReceipt,
             method,
-        });
+        }], {session});
 
+        if (deadline.getTime() <= Date.now()) throw new ConflictException('The down-payment deadline has passed.');
         // Real gateway integration will confirm or fail this payment later.
         return payment;
     }
@@ -1145,8 +1161,12 @@ private buildPaymentReceiptEmail(
         transactionRef?: string,
     ) {
         
+        const initialPayment = await this.paymentModel.findById(paymentId);
+        if (!initialPayment) throw new NotFoundException('Payment not found');
+        const {payment, vendorOrder, paidSoFar, bookingAmount} = await withBookingPaymentLock(
+            this.vendorOrderModel.db, this.vendorOrderModel, initialPayment.vendorOrderId, async session => {
         const payment =
-            await this.paymentModel.findById(paymentId);
+            await this.paymentModel.findById(paymentId).session(session);
 
         if (!payment) {
             throw new NotFoundException('Payment not found');
@@ -1161,7 +1181,7 @@ private buildPaymentReceiptEmail(
         const vendorOrder =
             await this.vendorOrderModel.findById(
                 payment.vendorOrderId,
-            );
+            ).session(session);
 
         if (!vendorOrder) {
             throw new NotFoundException(
@@ -1169,19 +1189,30 @@ private buildPaymentReceiptEmail(
             );
         }
 
+        if (['cancelled','cancelled_by_vendor','expired'].includes(vendorOrder.status)) throw new ConflictException('This vendor booking is closed. Payment cannot be confirmed.');
+        if (payment.type === 'DOWN_PAYMENT') {
+            await this.normalizeLegacyPaymentWindow(vendorOrder);
+            const deadline = effectiveDownPaymentDeadline(vendorOrder);
+            const submittedAt = new Date((payment as any).createdAt).getTime();
+            const cutoff = servicePaymentCutoff(vendorOrder)?.getTime() ?? NaN;
+            if (!deadline || !Number.isFinite(submittedAt) || submittedAt >= deadline.getTime() || !Number.isFinite(cutoff) || Date.now() >= cutoff) {
+                throw new ConflictException('Payment verification is overdue and this service is not secured. Review and reject this pending test payment; do not mark the booking confirmed.');
+            }
+        }
+
         payment.status = 'SUCCESS';
         payment.transactionRef =
             transactionRef || null;
         payment.paidAt = new Date();
 
-        await payment.save();
+        await payment.save({session});
 
         const successfulPayments =
             await this.paymentModel
                 .find({
                     vendorOrderId: vendorOrder._id,
                     status: 'SUCCESS',
-                })
+                }).session(session)
                 .lean();
 
         const paidSoFar =
@@ -1215,7 +1246,11 @@ if (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
 }
 if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline = null;
 
-       await vendorOrder.save();
+       if (payment.type === 'DOWN_PAYMENT' && paymentVerificationOverdue(vendorOrder,payment)) throw new ConflictException('Payment verification is overdue. Service is not secured; Admin review is required.');
+       await vendorOrder.save({session});
+
+        return { payment, vendorOrder, paidSoFar, bookingAmount };
+        });
 
 if (
     vendorOrder.status === 'completed' &&
@@ -1470,12 +1505,20 @@ return payment;
     }
 
     // ===== Called by gateway webhook (or manually for now) on failure =====
-    async failPayment(
+    async failPayment(paymentId: string, reason?: string) {
+        const payment = await this.paymentModel.findById(paymentId);
+        if (!payment) throw new NotFoundException('Payment not found');
+        return withBookingPaymentLock(this.vendorOrderModel.db, this.vendorOrderModel, payment.vendorOrderId,
+            session => this.failPaymentLocked(paymentId, reason, session));
+    }
+
+    private async failPaymentLocked(
         paymentId: string,
-        reason?: string,
+        reason: string | undefined,
+        session: ClientSession,
     ) {
         const payment =
-            await this.paymentModel.findById(paymentId);
+            await this.paymentModel.findById(paymentId).session(session);
 
         if (!payment) {
             throw new NotFoundException('Payment not found');
@@ -1490,12 +1533,12 @@ return payment;
         payment.status = 'FAILED';
         payment.failureReason = reason || null;
 
-        await payment.save();
+        await payment.save({session});
 
         const vendorOrder =
             await this.vendorOrderModel.findById(
                 payment.vendorOrderId,
-            );
+            ).session(session);
 
         if (vendorOrder) {
             const successfulPayments =
@@ -1504,7 +1547,7 @@ return payment;
                         vendorOrderId:
                             vendorOrder._id,
                         status: 'SUCCESS',
-                    })
+                    }).session(session)
                     .lean();
 
             const paidSoFar =
@@ -1525,8 +1568,8 @@ return payment;
                 vendorOrder.paymentStatus =
                     'PARTIALLY_PAID';
             } else {
-                vendorOrder.paymentStatus =
-                    'PAYMENT_FAILED';
+                vendorOrder.paymentStatus = 'PAYMENT_FAILED';
+
             }
 
             vendorOrder.remainingAmount = Math.max(
@@ -1534,7 +1577,7 @@ return payment;
                 0,
             );
 
-            await vendorOrder.save();
+            await vendorOrder.save({session});
         }
 
         return payment;

@@ -1,3 +1,4 @@
+import { bookingActionError } from './bookingActionError';
 //fyp-mobile/services/patchUpdateOrderStatus.ts
 /*import axios, { AxiosRequestConfig } from "axios";
 
@@ -74,7 +75,6 @@ export async function patchUpdateVendorOrderStatus(
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error("Error updating vendor order status:", error);
-        throw error;
+        throw bookingActionError(error, "Unable to update this booking. Please refresh and try again.");
     }
 }

@@ -19,6 +19,8 @@ export interface PaymentBreakdown {
     outstandingAmount: number;
 
     paymentStatus: string;
+    paymentVerificationOverdue?: boolean;
+    paymentServiceCutoff?: Date | null;
 paymentDeadline: Date | null;
 remainingPaymentDeadline: Date | null;
 

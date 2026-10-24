@@ -16,6 +16,7 @@ function load(name, token = 'session-token') {
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, console, require: dependency => {
     if (dependency === 'axios') return axios;
+    if (dependency === './bookingActionError') return load('bookingActionError').api;
     if (dependency === '../store') return { getSecureData: async key => { assert.equal(key, 'token'); return token; } };
     throw new Error(`Unexpected dependency: ${dependency}`);
   } }, { filename: file });

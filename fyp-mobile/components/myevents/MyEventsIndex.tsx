@@ -172,6 +172,8 @@ const MyEventsScreen = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
+  const [paymentNow, setPaymentNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setPaymentNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
   const { orderId: targetOrderId } = useLocalSearchParams<{ orderId?: string }>();
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   useFocusEffect(useCallback(() => { if (targetOrderId) setExpandedEvents(current => ({ ...current, [targetOrderId]: true })); }, [targetOrderId]));
@@ -1057,14 +1059,13 @@ const MyEventsScreen = () => {
                         vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
                       );
 
+                      const paymentBreakdown = paymentBreakdowns[vendor._id];
                       const isRemainingDue = paymentStatus === 'PARTIALLY_PAID' && vendorStatus === 'completed';
                       const deadlineValue = isRemainingDue ? vendor?.remainingPaymentDeadline
-                        : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(paymentStatus) ? vendor?.paymentDeadline : null;
+                        : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(paymentStatus) ? (paymentBreakdown?.paymentDeadline ?? vendor?.paymentDeadline) : null;
                       const paymentDeadline = deadlineValue && Number.isFinite(new Date(deadlineValue).getTime())
                         ? new Date(deadlineValue) : null;
-                      const paymentOverdue = !!paymentDeadline && paymentDeadline.getTime() < Date.now();
-
-                      const paymentBreakdown = paymentBreakdowns[vendor._id];
+                      const paymentOverdue = !!paymentDeadline && paymentDeadline.getTime() <= paymentNow;
 
                       const pendingPayment = paymentBreakdown?.pendingPayment;
 
@@ -1337,12 +1338,16 @@ const MyEventsScreen = () => {
                                 </View>
                               )}
 
+                              {paymentOverdue && !isRemainingDue && !hasPendingPayment && (
+                                <View style={styles.paymentPendingBox}><Text style={styles.paymentPendingText}>The down-payment deadline has passed. This unpaid vendor booking is no longer available for payment.</Text></View>
+                              )}
+
                               {hasPendingPayment && (
                                 <View style={styles.paymentPendingBox}>
                                   <Text style={styles.paymentPendingText}>
                                     {String(pendingPayment?.type || '').toUpperCase() === 'REMAINING'
                                       ? 'Remaining payment is awaiting confirmation.'
-                                      : 'Down payment is awaiting confirmation.'}
+                                      : (paymentBreakdown?.paymentVerificationOverdue || vendor?.paymentVerificationOverdue || (paymentBreakdown?.paymentServiceCutoff && new Date(paymentBreakdown.paymentServiceCutoff).getTime() <= paymentNow)) ? 'Payment verification overdue — service not secured. Awaiting Admin review.' : 'Down payment is awaiting confirmation.'}
                                   </Text>
 
                                   <Text style={styles.paymentPendingSubtext}>
@@ -1353,7 +1358,7 @@ const MyEventsScreen = () => {
                                 </View>
                               )}
 
-                              {paymentStatus === 'PAYMENT_REQUIRED' && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
+                              {paymentStatus === 'PAYMENT_REQUIRED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
                                 <TouchableOpacity
                                   style={styles.payNowButton}
                                   activeOpacity={0.85}
@@ -1364,7 +1369,7 @@ const MyEventsScreen = () => {
                                 </TouchableOpacity>
                               )}
 
-                              {paymentStatus === 'PAYMENT_FAILED' && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
+                              {paymentStatus === 'PAYMENT_FAILED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
                                 <>
                                   <View style={styles.paymentFailedBox}>
                                     <Ionicons name="warning-outline" size={13} color="#DC3545" />

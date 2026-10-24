@@ -396,13 +396,9 @@ const OrderSummary = () => {
 
         alert("Order Updated");
 
-    } catch (error) {
-        console.error(
-            "Error updating vendor order status:",
-            error
-        );
-
-        alert("Failed to update order status");
+    } catch (error: any) {
+        reportMarketplaceLoadError('Booking status unavailable', error);
+        Alert.alert('Booking could not be updated', error?.message || 'Please refresh and try again.');
     }
 };
     // Handler for summary card clicks
@@ -780,6 +776,9 @@ const OrderSummary = () => {
                                                     })}
 
                                                 {/* Organizer Details */}
+                                                {item.vendorOrders?.some((v:any)=>v.paymentVerificationOverdue) && (
+                                                    <Text style={{color:'#9B2335',paddingVertical:10}}>Payment verification overdue — service not secured. Awaiting Admin review.</Text>
+                                                )}
                                                 <Text style={styles.expandedSubTitle}>Organizer Details</Text>
                                                 {!!item.organizerId?.name && (
                                                     <View style={styles.detailRow}>

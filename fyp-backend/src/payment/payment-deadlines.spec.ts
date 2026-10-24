@@ -1,3 +1,5 @@
+jest.mock('../common/utils/booking-payment-window',()=>({...jest.requireActual('../common/utils/booking-payment-window'),withBookingPaymentLock:async(_connection:any,_model:any,_id:any,work:any)=>work(null)}));
+function sessionQueries(model:any) { for(const method of ['findById','find']) {if(!model[method])continue; const original=model[method]; model[method]=(...args:any[])=>{const result=original(...args);result.session=()=>result;return result;};} }
 import { PaymentService } from './payment.service';
 
 describe('Payment deadline lifecycle', () => {
@@ -11,6 +13,7 @@ describe('Payment deadline lifecycle', () => {
         const empty: any = { lean: async () => null }; empty.populate = () => empty;
         service.userModel = { findById: () => ({ select: () => empty }) };
         service.orderModel = { findById: () => empty };
+        sessionQueries(service.paymentModel);sessionQueries(service.vendorOrderModel);
         await service.confirmPayment('payment');
         expect(booking.paymentDeadline).toBeNull();
         expect(booking.holdExpiresAt).toBeNull();
