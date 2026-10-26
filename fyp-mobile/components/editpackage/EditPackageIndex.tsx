@@ -80,90 +80,18 @@ const bookingTypeOptions: {
   { label: "Custom", value: "CUSTOM" },
 ];
 
-type OffsetUnit = "HOURS" | "DAYS";
-type OffsetDirection = "BEFORE" | "AFTER";
+import { EMPTY_OFFSET, OFFSET_UNITS, offsetUnitLabel, offsetToMinutes, minutesToOffset, serviceWindowError, type FriendlyOffset, type OffsetDirection } from "@/utils/serviceWindowInput";
 type DurationInputUnit = "MINUTES" | "HOURS";
-
-interface FriendlyOffset {
-  value: string;
-  unit: OffsetUnit;
-  direction: OffsetDirection;
-}
 
 interface FriendlyDuration {
   value: string;
   unit: DurationInputUnit;
 }
 
-const EMPTY_OFFSET: FriendlyOffset = {
-  value: "",
-  unit: "HOURS",
-  direction: "BEFORE",
-};
-
 const EMPTY_DURATION_INPUT: FriendlyDuration = {
   value: "",
   unit: "MINUTES",
 };
-
-// number typed by vendor + unit + before/after -> signed minutes for the backend
-function offsetToMinutes(
-  offset: FriendlyOffset,
-): number | undefined {
-  const numeric = Number(offset.value);
-
-  if (
-    offset.value.trim().length === 0 ||
-    !Number.isFinite(numeric)
-  ) {
-    return undefined;
-  }
-
-  const magnitudeMinutes =
-    offset.unit === "DAYS"
-      ? numeric * 24 * 60
-      : numeric * 60;
-
-  return offset.direction === "BEFORE"
-    ? -magnitudeMinutes
-    : magnitudeMinutes;
-}
-
-// signed minutes coming from the backend/DB -> friendly value+unit+direction for the UI
-function minutesToOffset(
-  minutes: number | undefined | null,
-): FriendlyOffset {
-  if (
-    minutes === undefined ||
-    minutes === null ||
-    !Number.isFinite(minutes)
-  ) {
-    return { ...EMPTY_OFFSET };
-  }
-
-  const direction: OffsetDirection =
-    minutes < 0 ? "BEFORE" : "AFTER";
-
-  const abs = Math.abs(minutes);
-
-  if (abs !== 0 && abs % (24 * 60) === 0) {
-    return {
-      value: String(abs / (24 * 60)),
-      unit: "DAYS",
-      direction,
-    };
-  }
-
-  const hours = abs / 60;
-
-  return {
-    value: Number.isInteger(hours)
-      ? String(hours)
-      : hours.toFixed(1),
-    unit: "HOURS",
-    direction,
-  };
-}
 
 // number typed by vendor + unit -> plain minutes for the backend
 function durationInputToMinutes(
@@ -918,10 +846,7 @@ const removeExistingImage = (index: number) => {
   const startOffset = serviceWindowStartOffsetMinutesValue;
   const endOffset = serviceWindowEndOffsetMinutesValue;
 
-  const validWindow =
-    startOffset !== undefined &&
-    endOffset !== undefined &&
-    startOffset <= endOffset;
+  const validWindow = !serviceWindowError(startOffset, endOffset, requiredServiceDurationMinutesValue);
 
   if (bookingType === "CUSTOM") {
     return validWindow;
@@ -2409,7 +2334,7 @@ Alert.alert(
             />
 
             <View style={styles.friendlyToggleRow}>
-              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+              {OFFSET_UNITS.map((unit) => {
                 const active = windowStart.unit === unit;
 
                 return (
@@ -2430,7 +2355,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {unit === "HOURS" ? "Hours" : "Days"}
+                      {offsetUnitLabel(unit)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2504,7 +2429,7 @@ Alert.alert(
             />
 
             <View style={styles.friendlyToggleRow}>
-              {(["HOURS", "DAYS"] as OffsetUnit[]).map((unit) => {
+              {OFFSET_UNITS.map((unit) => {
                 const active = windowEnd.unit === unit;
 
                 return (
@@ -2525,7 +2450,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {unit === "HOURS" ? "Hours" : "Days"}
+                      {offsetUnitLabel(unit)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2568,6 +2493,14 @@ Alert.alert(
               },
             )}
           </View>
+
+          {serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (
+            <Text style={[styles.sectionSubtitle, { marginTop: 12 },
+              serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, requiredServiceDurationMinutesValue) ? { color: "#B42318" } : {}]}>
+              {serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, requiredServiceDurationMinutesValue) ||
+                `Service window: ${formatOffsetDisplay(serviceWindowStartOffsetMinutesValue)} → ${formatOffsetDisplay(serviceWindowEndOffsetMinutesValue)}`}
+            </Text>
+          )}
 
           <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
             Tip: enter 0 + "After event starts" to mean right when the
@@ -3320,11 +3253,13 @@ const styles = StyleSheet.create({
   friendlyToggleRow: {
     flex: 1,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
 
   friendlyToggleButton: {
     flex: 1,
+    minWidth: 65,
     height: 50,
     borderWidth: 1.5,
     borderColor: "#EFE0EB",

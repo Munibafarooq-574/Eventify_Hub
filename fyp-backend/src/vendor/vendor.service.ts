@@ -691,6 +691,14 @@ private validatePackageBookingConfiguration(pkg: {
     pkg.serviceWindowStartOffsetMinutes! <=
       pkg.serviceWindowEndOffsetMinutes!;
 
+  if (
+    [PackageBookingType.DELIVERY_BASED, PackageBookingType.SETUP_BASED, PackageBookingType.CUSTOM].includes(pkg.bookingType) &&
+    hasValidWindow && hasValidRequiredDuration &&
+    pkg.requiredServiceDurationMinutes! > pkg.serviceWindowEndOffsetMinutes! - pkg.serviceWindowStartOffsetMinutes!
+  ) {
+    throw new BadRequestException('Time needed must fit within the earliest and latest times.');
+  }
+
   switch (pkg.bookingType) {
     case PackageBookingType.DURATION_BASED:
       // Existing duration/pricing validation remains unchanged.
