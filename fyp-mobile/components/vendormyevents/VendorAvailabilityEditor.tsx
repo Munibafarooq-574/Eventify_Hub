@@ -335,7 +335,7 @@ const VendorAvailabilityEditor = ({
           ? {
               ...item,
               advanceNoticeOptionsMinutes: Array.from(
-                new Set([...(item.advanceNoticeOptionsMinutes || []), minutes]),
+                new Set([...(item.advanceNoticeOptionsMinutes || []).filter((value) => value > 0), minutes]),
               ).sort((a, b) => a - b),
             }
           : item,

@@ -1,3 +1,4 @@
+import { toggleBookingNotice } from '@/utils/bookingNoticeSelection';
 //fyp-mobile/components/VendorAvailabilitySettings/VendorAvailabilitySettings.tsx
 import getVendorAvailability from '@/services/getVendorAvailability';
 import patchVendorAvailability from '@/services/patchVendorAvailability';
@@ -311,9 +312,7 @@ const toggleDayAdvanceNotice = (day: string, value: number) => {
 
     const current = existing.advanceNoticeOptionsMinutes ?? [];
 
-    const updated = current.includes(value)
-      ? current.filter((item) => item !== value)
-      : [...current, value].sort((a, b) => a - b);
+    const updated = toggleBookingNotice(current, value);
 
     return prev.map((item) =>
       item.day === day
@@ -843,9 +842,7 @@ if (loadError) {
               const base =
                 prev.length > 0 ? prev : [minimumAdvanceMinutes];
 
-              const updated = base.includes(opt.value)
-                ? base.filter((value) => value !== opt.value)
-                : [...base, opt.value].sort((a, b) => a - b);
+              const updated = toggleBookingNotice(base, opt.value);
 
               return updated;
             });
