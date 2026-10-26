@@ -2,17 +2,14 @@
 import deletePackage from "@/services/deletePackage";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import {
-  getSecureData,
-  saveSecureData,
   getUserData,
   saveUserData,
 } from "@/store";
 
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute } from "expo-router/react-navigation";
-import { router } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -67,119 +64,48 @@ const PackageScreen = () => {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  const route = useRoute();
+  const { packageId: routePackageId } = useLocalSearchParams<{ packageId?: string | string[] }>();
+  const packageId = Array.isArray(routePackageId) ? routePackageId[0] : routePackageId;
+  const [loadError, setLoadError] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [retry, setRetry] = useState(0);
 
-  const params = route.params as
-    | {
-        packageId?: string;
-      }
-    | undefined;
+  // Use the same current account as the dashboard; legacy SecureStore may hold a previous login.
+  const readUser = getUserData;
+  const writeUser = saveUserData;
 
-  const packageId = params?.packageId;
-
-  useEffect(() => {
-    console.log("packageId", packageId);
-
-    if (packageId) {
-      fetchPackageDetails(packageId);
-    } else {
-      setLoading(false);
-    }
-  }, [packageId]);
-
-  // ---------------------------------------------------------
-  // Read user from SecureStore / AsyncStorage
-  // ---------------------------------------------------------
-
-  const readUser = async (): Promise<any | null> => {
-    try {
-      const userRaw = await getSecureData("user");
-
-      if (userRaw) {
-        return JSON.parse(userRaw);
-      }
-    } catch (err) {
-      console.error(
-        "Failed to parse user from getSecureData:",
-        err
-      );
-    }
-
-    try {
-      const userObj = await getUserData();
-
-      if (userObj) {
-        return userObj;
-      }
-    } catch (err) {
-      console.error(
-        "Failed to read user from getUserData:",
-        err
-      );
-    }
-
-    return null;
-  };
-
-  // ---------------------------------------------------------
-  // Write updated user back to storage
-  // ---------------------------------------------------------
-
-  const writeUser = async (user: any) => {
-    try {
-      const userRaw = await getSecureData("user");
-
-      if (userRaw) {
-        await saveSecureData(
-          "user",
-          JSON.stringify(user)
-        );
-      } else {
-        await saveUserData(user);
-      }
-    } catch (error) {
-      console.error("Failed to save updated user:", error);
-    }
-  };
-
-  // ---------------------------------------------------------
-  // Fetch package details from locally stored user
-  // ---------------------------------------------------------
-
-  const fetchPackageDetails = async (id: string) => {
-  setLoading(true);
-  setPackageDetails(null);
-
-  try {
-    const user = await readUser();
-
-    const vendorId = user?._id || user?.id;
-
-    if (!vendorId) {
-      throw new Error("Vendor ID not found");
-    }
-
-    // Always fetch the latest packages from the backend.
-    const packages = await getVendorPackagesList(String(vendorId));
-
-    const packageObj = packages.find(
-      (pkg) => String(pkg._id) === String(id)
-    );
-
-    if (!packageObj) {
-      console.warn("Package not found on server:", id);
-      setPackageDetails(null);
-      return;
-    }
-
-    setPackageDetails(packageObj);
-  } catch (error) {
-    console.error("Error fetching package details:", error);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setLoading(true);
     setPackageDetails(null);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoadError("");
+    setNotFound(false);
+    const load = async () => {
+      try {
+        if (!packageId) {
+          if (active) setLoadError("Please go back and select a package again.");
+          return;
+        }
+        const user = await getUserData();
+        const vendorId = user?._id || user?.id;
+        if (!vendorId) {
+          if (active) setLoadError("Please sign in again to view your package.");
+          return;
+        }
+        const packages = await getVendorPackagesList(String(vendorId));
+        if (!active) return;
+        const found = packages.find(pkg => String(pkg._id) === String(packageId));
+        if (found) setPackageDetails(found);
+        else setNotFound(true);
+      } catch {
+        if (active) setLoadError("Unable to load this package right now. Please try again.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [packageId, retry]));
 
   useEffect(() => {
     console.log(
@@ -1329,12 +1255,15 @@ const PackageScreen = () => {
               />
 
               <Text style={styles.emptyTitle}>
-                Package Not Found
+                {notFound ? "Package No Longer Available" : "Unable to Load Package"}
               </Text>
 
               <Text style={styles.emptyText}>
-                This package could not be found.
+                {notFound ? "This package may have been removed. Go back to refresh your package list." : loadError}
               </Text>
+              <TouchableOpacity onPress={() => setRetry(value => value + 1)} style={{ marginTop: 18, padding: 12 }}>
+                <Text style={{ color: "#780C60", fontWeight: "700" }}>Try Again</Text>
+              </TouchableOpacity>
             </View>
           )}
         </ScrollView>
