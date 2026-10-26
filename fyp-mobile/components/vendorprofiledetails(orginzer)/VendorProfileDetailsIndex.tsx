@@ -2775,7 +2775,7 @@ const serviceCityNamesFromIds =
                         styles.sectionTitle
                       }
                     >
-                      Photos
+                      {isOwnerView ? 'Portfolio' : 'Photos'}
                     </Text>
 
                     {vendorData
@@ -2802,10 +2802,7 @@ const serviceCityNamesFromIds =
                     )}
                   </View>
 
-                  {vendorData
-                    .images
-                    ?.length >
-                    0 && (
+                  {(isOwnerView || (vendorData.images?.length ?? 0) > 0) && (
                     <TouchableOpacity
                       testID="see-all-photos"
                       onPress={() =>
@@ -2816,7 +2813,7 @@ const serviceCityNamesFromIds =
                             params: {
                               vendorId:
                                 vendorData._id,
-                              readOnly: 'true',
+                              readOnly: isOwnerView ? 'false' : 'true',
                             },
                           },
                         )
@@ -2831,7 +2828,7 @@ const serviceCityNamesFromIds =
                           styles.seeAllLink
                         }
                       >
-                        See All
+                        {isOwnerView ? 'Manage Portfolio' : 'See All'}
                       </Text>
 
                       <Ionicons
@@ -2882,7 +2879,7 @@ const serviceCityNamesFromIds =
                                 params: {
                                   vendorId:
                                     vendorData._id,
-                                  readOnly: 'true',
+                                  readOnly: isOwnerView ? 'false' : 'true',
                                 },
                               },
                             )
