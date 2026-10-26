@@ -47,6 +47,7 @@ export type DaySlotConfig = {
 };
 
 type AvailabilitySettings = {
+  minimumWorkingWindowMinutes?: number;
   workingDays?: { day: string; enabled: boolean }[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
@@ -281,6 +282,11 @@ const VendorAvailabilityEditor = ({
       return;
     }
 
+    const minimumWindow = availability?.minimumWorkingWindowMinutes ?? 60;
+    if (minutesBetween(toHHMM(draftStart), toHHMM(draftEnd)) < minimumWindow) {
+      Alert.alert('Invalid working slot', minimumWindow === 60 ? 'Working slot must be at least 1 hour.' : 'Working slot must be at least 1 minute.');
+      return;
+    }
     const newSlot: TimeSlotConfig = { start: toHHMM(draftStart), end: toHHMM(draftEnd) };
 
     const currentDay = editorDaySlots.find((day) => day.day === activeDayForSlot);
@@ -366,13 +372,13 @@ const VendorAvailabilityEditor = ({
     }
 
     const invalidDay = editorDaySlots.find(
-      (day) => day.enabled && day.slots.some((slot) => minutesBetween(slot.start, slot.end) <= 0),
+      (day) => day.enabled && day.slots.some((slot) => minutesBetween(slot.start, slot.end) < (availability?.minimumWorkingWindowMinutes ?? 60)),
     );
 
     if (invalidDay) {
       Alert.alert(
         'Invalid time slot',
-        `${DAYS.find((d) => d.code === invalidDay.day)?.label || invalidDay.day} contains an invalid time slot.`,
+        (availability?.minimumWorkingWindowMinutes ?? 60) === 60 ? 'Working slot must be at least 1 hour.' : 'Working slot must be at least 1 minute.',
       );
       return;
     }

@@ -99,6 +99,7 @@ const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
 
 const [blockedDates, setBlockedDates] = useState<string[]>([]);
  const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
+ const [minimumWorkingWindow, setMinimumWorkingWindow] = useState(60);
 
 const [advanceNoticeOptionsMinutes, setAdvanceNoticeOptionsMinutes] =
   useState<number[]>([]);
@@ -133,6 +134,7 @@ const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
     setVendorId(user._id);
 
     const data = await getVendorAvailability(user._id);
+    setMinimumWorkingWindow(data.minimumWorkingWindowMinutes ?? 60);
 
     const hasExistingAvailability =
   !!data &&
@@ -376,9 +378,23 @@ const toggleBlockedDate = (dateStr: string) => {
     return;
   }
 
+  const durationMinutes = (start: string, end: string) => {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    return eh * 60 + em - sh * 60 - sm;
+  };
+  const minimumMessage = minimumWorkingWindow === 60 ? 'Working slot must be at least 1 hour.' : 'Working slot must be at least 1 minute.';
+  if (durationMinutes(workingHoursStart, workingHoursEnd) < minimumWorkingWindow) {
+    Alert.alert('Invalid working slot', minimumMessage);
+    return;
+  }
   // Validate every custom slot before saving.
   for (const config of daySlots) {
     for (const slot of config.slots) {
+      if (config.enabled !== false && durationMinutes(slot.start, slot.end) < minimumWorkingWindow) {
+        Alert.alert('Invalid working slot', `${config.day}: ${minimumMessage}`);
+        return;
+      }
       if (slot.start >= slot.end) {
         Alert.alert(
           'Invalid slot',

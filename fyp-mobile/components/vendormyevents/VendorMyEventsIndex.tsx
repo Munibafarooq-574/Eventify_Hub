@@ -19,8 +19,8 @@ type ViewMode = "day" | "upcoming" | "month" | "past";
 type WorkingDay = { day: string; enabled: boolean };
 type TimeSlotConfig = { start: string; end: string };
 type DaySlotConfig = { day: string; enabled: boolean; slots: TimeSlotConfig[]; advanceNoticeOptionsMinutes?: number[] };
-type AvailabilitySettings = { workingDays?: WorkingDay[]; workingHoursStart?: string; workingHoursEnd?: string; daySlots?: DaySlotConfig[]; blockedDates?: string[]; advanceNoticeOptionsMinutes?: number[]; maxConcurrentBookings?: number };
-type GeneratedSlot = { start: string; end: string; status: "available" | "booked"; booking?: any };
+type AvailabilitySettings = { minimumWorkingWindowMinutes?: number; workingDays?: WorkingDay[]; workingHoursStart?: string; workingHoursEnd?: string; daySlots?: DaySlotConfig[]; blockedDates?: string[]; advanceNoticeOptionsMinutes?: number[]; maxConcurrentBookings?: number };
+type GeneratedSlot = { start: string; end: string; status: "available" | "booked"; booking?: any; durationMinutes?: number; belowMinimum?: boolean };
 
 const FILTERS: { key: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "day", label: "Selected Day", icon: "today-outline" },
@@ -362,8 +362,9 @@ const dayAvailability = useMemo(() => {
     let cursor = start;
 
     while (cursor < end) {
-      const slotEnd = addMinutes(cursor, SLOT_MINUTES);
-      if (slotEnd > end) break;
+      const slotEnd = new Date(Math.min(addMinutes(cursor, SLOT_MINUTES).getTime(), end.getTime()));
+      const durationMinutes = (slotEnd.getTime() - cursor.getTime()) / 60000;
+      const belowMinimum = durationMinutes < (availability.minimumWorkingWindowMinutes ?? 60);
 
       const slotStartKey = cursor.getTime(), slotEndKey = slotEnd.getTime();
       const booking = selectedDayBookings.find((order) => {
@@ -374,7 +375,7 @@ const dayAvailability = useMemo(() => {
         return !Number.isNaN(bookingStart) && !Number.isNaN(bookingEnd) && bookingStart < slotEndKey && bookingEnd > slotStartKey;
       });
 
-      slots.push({ start: formatTime(cursor), end: formatTime(slotEnd), status: booking ? "booked" : "available", booking });
+      slots.push({ start: formatTime(cursor), end: formatTime(slotEnd), status: booking ? "booked" : "available", booking, durationMinutes, belowMinimum });
       cursor = slotEnd;
     }
   });
@@ -410,7 +411,7 @@ const monthLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-U
 /**
  * AVAILABILITY SUMMARY & HANDLERS
  */
-const availableSlotCount = dayAvailability.slots.filter((slot) => slot.status === "available").length;
+const availableSlotCount = dayAvailability.slots.filter((slot) => slot.status === "available" && !slot.belowMinimum).length;
 
 const bookedSlotCount = dayAvailability.slots.filter((slot) => slot.status === "booked").length;
 
@@ -658,7 +659,7 @@ return (
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.slotTime}>{slot.start} - {slot.end}</Text>
-                  <Text style={styles.slotStatus}>{booked ? slot.booking?.eventName || "Booked" : "Available"}</Text>
+                  <Text style={styles.slotStatus}>{booked ? slot.booking?.eventName || "Booked" : slot.belowMinimum ? `${slot.durationMinutes} min — below minimum working window` : "Available"}</Text>
                 </View>
               </View>
             );

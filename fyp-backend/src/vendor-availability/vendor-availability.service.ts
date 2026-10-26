@@ -16,6 +16,7 @@ import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CityService } from '../city/city.service';
 import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
+import { minimumWorkingWindowMinutes, workingWindowMinutes } from './working-window';
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -62,14 +63,14 @@ export class VendorAvailabilityService {
   async getAvailability(vendorId: string) {
     const user = await this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role')
+      .select('availabilitySettings role packages')
       .lean();
 
     if (!user || user.role !== 'Vendor') {
       throw new NotFoundException('Vendor not found');
     }
 
-    return user.availabilitySettings ?? {};
+    return { ...(user.availabilitySettings ?? {}), minimumWorkingWindowMinutes: minimumWorkingWindowMinutes(user.packages as any[]) };
   }
 
   async setAvailability(
@@ -95,6 +96,12 @@ if (!hasAccess) {
     // Backend final-authority validation for availability CRUD.
     // ---------------------------------------------------------
 
+    const minimumWindow = minimumWorkingWindowMinutes(user.packages as any[]);
+    const validateWindow = (start: string, end: string) => {
+      if (workingWindowMinutes(start, end) < minimumWindow) {
+        throw new BadRequestException(minimumWindow === 60 ? 'Working slot must be at least 1 hour.' : 'Working slot must be at least 1 minute.');
+      }
+    };
     const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
     const validateTime = (value: string, fieldName: string) => {
@@ -141,6 +148,7 @@ if (!hasAccess) {
           'Working hours start must be before working hours end',
         );
       }
+      validateWindow(start, end);
     }
 
     // Validate every per-day custom slot.
@@ -155,6 +163,7 @@ if (!hasAccess) {
               `${dayConfig.day}: slot start must be before slot end`,
             );
           }
+          if (dayConfig.enabled !== false) validateWindow(slot.start, slot.end);
         }
 
                 // Reject duplicate or overlapping availability slots
