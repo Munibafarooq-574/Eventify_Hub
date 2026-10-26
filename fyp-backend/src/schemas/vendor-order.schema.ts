@@ -119,8 +119,18 @@ status:
     @Prop()
     message?: string;
 
+    // First time the required payment was secured (or no advance was required).
     @Prop()
     confirmationTime?: Date;
+
+    @Prop({ type: Date })
+    rejectedAt?: Date;
+
+    @Prop({ type: Date })
+    completedAt?: Date;
+
+    @Prop({ type: Date })
+    expiredAt?: Date;
 
     @Prop()
     eventStartDateTime?: Date;

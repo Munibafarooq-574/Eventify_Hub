@@ -1,3 +1,4 @@
+import BookingActivity from '../booking/BookingActivity';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getVendorCancellationPreview, { type VendorCancellationPreview } from '@/services/getVendorCancellationPreview';
 import VendorCancellationSummary from '../cancellation/VendorCancellationSummary';
@@ -634,6 +635,9 @@ const OrderSummary = () => {
                                         />
                                     </View>
 
+                                    {(item.vendorOrders || []).map((booking: any) => (
+                                        <BookingActivity key={booking._id} booking={booking} timeZone={item.eventCityId?.timeZone} cancellationDetailsVisible />
+                                    ))}
                                     <View style={styles.detailsBlock}>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />

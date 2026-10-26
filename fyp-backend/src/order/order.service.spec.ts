@@ -229,6 +229,8 @@ describe('OrderService - Unit Tests', () => {
         const before = Date.now();
         const result = await service.completeVendorOrder(validObjectId);
         expect(result.paymentDeadline).toBeNull();
+        expect(result.completedAt!.getTime()).toBeGreaterThanOrEqual(before);
+        expect(result.completedAt!.getTime()).toBeLessThanOrEqual(Date.now());
         expect(result.remainingPaymentDeadline!.getTime()).toBeGreaterThanOrEqual(before+86400000);
         expect(result.remainingPaymentDeadline!.getTime()).toBeLessThanOrEqual(Date.now()+86400000);
         vendorOrderModel.findById.mockResolvedValue(result);

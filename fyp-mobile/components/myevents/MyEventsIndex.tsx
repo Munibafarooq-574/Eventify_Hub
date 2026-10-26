@@ -1,3 +1,4 @@
+import BookingActivity from '../booking/BookingActivity';
 import CancellationReplacementActions from '../booking/CancellationReplacementActions';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
@@ -1254,6 +1255,7 @@ const MyEventsScreen = () => {
                             </View>
                           )}
 
+                          <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
                           {/* Status + message row */}
                           <View style={styles.vendorFooterRow}>
                             <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
@@ -1503,6 +1505,7 @@ const MyEventsScreen = () => {
                                   <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
                                 </View>
                               </View>
+                              <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
                               <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
                             </View>

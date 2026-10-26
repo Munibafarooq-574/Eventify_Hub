@@ -1,5 +1,6 @@
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
+import BookingActivity from '../booking/BookingActivity';
 import getVendorOrders from "@/services/getVendorOrders";
 import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
 import getVendorAvailability, { getVendorDayAvailability, type VendorAvailabilityResponse } from "@/services/getVendorAvailability";
@@ -754,6 +755,7 @@ renderItem={({ item }) => {
           )}
         </View>
 
+        {ownVendorOrders.map((booking: any) => <BookingActivity key={booking._id} booking={booking} timeZone={item.eventCityId?.timeZone} />)}
         <View style={styles.metaRow}>
           {!!item?.guests && (
             <View style={styles.eventMeta}>

@@ -1922,6 +1922,7 @@ async getOrderStats(type: string, userId: string) {
         if (status === 'accepted' && vendorOrder.status === 'accepted') return vendorOrder;
         if (vendorOrder.status === 'expired') throw new ConflictException('This booking has expired.');
         vendorOrder.status = status;
+        if (status === 'rejected' && previousStatus !== 'rejected') vendorOrder.rejectedAt = new Date();
         if (message) {
             vendorOrder.message = message;
         }
@@ -2023,6 +2024,7 @@ if (downPaymentAmount === 0) {
     vendorOrder.paymentDeadline = null;
     vendorOrder.holdExpiresAt = null;
     vendorOrder.acceptedAt = now;
+    vendorOrder.confirmationTime = vendorOrder.confirmationTime || now;
     if (!vendorOrder.eventStartDateTime || new Date(vendorOrder.eventStartDateTime).getTime() <= now.getTime()) throw new ConflictException('This service has already started and cannot be accepted.');
 }
     } else {
@@ -2211,6 +2213,7 @@ vendorOrder.vendorNetAmount =
                     if (['PARTIALLY_PAID', 'PAID'].includes(booking.paymentStatus)) return false;
                     if (await payments.exists({ vendorOrderId: booking._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) return false;
                     booking.status = 'expired';
+                    booking.expiredAt = new Date();
                     await booking.save({ session });
                     return true;
                 }
@@ -2224,7 +2227,7 @@ vendorOrder.vendorNetAmount =
                 const deadline = effectiveDownPaymentDeadline(booking);
                 if (!deadline || deadline.getTime() > Date.now()) return false;
                 if (await payments.exists({ vendorOrderId: booking._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) return false;
-                booking.status = 'expired';booking.paymentStatus = 'PAYMENT_EXPIRED';booking.paymentDeadline = deadline;booking.holdExpiresAt = deadline;
+                booking.status = 'expired';booking.expiredAt = new Date();booking.paymentStatus = 'PAYMENT_EXPIRED';booking.paymentDeadline = deadline;booking.holdExpiresAt = deadline;
                 await booking.save({session});return true;
             });
             if (!changed) continue;
@@ -2295,7 +2298,7 @@ async completeVendorOrder(vendorOrderId: string) {
     const saved = await this.vendorOrderModel.findOneAndUpdate(
         { _id: vendorOrderId, status: 'accepted', paymentStatus: vendorOrder.paymentStatus },
         { $set: {
-            status: 'completed', paymentDeadline: null,
+            status: 'completed', completedAt: new Date(), paymentDeadline: null,
             remainingPaymentDeadline: vendorOrder.paymentStatus === 'PARTIALLY_PAID'
                 ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
         } },

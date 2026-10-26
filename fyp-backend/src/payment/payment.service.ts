@@ -1241,6 +1241,7 @@ vendorOrder.remainingAmount = Math.max(
     0,
 );
 if (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
+    if (payment.type === 'DOWN_PAYMENT') vendorOrder.confirmationTime = vendorOrder.confirmationTime || payment.paidAt;
     vendorOrder.paymentDeadline = null;
     vendorOrder.holdExpiresAt = null;
 }
