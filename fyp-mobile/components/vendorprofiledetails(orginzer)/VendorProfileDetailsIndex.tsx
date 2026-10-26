@@ -1,4 +1,5 @@
 import { growthApi } from '@/services/growthApiClient';
+import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import BookingReviewNotice from './BookingReviewNotice';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // client side detail section
@@ -4756,29 +4757,19 @@ const serviceCityNamesFromIds =
                 />
 
                 <Text style={styles.servicesLabel}>
-                  Delivery Configuration
+                  Delivery Window
                 </Text>
               </View>
-
-              <Text style={styles.packageDetailItem}>
-                Delivery Time:{' '}
-                {selectedPackage.requiredServiceDurationMinutes ?? 'N/A'} minutes
-              </Text>
+              <Text style={styles.packageDetailItem}>Delivery must happen between the earliest and latest delivery times, relative to the event start.</Text>
 
               <Text style={styles.packageDetailItem}>
                 Earliest Delivery:{' '}
-                {Math.abs(
-                  Number(selectedPackage.serviceWindowStartOffsetMinutes ?? 0),
-                )}{' '}
-                minutes before event
+                {formatServiceOffset(selectedPackage.serviceWindowStartOffsetMinutes)}
               </Text>
 
               <Text style={styles.packageDetailItem}>
                 Latest Delivery:{' '}
-                {Math.abs(
-                  Number(selectedPackage.serviceWindowEndOffsetMinutes ?? 0),
-                )}{' '}
-                minutes before event
+                {formatServiceOffset(selectedPackage.serviceWindowEndOffsetMinutes)}
               </Text>
             </View>
           )}
@@ -4793,9 +4784,10 @@ const serviceCityNamesFromIds =
                 />
 
                 <Text style={styles.servicesLabel}>
-                  Setup Configuration
+                  Setup Duration &amp; Allowed Window
                 </Text>
               </View>
+              <Text style={styles.packageDetailItem}>Setup duration is the time the work takes. Setup must start and finish within the allowed window.</Text>
 
               <Text style={styles.packageDetailItem}>
                 Setup Duration:{' '}
@@ -4803,19 +4795,13 @@ const serviceCityNamesFromIds =
               </Text>
 
               <Text style={styles.packageDetailItem}>
-                Service Window Start:{' '}
-                {Math.abs(
-                  Number(selectedPackage.serviceWindowStartOffsetMinutes ?? 0),
-                )}{' '}
-                minutes before event
+                Earliest Setup Start:{' '}
+                {formatServiceOffset(selectedPackage.serviceWindowStartOffsetMinutes)}
               </Text>
 
               <Text style={styles.packageDetailItem}>
-                Service Window End:{' '}
-                {Math.abs(
-                  Number(selectedPackage.serviceWindowEndOffsetMinutes ?? 0),
-                )}{' '}
-                minutes before event
+                Setup Completion Deadline:{' '}
+                {formatServiceOffset(selectedPackage.serviceWindowEndOffsetMinutes)}
               </Text>
             </View>
           )}
@@ -4830,13 +4816,21 @@ const serviceCityNamesFromIds =
                 />
 
                 <Text style={styles.servicesLabel}>
-                  Custom Configuration
+                  Custom Service Timing
                 </Text>
               </View>
+              <Text style={styles.packageDetailItem}>Service must start and finish within this window. Duration is optional.</Text>
 
+              {!!selectedPackage.requiredServiceDurationMinutes && (
+                <Text style={styles.packageDetailItem}>
+                  Service Duration: {selectedPackage.requiredServiceDurationMinutes} minutes
+                </Text>
+              )}
               <Text style={styles.packageDetailItem}>
-                Required Service Duration:{' '}
-                {selectedPackage.requiredServiceDurationMinutes ?? 'N/A'} minutes
+                Earliest Service Start: {formatServiceOffset(selectedPackage.serviceWindowStartOffsetMinutes)}
+              </Text>
+              <Text style={styles.packageDetailItem}>
+                Service Completion Deadline: {formatServiceOffset(selectedPackage.serviceWindowEndOffsetMinutes)}
               </Text>
             </View>
           )}

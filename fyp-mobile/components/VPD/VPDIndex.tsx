@@ -1416,16 +1416,10 @@ const category =
       />
 
       <Text style={styles.servicesLabel}>
-        Delivery Configuration
+        Delivery Window
       </Text>
     </View>
-
-    <Text style={styles.packageDetailItem}>
-      Delivery Time:{" "}
-      {pkg.requiredServiceDurationMinutes
-        ? `${pkg.requiredServiceDurationMinutes} minutes`
-        : "N/A"}
-    </Text>
+    <Text style={styles.packageDetailItem}>Delivery must happen between the earliest and latest delivery times, relative to the event start.</Text>
 
     <Text style={styles.packageDetailItem}>
       Earliest Delivery:{" "}
@@ -1468,9 +1462,10 @@ const category =
       />
 
       <Text style={styles.servicesLabel}>
-        Setup Configuration
+        Setup Duration &amp; Allowed Window
       </Text>
     </View>
+    <Text style={styles.packageDetailItem}>Setup duration is the time the work takes. Setup must start and finish within the allowed window.</Text>
 
     <Text style={styles.packageDetailItem}>
       Setup Duration:{" "}
@@ -1480,7 +1475,7 @@ const category =
     </Text>
 
     <Text style={styles.packageDetailItem}>
-      Earliest Setup:{" "}
+      Earliest Setup Start:{" "}
       {typeof pkg.serviceWindowStartOffsetMinutes ===
       "number"
         ? pkg.serviceWindowStartOffsetMinutes === 0
@@ -1494,7 +1489,7 @@ const category =
     </Text>
 
     <Text style={styles.packageDetailItem}>
-      Setup Finished By:{" "}
+      Setup Completion Deadline:{" "}
       {typeof pkg.serviceWindowEndOffsetMinutes ===
       "number"
         ? pkg.serviceWindowEndOffsetMinutes === 0
@@ -1520,9 +1515,10 @@ const category =
       />
 
       <Text style={styles.servicesLabel}>
-        Custom Service Window
+        Custom Service Timing
       </Text>
     </View>
+    <Text style={styles.packageDetailItem}>Service must start and finish within this window. Duration is optional.</Text>
 
     {pkg.requiredServiceDurationMinutes ? (
       <Text style={styles.packageDetailItem}>
@@ -1532,7 +1528,7 @@ const category =
     ) : null}
 
     <Text style={styles.packageDetailItem}>
-      Earliest Service:{" "}
+      Earliest Service Start:{" "}
       {typeof pkg.serviceWindowStartOffsetMinutes ===
       "number"
         ? pkg.serviceWindowStartOffsetMinutes === 0
@@ -1546,7 +1542,7 @@ const category =
     </Text>
 
     <Text style={styles.packageDetailItem}>
-      Latest Service:{" "}
+      Service Completion Deadline:{" "}
       {typeof pkg.serviceWindowEndOffsetMinutes ===
       "number"
         ? pkg.serviceWindowEndOffsetMinutes === 0

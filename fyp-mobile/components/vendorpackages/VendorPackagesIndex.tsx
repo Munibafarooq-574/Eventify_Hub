@@ -1075,33 +1075,12 @@ const PackageScreen = () => {
                     </View>
 
                     <Text style={styles.sectionTitle}>
-                      Delivery Configuration
+                      Delivery Window
                     </Text>
                   </View>
+                  <Text style={styles.durationLabel}>Delivery must happen between the earliest and latest delivery times, relative to the event start.</Text>
 
                   <View style={styles.durationList}>
-                    <View style={styles.durationCard}>
-                      <View style={styles.durationIcon}>
-                        <Ionicons
-                          name="time-outline"
-                          size={18}
-                          color="#780C60"
-                        />
-                      </View>
-
-                      <View style={styles.durationInfo}>
-                        <Text style={styles.durationLabel}>
-                          Delivery Time
-                        </Text>
-
-                        <Text style={styles.durationValue}>
-                          {formatServiceDuration(
-                            packageDetails.requiredServiceDurationMinutes
-                          )}
-                        </Text>
-                      </View>
-                    </View>
-
                     <View style={styles.durationCard}>
                       <View style={styles.durationIcon}>
                         <Ionicons
@@ -1166,9 +1145,10 @@ const PackageScreen = () => {
                     </View>
 
                     <Text style={styles.sectionTitle}>
-                      Setup Configuration
+                      Setup Duration &amp; Allowed Window
                     </Text>
                   </View>
+                  <Text style={styles.durationLabel}>Setup duration is the time the work takes. Setup must start and finish within the allowed window.</Text>
 
                   <View style={styles.durationList}>
                     <View style={styles.durationCard}>
@@ -1204,7 +1184,7 @@ const PackageScreen = () => {
 
                       <View style={styles.durationInfo}>
                         <Text style={styles.durationLabel}>
-                          Earliest Arrival
+                          Earliest Setup Start
                         </Text>
 
                         <Text style={styles.durationValue}>
@@ -1226,7 +1206,7 @@ const PackageScreen = () => {
 
                       <View style={styles.durationInfo}>
                         <Text style={styles.durationLabel}>
-                          Setup Finished By
+                          Setup Completion Deadline
                         </Text>
 
                         <Text style={styles.durationValue}>
@@ -1256,9 +1236,10 @@ const PackageScreen = () => {
                     </View>
 
                     <Text style={styles.sectionTitle}>
-                      Custom Service Window
+                      Custom Service Timing
                     </Text>
                   </View>
+                  <Text style={styles.durationLabel}>Service must start and finish within this window. Duration is optional.</Text>
 
                   <View style={styles.durationList}>
                     {packageDetails.requiredServiceDurationMinutes !==
@@ -1301,7 +1282,7 @@ const PackageScreen = () => {
 
                       <View style={styles.durationInfo}>
                         <Text style={styles.durationLabel}>
-                          Earliest Service
+                          Earliest Service Start
                         </Text>
 
                         <Text style={styles.durationValue}>
@@ -1323,7 +1304,7 @@ const PackageScreen = () => {
 
                       <View style={styles.durationInfo}>
                         <Text style={styles.durationLabel}>
-                          Latest Service
+                          Service Completion Deadline
                         </Text>
 
                         <Text style={styles.durationValue}>

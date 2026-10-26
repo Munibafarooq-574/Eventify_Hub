@@ -692,7 +692,7 @@ private validatePackageBookingConfiguration(pkg: {
       pkg.serviceWindowEndOffsetMinutes!;
 
   if (
-    [PackageBookingType.DELIVERY_BASED, PackageBookingType.SETUP_BASED, PackageBookingType.CUSTOM].includes(pkg.bookingType) &&
+    [PackageBookingType.SETUP_BASED, PackageBookingType.CUSTOM].includes(pkg.bookingType) &&
     hasValidWindow && hasValidRequiredDuration &&
     pkg.requiredServiceDurationMinutes! > pkg.serviceWindowEndOffsetMinutes! - pkg.serviceWindowStartOffsetMinutes!
   ) {
@@ -713,12 +713,6 @@ private validatePackageBookingConfiguration(pkg: {
       return;
 
     case PackageBookingType.DELIVERY_BASED:
-      if (!hasValidRequiredDuration) {
-        throw new BadRequestException(
-          'DELIVERY_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
-        );
-      }
-
       if (!hasValidWindow) {
         throw new BadRequestException(
           'DELIVERY_BASED packages require a valid service window where start offset is less than or equal to end offset.',

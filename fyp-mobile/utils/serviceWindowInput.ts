@@ -36,3 +36,11 @@ export function serviceWindowError(start: number | undefined, end: number | unde
     return "Time needed must fit within the earliest and latest times.";
   return "";
 }
+
+export function formatServiceOffset(minutes: number | undefined | null): string {
+  if (minutes == null || !Number.isFinite(minutes)) return "Not specified";
+  if (minutes === 0) return "At event start";
+  const offset = minutesToOffset(minutes);
+  const unit = offset.unit === "MINUTES" ? "minute" : offset.unit === "HOURS" ? "hour" : "day";
+  return `${offset.value} ${unit}${Number(offset.value) === 1 ? "" : "s"} ${minutes < 0 ? "before" : "after"} event start`;
+}

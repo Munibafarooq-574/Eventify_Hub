@@ -5,7 +5,12 @@ describe('package minute window validation', () => {
   it.each(['DELIVERY_BASED', 'SETUP_BASED', 'CUSTOM'])('%s accepts minute offsets and rejects reversed or insufficient windows', bookingType => {
     const pkg = { bookingType, requiredServiceDurationMinutes: 30, serviceWindowStartOffsetMinutes: -45, serviceWindowEndOffsetMinutes: -15 };
     expect(() => validate(pkg)).not.toThrow();
-    expect(() => validate({ ...pkg, requiredServiceDurationMinutes: 31 })).toThrow('Time needed must fit');
+    if (bookingType === 'DELIVERY_BASED') {
+      expect(() => validate({ ...pkg, requiredServiceDurationMinutes: 120 })).not.toThrow();
+      expect(() => validate({ ...pkg, requiredServiceDurationMinutes: undefined })).not.toThrow();
+    } else {
+      expect(() => validate({ ...pkg, requiredServiceDurationMinutes: 31 })).toThrow('Time needed must fit');
+    }
     expect(() => validate({ ...pkg, serviceWindowStartOffsetMinutes: -10 })).toThrow();
     expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 15 })).not.toThrow();
   });

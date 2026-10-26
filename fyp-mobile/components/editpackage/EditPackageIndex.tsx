@@ -846,9 +846,9 @@ const removeExistingImage = (index: number) => {
   const startOffset = serviceWindowStartOffsetMinutesValue;
   const endOffset = serviceWindowEndOffsetMinutesValue;
 
-  const validWindow = !serviceWindowError(startOffset, endOffset, requiredServiceDurationMinutesValue);
+  const validWindow = !serviceWindowError(startOffset, endOffset, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue);
 
-  if (bookingType === "CUSTOM") {
+  if (bookingType === "CUSTOM" || bookingType === "DELIVERY_BASED") {
     return validWindow;
   }
 
@@ -930,7 +930,7 @@ const removeExistingImage = (index: number) => {
 
   requiredServiceDurationMinutes:
     bookingType !== "DURATION_BASED" &&
-    bookingType !== "CUSTOM"
+    bookingType !== "DELIVERY_BASED"
       ? requiredServiceDurationMinutesValue
       : undefined,
 
@@ -2210,20 +2210,20 @@ Alert.alert(
       {bookingType === "TIME_SLOT_BASED"
         ? "How long does this take?"
         : bookingType === "DELIVERY_BASED"
-        ? "Delivery Details"
+        ? "Delivery Window"
         : bookingType === "SETUP_BASED"
-        ? "Setup Details"
-        : "Custom Service Window"}
+        ? "Setup Duration & Allowed Window"
+        : "Custom Service Timing"}
     </Text>
 
     <Text style={styles.sectionSubtitle}>
       {bookingType === "TIME_SLOT_BASED"
         ? "This is how much of your time a single booking takes — e.g. a makeup session or a transport trip."
         : bookingType === "DELIVERY_BASED"
-        ? "Tell us how long it takes you to deliver, and the earliest / latest you can deliver relative to the event."
+        ? "Choose the earliest and latest delivery times relative to the event start. Delivery must happen within this window."
         : bookingType === "SETUP_BASED"
-        ? "Tell us how long setup takes, and the earliest / latest you can be there relative to the event."
-        : "Use this only if your service doesn't fit the other booking types. Optionally set how long the task takes, and the earliest / latest it can happen relative to the event."}
+        ? "Enter how long setup takes, the earliest it may start, and when it must be finished. The setup duration must fit inside this window."
+        : "Choose when the service may start and when it must finish, relative to the event start. Duration is optional; if entered, it must fit inside this window."}
     </Text>
 
     {/* --------------------------------------------------
@@ -2231,15 +2231,12 @@ Alert.alert(
     -------------------------------------------------- */}
 
     {(bookingType === "TIME_SLOT_BASED" ||
-      bookingType === "DELIVERY_BASED" ||
       bookingType === "SETUP_BASED" ||
       bookingType === "CUSTOM") && (
       <View style={{ marginTop: 18 }}>
         <Text style={styles.smallLabel}>
           {bookingType === "TIME_SLOT_BASED"
             ? "Time needed per booking"
-            : bookingType === "DELIVERY_BASED"
-            ? "Time needed to deliver"
             : bookingType === "SETUP_BASED"
             ? "Time needed to set up"
             : "Time needed (optional)"}
@@ -2259,8 +2256,6 @@ Alert.alert(
             placeholder={
               bookingType === "TIME_SLOT_BASED"
                 ? "e.g. 1"
-                : bookingType === "DELIVERY_BASED"
-                ? "e.g. 30"
                 : "e.g. 2"
             }
             placeholderTextColor="#9C9CA3"
@@ -2312,10 +2307,10 @@ Alert.alert(
         <View style={{ marginTop: 22 }}>
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
-              ? "Earliest you can deliver"
+              ? "Earliest delivery time"
               : bookingType === "SETUP_BASED"
-              ? "How early you can start setup"
-              : "Earliest this can happen"}
+              ? "Earliest setup start"
+              : "Earliest service start"}
           </Text>
 
           <View style={styles.friendlyRow}>
@@ -2407,10 +2402,10 @@ Alert.alert(
         <View style={{ marginTop: 22 }}>
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
-              ? "Latest you can deliver"
+              ? "Latest delivery time"
               : bookingType === "SETUP_BASED"
-              ? "Setup must be finished by"
-              : "Latest this can happen"}
+              ? "Setup completion deadline"
+              : "Service completion deadline"}
           </Text>
 
           <View style={styles.friendlyRow}>
@@ -2496,8 +2491,8 @@ Alert.alert(
 
           {serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (
             <Text style={[styles.sectionSubtitle, { marginTop: 12 },
-              serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, requiredServiceDurationMinutesValue) ? { color: "#B42318" } : {}]}>
-              {serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, requiredServiceDurationMinutesValue) ||
+              serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ? { color: "#B42318" } : {}]}>
+              {serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ||
                 `Service window: ${formatOffsetDisplay(serviceWindowStartOffsetMinutesValue)} → ${formatOffsetDisplay(serviceWindowEndOffsetMinutesValue)}`}
             </Text>
           )}
@@ -2864,19 +2859,7 @@ Alert.alert(
 
   {bookingType === "DELIVERY_BASED" && (
     <>
-      {requiredServiceDurationMinutesValue !== undefined && (
-        <View style={styles.previewDurationRow}>
-          <Text style={styles.previewDurationText}>
-            Time to deliver
-          </Text>
 
-          <Text style={styles.previewDurationPrice}>
-            {formatDurationDisplay(
-              requiredServiceDurationMinutesValue,
-            )}
-          </Text>
-        </View>
-      )}
 
       <View style={styles.previewDurationRow}>
         <Text style={styles.previewDurationText}>
@@ -2922,7 +2905,7 @@ Alert.alert(
 
       <View style={styles.previewDurationRow}>
         <Text style={styles.previewDurationText}>
-          Earliest arrival
+          Earliest setup start
         </Text>
 
         <Text style={styles.previewDurationPrice}>
@@ -2934,7 +2917,7 @@ Alert.alert(
 
       <View style={styles.previewDurationRow}>
         <Text style={styles.previewDurationText}>
-          Setup finished by
+          Setup completion deadline
         </Text>
 
         <Text style={styles.previewDurationPrice}>
@@ -2965,7 +2948,7 @@ Alert.alert(
       {serviceWindowStartOffsetMinutesValue !== undefined && (
         <View style={styles.previewDurationRow}>
           <Text style={styles.previewDurationText}>
-            Earliest
+            Earliest service start
           </Text>
 
           <Text style={styles.previewDurationPrice}>
@@ -2979,7 +2962,7 @@ Alert.alert(
       {serviceWindowEndOffsetMinutesValue !== undefined && (
         <View style={styles.previewDurationRow}>
           <Text style={styles.previewDurationText}>
-            Latest
+            Service completion deadline
           </Text>
 
           <Text style={styles.previewDurationPrice}>
