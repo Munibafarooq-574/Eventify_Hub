@@ -50,6 +50,12 @@ export type VendorAvailabilityResponse = {
   }[];
 };
 
+export function getVendorDayAvailability(vendorId: string, date: string) {
+  return growthApi.get<VendorAvailabilityResponse>(
+    `/vendor-availability/${encodeURIComponent(vendorId)}/slots?date=${encodeURIComponent(date)}`,
+  );
+}
+
 export default function getVendorAvailability(vendorId: string) {
   return growthApi.get<VendorAvailabilityResponse>(
     `/vendor-availability/${vendorId}`,

@@ -836,7 +836,7 @@ return {
     const vendorTimeZone = await this.cityService.requireCityTimeZone(
       String((vendor as any).businessCityId),
     );
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(dateStr)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       throw new BadRequestException('Calendar date must use YYYY-MM-DD');
     }
     const dayStart = eventLocalToUtc(dateStr, '00:00', vendorTimeZone);

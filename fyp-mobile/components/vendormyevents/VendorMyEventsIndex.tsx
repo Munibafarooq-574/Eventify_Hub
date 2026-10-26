@@ -2,7 +2,7 @@
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 import getVendorOrders from "@/services/getVendorOrders";
 import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
-import getVendorAvailability from "@/services/getVendorAvailability";
+import getVendorAvailability, { getVendorDayAvailability, type VendorAvailabilityResponse } from "@/services/getVendorAvailability";
 import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -97,7 +97,7 @@ const getStatusBackground = (status?: string) => {
   }
 };
 
-const isBlockingBookingStatus = (status?: string) => !["cancelled", "rejected", "expired"].includes(String(status || "").toLowerCase());
+const isBlockingBookingStatus = (status?: string) => ["pending", "accepted", "completed"].includes(String(status || "").toLowerCase());
 
 /**
  * MAIN SCREEN
@@ -111,6 +111,9 @@ const MyEventsScreen = () => {
   const [availability, setAvailability] = useState<AvailabilitySettings | null>(null);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [daySnapshot, setDaySnapshot] = useState<VendorAvailabilityResponse | null>(null);
+  const [dayLoading, setDayLoading] = useState(true);
+  const [dayError, setDayError] = useState("");
 
  /**
    * AVAILABILITY EDITOR STATE
@@ -143,6 +146,22 @@ const MyEventsScreen = () => {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Day availability uses every blocking vendor booking, independent of the
+  // paginated orders list. Discard old responses when the selected day changes.
+  useEffect(() => {
+    if (!vendorId) return;
+    let active = true;
+    setDayLoading(true);
+    setDayError("");
+    setDaySnapshot(null);
+    getVendorDayAvailability(vendorId, selectedDate).then((data) => {
+      if (active) setDaySnapshot(data);
+    }).catch(() => {
+      if (active) setDayError("Availability could not be loaded. Pull down to refresh before choosing a time.");
+    }).finally(() => { if (active) setDayLoading(false); });
+    return () => { active = false; };
+  }, [vendorId, selectedDate, orders, availability]);
 
   useEffect(() => {
   let mounted = true;
@@ -229,13 +248,13 @@ const MyEventsScreen = () => {
           const replacementOutcome = String(vendorOrder?.replacementOutcome || "").toUpperCase();
 
           return (
-            !["cancelled", "rejected", "expired"].includes(status) &&
+            !["cancelled", "cancelled_by_vendor", "rejected", "expired"].includes(status) &&
             replacementOutcome !== "NO_LONGER_ASSIGNED"
           );
         });
       }
 
-      return !["cancelled", "rejected", "expired"].includes(
+      return !["cancelled", "cancelled_by_vendor", "rejected", "expired"].includes(
         String(order?.status || "").toLowerCase(),
       );
     });
@@ -301,8 +320,14 @@ const isWorkingDay = useCallback((date: string) => {
  * SELECTED DAY BOOKINGS
  */
 const selectedDayBookings = useMemo(() => {
-  return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
-}, [scheduleOrders, selectedDate]);
+  if (daySnapshot?.date !== selectedDate) return [];
+  return (daySnapshot.bookings || []).filter((booking) => isBlockingBookingStatus(booking.status)).map((booking) => ({
+    status: booking.status,
+    eventName: booking.serviceName || "Booked",
+    eventStartDateTime: booking.start,
+    eventEndDateTime: booking.end,
+  }));
+}, [daySnapshot, selectedDate]);
 
 /**
  * SELECTED DAY WINDOWS
@@ -325,7 +350,7 @@ const selectedDayWindows = useMemo(() => {
  * DAY AVAILABILITY
  */
 const dayAvailability = useMemo(() => {
-  if (!availability) return { isWorking: true, isBlocked: false, windows: [], slots: [] as GeneratedSlot[] };
+  if (!availability || dayLoading || dayError || daySnapshot?.date !== selectedDate) return { isWorking: true, isBlocked: false, windows: [], slots: [] as GeneratedSlot[] };
   const isWorking = isWorkingDay(selectedDate), isBlocked = isBlockedDate(selectedDate);
   if (!isWorking || isBlocked) return { isWorking, isBlocked, windows: [], slots: [] as GeneratedSlot[] };
 
@@ -342,7 +367,7 @@ const dayAvailability = useMemo(() => {
 
       const slotStartKey = cursor.getTime(), slotEndKey = slotEnd.getTime();
       const booking = selectedDayBookings.find((order) => {
-        const status = getVendorStatus(order);
+        const status = order.status;
         if (!isBlockingBookingStatus(status) || !order?.eventStartDateTime || !order?.eventEndDateTime) return false;
         const bookingStart = new Date(order.eventStartDateTime).getTime();
         const bookingEnd = new Date(order.eventEndDateTime).getTime();
@@ -355,7 +380,7 @@ const dayAvailability = useMemo(() => {
   });
 
   return { isWorking, isBlocked, windows, slots };
-}, [availability, selectedDate, selectedDayBookings, selectedDayWindows, isWorkingDay, isBlockedDate, getVendorStatus]);
+}, [availability, selectedDate, selectedDayBookings, selectedDayWindows, isWorkingDay, isBlockedDate, dayLoading, dayError, daySnapshot]);
 
 /**
  * CALENDAR MARKS
@@ -551,10 +576,14 @@ return (
     </View>
   </View>
 
-  {availabilityLoading ? (
+  {availabilityLoading || dayLoading ? (
     <View style={styles.loadingAvailability}>
       <ActivityIndicator size="small" color={PRIMARY} />
       <Text style={styles.loadingText}>Loading availability...</Text>
+    </View>
+  ) : dayError ? (
+    <View style={styles.unavailableMessage}>
+      <Text accessibilityRole="alert" style={styles.messageText}>{dayError}</Text>
     </View>
   ) : dayAvailability.isBlocked ? (
     <View style={styles.unavailableMessage}>
