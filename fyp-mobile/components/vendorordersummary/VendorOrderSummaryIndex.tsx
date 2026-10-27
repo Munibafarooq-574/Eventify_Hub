@@ -824,7 +824,14 @@ const OrderSummary = () => {
                                                             const vendorPackages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
                                                             const selectedPackage = vendorPackages.find((pkg: any) => String(pkg?._id || pkg?.id) === String(service?.packageId || ""));
                                                             const total = Number(service?.finalAmount ?? service?.price ?? 0);
-                                                            const remaining = Number(service?.remainingAmount ?? total);
+                                                            const paymentStatus = String(service?.paymentStatus || "UNPAID").toUpperCase();
+                                                            // remainingAmount is also a pre-payment snapshot, so only
+                                                            // secured payment states may contribute to the paid display.
+                                                            const savedRemaining = Number(service?.remainingAmount ?? total);
+                                                            const remaining = paymentStatus === "PAID" ? 0
+                                                                : paymentStatus === "PARTIALLY_PAID" && Number.isFinite(savedRemaining)
+                                                                    ? Math.min(total, Math.max(savedRemaining, 0))
+                                                                    : total;
                                                             const paid = Math.max(total - remaining, 0);
                                                             return (
                                                               <View key={service?._id || idx} style={styles.serviceDetailCard}>
