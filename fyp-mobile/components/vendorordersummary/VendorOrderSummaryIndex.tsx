@@ -71,6 +71,8 @@ const CONFIRMED_STATUS = "confirmed";
 const COMPLETED_STATUS = "completed";
 const CANCELLED_STATUS = "cancelled";
 const PAYMENT_EXPIRED_STATUS = "payment_expired";
+const EXPIRED_STATUS = "expired";
+const isClosedVendorStatus = (status: string) => ["no_longer_assigned", PAYMENT_EXPIRED_STATUS, EXPIRED_STATUS].includes(status);
 
 // VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
 const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
@@ -102,6 +104,10 @@ const getVendorStatus = (order: any) => {
         return PAYMENT_EXPIRED_STATUS;
     }
 
+    if (vOrders.every((v: any) => v.status === EXPIRED_STATUS || ["EXPIRED", "PAYMENT_EXPIRED"].includes(String(v?.paymentStatus || "").toUpperCase()))) {
+        return EXPIRED_STATUS;
+    }
+
     const statuses = vOrders.map((v: any) => mapVendorStatus(v.status, v.replacementOutcome));
     if (statuses.every((x: string) => x === "no_longer_assigned")) return "no_longer_assigned";
     if (statuses.every((x: string) => x === "completed")) return "completed";
@@ -115,7 +121,7 @@ const getVendorStatus = (order: any) => {
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Cancelled" | "Payment Expired" | "No Longer Assigned";
+type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Cancelled" | "Expired" | "Payment Expired" | "No Longer Assigned";
 
 const OrderSummary = () => {
     const { selectedTab, orderId: targetOrderId } = useLocalSearchParams(); // Read tab from navigation params
@@ -153,7 +159,7 @@ const OrderSummary = () => {
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
-        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Confirmed", "Completed", "Cancelled", "Payment Expired", "No Longer Assigned"];
+        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Confirmed", "Completed", "Cancelled", "Expired", "Payment Expired", "No Longer Assigned"];
         if (tab && validTabs.includes(tab as FilterType)) {
             setSelectedFilter(tab as FilterType);
 
@@ -225,6 +231,7 @@ const OrderSummary = () => {
         const confirmed = orders.filter((o) => getVendorStatus(o) === CONFIRMED_STATUS).length;
         const completed = orders.filter((o) => getVendorStatus(o) === COMPLETED_STATUS).length;
         const cancelled = orders.filter((o) => getVendorStatus(o) === CANCELLED_STATUS).length;
+        const expired = orders.filter((o) => getVendorStatus(o) === EXPIRED_STATUS).length;
         const paymentExpired = orders.filter((o) => getVendorStatus(o) === PAYMENT_EXPIRED_STATUS).length;
         const noLongerAssigned = orders.filter((o) => getVendorStatus(o) === "no_longer_assigned").length;
         return {
@@ -234,6 +241,7 @@ const OrderSummary = () => {
             confirmed,
             completed,
             cancelled,
+            expired,
             paymentExpired,
             noLongerAssigned,
         };
@@ -249,6 +257,7 @@ const OrderSummary = () => {
                 return "#5CB85C";
             case "cancelled":
                 return "#D9534F";
+            case "expired":
             case "payment_expired":
                 return "#C47A2C";
             case "no_longer_assigned":
@@ -271,6 +280,7 @@ const OrderSummary = () => {
             if (selectedFilter === "Confirmed") return getVendorStatus(order) === CONFIRMED_STATUS;
             if (selectedFilter === "Completed") return getVendorStatus(order) === COMPLETED_STATUS;
             if (selectedFilter === "Cancelled") return getVendorStatus(order) === CANCELLED_STATUS;
+            if (selectedFilter === "Expired") return getVendorStatus(order) === EXPIRED_STATUS;
             if (selectedFilter === "Payment Expired") return getVendorStatus(order) === PAYMENT_EXPIRED_STATUS;
             if (selectedFilter === "No Longer Assigned") return getVendorStatus(order) === "no_longer_assigned";
             return true;
@@ -553,6 +563,10 @@ const OrderSummary = () => {
                             icon="close-circle-outline"
                             isActive={selectedFilter === "Cancelled"}
                         />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => handleSummaryCardClick("Expired")} activeOpacity={0.7}>
+                        <SummaryCard label="Expired" value={orderStats.expired} icon="timer-outline" isActive={selectedFilter === "Expired"} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -858,16 +872,18 @@ const OrderSummary = () => {
                                     {(item.vendorOrders || []).map((booking: any) => (
                                         <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={lateAcceptanceId === booking._id} onUpdated={refreshScreenData} />
                                     ))}
-                                    {getVendorStatus(item) === "no_longer_assigned" || getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? (
+                                    {isClosedVendorStatus(getVendorStatus(item)) ? (
                                         <View style={styles.closedBookingBox}>
                                             <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.closedBookingTitle}>
-                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment window expired" : "This booking is closed"}
+                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment window expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Booking expired" : "This booking is closed"}
                                                 </Text>
                                                 <Text style={styles.closedBookingText}>
                                                     {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS
                                                         ? "The client did not complete the required payment before the deadline. This booking is now history only and the reserved slot has been released."
+                                                        : getVendorStatus(item) === EXPIRED_STATUS
+                                                        ? "This booking has expired. It is kept for your history; booking actions and messaging are no longer available here."
                                                         : "This record is available for your history only. No further actions are required."}
                                                 </Text>
                                             </View>

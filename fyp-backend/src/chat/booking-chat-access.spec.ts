@@ -19,3 +19,26 @@ describe('Inactive vendor booking-only messaging',()=>{
  it('authenticates socket sender before a message can be stored',async()=>{const g:any=Object.create(ChatGateway.prototype);g.logger={log:jest.fn()};g.jwt={verifyAsync:jest.fn(async()=>({id:'other'}))};g.config={get:()=> 'secret'};g.chatService={createMessage:jest.fn()};const c:any={emit:jest.fn()};await g.handleMessage(c,{user:id(),receiverId:id(),chatId:'fake',token:'bad'});expect(g.chatService.createMessage).not.toHaveBeenCalled();expect(c.emit).toHaveBeenCalledWith('chatError',expect.anything())});
  it('does not join a room when booking access is denied',async()=>{const g:any=Object.create(ChatGateway.prototype);const user=id();g.jwt={verifyAsync:async()=>({id:user})};g.config={get:()=> 'secret'};g.chatService={assertBookingChatAccess:jest.fn(async()=>{throw Error('denied')})};const c:any={emit:jest.fn(),join:jest.fn()};await g.handleJoinConversation(c,{userId:user,chatId:'blocked',token:'valid'});expect(c.join).not.toHaveBeenCalled()});
 });
+
+describe('Expired subscription booking-state access regression',()=>{
+ it.each([
+  ['pending','UNPAID',true],
+  ['accepted','PAYMENT_REQUIRED',true],
+  ['accepted','PARTIALLY_PAID',true],
+  ['accepted','PAID',true],
+  ['completed','PAID',true],
+  ['expired','UNPAID',false],
+  ['expired','PAYMENT_EXPIRED',false],
+  ['pending','EXPIRED',false],
+  ['cancelled_by_vendor','UNPAID',false],
+  ['rejected','UNPAID',false],
+ ])('%s / %s preserves booking-based access (%s)',async(status,paymentStatus,allowed)=>{
+  const f=fixture(false);
+  f.s.bookings.exists.mockImplementation(async(filter:any)=>filter.status.$in.includes(status)&&!filter.paymentStatus.$nin.includes(paymentStatus)?{_id:id()}:null);
+  const chatId=[f.vendor,f.client].sort().join('-');
+  for(const participant of [f.vendor,f.client]) {
+   if(allowed) await expect(f.s.assertChat(chatId,participant)).resolves.toBeUndefined();
+   else await expect(f.s.assertChat(chatId,participant)).rejects.toThrow('existing bookings');
+  }
+ });
+});
