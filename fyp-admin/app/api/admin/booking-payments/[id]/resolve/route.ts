@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAdminToken } from "@/lib/auth";
 import { backendFetch } from "@/lib/backend";
+import { apiErrorMessage } from "@/lib/api-error";
 
 type RouteContext = {
   params: Promise<{
@@ -123,19 +124,12 @@ export async function PATCH(
   }
 
   if (!backendResponse.ok) {
-    const backendMessage =
-      data &&
-      typeof data === "object" &&
-      "message" in data
-        ? (data as { message?: unknown }).message
-        : null;
-
     return NextResponse.json(
       {
-        message:
-          typeof backendMessage === "string"
-            ? backendMessage
-            : "Unable to resolve booking payment.",
+        message: apiErrorMessage(
+          data,
+          "Unable to resolve booking payment.",
+        ),
       },
       { status: backendResponse.status },
     );
