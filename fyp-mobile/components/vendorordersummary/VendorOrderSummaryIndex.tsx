@@ -1,4 +1,5 @@
 import BookingActivity from '../booking/BookingActivity';
+import VendorLaterTimeRequest from '../booking/VendorLaterTimeRequest';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getVendorCancellationPreview, { type VendorCancellationPreview } from '@/services/getVendorCancellationPreview';
 import VendorCancellationSummary from '../cancellation/VendorCancellationSummary';
@@ -135,6 +136,7 @@ const OrderSummary = () => {
     const cancellationLock = useRef(false);
     const summaryScrollRef = useRef<ScrollView>(null);
 
+    const [lateAcceptanceId, setLateAcceptanceId] = useState<string | null>(null);
     const refreshScreenData = useCallback(async () => {
         const user = await getUserData();
         if (!user) throw new Error("user not found");
@@ -398,6 +400,7 @@ const OrderSummary = () => {
         alert("Order Updated");
 
     } catch (error: any) {
+        if (/not enough time remains|service has already started/i.test(error?.message || '')) setLateAcceptanceId(vendorOrderId);
         reportMarketplaceLoadError('Booking status unavailable', error);
         Alert.alert('Booking could not be updated', error?.message || 'Please refresh and try again.');
     }
@@ -852,7 +855,10 @@ const OrderSummary = () => {
                                         )}
                                     </View>
 
-                                                                        {getVendorStatus(item) === "no_longer_assigned" || getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? (
+                                    {(item.vendorOrders || []).map((booking: any) => (
+                                        <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={lateAcceptanceId === booking._id} onUpdated={refreshScreenData} />
+                                    ))}
+                                    {getVendorStatus(item) === "no_longer_assigned" || getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? (
                                         <View style={styles.closedBookingBox}>
                                             <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
                                             <View style={{ flex: 1 }}>
@@ -885,7 +891,7 @@ const OrderSummary = () => {
                                         )}
 
                                         {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
-                                            getVendorStatus(item) === "pending" ? (
+                                            getVendorStatus(item) === "pending" ? (item.vendorOrders?.[0]?.laterTimeRequest?.status !== "PENDING" &&
                                                 <TouchableOpacity
                                                     style={styles.completeButton}
                                                    // onPress={() => mark(item._id, "confirmed")}

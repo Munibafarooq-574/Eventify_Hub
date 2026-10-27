@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
+import { bookingActionError } from '@/services/bookingActionError';
+import { formatBookingActivityTime } from '@/utils/bookingActivity';
 import { getSecureData, saveSecureData } from '@/store';
 import { continueWithoutCancelledVendor, getCancellationReplacement } from '@/services/cancellationReplacement';
 
-type Props = { event: any; booking: any; onUpdated: () => Promise<void> };
-export default function CancellationReplacementActions({ event, booking, onUpdated }: Props) {
+type Props = { event: any; booking: any; onUpdated: () => Promise<void>; canReschedule?: boolean };
+export default function CancellationReplacementActions({ event, booking, onUpdated, canReschedule = false }: Props) {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const lock = useRef(false);
@@ -16,7 +18,10 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
   const replacement = (event.vendorOrders || []).find((item: any) =>
     String(item.replacesVendorOrderId || '') === String(booking._id) &&
     ['pending', 'accepted', 'completed'].includes(String(item.status)) && !['EXPIRED', 'PAYMENT_EXPIRED'].includes(item.paymentStatus));
-  if (booking.status !== 'cancelled_by_vendor' || booking.cancelledBy !== 'vendor') return null;
+  const later = booking.laterTimeRequest;
+  const laterPending = booking.status === 'pending' && later?.status === 'PENDING' && !booking.replacementOutcome;
+  if (later && !laterPending && booking.status !== 'cancelled_by_vendor') return <Text style={styles.hint}>{later.status === 'RESCHEDULE_REQUESTED' ? 'Your schedule change request has been sent for vendor review.' : later.status === 'REPLACED' ? 'You requested a replacement vendor.' : later.status === 'CONTINUE_WITHOUT' ? 'You chose to continue without this vendor.' : 'This later-time request is closed.'}{later.resolvedAt ? ` ${formatBookingActivityTime(later.resolvedAt, event.eventCityId?.timeZone)}` : ''}</Text>;
+  if (!laterPending && (booking.status !== 'cancelled_by_vendor' || booking.cancelledBy !== 'vendor')) return null;
   if ((event.vendorOrders || []).some((item: any) => String(item.replacesVendorOrderId || '') === String(booking._id) && item.status === 'cancelled_by_vendor')) return <Text style={styles.hint}>The replacement vendor cancelled. Use its booking history to find another replacement.</Text>;
   if (replacement) return <Text style={styles.hint}>{replacement.status === 'pending' ? 'Replacement requested — awaiting vendor response.' : `Replaced by ${replacement.vendorId?.contactDetails?.brandName || replacement.vendorId?.name || replacement.serviceName || 'another vendor'}.`}</Text>;
   const start = new Date(event.eventStartDateTime).getTime();
@@ -45,17 +50,28 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
         excludedVendorIds: JSON.stringify(context.excludedVendorIds), excludedVendorId: String(booking.vendorId?._id || booking.vendorId),
       }});
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message;
-      Alert.alert('Replacement unavailable', typeof message === 'string' ? message : 'Please refresh this event and try again.');
+      Alert.alert('Unable to update booking', error?.response ? bookingActionError(error, 'Please refresh this event and try again.').message : error?.message || 'Please refresh this event and try again.');
     } finally { lock.current = false; setBusy(false); }
   };
   return <View style={styles.box}>
-    <Text style={styles.title}>Need another vendor?</Text>
+    <Text style={styles.title}>{laterPending ? 'Vendor requested a later service time' : 'Need another vendor?'}</Text>
+    {laterPending && <>
+      <Text style={styles.hint}>{later.reason}</Text>
+      <Text style={styles.hint}>Requested: {formatBookingActivityTime(later.requestedAt, event.eventCityId?.timeZone)}</Text>
+      {!!later.suggestedEventStart && <Text style={styles.hint}>Suggested event time: {formatBookingActivityTime(later.suggestedEventStart, event.eventCityId?.timeZone)}. Availability is checked when you reschedule.</Text>}
+      {canReschedule ? <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => router.push({ pathname: '/reschedulebooking', params: {
+        orderId: event._id, eventName: event.eventName, eventDate: event.eventDate, eventTime: event.eventTime,
+        durationMinutes: String(event.eventDurationMinutes || 60),
+      } })}><Text style={styles.primaryText}>Review &amp; reschedule</Text></TouchableOpacity>
+      : <Text style={styles.hint}>Rescheduling is unavailable under this event’s existing payment or schedule-change rules.</Text>}
+    </>}
     <Text style={styles.hint}>{booking.cancellationReplacementChoice === 'CONTINUE_WITHOUT'
       ? 'You chose to continue without this vendor. You can still find a replacement before the event starts.'
-      : 'Find a replacement for this event, or continue with your remaining vendors. Your refund is handled separately.'}</Text>
+      : laterPending ? 'Choose a replacement for the current event time, or continue without this vendor. No payment has been taken for this pending booking.' : 'Find a replacement for this event, or continue with your remaining vendors. Your refund is handled separately.'}</Text>
     <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => void run(false)}><Text style={styles.primaryText}>{busy ? 'Please wait…' : 'Find replacement'}</Text></TouchableOpacity>
-    {booking.cancellationReplacementChoice !== 'CONTINUE_WITHOUT' && <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={() => void run(true)}><Text style={styles.secondaryText}>Continue without this vendor</Text></TouchableOpacity>}
+    {booking.cancellationReplacementChoice !== 'CONTINUE_WITHOUT' && <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={() => Alert.alert('Continue without this vendor?', 'Only this vendor booking will be closed. Your event and other vendors will stay unchanged.', [
+      { text: 'Keep booking', style: 'cancel' }, { text: 'Continue without', onPress: () => void run(true) },
+    ])}><Text style={styles.secondaryText}>Continue without this vendor</Text></TouchableOpacity>}
   </View>;
 }
 const styles = StyleSheet.create({

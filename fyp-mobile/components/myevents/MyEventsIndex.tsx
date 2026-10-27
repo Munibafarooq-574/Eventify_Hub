@@ -739,6 +739,7 @@ const MyEventsScreen = () => {
   !['completed', 'cancelled'].includes(String(event.status || '').toLowerCase()) &&
   !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) &&
   !hasSuccessfulVendorPayment &&
+  !vendorOrders.some((vendor: any) => vendor.status === 'pending' && vendor.laterTimeRequest?.status === 'PENDING') &&
   vendorOrders.some((vendor: any) =>
     ['pending', 'accepted'].includes(
       String(vendor?.status || '').toLowerCase(),
@@ -1255,6 +1256,8 @@ const MyEventsScreen = () => {
                             </View>
                           )}
 
+                          {!!vendor.laterTimeRequest && <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData}
+                            canReschedule={!hasSuccessfulVendorPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id))} />}
                           <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
                           {/* Status + message row */}
                           <View style={styles.vendorFooterRow}>

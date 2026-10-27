@@ -25,6 +25,12 @@ import { CreateRescheduleRequestDto, RespondRescheduleRequestDto, ResolveResched
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
+    @Post('vendor-order/:id/later-time-request')
+    @UseGuards(JwtAuthGuard)
+    requestLaterTime(@Param('id') id: string, @Request() req: any, @Body() body: any) {
+        return this.orderService.requestLaterServiceTime(id, req.user, body);
+    }
+
     @Get('vendor-order/:id/cancellation-replacement')
     @UseGuards(JwtAuthGuard)
     cancellationReplacement(@Param('id') id: string, @Request() req: any) {

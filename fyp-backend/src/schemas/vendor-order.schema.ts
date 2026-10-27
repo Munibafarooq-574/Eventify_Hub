@@ -27,8 +27,26 @@ export class BookingPolicySnapshot {
 }
 const BookingPolicySnapshotSchema = SchemaFactory.createForClass(BookingPolicySnapshot);
 
+@Schema({ _id: false })
+export class LaterTimeRequest {
+    @Prop({ required: true, enum: ['PENDING', 'RESCHEDULE_REQUESTED', 'REPLACED', 'CONTINUE_WITHOUT'] })
+    status: string;
+    @Prop({ required: true })
+    reason: string;
+    @Prop({ type: Date, required: true })
+    requestedAt: Date;
+    @Prop({ type: Date })
+    suggestedEventStart?: Date;
+    @Prop({ type: Date })
+    resolvedAt?: Date;
+}
+const LaterTimeRequestSchema = SchemaFactory.createForClass(LaterTimeRequest);
+
 @Schema({ timestamps: true })
 export class VendorOrder extends Document {
+    @Prop({ type: LaterTimeRequestSchema })
+    laterTimeRequest?: LaterTimeRequest;
+
     // Server-generated once at booking creation. Absent on legacy bookings.
     // Acceptance, payment and rescheduling must not replace these terms.
     @Prop({ type: BookingPolicySnapshotSchema, immutable: true })

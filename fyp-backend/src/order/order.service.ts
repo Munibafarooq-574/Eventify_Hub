@@ -1018,6 +1018,9 @@ export class OrderService {
                                 };
                         }
 
+                        if (cancellationReplacement?.laterTimePending && this.getDownPaymentConfig(vendor)?.value !== 0) {
+                            snapshotDownPaymentWindow({ eventStartDateTime: finalServiceStartDateTime }, vendor.availabilitySettings, new Date(), eventTimeZone);
+                        }
                         validatedServices.push(
                             {
                                 serviceIndex,
@@ -1217,6 +1220,14 @@ export class OrderService {
                         order.totalAmount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.originalAmount ?? booking.price ?? 0), 0) + totalAmount;
                         order.discount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.discountAmount ?? 0), 0) + totalDiscount;
                         order.finalAmount = cancellationReplacement.active.reduce((sum, booking) => sum + Number(booking.finalAmount ?? booking.price ?? 0), 0) + finalAmount;
+                        if (cancellationReplacement.laterTimePending) {
+                            const oldBooking = cancellationReplacement.vendorOrder;
+                            oldBooking.status = 'rejected';
+                            oldBooking.replacementOutcome = 'NO_LONGER_ASSIGNED';
+                            oldBooking.replacementFinalizedAt = new Date();
+                            oldBooking.laterTimeRequest!.status = 'REPLACED';
+                            oldBooking.laterTimeRequest!.resolvedAt = oldBooking.replacementFinalizedAt;
+                        }
                         cancellationReplacement.vendorOrder.cancellationReplacementChoice = null;
                         await cancellationReplacement.vendorOrder.save({ session });
                     } else {
@@ -1279,6 +1290,9 @@ export class OrderService {
             );
         }
 
+        if (cancellationReplacement?.laterTimePending && savedOrder) {
+            await this.notifyLaterTimeDecision(savedOrder, cancellationReplacement.vendorOrder, 'The client requested a replacement vendor. Your previous pending booking is no longer assigned to you.');
+        }
         // Notifications only after a successful transaction commit.
         try {
             for (
@@ -1302,9 +1316,62 @@ export class OrderService {
     }
 
 
+    async requestLaterServiceTime(id: string, actor: CancellationActor, body: any) {
+        // Authenticate before entering the write lock; recheck ownership inside it.
+        await this.cancellationService.assertVendorBookingOwner(id, actor);
+        const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+        if (!reason || reason.length > 500) throw new BadRequestException('Enter a reason of 1–500 characters.');
+        const result = await withBookingPaymentLock(this.connection, this.vendorOrderModel, id, async session => {
+            const booking = await this.cancellationService.assertVendorBookingOwner(id, actor, session);
+            const order = await this.orderModel.findById(booking.orderId).session(session);
+            if (!order || !order.eventStartDateTime || new Date(order.eventStartDateTime).getTime() <= Date.now() || ['completed', 'cancelled'].includes(order.status)) {
+                throw new ConflictException('A later time can only be requested before the event starts.');
+            }
+            if (booking.status !== 'pending' || booking.replacementOutcome || ['PARTIALLY_PAID', 'PAID'].includes(booking.paymentStatus)) {
+                throw new ConflictException('Only a pending unpaid booking can request a later service time.');
+            }
+            if (await this.connection.model(Payment.name).exists({ vendorOrderId: booking._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) {
+                throw new ConflictException('Resolve the existing payment before requesting a later time.');
+            }
+            if (booking.laterTimeRequest) return { booking, order, created: false };
+            if (await this.rescheduleRequestModel.exists({ orderId: order._id, resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] } }).session(session)) {
+                throw new ConflictException('A schedule change is already awaiting a decision.');
+            }
+            const vendor = await this.userModel.findById(booking.vendorId).session(session).lean();
+            if (this.getDownPaymentConfig(vendor)?.value === 0) throw new ConflictException('No advance payment is required. Please use the normal booking response.');
+            const zone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+            let blocked = false;
+            try { snapshotDownPaymentWindow({ eventStartDateTime: booking.eventStartDateTime }, vendor?.availabilitySettings, new Date(), zone); }
+            catch (error) { if (error instanceof ConflictException) blocked = true; else throw error; }
+            if (!blocked) throw new ConflictException('There is still enough time to accept this booking normally.');
+            let suggestedEventStart: Date | undefined;
+            if (body.suggestedDate || body.suggestedTime) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(body.suggestedDate || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.suggestedTime || '')) {
+                    throw new BadRequestException('Provide both a valid suggested date (YYYY-MM-DD) and time (HH:mm).');
+                }
+                suggestedEventStart = eventLocalToUtc(body.suggestedDate, body.suggestedTime, zone);
+                if (suggestedEventStart.getTime() <= Math.max(Date.now(), new Date(order.eventStartDateTime).getTime())) throw new BadRequestException('Suggest a time later than the current event.');
+            }
+            booking.laterTimeRequest = { status: 'PENDING', reason, requestedAt: new Date(), suggestedEventStart };
+            await booking.save({ session });
+            return { booking, order, created: true };
+        });
+        if (result.created) await this.notifyLaterTimeDecision(result.order, result.booking, 'The vendor requested a later service time. Open your booking to review your available options.', 'Your later-time request was sent to the client. This booking remains pending until the client decides.');
+        return result.booking.laterTimeRequest;
+    }
+
+    private async notifyLaterTimeDecision(order: any, booking: any, message: string, vendorMessage = message) {
+        for (const [recipient, body] of [[String(order.organizerId), message], [String(booking.vendorId), vendorMessage]]) {
+            try { await this.sendPushNotification('Booking time update', body, recipient, 'BOOKING_TIME_UPDATE'); }
+            catch { try { await this.saveNotification(recipient, 'Booking time update', body, 'BOOKING_TIME_UPDATE'); } catch {} }
+        }
+    }
+
     private async cancellationReplacementContext(id: string, actor: CancellationActor, session?: ClientSession) {
         const { vendorOrder, order } = await this.cancellationService.assertClientBookingOwner(id, actor, session);
-        if (vendorOrder.status !== 'cancelled_by_vendor' || vendorOrder.cancelledBy !== 'vendor') {
+        const laterTimePending = vendorOrder.status === 'pending' && vendorOrder.laterTimeRequest?.status === 'PENDING' && !vendorOrder.replacementOutcome;
+        if (laterTimePending && (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus) || await this.connection.model(Payment.name).exists({ vendorOrderId: vendorOrder._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session ?? null))) throw new ConflictException('This booking has a payment that must be resolved first.');
+        if (!laterTimePending && (vendorOrder.status !== 'cancelled_by_vendor' || vendorOrder.cancelledBy !== 'vendor')) {
             throw new ConflictException('Only a vendor-cancelled booking can be replaced this way.');
         }
         const start = new Date(order.eventStartDateTime as any).getTime();
@@ -1325,7 +1392,7 @@ export class OrderService {
         }
         const vendor = await this.userModel.findById(vendorOrder.vendorId).select('buisnessCategory').session(session ?? null);
         if (!vendor?.buisnessCategory) throw new ConflictException('The cancelled vendor category is unavailable.');
-        return { vendorOrder, order, categoryId: String(vendor.buisnessCategory), active };
+        return { vendorOrder, order, categoryId: String(vendor.buisnessCategory), active: active.filter(booking => String(booking._id) !== String(vendorOrder._id)), laterTimePending };
     }
 
     async getCancellationReplacementContext(id: string, actor: CancellationActor) {
@@ -1344,6 +1411,30 @@ export class OrderService {
     }
 
     async continueWithoutCancelledVendor(id: string, actor: CancellationActor) {
+        const initial = await this.cancellationService.assertClientBookingOwner(id, actor);
+        if (initial.vendorOrder.laterTimeRequest && initial.vendorOrder.status !== 'cancelled_by_vendor') {
+            const result = await withBookingPaymentLock(this.connection, this.vendorOrderModel, id, async session => {
+                const owned = await this.cancellationService.assertClientBookingOwner(id, actor, session);
+                if (owned.vendorOrder.laterTimeRequest?.status === 'CONTINUE_WITHOUT') return null;
+                const context = await this.cancellationReplacementContext(id, actor, session);
+                if (!context.laterTimePending) throw new ConflictException('This request has already been resolved.');
+                const booking = context.vendorOrder;
+                booking.status = 'rejected';
+                booking.replacementOutcome = 'NO_LONGER_ASSIGNED';
+                booking.replacementFinalizedAt = new Date();
+                booking.laterTimeRequest!.status = 'CONTINUE_WITHOUT';
+                booking.laterTimeRequest!.resolvedAt = booking.replacementFinalizedAt;
+                booking.cancellationReplacementChoice = 'CONTINUE_WITHOUT';
+                await booking.save({ session });
+                context.order.totalAmount = context.active.reduce((sum, b) => sum + Number(b.originalAmount ?? b.price ?? 0), 0);
+                context.order.discount = context.active.reduce((sum, b) => sum + Number(b.discountAmount ?? 0), 0);
+                context.order.finalAmount = context.active.reduce((sum, b) => sum + Number(b.finalAmount ?? b.price ?? 0), 0);
+                await context.order.save({ session });
+                return context;
+            });
+            if (result) await this.notifyLaterTimeDecision(result.order, result.vendorOrder, 'The client chose to continue without this vendor. Other vendor bookings remain unchanged.');
+            return { ok: true };
+        }
         const context = await this.cancellationReplacementContext(id, actor);
         context.vendorOrder.cancellationReplacementChoice = 'CONTINUE_WITHOUT';
         await context.vendorOrder.save();
@@ -1919,6 +2010,7 @@ async getOrderStats(type: string, userId: string) {
         }
 
         const previousStatus = vendorOrder.status;
+        if (status === 'accepted' && vendorOrder.laterTimeRequest?.status === 'PENDING') throw new ConflictException('A later-time request is awaiting the client’s decision.');
         if (status === 'accepted' && vendorOrder.status === 'accepted') return vendorOrder;
         if (vendorOrder.status === 'expired') throw new ConflictException('This booking has expired.');
         vendorOrder.status = status;
@@ -2062,7 +2154,7 @@ vendorOrder.vendorNetAmount =
     vendorOrder.price - vendorOrder.commissionAmount;
 }
 
-        if (status === 'accepted') vendorOrder.$where = { status: previousStatus };
+        if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' } };
         let saved;
         try { saved = await vendorOrder.save(); }
         catch(error) {
@@ -2555,6 +2647,9 @@ async completeVendorOrder(vendorOrderId: string) {
         const created: any[] = [];
         const requestGroupId = new Types.ObjectId();
 
+        // Handle pending later-time decisions first, so concurrent replacement
+        // cannot close an assignment while its schedule request is created.
+        vendorOrders.sort((a, b) => Number(b.laterTimeRequest?.status === 'PENDING') - Number(a.laterTimeRequest?.status === 'PENDING'));
         for (const vendorOrder of vendorOrders) {
             const availability = await this.availabilityService.checkVendorAvailability(
                 String(vendorOrder.vendorId),
@@ -2574,7 +2669,7 @@ async completeVendorOrder(vendorOrderId: string) {
                 (p: any) => String(p._id) === String(vendorOrder.packageId),
             );
 
-            const request = await this.rescheduleRequestModel.create({
+            const requestData = {
                 requestGroupId,
                 bookingId: order._id,
                 orderId: order._id,
@@ -2600,8 +2695,27 @@ async completeVendorOrder(vendorOrderId: string) {
                 status: 'CHANGE_REQUESTED',
                 resolutionStatus: 'PENDING',
                 expiresAt,
-            });
-
+            };
+            const request = vendorOrder.laterTimeRequest?.status === 'PENDING'
+                ? await withBookingPaymentLock(this.connection, this.vendorOrderModel, vendorOrder._id, async session => {
+                    const current = await this.vendorOrderModel.findById(vendorOrder._id).session(session);
+                    if (!current || current.status !== 'pending' || current.replacementOutcome || current.laterTimeRequest?.status !== 'PENDING') {
+                        throw new ConflictException('This vendor request has changed. Please refresh the event.');
+                    }
+                    if (oldEventStart.getTime() <= Date.now()) throw new ConflictException('This event has already started and cannot be rescheduled.');
+                    if (await this.rescheduleRequestModel.exists({ vendorOrderId: current._id }).session(session)) {
+                        throw new ConflictException('A schedule request already exists for this booking.');
+                    }
+                    if (await this.connection.model(Payment.name).exists({ vendorOrderId: current._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) {
+                        throw new ConflictException('Resolve the existing payment before rescheduling.');
+                    }
+                    const [saved] = await this.rescheduleRequestModel.create([requestData], { session });
+                    current.laterTimeRequest.status = 'RESCHEDULE_REQUESTED';
+                    current.laterTimeRequest.resolvedAt = new Date();
+                    await current.save({ session });
+                    return saved;
+                })
+                : await this.rescheduleRequestModel.create(requestData);
             created.push(request);
 
             try {

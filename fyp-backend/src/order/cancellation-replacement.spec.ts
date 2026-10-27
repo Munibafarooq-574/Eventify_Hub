@@ -64,3 +64,58 @@ describe('Subscription changes during replacement checkout',()=>{
   expect(JSON.stringify(f.order)).toBe(before);expect(f.sibling.status).toBe('accepted');
  });
 });
+
+function laterFixture() {
+ const f=fixture();f.old.status='pending';f.old.cancelledBy=null;f.old.paymentStatus='UNPAID';f.old.eventStartDateTime=new Date('2026-11-10T08:00:00Z');
+ f.old.laterTimeRequest={status:'PENDING',reason:'More time needed',requestedAt:new Date()};
+ f.s.connection.model=()=>({exists:()=>q(false)});f.s.vendorOrderModel.updateOne=jest.fn(async()=>({matchedCount:1}));
+ return f;
+}
+describe('Pending later-time request replacement reuses existing checkout',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-10-19T07:00:00Z'))});afterEach(()=>jest.useRealTimers());
+ it('browsing preserves the old pending booking',async()=>{const f=laterFixture();await f.s.getCancellationReplacementContext(String(f.old._id),f.actor);expect(f.old.status).toBe('pending');expect(f.old.save).not.toHaveBeenCalled()});
+ it('successful replacement closes only the old assignment and preserves siblings',async()=>{const f=laterFixture();await f.create();expect(f.old.status).toBe('rejected');expect(f.old.replacementOutcome).toBe('NO_LONGER_ASSIGNED');expect(f.old.laterTimeRequest.status).toBe('REPLACED');expect(f.old.replacementFinalizedAt).toEqual(new Date());expect(f.order.finalAmount).toBe(9000);expect(f.sibling.status).toBe('accepted');expect(f.s.vendorOrderModel.create).toHaveBeenCalledTimes(1)});
+ it('failed replacement validation preserves old booking and price',async()=>{const f=laterFixture();f.s.featureAccessService.hasActiveSubscription=async()=>false;await expect(f.create()).rejects.toThrow();expect(f.old.status).toBe('pending');expect(f.old.laterTimeRequest.status).toBe('PENDING');expect(f.old.save).not.toHaveBeenCalled();expect(f.order.finalAmount).toBe(9000)});
+ it('continue without affects only this unpaid assignment and is idempotent',async()=>{const f=laterFixture();await f.s.continueWithoutCancelledVendor(String(f.old._id),f.actor);expect(f.old.laterTimeRequest.status).toBe('CONTINUE_WITHOUT');expect(f.old.replacementOutcome).toBe('NO_LONGER_ASSIGNED');expect(f.order.finalAmount).toBe(3000);expect(f.sibling.status).toBe('accepted');const count=f.s.sendPushNotification.mock.calls.length;await f.s.continueWithoutCancelledVendor(String(f.old._id),f.actor);expect(f.s.sendPushNotification).toHaveBeenCalledTimes(count);expect(f.old.save).toHaveBeenCalledTimes(1)});
+ it('rejects paid bookings, wrong clients, duplicate replacements and past events',async()=>{
+  const f=laterFixture();f.old.paymentStatus='PARTIALLY_PAID';await expect(f.s.getCancellationReplacementContext(String(f.old._id),f.actor)).rejects.toThrow('payment');f.old.paymentStatus='UNPAID';
+  await expect(f.s.getCancellationReplacementContext(String(f.old._id),{id:String(id()),role:'client'})).rejects.toThrow('own');
+  f.s.vendorOrderModel.find=()=>q([{...f.sibling,replacesVendorOrderId:f.old._id}]);await expect(f.create()).rejects.toThrow('already exists');
+  f.order.eventStartDateTime=new Date();await expect(f.s.continueWithoutCancelledVendor(String(f.old._id),f.actor)).rejects.toThrow('before');expect(f.old.save).not.toHaveBeenCalled();
+ });
+ it('cannot accept while a later-time decision is pending',async()=>{const f=laterFixture();f.s.vendorOrderModel.findById=()=>q(f.old);await expect(f.s.updateVendorResponse(String(f.old._id),'accepted')).rejects.toThrow('awaiting');expect(f.old.save).not.toHaveBeenCalled()});
+});
+
+describe('Vendor later-time request authorization, timing and duplicate safety',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-11-10T06:50:00Z'))});afterEach(()=>jest.useRealTimers());
+ function requestFixture(){const f=laterFixture();delete f.old.laterTimeRequest;f.s.orderModel.findById=()=>q(f.order);
+  f.s.cancellationService.assertVendorBookingOwner=async(_id:any,actor:any)=>{if(actor.role!=='vendor'||actor.id!==String(f.old.vendorId))throw Error('Vendor ownership required');return f.old};
+  f.s.userModel.findById=()=>q({availabilitySettings:{minimumAdvanceMinutes:60}});return f;
+ }
+ it('stores one request with city timezone suggestion and notifies each party once',async()=>{const f=requestFixture();const actor={id:String(f.old.vendorId),role:'vendor'};
+  const result=await f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:' Please choose a later time ',suggestedDate:'2026-11-10',suggestedTime:'15:00'});
+  expect(result.reason).toBe('Please choose a later time');expect(result.suggestedEventStart).toEqual(new Date('2026-11-10T10:00:00Z'));expect(f.old.status).toBe('pending');
+  await f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Retry'});expect(f.old.save).toHaveBeenCalledTimes(1);expect(f.s.sendPushNotification).toHaveBeenCalledTimes(2);
+ });
+ it('blocks other vendors, blank reasons, past events and requests when normal acceptance is possible',async()=>{const f=requestFixture();const actor={id:String(f.old.vendorId),role:'vendor'};
+  await expect(f.s.requestLaterServiceTime(String(f.old._id),{...actor,id:String(id())},{reason:'Later'})).rejects.toThrow('ownership');
+  await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'  '})).rejects.toThrow('reason');
+  jest.setSystemTime(new Date('2026-11-10T05:00:00Z'));await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Later'})).rejects.toThrow('enough time');
+  jest.setSystemTime(new Date('2026-11-10T08:00:00Z'));await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Later'})).rejects.toThrow('before');expect(f.old.save).not.toHaveBeenCalled();
+ });
+ it('rejects accepted, paid and zero advance requests without mutation',async()=>{const f=requestFixture();const actor={id:String(f.old.vendorId),role:'vendor'};
+  f.old.status='accepted';await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Later'})).rejects.toThrow('pending unpaid');f.old.status='pending';
+  f.s.connection.model=()=>({exists:()=>q(true)});await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Later'})).rejects.toThrow('payment');f.s.connection.model=()=>({exists:()=>q(false)});
+  f.s.userModel.findById=()=>q({cakeBusinessDetails:{downPaymentType:'FIXED',downPayment:0}});await expect(f.s.requestLaterServiceTime(String(f.old._id),actor,{reason:'Later'})).rejects.toThrow('No advance');expect(f.old.save).not.toHaveBeenCalled();
+ });
+});
+
+describe('Later-time decisions use the existing reschedule approval flow',()=>{
+ beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-11-10T06:50:00Z'))});afterEach(()=>jest.useRealTimers());
+ function setup(){const f=laterFixture();f.s.orderModel.findById=()=>q(f.order);f.s.vendorOrderModel.find=()=>q([f.sibling,f.old]);f.s.vendorOrderModel.findById=()=>q(f.old);f.s.rescheduleRequestModel.findOne=()=>q(null);f.s.rescheduleRequestModel.create=jest.fn(async(data:any)=>Array.isArray(data)?data:data);f.s.chatService={createOrGetConversation:async()=>'chat',createMessage:async()=>{}};return f;}
+ const dto={eventDate:'2026-11-11',eventTime:'15:00',durationMinutes:60,reason:'Later time requested'};
+ it('records the client decision atomically, retains both vendors and awaits their approvals',async()=>{const f=setup();const result=await f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto);expect(result.requests).toHaveLength(2);expect(f.old.laterTimeRequest.status).toBe('RESCHEDULE_REQUESTED');expect(f.old.laterTimeRequest.resolvedAt).toEqual(new Date());expect(f.old.status).toBe('pending');expect(f.sibling.status).toBe('accepted');expect(f.order.eventTime).toBe('13:00');expect(f.s.rescheduleRequestModel.create.mock.calls[0][1]).toHaveProperty('session');expect(f.s.sendPushNotification).toHaveBeenCalledTimes(2)});
+ it('does not create schedule requests if replacement closed the assignment concurrently',async()=>{const f=setup();f.s.vendorOrderModel.findById=()=>q({...f.old,status:'rejected',replacementOutcome:'NO_LONGER_ASSIGNED'});await expect(f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto)).rejects.toThrow('changed');expect(f.s.rescheduleRequestModel.create).not.toHaveBeenCalled()});
+ it('preserves existing paid-event rescheduling restrictions',async()=>{const f=setup();f.sibling.paymentStatus='PARTIALLY_PAID';await expect(f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto)).rejects.toThrow('before any down payment');expect(f.s.rescheduleRequestModel.create).not.toHaveBeenCalled();expect(f.old.laterTimeRequest.status).toBe('PENDING')});
+ it('does not close a later-time decision when request creation fails',async()=>{const f=setup();f.s.rescheduleRequestModel.create.mockRejectedValue(new Error('Storage unavailable'));await expect(f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto)).rejects.toThrow('Storage unavailable');expect(f.old.laterTimeRequest.status).toBe('PENDING');expect(f.old.save).not.toHaveBeenCalled()});
+});

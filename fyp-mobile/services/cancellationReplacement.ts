@@ -12,6 +12,9 @@ async function auth() {
   if (!token) throw new Error('Please sign in again.');
   return { headers: { Authorization: `Bearer ${token}` }, timeout: 20000 };
 }
+export async function requestLaterServiceTime(id: string, body: { reason: string; suggestedDate?: string; suggestedTime?: string }) {
+  return (await axios.post(`${API_BASE_URL}/orders/vendor-order/${encodeURIComponent(id)}/later-time-request`, body, await auth())).data;
+}
 export async function getCancellationReplacement(id: string): Promise<CancellationReplacementContext> {
   return (await axios.get(`${API_BASE_URL}/orders/vendor-order/${encodeURIComponent(id)}/cancellation-replacement`, await auth())).data;
 }
