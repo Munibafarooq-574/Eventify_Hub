@@ -74,6 +74,9 @@ const CANCELLED_STATUS = "cancelled";
 const PAYMENT_EXPIRED_STATUS = "payment_expired";
 const EXPIRED_STATUS = "expired";
 const isClosedVendorStatus = (status: string) => ["no_longer_assigned", PAYMENT_EXPIRED_STATUS, EXPIRED_STATUS].includes(status);
+const isAcceptanceDisabled = (booking: any, blockedId: string | null) =>
+    booking?.laterTimeRequest?.status === 'PENDING' || booking?.laterTimeRequestAvailable === true ||
+    (booking?.laterTimeRequestAvailable == null && !booking?.laterTimeRequest && blockedId === booking?._id);
 
 // VendorOrder schema uses 'accepted' where Order/UI uses 'confirmed'
 const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
@@ -601,6 +604,8 @@ const OrderSummary = () => {
                     style={styles.ordersList}
                     contentContainerStyle={styles.ordersListContent}
                     data={filteredOrders}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
                     keyExtractor={(item) => item._id}
                     showsVerticalScrollIndicator={false}
                     ListHeaderComponent={
@@ -872,7 +877,7 @@ const OrderSummary = () => {
                                     </View>
 
                                     {(item.vendorOrders || []).map((booking: any) => (
-                                        <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={lateAcceptanceId === booking._id} onUpdated={refreshScreenData} />
+                                        <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={isAcceptanceDisabled(booking, lateAcceptanceId)} onUpdated={refreshScreenData} />
                                     ))}
                                     {isClosedVendorStatus(getVendorStatus(item)) ? (
                                         <View style={styles.closedBookingBox}>
@@ -909,9 +914,11 @@ const OrderSummary = () => {
                                         )}
 
                                         {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
-                                            getVendorStatus(item) === "pending" ? (item.vendorOrders?.[0]?.laterTimeRequest?.status !== "PENDING" &&
+                                            getVendorStatus(item) === "pending" ? (
                                                 <TouchableOpacity
-                                                    style={styles.completeButton}
+                                                    disabled={isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId)}
+                                                    accessibilityState={{ disabled: isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId) }}
+                                                    style={[styles.completeButton, (isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId)) && { opacity: 0.45 }]}
                                                    // onPress={() => mark(item._id, "confirmed")}
                                                    onPress={() =>
                                                         mark(

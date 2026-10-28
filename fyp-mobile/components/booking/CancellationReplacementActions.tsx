@@ -59,10 +59,14 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
       <Text style={styles.hint}>{later.reason}</Text>
       <Text style={styles.hint}>Requested: {formatBookingActivityTime(later.requestedAt, event.eventCityId?.timeZone)}</Text>
       {!!later.suggestedEventStart && <Text style={styles.hint}>Suggested event time: {formatBookingActivityTime(later.suggestedEventStart, event.eventCityId?.timeZone)}. Availability is checked when you reschedule.</Text>}
-      {canReschedule ? <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => router.push({ pathname: '/reschedulebooking', params: {
-        orderId: event._id, eventName: event.eventName, eventDate: event.eventDate, eventTime: event.eventTime,
-        durationMinutes: String(event.eventDurationMinutes || 60),
-      } })}><Text style={styles.primaryText}>Review &amp; reschedule</Text></TouchableOpacity>
+      {canReschedule ? <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => {
+        let suggestedDate = event.eventDate, suggestedTime = event.eventTime;
+        if (later.suggestedEventStart && Number.isFinite(new Date(later.suggestedEventStart).getTime())) {
+          const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: event.eventCityId?.timeZone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(later.suggestedEventStart)).map(part => [part.type, part.value]));
+          suggestedDate = `${parts.year}-${parts.month}-${parts.day}`; suggestedTime = `${parts.hour}:${parts.minute}`;
+        }
+        router.push({ pathname: '/reschedulebooking', params: { orderId: event._id, eventName: event.eventName, eventDate: suggestedDate, eventTime: suggestedTime, durationMinutes: String(event.eventDurationMinutes || 60) } });
+      }}><Text style={styles.primaryText}>Review &amp; reschedule</Text></TouchableOpacity>
       : <Text style={styles.hint}>Rescheduling is unavailable under this event’s existing payment or schedule-change rules.</Text>}
     </>}
     <Text style={styles.hint}>{booking.cancellationReplacementChoice === 'CONTINUE_WITHOUT'

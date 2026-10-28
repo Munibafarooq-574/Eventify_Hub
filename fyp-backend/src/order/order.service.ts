@@ -1598,6 +1598,20 @@ export class OrderService {
             businessCityId
             packages
             availabilitySettings
+            photographerBusinessDetails.downPayment
+            photographerBusinessDetails.downPaymentType
+            cateringBusinessDetails.downPayment
+            cateringBusinessDetails.downPaymentType
+            venueBusinessDetails.downPayment
+            venueBusinessDetails.downPaymentType
+            salonBusinessDetails.downPayment
+            salonBusinessDetails.downPaymentType
+            cakeBusinessDetails.downPayment
+            cakeBusinessDetails.downPaymentType
+            mehndiBusinessDetails.downPayment
+            mehndiBusinessDetails.downPaymentType
+            soundBusinessDetails.downPayment
+            soundBusinessDetails.downPaymentType
         `,
         populate: [
             {
@@ -1626,6 +1640,7 @@ export class OrderService {
         const pending = await this.connection.model(Payment.name).find({vendorOrderId:{$in:visibleBookings.map((v:any)=>v._id)},type:'DOWN_PAYMENT',status:'PENDING'}).lean();
         const pendingIds = new Set(pending.map((p:any)=>String(p.vendorOrderId)));
         for (const order of orders as any[]) for (const booking of order.vendorOrders || []) {
+            booking.laterTimeRequestAvailable = this.canRequestLaterTime(booking, order, pendingIds.has(String(booking._id)));
             if (!['PAYMENT_REQUIRED','PAYMENT_FAILED'].includes(booking.paymentStatus)) continue;
             applyLegacyPaymentWindow(booking,booking.vendorId?.availabilitySettings,order.eventCityId?.timeZone || 'UTC');
             booking.paymentDeadline=effectiveDownPaymentDeadline(booking);
@@ -2341,6 +2356,21 @@ vendorOrder.vendorNetAmount =
 
     // ===== NEW (Phase 4): down payment info for vendor request details =====
     // Reuses the EXISTING per-category downPayment field — no duplicate field.
+    private canRequestLaterTime(booking: any, order: any, hasPendingPayment: boolean): boolean {
+        if (booking.status !== 'pending' || booking.replacementOutcome || hasPendingPayment ||
+            ['PARTIALLY_PAID', 'PAID', 'EXPIRED', 'PAYMENT_EXPIRED'].includes(booking.paymentStatus) ||
+            ['completed', 'cancelled'].includes(order.status) ||
+            !(new Date(order.eventStartDateTime).getTime() > Date.now()) ||
+            this.getDownPaymentConfig(booking.vendorId)?.value === 0) return false;
+        try {
+            snapshotDownPaymentWindow({ eventStartDateTime: booking.eventStartDateTime }, booking.vendorId?.availabilitySettings, new Date(), order.eventCityId?.timeZone || 'UTC');
+            return false;
+        } catch (error) {
+            if (error instanceof ConflictException) return true;
+            throw error;
+        }
+    }
+
     private getDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
         const businessDetails =
             vendorUser?.photographerBusinessDetails ||

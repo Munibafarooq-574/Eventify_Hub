@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
+import { Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { requestLaterServiceTime } from '@/services/cancellationReplacement';
 import { bookingActionError } from '@/services/bookingActionError';
 import { formatBookingActivityTime } from '@/utils/bookingActivity';
@@ -13,10 +15,11 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
   const [time, setTime] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<any>(null);
+  const [picker, setPicker] = useState<'date' | 'time' | null>(null);
   const lock = useRef(false);
   const request = booking.laterTimeRequest || sent;
   const future = new Date(event.eventStartDateTime).getTime() > Date.now();
-  if (!request && (!available || booking.status !== 'pending' || !future)) return null;
+  if (!request && (!(available || booking.laterTimeRequestAvailable === true) || booking.status !== 'pending' || !future)) return null;
   const labels: Record<string, string> = { PENDING: future && booking.status === 'pending' ? 'Awaiting client decision' : 'Request closed — original event or booking is no longer available', RESCHEDULE_REQUESTED: 'Client requested rescheduling — review the schedule request', REPLACED: 'Client requested a replacement vendor', CONTINUE_WITHOUT: 'Client chose to continue without this vendor' };
   const send = async () => {
     if (lock.current) return;
@@ -32,6 +35,13 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
     } catch (error: any) { Alert.alert('Request could not be sent', bookingActionError(error, 'Please refresh your booking and try again.').message); }
     finally { lock.current = false; setBusy(false); }
   };
+  const pickerDate = new Date(`${date || '2000-01-01'}T${time || '13:00'}:00`);
+  const choose = (_event: any, value?: Date) => {
+    if (Platform.OS !== 'ios') setPicker(null);
+    if (!value) return;
+    if (picker === 'date') setDate(`${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`);
+    else setTime(`${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`);
+  };
   return <View style={styles.box}>
     <Text style={styles.title}>Later service time</Text>
     {request ? <>
@@ -42,11 +52,19 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
       {!!request.resolvedAt && <Text style={styles.text}>Client decision: {formatBookingActivityTime(request.resolvedAt, event.eventCityId?.timeZone)}</Text>}
     </> : !open ? <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={() => setOpen(true)}><Text style={styles.buttonText}>Request later service time</Text></TouchableOpacity> : <>
       <Text style={styles.text}>The client chooses whether to reschedule, replace your booking or continue without you. Sending this request does not change the event time.</Text>
-      <TextInput accessibilityLabel="Reason for later service time" placeholder="Reason (required)" value={reason} onChangeText={setReason} maxLength={500} multiline style={styles.input} />
+      <Text style={styles.title}>Reason <Text style={{ color: '#B12A48' }}>*</Text></Text>
+      <TextInput accessibilityLabel="Reason for later service time" placeholderTextColor="#896F81" placeholder="Explain why a later time is needed" value={reason} onChangeText={setReason} maxLength={500} multiline style={styles.input} />
       <Text style={styles.text}>Optional suggested event date/time, in {event.eventCityId?.timeZone || 'the event city timezone'}. Availability will be checked when rescheduling.</Text>
-      <TextInput accessibilityLabel="Suggested date YYYY-MM-DD" placeholder="Date: YYYY-MM-DD" value={date} onChangeText={setDate} maxLength={10} style={styles.input} />
-      <TextInput accessibilityLabel="Suggested time HH:mm" placeholder="Time: HH:mm (24-hour, e.g. 15:00)" value={time} onChangeText={setTime} maxLength={5} style={styles.input} />
-      <TouchableOpacity accessibilityRole="button" disabled={busy || !reason.trim()} style={styles.button} onPress={() => void send()}><Text style={styles.buttonText}>{busy ? 'Sending…' : 'Send request'}</Text></TouchableOpacity>
+      <Text style={styles.title}>Suggested event time · optional</Text>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select suggested date" disabled={busy} style={styles.input} onPress={() => setPicker('date')}><Text style={styles.text}><Ionicons name="calendar-outline" size={16} />  {date || 'Select date'}</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select suggested time" disabled={busy} style={styles.input} onPress={() => setPicker('time')}><Text style={styles.text}><Ionicons name="time-outline" size={16} />  {time ? `${Number(time.slice(0, 2)) % 12 || 12}:${time.slice(3)} ${Number(time.slice(0, 2)) >= 12 ? 'PM' : 'AM'}` : 'Select time'}</Text></TouchableOpacity>
+      {!!(date || time) && <TouchableOpacity accessibilityRole="button" disabled={busy} onPress={() => { setDate(''); setTime(''); setPicker(null); }}><Text style={styles.text}>Remove suggested time</Text></TouchableOpacity>}
+      {!!picker && <View style={styles.input}>
+        <DateTimePicker mode={picker} value={date ? pickerDate : new Date()} onChange={choose} display={Platform.OS === 'ios' ? 'spinner' : 'default'} />
+        {Platform.OS === 'ios' && <TouchableOpacity accessibilityRole="button" onPress={() => { choose(null, date ? pickerDate : new Date()); setPicker(null); }}><Text style={styles.title}>Done</Text></TouchableOpacity>}
+      </View>}
+      <Text style={styles.text}>Your client reviews this suggestion before requesting a schedule change. The original event stays unchanged until the existing approval flow completes.</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={busy || !reason.trim()} style={[styles.button, (busy || !reason.trim()) && { opacity: 0.5 }]} onPress={() => void send()}><Text style={styles.buttonText}>{busy ? 'Sending…' : 'Send request'}</Text></TouchableOpacity>
       <TouchableOpacity disabled={busy} onPress={() => setOpen(false)}><Text style={styles.text}>Close</Text></TouchableOpacity>
     </>}
   </View>;
