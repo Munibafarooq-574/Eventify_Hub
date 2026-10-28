@@ -1,3 +1,4 @@
+import { formatBookingActivityTime } from '@/utils/bookingActivity';
 import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
 import VendorLaterTimeRequest from '../booking/VendorLaterTimeRequest';
@@ -87,6 +88,12 @@ const mapVendorStatus = (status: string, replacementOutcome?: string | null) =>
             : status === "accepted"
             ? "confirmed"
             : status;
+
+const formatScheduleTime = (value: string) => {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value || '')) return 'Not provided';
+    const [hour, minute] = value.split(':').map(Number);
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+};
 
 const formatTimeOnly = (value: string | Date) => {
     const date = value instanceof Date ? value : new Date(value);
@@ -764,14 +771,14 @@ const OrderSummary = () => {
                                                                     <Text style={styles.rescheduleTitle}>Schedule Update Request</Text>
                                                                 </View>
                                                                 <Text style={styles.rescheduleLine}>
-                                                                    New date: {new Date(request.newEventDate).toDateString()}
+                                                                    New date: {new Date(request.newEventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                                                                 </Text>
                                                                 <Text style={styles.rescheduleLine}>
-                                                                    New start: {request.newStartTime}
+                                                                    New start time: {formatScheduleTime(request.newStartTime)}
                                                                 </Text>
-                                                                {!!request.reason && (
-                                                                    <Text style={styles.rescheduleReason}>Reason: {request.reason}</Text>
-                                                                )}
+                                                                <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
+                                                                <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, item.eventCityId?.timeZone)}</Text>
+                                                                <Text style={styles.rescheduleReason}>Times shown in {item.eventCityId?.timeZone || 'your device timezone'}</Text>
                                                                 {request.availabilityPrecheckPassed === false && (
                                                                     <Text style={styles.rescheduleWarning}>
                                                                         Availability pre-check found a conflict. Review carefully.
