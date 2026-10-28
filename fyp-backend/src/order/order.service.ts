@@ -2699,6 +2699,11 @@ async completeVendorOrder(vendorOrderId: string) {
                 (p: any) => String(p._id) === String(vendorOrder.packageId),
             );
 
+            const acceptsSuggestion = vendorOrder.laterTimeRequest?.status === 'PENDING' &&
+                !!vendorOrder.laterTimeRequest.suggestedEventStart &&
+                new Date(vendorOrder.laterTimeRequest.suggestedEventStart).getTime() === newEventStart.getTime() &&
+                Number(dto.durationMinutes) === Number(order.eventDurationMinutes);
+            if (acceptsSuggestion && !availability.available) throw new ConflictException(availability.reason || 'The suggested time is no longer available. Please choose another time.');
             const requestData = {
                 requestGroupId,
                 bookingId: order._id,
@@ -2722,7 +2727,9 @@ async completeVendorOrder(vendorOrderId: string) {
                 reason: dto.reason.trim(),
                 availabilityPrecheckPassed: availability.available,
                 availabilityPrecheckReason: availability.reason || null,
-                status: 'CHANGE_REQUESTED',
+                status: acceptsSuggestion ? 'ACCEPTED' : 'CHANGE_REQUESTED',
+                respondedAt: acceptsSuggestion ? new Date() : undefined,
+                responseMessage: acceptsSuggestion ? 'The client agreed to the vendor’s suggested time.' : undefined,
                 resolutionStatus: 'PENDING',
                 expiresAt,
             };
@@ -2739,14 +2746,19 @@ async completeVendorOrder(vendorOrderId: string) {
                     if (await this.connection.model(Payment.name).exists({ vendorOrderId: current._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) {
                         throw new ConflictException('Resolve the existing payment before rescheduling.');
                     }
+                    if (acceptsSuggestion && new Date(current.laterTimeRequest.suggestedEventStart as any).getTime() !== newEventStart.getTime()) {
+                        throw new ConflictException('The suggestion has changed. Please refresh before confirming.');
+                    }
                     const [saved] = await this.rescheduleRequestModel.create([requestData], { session });
                     current.laterTimeRequest.status = 'RESCHEDULE_REQUESTED';
+                    current.laterTimeRequest.clientAcceptedSuggestion = acceptsSuggestion;
                     current.laterTimeRequest.resolvedAt = new Date();
                     await current.save({ session });
                     return saved;
                 })
                 : await this.rescheduleRequestModel.create(requestData);
             created.push(request);
+            if (acceptsSuggestion) continue;
 
             try {
                 const chatId = await this.chatService.createOrGetConversation(
@@ -2784,6 +2796,18 @@ async completeVendorOrder(vendorOrderId: string) {
             }
         }
 
+        const agreed = created.filter(request => request.status === 'ACCEPTED');
+        if (agreed.length) {
+            const outcome = await this.applyRescheduleIfAllAccepted(String(order._id));
+            for (const request of agreed) {
+                await this.notifyLaterTimeDecision(order, { vendorId: request.vendorId }, outcome.applied
+                    ? 'The suggested time is agreed and your event schedule has been updated. Check the booking for the new service details.'
+                    : 'The suggested time is agreed. We are waiting for the other vendors before updating the event schedule.',
+                    outcome.applied
+                    ? 'Your client is happy with your suggested time. The schedule is updated; you can now review and mark the booking Processing when allowed.'
+                    : 'Your client is happy with your suggested time. We are waiting for the other vendors before updating the event schedule.');
+            }
+        }
         return {
             orderId: order._id,
             eventId: order.eventId,

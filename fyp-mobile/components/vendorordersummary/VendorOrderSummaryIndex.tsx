@@ -753,7 +753,7 @@ const OrderSummary = () => {
                                                 })()}
 
                                                 {!["cancelled", "no_longer_assigned"].includes(getVendorStatus(item)) && rescheduleRequests
-                                                    .filter((request: any) => String(request.orderId) === String(item._id))
+                                                    .filter((request: any) => String(request.orderId) === String(item._id) && !(item.vendorOrders || []).some((booking: any) => String(booking._id) === String(request.vendorOrderId) && booking.laterTimeRequest?.clientAcceptedSuggestion))
                                                     .map((request: any) => {
                                                         const pending = request.status === "CHANGE_REQUESTED";
                                                         const busy = respondingRequestId === request._id;

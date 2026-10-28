@@ -37,6 +37,8 @@ export class LaterTimeRequest {
     requestedAt: Date;
     @Prop({ type: Date })
     suggestedEventStart?: Date;
+    @Prop({ type: Boolean, default: false })
+    clientAcceptedSuggestion?: boolean;
     @Prop({ type: Date })
     resolvedAt?: Date;
 }

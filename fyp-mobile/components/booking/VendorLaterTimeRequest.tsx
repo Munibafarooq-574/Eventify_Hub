@@ -20,7 +20,7 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
   const request = booking.laterTimeRequest || sent;
   const future = new Date(event.eventStartDateTime).getTime() > Date.now();
   if (!request && (!(available || booking.laterTimeRequestAvailable === true) || booking.status !== 'pending' || !future)) return null;
-  const labels: Record<string, string> = { PENDING: future && booking.status === 'pending' ? 'Awaiting client decision' : 'Request closed — original event or booking is no longer available', RESCHEDULE_REQUESTED: 'Client requested rescheduling — review the schedule request', REPLACED: 'Client requested a replacement vendor', CONTINUE_WITHOUT: 'Client chose to continue without this vendor' };
+  const labels: Record<string, string> = { PENDING: future && booking.status === 'pending' ? 'Awaiting client decision' : 'Request closed — original event or booking is no longer available', RESCHEDULE_REQUESTED: request?.clientAcceptedSuggestion ? 'Your client is happy with your suggested time. Check the event details for the updated schedule. If other vendors are involved, their responses must finish first.' : 'Your client suggested a different schedule — please review the new time', REPLACED: 'Client requested a replacement vendor', CONTINUE_WITHOUT: 'Client chose to continue without this vendor' };
   const send = async () => {
     if (lock.current) return;
     if (!reason.trim()) { Alert.alert('Reason required', 'Please explain why a later service time is needed.'); return; }
@@ -43,7 +43,7 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
     else setTime(`${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`);
   };
   return <View style={styles.box}>
-    <Text style={styles.title}>Later service time</Text>
+    <Text style={styles.title}>{request?.clientAcceptedSuggestion ? "Client agreed to your suggested time" : "Later service time"}</Text>
     {request ? <>
       <Text style={styles.text}>{labels[request.status] || 'Request closed'}</Text>
       <Text style={styles.text}>{request.reason}</Text>
