@@ -617,6 +617,7 @@ const [availabilityCheck, setAvailabilityCheck] =
 
           const checkResult =
   await checkVendorsAvailability({
+    replacementMode: String(Array.isArray(replacementMode) ? replacementMode[0] : replacementMode || '') === 'true',
     vendorIds: [
       vendorData._id,
     ],
@@ -4864,15 +4865,12 @@ const serviceCityNamesFromIds =
                           </Text>
                         </View>
 
-                        {isEventMode &&
-                          (
-                            availabilityCheck?.available
-                          ) && (
+                        {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              style={
-                                styles.cartButton
-                              }
+                              disabled={!availabilityCheck.available}
+                              accessibilityState={{ disabled: !availabilityCheck.available }}
+                              style={[styles.cartButton, !availabilityCheck.available && { opacity: 0.45 }]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,
@@ -4893,7 +4891,7 @@ const serviceCityNamesFromIds =
                                   styles.cartButtonText
                                 }
                               >
-                                Add to Cart
+                                {availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
                               </Text>
                             </TouchableOpacity>
                           )}

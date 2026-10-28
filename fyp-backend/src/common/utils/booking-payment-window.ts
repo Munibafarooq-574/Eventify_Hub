@@ -49,3 +49,23 @@ export function servicePaymentCutoff(booking:any):Date|null {
  if(booking.eventStartDateTime)cutoffs.push(new Date(booking.eventStartDateTime).getTime()-minutes(booking.paymentPreparationMinutes,minutes(process.env.BOOKING_PAYMENT_PREPARATION_MINUTES,60))*60000);
  const valid=cutoffs.filter(Number.isFinite);return valid.length?new Date(Math.min(...valid)):null;
 }
+
+export function getVendorDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
+        const businessDetails =
+            vendorUser?.photographerBusinessDetails ||
+            vendorUser?.cateringBusinessDetails ||
+            vendorUser?.venueBusinessDetails ||
+            vendorUser?.salonBusinessDetails ||
+            vendorUser?.cakeBusinessDetails ||
+            vendorUser?.mehndiBusinessDetails ||
+            vendorUser?.soundBusinessDetails;
+
+        if (!businessDetails || businessDetails.downPayment == null) {
+            return null;
+        }
+
+        return {
+            type: businessDetails.downPaymentType || 'PERCENTAGE',
+            value: businessDetails.downPayment,
+        };
+}

@@ -11,6 +11,15 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const lock = useRef(false);
+  const [replacementState, setReplacementState] = useState<'checking' | 'available' | 'unavailable' | 'error'>('checking');
+  useEffect(() => {
+    let active = true;
+    const eligible = (booking.status === 'pending' && booking.laterTimeRequest?.status === 'PENDING') || (booking.status === 'cancelled_by_vendor' && booking.cancelledBy === 'vendor');
+    if (!eligible || !(new Date(event.eventStartDateTime).getTime() > Date.now())) return;
+    setReplacementState('checking');
+    getCancellationReplacement(String(booking._id)).then(context => { if (active) setReplacementState(context.canReplace === false ? 'unavailable' : 'available'); }).catch(() => { if (active) setReplacementState('error'); });
+    return () => { active = false; };
+  }, [booking._id, booking.status, booking.laterTimeRequest?.status, event.eventStartDateTime, now]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
@@ -41,6 +50,7 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
       try { cart = rawCart ? JSON.parse(rawCart) : null; } catch { throw new Error('Please clear your current cart before finding a replacement.'); }
       if (cart?.vendors?.length) throw new Error('Complete or clear your current cart before finding a replacement.');
       const context = await getCancellationReplacement(String(booking._id));
+      if (context.canReplace === false) { setReplacementState('unavailable'); throw new Error('No replacement is available for this time. Please choose a later time or continue without this vendor.'); }
       await saveSecureData('eventDetails', JSON.stringify(context.eventDetails));
       router.push({ pathname: '/categoryvendorlisting', params: {
         categoryIds: JSON.stringify([context.categoryId]), categoryNames: JSON.stringify([context.categoryName]),
@@ -72,7 +82,10 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
     <Text style={styles.hint}>{booking.cancellationReplacementChoice === 'CONTINUE_WITHOUT'
       ? 'You chose to continue without this vendor. You can still find a replacement before the event starts.'
       : laterPending ? 'Choose a replacement for the current event time, or continue without this vendor. No payment has been taken for this pending booking.' : 'Find a replacement for this event, or continue with your remaining vendors. Your refund is handled separately.'}</Text>
-    <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.primary} onPress={() => void run(false)}><Text style={styles.primaryText}>{busy ? 'Please wait…' : 'Find replacement'}</Text></TouchableOpacity>
+    <TouchableOpacity accessibilityRole="button" disabled={busy || replacementState !== 'available'} style={[styles.primary, replacementState !== 'available' && { opacity: 0.5 }]} onPress={() => void run(false)}><Text style={styles.primaryText}>{busy ? 'Please wait…' : 'Find replacement'}</Text></TouchableOpacity>
+    {replacementState === 'checking' && <Text style={styles.hint}>Checking available replacements…</Text>}
+    {replacementState === 'unavailable' && <Text style={styles.hint}>No replacement is available for this time. You can choose a later time where offered, or continue without this vendor.</Text>}
+    {replacementState === 'error' && <Text style={styles.hint}>We could not check replacements. Refresh this event to try again.</Text>}
     {booking.cancellationReplacementChoice !== 'CONTINUE_WITHOUT' && <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={() => Alert.alert('Continue without this vendor?', 'Only this vendor booking will be closed. Your event and other vendors will stay unchanged.', [
       { text: 'Keep booking', style: 'cancel' }, { text: 'Continue without', onPress: () => void run(true) },
     ])}><Text style={styles.secondaryText}>Continue without this vendor</Text></TouchableOpacity>}

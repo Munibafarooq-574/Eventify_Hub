@@ -1,7 +1,9 @@
+import { getVendorDownPaymentConfig, snapshotDownPaymentWindow } from '../common/utils/booking-payment-window';
 // fyp-backend/src/vendor-availability/vendor-availability.service.ts
 
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -298,6 +300,8 @@ if (!hasAccess) {
     packageId?: string,
     session?: ClientSession,
     excludeVendorOrderId?: string,
+    replacementMode = false,
+    eventTimeZone = 'UTC',
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -340,7 +344,7 @@ if (!hasAccess) {
 
     const vendorQuery = this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role packages businessCityId');
+      .select('availabilitySettings role packages businessCityId photographerBusinessDetails.downPayment photographerBusinessDetails.downPaymentType cateringBusinessDetails.downPayment cateringBusinessDetails.downPaymentType venueBusinessDetails.downPayment venueBusinessDetails.downPaymentType salonBusinessDetails.downPayment salonBusinessDetails.downPaymentType cakeBusinessDetails.downPayment cakeBusinessDetails.downPaymentType mehndiBusinessDetails.downPayment mehndiBusinessDetails.downPaymentType soundBusinessDetails.downPayment soundBusinessDetails.downPaymentType');
 
     if (session) {
       vendorQuery.session(session);
@@ -782,6 +786,10 @@ if (!hasAccess) {
 // Available
 // ---------------------------------------------------------
 
+if (replacementMode && getVendorDownPaymentConfig(vendor)?.value !== 0) {
+  try { snapshotDownPaymentWindow({ eventStartDateTime: startDateTime }, vendor.availabilitySettings, new Date(), eventTimeZone); }
+  catch (error) { if (!(error instanceof ConflictException)) throw error; return { vendorId, available: false, reason: 'There is not enough time to book and prepare this service. Please choose a later time.' }; }
+}
 return {
   vendorId,
   available: true,
@@ -802,6 +810,8 @@ return {
     startDateTime: Date,
     endDateTime: Date,
     packageId?: string,
+    replacementMode = false,
+    eventTimeZone = 'UTC',
   ): Promise<AvailabilityResult[]> {
     return Promise.all(
       vendorIds.map((id) =>
@@ -809,7 +819,7 @@ return {
           id,
           startDateTime,
           endDateTime,
-          packageId,
+          packageId, undefined, undefined, replacementMode, eventTimeZone,
         ),
       ),
     );

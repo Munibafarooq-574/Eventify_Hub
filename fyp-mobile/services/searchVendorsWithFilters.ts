@@ -6,6 +6,7 @@ const searchVendorsWithFilters = async (filters: {
   staffOptions?: string[];
   policies?: string[];
   ratingBands?: string[];
+  replacementMode?: boolean;
   name?: string;
   categoryId?: string;
   eventCityId?: string;
@@ -18,6 +19,7 @@ const searchVendorsWithFilters = async (filters: {
 }) => {
   try {
     const query = new URLSearchParams();
+    if (filters.replacementMode) query.append('replacementMode', 'true');
     for (const key of ['cityIds', 'staffOptions', 'policies', 'ratingBands'] as const) {
       if (filters[key]?.length) query.append(key, filters[key]!.join(','));
     }

@@ -1007,7 +1007,7 @@ if (
                             vendor._id.toString(),
                             eventStartDateTime,
                             eventEndDateTime,
-                            pkg._id.toString(),
+                            pkg._id.toString(), undefined, undefined, filters.replacementMode === 'true', eventTimeZone,
                           ),
                     }),
                   ),

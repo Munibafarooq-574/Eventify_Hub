@@ -48,6 +48,7 @@ export default function App() {
 } | null>(null);
   const routeParams = useLocalSearchParams();
   const routeParamsKey = JSON.stringify(routeParams);
+  const isReplacementMode = String(Array.isArray(routeParams.replacementMode) ? routeParams.replacementMode[0] : routeParams.replacementMode || '') === 'true';
   const isBrowseMode = (Array.isArray(routeParams.bookingMode)
     ? routeParams.bookingMode[0]
     : routeParams.bookingMode) === "browse";
@@ -255,6 +256,7 @@ const getServiceWindowLabel = (
       marketplaceContext?.discoveryCityId;
 
     const filters = {
+      replacementMode: isReplacementMode,
       name: query.trim() || undefined,
       eventCityId: discoveryCityId || undefined,
       cityIds: isBrowseMode ? savedFilters.cityIds : undefined,
@@ -558,8 +560,8 @@ const renderEmptyState = () => {
       <View style={styles.emptyIconWrap}>
         <Ionicons name="calendar-outline" size={scale(34)} color={COLORS.primary} />
       </View>
-      <Text style={styles.emptyTitle}>No vendors match these filters</Text>
-      <Text style={styles.emptySubtitle}>{eventTiming ? 'Try adjusting your filters or event date and time.' : 'Try adjusting your search or clearing filters.'}</Text>
+      <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : "No vendors match these filters"}</Text>
+      <Text style={styles.emptySubtitle}>{isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? 'Try adjusting your filters or event date and time.' : 'Try adjusting your search or clearing filters.'}</Text>
       {activeChips.length > 0 && <TouchableOpacity disabled={checkingAvailability} onPress={() => updateFilters(emptyVendorFilters())} style={{ padding: 14 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear filters</Text></TouchableOpacity>}
     </View>
   );

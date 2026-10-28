@@ -8,7 +8,7 @@ const timing: GuideSection = {
     'The payment clock starts when the vendor accepts, not when the client sends the booking request. The deadline is usually within 24 hours of acceptance, but can be earlier to leave time for preparation.',
     'Booking Notice tells clients how early they must request a service. The current payment rules also use the applicable notice to protect preparation time, with a minimum preparation buffer. It is not always a fixed two hours.',
     'Example only: service starts at 3 PM and its preparation buffer is one hour. The payment cutoff is 2 PM. Acceptance at 1:40 PM leaves 20 minutes for payment confirmation.',
-    'The current default minimum payment window is 15 minutes. In that example, acceptance at 1:55 PM is blocked because only five minutes remain. Follow the actual deadline and any message shown for your booking.',
+    'The usual minimum time for payment is 15 minutes. In that example, acceptance at 1:55 PM is blocked because only five minutes remain. Follow the actual deadline and any message shown for your booking.',
     'Delivery and setup times may be earlier than the event. Payment timing uses the booked service time, so always read the service details as well as the event time.',
   ], note: 'Payment must be confirmed in time. Submitting a payment is not the same as a successful payment. Refreshing or retrying does not extend a saved deadline.',
 };
@@ -19,7 +19,7 @@ const status: GuideSection = {
     'Confirmed: the required advance is secured, or no advance is required. Check Paid and Remaining for the actual money received; a zero advance does not mean the whole package is paid.',
     'Completed: the vendor has marked the booked service as provided. Any outstanding balance is handled separately.',
     'Cancelled or Rejected: this vendor booking will not proceed. Read the reason, cancellation details and any refund status.',
-    'Expired / Payment Expired: the request or unpaid payment window ended. Closed bookings stay in history and cannot be accepted or paid through their old buttons.',
+    'Request Expired / Payment Expired: the request or unpaid payment window ended. Closed bookings stay in history and cannot be accepted or paid through their old buttons.',
     'No longer assigned: this vendor was removed from the active assignment, for example after a replacement. The history remains.',
   ], note: 'One vendor accepting, completing, cancelling or expiring does not perform that action on the other vendors in the event.',
 };
@@ -37,9 +37,9 @@ const laterClient: GuideSection = {
   steps: [
     'If there is too little payment/preparation time, the vendor cannot accept normally. They can send a later-time request with a reason and an optional suggested event time.',
     'Review & reschedule: use the existing date/time request flow. A suggestion alone does not change the event; availability and the required vendor approvals are checked.',
-    'Find replacement: browse another vendor for the existing event time. The original pending assignment stays in place while browsing. It becomes No longer assigned only after the replacement request is successfully created.',
+    'Find replacement: the app checks whether another vendor can still be booked for the existing event time. If none is available, this button is unavailable; choose a later time or continue without this vendor. The original pending assignment stays in place while browsing. It becomes No longer assigned only after the replacement request is successfully created.',
     'Continue without this vendor: read the confirmation. Keep booking leaves it pending; confirming closes only that assignment and updates the event total.',
-    'These choices are available only while the event is still in the future and their other checks pass. The replacement must have enough availability, notice and payment time too.',
+    'These choices are available only while the event is still in the future and their other checks pass. Only packages with enough time to book and prepare can be selected. A final check happens when you submit, because time or availability can change while you browse.',
   ], note: 'This later-time decision is for a pending unpaid booking. It does not itself charge a payment or apply a monetary cancellation penalty. Rescheduling may be unavailable if the event has already used its date/time request or has a successful payment.',
 };
 
@@ -63,7 +63,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] }, timing,
       { id: 'expiry', title: 'If a request or payment expires', summary: 'Know when the booking is no longer secured.', steps: [
         'A pending request cannot be accepted after its service has started. An accepted booking with no successful advance can expire when its payment deadline passes.',
-        'If a submitted down payment is still awaiting confirmation when the preparation cutoff passes, Payment verification overdue — service not secured means the payment needs resolution. Do not treat it as a secured booking.',
+        'If a submitted down payment is still awaiting confirmation when the preparation cutoff passes, Payment verification overdue — service not secured means the payment still needs to be checked. Do not treat it as a secured booking.',
         'If the failed/unpaid booking expires, its old Pay and Retry actions are unavailable and the record stays in history. Confirmed paid bookings are not expired simply because their old advance deadline passed.',
       ] },
       { id: 'reschedule', title: 'Request a different date or time', summary: 'Send a request, then follow each vendor’s response.', steps: [
@@ -127,7 +127,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
       ] }, status, service,
       { id: 'accept', title: 'Accept a new request', summary: 'Mark Processing is your acceptance action.', steps: [
-        'On a Pending booking, check whether you can provide the booked service, then use Mark Processing. The backend checks the remaining payment and preparation time.',
+        'On a Pending booking, check whether you can provide the booked service, then use Mark Processing. The app checks that there is enough time for payment and preparation.',
         'If successful, your booking becomes Processing / Accepted. The client sees the required advance and its exact deadline. Acceptance alone does not mean money has been paid.',
         'If too little time remains, acceptance is blocked and the booking stays Pending. Use Request later service time when offered. Do not promise fulfilment on the assumption that a blocked acceptance succeeded.',
       ] }, timing,
@@ -135,14 +135,14 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Payment Required means the client still needs to secure the advance. Awaiting confirmation means a payment was submitted but has not become successful.',
         'Confirmed / Partially Paid means the required advance is secured. Paid means the full recorded booking amount has been paid. If no advance is required, zero paid can be correct.',
         'An unpaid booking can expire at its payment deadline. A pending payment past the preparation cutoff is overdue and the service is not secured; do not treat it as paid.',
-        'Expired and No longer assigned records are kept for history. They do not offer normal acceptance, completion or booking-message actions. Payment expiry for one assignment does not expire other vendors.',
+        'Request Expired and No longer assigned records are kept for history. They do not offer normal acceptance, completion or booking-message actions. Payment expiry for one assignment does not expire other vendors.',
         'After service completion, the client handles any remaining balance using the displayed remaining-payment deadline. Refresh to check the recorded result.',
       ] },
       { id: 'later', title: 'Ask the client for a later time', summary: 'Send a request without changing the event yourself.', steps: [
         'After acceptance is blocked for insufficient time, open Request later service time on that pending unpaid booking.',
-        'Enter a reason. You may suggest an event date (YYYY-MM-DD) and time (HH:mm, 24-hour). Enter both if suggesting a time; the event-city timezone applies.',
+        'Enter a reason. Use the date and time buttons to suggest a new event time. Choose both, or leave both empty; the event-city timezone applies.',
         'Send once. The client can review and reschedule, find a replacement for the current event time, or continue without your assignment. Availability and existing restrictions still apply.',
-        'Your suggestion does not automatically change the event or accept the booking. Follow the request status and recorded client decision time. A replacement or continue-without decision closes only your assignment.',
+        'If the client confirms your exact suggested time and the same duration, you do not need to approve it again. A different time still needs your review. Other vendors must agree too if they are affected. Follow the request status and recorded client decision time. A replacement or continue-without decision closes only your assignment.',
         'These actions are restricted to before the event starts. The same pending request cannot be repeatedly created to send duplicate updates.',
       ] },
       { id: 'reschedule', title: 'Respond to a client’s date/time request', summary: 'Review the proposed schedule before agreeing.', steps: [

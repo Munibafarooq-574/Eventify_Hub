@@ -63,7 +63,7 @@ describe('event-city timezone in vendor search', () => {
   ])('uses %s independently of the server timezone', async (zone, date, expected) => {
     cityService.requireCityTimeZone.mockResolvedValue(zone);
     const result = await service.searchVendorsByFilters({ eventCityId: CITY_A, eventDate: date, startTime: '13:00', durationMinutes: '120' });
-    expect(checkAvailability).toHaveBeenCalledWith(VENDOR_ID, new Date(expected), new Date(Date.parse(expected) + 120 * 60000), 'delivery');
+    expect(checkAvailability).toHaveBeenCalledWith(VENDOR_ID, new Date(expected), new Date(Date.parse(expected) + 120 * 60000), 'delivery', undefined, undefined, false, zone);
     expect(result[0].eventTimeZone).toBe(zone);
   });
   it('keeps a 1 PM Pakistan delivery within 9 AM–6 PM working hours', async () => {

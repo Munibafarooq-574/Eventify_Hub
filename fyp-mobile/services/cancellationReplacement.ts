@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getSecureData } from '../store';
 import { API_BASE_URL } from './apiConfig';
 export type CancellationReplacementContext = {
+  canReplace?: boolean;
   categoryId: string; categoryName: string; excludedVendorIds: string[]; orderId: string;
   eventDetails: { eventId: string; eventName: string; eventType: string; eventDate: string; startTime: string;
     durationMinutes: number; guests: number; eventCityId: string; eventAddress: string;

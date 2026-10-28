@@ -56,7 +56,7 @@ setAvailability(
       dto.vendorIds,
       start,
       end,
-      dto.packageId,
+      dto.packageId, dto.replacementMode === true, timeZone,
     );
   }
 

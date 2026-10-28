@@ -10,6 +10,9 @@ import {
 
 export class SearchVendorsDto {
   @IsOptional()
+  @IsIn(['true', 'false'])
+  replacementMode?: string;
+  @IsOptional()
   @IsString()
   name?: string;
 

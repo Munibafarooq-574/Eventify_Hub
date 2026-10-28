@@ -1,4 +1,4 @@
-import { effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
+import { getVendorDownPaymentConfig, effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
 import { Payment } from '../schemas/payment.schema';
 //fyp-backend/src/order/order.service.ts
 import {
@@ -1018,7 +1018,7 @@ export class OrderService {
                                 };
                         }
 
-                        if (cancellationReplacement?.laterTimePending && this.getDownPaymentConfig(vendor)?.value !== 0) {
+                        if (cancellationReplacement && this.getDownPaymentConfig(vendor)?.value !== 0) {
                             snapshotDownPaymentWindow({ eventStartDateTime: finalServiceStartDateTime }, vendor.availabilitySettings, new Date(), eventTimeZone);
                         }
                         validatedServices.push(
@@ -1400,7 +1400,18 @@ export class OrderService {
         const category = await this.categoryModel.findById(context.categoryId).select('name');
         const timeZone = await this.cityService.requireCityTimeZone(String(context.order.eventCityId));
         const eventDate = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(context.order.eventStartDateTime!));
-        return { categoryId: context.categoryId, categoryName: category?.name || 'Vendor',
+        const excluded = [String(context.vendorOrder.vendorId), ...context.active.map(booking => String(booking.vendorId))];
+        const candidates = await this.userModel.find({ role: 'Vendor', buisnessCategory: new Types.ObjectId(context.categoryId), serviceLocationCityIds: context.order.eventCityId, _id: { $nin: excluded.map(id => new Types.ObjectId(id)) } });
+        const checks = await Promise.all(candidates.map(async (vendor: any) => {
+            if (!await this.featureAccessService.hasActiveSubscription(String(vendor._id))) return false;
+            for (const pkg of vendor.packages || []) {
+                if (pkg.isActive === false) continue;
+                const result = await this.availabilityService.checkVendorAvailability(String(vendor._id), new Date(context.order.eventStartDateTime!), new Date(context.order.eventEndDateTime || new Date(context.order.eventStartDateTime!).getTime() + Number(context.order.eventDurationMinutes || 60) * 60000), String(pkg._id), undefined, undefined, true, timeZone);
+                if (result.available) return true;
+            }
+            return false;
+        }));
+        return { canReplace: checks.some(Boolean), categoryId: context.categoryId, categoryName: category?.name || 'Vendor',
             excludedVendorIds: [String(context.vendorOrder.vendorId), ...context.active.map(booking => String(booking.vendorId))],
             eventDetails: { eventId: String(context.order.eventId || context.order._id), eventName: context.order.eventName,
                 eventType: context.order.eventType, eventDate, startTime: context.order.eventTime,
@@ -2380,23 +2391,7 @@ vendorOrder.vendorNetAmount =
     }
 
     private getDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
-        const businessDetails =
-            vendorUser?.photographerBusinessDetails ||
-            vendorUser?.cateringBusinessDetails ||
-            vendorUser?.venueBusinessDetails ||
-            vendorUser?.salonBusinessDetails ||
-            vendorUser?.cakeBusinessDetails ||
-            vendorUser?.mehndiBusinessDetails ||
-            vendorUser?.soundBusinessDetails;
-
-        if (!businessDetails || businessDetails.downPayment == null) {
-            return null;
-        }
-
-        return {
-            type: businessDetails.downPaymentType || 'PERCENTAGE',
-            value: businessDetails.downPayment,
-        };
+        return getVendorDownPaymentConfig(vendorUser);
     }
 
     // Mark a vendor order as completed

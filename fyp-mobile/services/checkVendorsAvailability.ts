@@ -19,6 +19,7 @@ export default function checkVendorsAvailability(
     durationMinutes: number;
   eventCityId: string;
   packageId?: string;
+  replacementMode?: boolean;
 }
 ) {
   return growthApi.post<AvailabilityCheckResult[]>('/vendor-availability/check', payload);

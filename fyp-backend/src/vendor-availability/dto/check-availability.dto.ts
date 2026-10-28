@@ -1,6 +1,7 @@
 //fyp-backend/src/vendor-availability/dto/check-availability.dto.ts
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsInt,
   IsNotEmpty,
@@ -10,6 +11,9 @@ import {
 } from 'class-validator';
 
 export class CheckAvailabilityDto {
+  @IsOptional()
+  @IsBoolean()
+  replacementMode?: boolean;
   @IsArray()
   @IsNotEmpty()
   vendorIds: string[];
