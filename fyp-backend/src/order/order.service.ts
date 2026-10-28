@@ -1751,6 +1751,7 @@ async getOrderStats(type: string, userId: string) {
       cancelled,
       paymentExpired,
       noLongerAssigned,
+      requestExpired,
     ] = await Promise.all([
       this.vendorOrderModel.countDocuments(vQuery),
       this.vendorOrderModel.countDocuments({
@@ -1790,6 +1791,11 @@ async getOrderStats(type: string, userId: string) {
         ...vQuery,
         replacementOutcome: 'NO_LONGER_ASSIGNED',
       }),
+      this.vendorOrderModel.countDocuments({
+        ...vQuery,
+        $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }],
+        paymentStatus: { $ne: 'PAYMENT_EXPIRED' },
+      }),
     ]);
 
     console.log('📊 Vendor order stats:', {
@@ -1801,6 +1807,7 @@ async getOrderStats(type: string, userId: string) {
       cancelled,
       paymentExpired,
       noLongerAssigned,
+      requestExpired,
     });
 
     return {
@@ -1812,6 +1819,7 @@ async getOrderStats(type: string, userId: string) {
       cancelled,
       paymentExpired,
       noLongerAssigned,
+      requestExpired,
     };
   }
 

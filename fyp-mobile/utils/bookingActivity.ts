@@ -19,7 +19,7 @@ export function bookingActivity(booking: BookingActivityRecord, cancellationDeta
   if (!cancellationDetailsVisible) add('Cancelled', booking.cancelledAt, ['cancelled', 'cancelled_by_vendor'].includes(status));
   add('Rejected', booking.rejectedAt, status === 'rejected' && !unassigned);
   add('Completed', booking.completedAt, status === 'completed');
-  add(booking.paymentStatus === 'PAYMENT_EXPIRED' ? 'Payment expired' : 'Expired', booking.expiredAt, status === 'expired');
+  add(booking.paymentStatus === 'PAYMENT_EXPIRED' ? 'Payment expired' : 'Request expired', booking.expiredAt, status === 'expired');
   add('No longer assigned', booking.replacementFinalizedAt, unassigned);
   return rows;
 }

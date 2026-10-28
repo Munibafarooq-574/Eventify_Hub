@@ -191,6 +191,14 @@ describe('OrderService - Unit Tests', () => {
         await expect(service.completeVendorOrder(validObjectId)).rejects.toThrow('Cancelled bookings');
     });
 
+    it('counts request expiry separately from payment expiry for the dashboard', async () => {
+        vendorOrderModel.countDocuments.mockImplementation(async (filter: any) => filter.$or ? 2 : filter.paymentStatus === 'PAYMENT_EXPIRED' ? 3 : 0);
+        const stats = await service.getOrderStats('Vendor', validObjectId);
+        expect(stats.requestExpired).toBe(2);
+        expect(stats.paymentExpired).toBe(3);
+        expect(vendorOrderModel.countDocuments).toHaveBeenCalledWith({ vendorId: new (require('mongoose').Types.ObjectId)(validObjectId), $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }], paymentStatus: { $ne: 'PAYMENT_EXPIRED' } });
+    });
+
     it('should get order stats', async () => {
         const stats = await service.getOrderStats('Organizer', validObjectId);
         expect(stats.totalOrders).toBe(5);

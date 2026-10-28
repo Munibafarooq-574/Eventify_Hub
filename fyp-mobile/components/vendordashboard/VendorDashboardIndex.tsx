@@ -54,7 +54,7 @@ const MONTH_NAMES = [
 ];
 
 //type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
-type OrderStats = { totalOrders: number; pending: number; processing: number; confirmed: number; completed: number; cancelled: number; paymentExpired: number; noLongerAssigned: number };
+type OrderStats = { totalOrders: number; pending: number; processing: number; confirmed: number; completed: number; cancelled: number; requestExpired: number; paymentExpired: number; noLongerAssigned: number };
 
 function formatPKR(amount: number): string {
     if (!amount) return "Rs. 0";
@@ -73,6 +73,7 @@ const DashboardScreen = () => {
         confirmed: 0,
         completed: 0,
         cancelled: 0,
+        requestExpired: 0,
         paymentExpired: 0,
         noLongerAssigned: 0,
     });
@@ -234,6 +235,7 @@ const packageLimitReached =
                 confirmed: (statsData as any).confirmed ?? 0,
                 completed: statsData.completed ?? 0,
                 cancelled: (statsData as any).cancelled ?? 0,
+                requestExpired: (statsData as any).requestExpired ?? 0,
                 paymentExpired: (statsData as any).paymentExpired ?? 0,
                 noLongerAssigned: (statsData as any).noLongerAssigned ?? 0,
             });
@@ -908,6 +910,13 @@ if (!hasValidSubscription) {
                                     params: { selectedTab: "Cancelled" },
                                 })
                             }
+                        />
+                        <StatBox
+                            icon="timer-outline"
+                            value={orderStats.requestExpired}
+                            label="Request Expired"
+                            accent="#8B6B82"
+                            onPress={() => router.push({ pathname: "/vendorordersummary", params: { selectedTab: "Expired" } })}
                         />
                         <StatBox
                             icon="timer-outline"

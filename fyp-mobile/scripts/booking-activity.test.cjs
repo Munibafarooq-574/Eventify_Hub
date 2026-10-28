@@ -7,7 +7,7 @@ test('each action uses its own timestamp; updatedAt never substitutes for missin
  assert.ok(rows(b).every(r=>r.at===t));assert.equal(rows({status:'completed',updatedAt:t})[0].at,null);
 });
 test('pending rejected expired and no longer assigned have distinct dates',()=>{
- for(const [b,label] of [[{status:'pending',createdAt:t},'Requested'],[{status:'rejected',rejectedAt:t},'Rejected'],[{status:'expired',paymentStatus:'PAYMENT_EXPIRED',expiredAt:t},'Payment expired'],[{status:'expired',expiredAt:t},'Expired'],[{status:'rejected',replacementOutcome:'NO_LONGER_ASSIGNED',replacementFinalizedAt:t},'No longer assigned']]){assert.equal(rows(b).length,1);assert.equal(rows(b)[0].label,label);assert.equal(rows(b)[0].at,t)}
+ for(const [b,label] of [[{status:'pending',createdAt:t},'Requested'],[{status:'rejected',rejectedAt:t},'Rejected'],[{status:'expired',paymentStatus:'PAYMENT_EXPIRED',expiredAt:t},'Payment expired'],[{status:'expired',expiredAt:t},'Request expired'],[{status:'rejected',replacementOutcome:'NO_LONGER_ASSIGNED',replacementFinalizedAt:t},'No longer assigned']]){assert.equal(rows(b).length,1);assert.equal(rows(b)[0].label,label);assert.equal(rows(b)[0].at,t)}
 });
 test('cancellation timestamp is shown once when existing details own it',()=>{const b={status:'cancelled_by_vendor',cancelledAt:t};assert.equal(rows(b)[0].at,t);assert.equal(rows(b,true).length,0)});
 test('timezone and twelve hour format preserve exact instant, invalid dates are safe',()=>{

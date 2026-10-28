@@ -4,6 +4,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import { withRetry } from "@/utils/httpRetry";
 
 interface OrderStats {
+  requestExpired?: number;
   totalOrders: number;
   pending: number;
   processing: number;

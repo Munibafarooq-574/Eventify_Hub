@@ -578,7 +578,7 @@ const OrderSummary = () => {
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => handleSummaryCardClick("Expired")} activeOpacity={0.7}>
-                        <SummaryCard label="Expired" value={orderStats.expired} icon="timer-outline" isActive={selectedFilter === "Expired"} />
+                        <SummaryCard label="Request Expired" value={orderStats.expired} icon="timer-outline" isActive={selectedFilter === "Expired"} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -617,7 +617,7 @@ const OrderSummary = () => {
                     showsVerticalScrollIndicator={false}
                     ListHeaderComponent={
                         <Text style={styles.sectionTitle}>
-                            {selectedFilter === "All" ? "All Orders" : `${selectedFilter} Orders`}
+                            {selectedFilter === "All" ? "All Orders" : `${selectedFilter === "Expired" ? "Request Expired" : selectedFilter} Orders`}
                         </Text>
                     }
                     ListEmptyComponent={
@@ -656,7 +656,7 @@ const OrderSummary = () => {
                                             <Text style={styles.orderName}>{item.organizerId?.name}</Text>
                                         </View>
                                         <View style={styles.statusBadge}>
-                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item)}</Text>
+                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
                                         </View>
                                         <Ionicons
                                             name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -843,7 +843,7 @@ const OrderSummary = () => {
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item)}</Text>
+                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
                                                     </View>
                                                 )}
 
@@ -891,13 +891,13 @@ const OrderSummary = () => {
                                             <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.closedBookingTitle}>
-                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment window expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Booking expired" : "This booking is closed"}
+                                                    {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment window expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request expired" : "This booking is closed"}
                                                 </Text>
                                                 <Text style={styles.closedBookingText}>
                                                     {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS
                                                         ? "The client did not complete the required payment before the deadline. This booking is now history only and the reserved slot has been released."
                                                         : getVendorStatus(item) === EXPIRED_STATUS
-                                                        ? "This booking has expired. It is kept for your history; booking actions and messaging are no longer available here."
+                                                        ? "This request was not accepted before the service started. It is kept for your history; booking actions and messaging are no longer available here."
                                                         : "This record is available for your history only. No further actions are required."}
                                                 </Text>
                                             </View>

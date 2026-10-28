@@ -1492,7 +1492,7 @@ const MyEventsScreen = () => {
                                 ? 'Cancelled'
                                 : status === 'rejected'
                                   ? 'Rejected'
-                                  : 'Expired';
+                                  : String(vendor?.paymentStatus || '').toUpperCase() === 'PAYMENT_EXPIRED' ? 'Payment Expired' : 'Request Expired';
 
                           return (
                             <View
@@ -1510,6 +1510,9 @@ const MyEventsScreen = () => {
                                   <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
                                 </View>
                               </View>
+                              {['Request Expired', 'Payment Expired'].includes(historyLabel) && <Text style={styles.inactiveHistoryHint}>{historyLabel === 'Payment Expired'
+                                ? 'The vendor accepted, but the required down payment was not confirmed before the deadline. This booking is now closed.'
+                                : 'The vendor did not accept before the service started. This request is now closed.'}</Text>}
                               <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
                               <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
