@@ -1,3 +1,4 @@
+import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
 import VendorLaterTimeRequest from '../booking/VendorLaterTimeRequest';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -484,6 +485,7 @@ const OrderSummary = () => {
                     </TouchableOpacity>
                 </View>
 
+                <BookingUserGuide kind="vendorOrders" primary={PRIMARY} />
                                 {/* Order Status Summary */}
                 <ScrollView
                     ref={summaryScrollRef}

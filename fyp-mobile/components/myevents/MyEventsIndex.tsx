@@ -1,3 +1,4 @@
+import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
 import CancellationReplacementActions from '../booking/CancellationReplacementActions';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
@@ -486,6 +487,7 @@ const MyEventsScreen = () => {
         </TouchableOpacity>
       </View>
 
+      <BookingUserGuide kind="clientEvents" primary={COLORS.primary} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 120, flexGrow: 1 }}

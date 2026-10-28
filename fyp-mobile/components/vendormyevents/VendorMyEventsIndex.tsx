@@ -1,3 +1,4 @@
+import BookingUserGuide from '../guides/BookingUserGuide';
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 import BookingActivity from '../booking/BookingActivity';
@@ -469,6 +470,7 @@ return (
       </TouchableOpacity>
     </View>
 
+    <BookingUserGuide kind="vendorEvents" primary={PRIMARY} />
     <FlatList
       data={events}
       keyExtractor={(item) => String(item?._id || item?.id)}
