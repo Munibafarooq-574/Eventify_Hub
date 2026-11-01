@@ -44,6 +44,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  type ScrollView as ScrollViewInstance,
   StyleSheet,
   Text,
   TextInput,
@@ -474,7 +475,7 @@ const phase6AvailablePackageIds = useMemo(() => {
       useState('');
 
     const scrollViewRef =
-      useRef<ScrollView>(null);
+      useRef<ScrollViewInstance>(null);
 
     const sponsoredVisitRecordedRef =
       useRef<string | null>(null);
