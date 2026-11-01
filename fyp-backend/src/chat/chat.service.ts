@@ -109,16 +109,14 @@ export class ChatService {
                     isRead: false,
                 });
 
-                // User schema has no dedicated "avatar" field.
-                // Use coverImage first, fall back to the first uploaded image.
+                // Use the vendor brand photo or the client's account profile photo.
                 // isOnline/lastSeen come through automatically once the
                 // participant doc has those fields (Phase 7.1).
                 const participants = (conversation.participants || []).map((p: any) => ({
                     ...p,
-                    avatar:
-                        p.contactDetails?.brandLogo ||
-                        p.coverImage ||
-                        (p.images && p.images.length > 0 ? p.images[0] : ""),
+                    avatar: String(p.role).toLowerCase() === 'vendor'
+                        ? p.contactDetails?.brandLogo || p.coverImage || p.images?.[0] || ''
+                        : p.profileImage || '',
                     displayName: p.contactDetails?.brandName || p.name || "",
                 }));
                 return {

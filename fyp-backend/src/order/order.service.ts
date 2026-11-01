@@ -1583,7 +1583,7 @@ export class OrderService {
         .limit(Number(limit))
         .populate({
     path: 'organizerId',
-    select: 'name email phone_number contactDetails',
+    select: 'name email phone_number contactDetails profileImage',
 })
 .populate({
     path: 'eventCityId',

@@ -436,7 +436,8 @@ const OrderSummary = () => {
     };
 
     // Create or get existing conversation/chat
-    const handleMessageButtonClick = async (vendorId: string, historyBookingId?: string) => {
+    const handleMessageButtonClick = async (client: any, historyBookingId?: string) => {
+        const vendorId = client?._id;
         try {
             const user = await getUserData();
             if (!user) {
@@ -447,7 +448,8 @@ const OrderSummary = () => {
             const { chatId } = historyBookingId ? { chatId: '' } : await createConversation(user._id, vendorId);
             await saveSecureData("chatId", chatId);
             await saveSecureData("receiverId", vendorId);
-            await saveSecureData("receiverAvatar", "");
+            await saveSecureData("receiverAvatar", client?.profileImage || "");
+            await saveSecureData("receiverName", client?.name || "Conversation");
             router.push(historyBookingId ? `/message?history=true&bookingId=${historyBookingId}` : `/message`);
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);
@@ -888,7 +890,7 @@ const OrderSummary = () => {
                                         <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={isAcceptanceDisabled(booking, lateAcceptanceId)} onUpdated={refreshScreenData} />
                                     ))}
                                     {(isClosedVendorStatus(getVendorStatus(item)) || getVendorStatus(item) === 'cancelled') && <View style={styles.actionButtons}>
-                                        <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId?._id, item.vendorOrders?.[0]?._id)}>
+                                        <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId, item.vendorOrders?.[0]?._id)}>
                                             <Text style={styles.buttonText}>View chat history</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
@@ -972,7 +974,7 @@ const OrderSummary = () => {
 
                                         {getVendorStatus(item) !== "cancelled" && <TouchableOpacity
                                             style={styles.messageButton}
-                                            onPress={() => handleMessageButtonClick(item.organizerId?._id)}
+                                            onPress={() => handleMessageButtonClick(item.organizerId)}
                                         >
                                             <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
                                             <Text style={styles.buttonText}>Message</Text>

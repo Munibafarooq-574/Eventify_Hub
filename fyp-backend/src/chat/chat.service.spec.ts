@@ -86,6 +86,16 @@ describe('ChatService', () => {
         expect(result).toEqual([{ id: 'c1', participants: [], unreadCount: 0 }]);
     });
 
+    it('uses client account photos, preserves vendor photos and leaves missing client photos empty', async () => {
+        mockConversationModel.exec.mockResolvedValue([{chatId:'pair',participants:[
+            {_id:'client',role:'Organizer',name:'Muniba',profileImage:'client.jpg',coverImage:'wrong.jpg'},
+            {_id:'blank',role:'Organizer',name:'Sara',coverImage:'not-a-profile.jpg'},
+            {_id:'vendor',role:'Vendor',contactDetails:{brandName:'Brand',brandLogo:'brand.jpg'},profileImage:'other.jpg'},
+        ]}]);
+        const result:any=await service.getUserConversations('viewer');
+        expect(result[0].participants.map((p:any)=>p.avatar)).toEqual(['client.jpg','','brand.jpg']);
+    });
+
     it('should return sorted messages', async () => {
         const messages = [{ message: 'Hi' }];
         mockMessageModel.exec.mockResolvedValue(messages);

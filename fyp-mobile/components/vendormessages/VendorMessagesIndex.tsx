@@ -33,9 +33,6 @@ import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8E9F0';
 
-const DEFAULT_AVATAR =
-    'https://img.freepik.com/premium-vector/man-avatar-profile-picture-isolated-background-avatar-profile-picture-man_1293239-4841.jpg';
-
 // ---------- Helpers ----------
 
 const getMsgText = (m: any) =>
@@ -177,6 +174,7 @@ const formatListTime = (iso?: string) => {
 };
 
 const MessagesScreen: React.FC = () => {
+    const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>({});
     const [conversations, setConversations] =
         useState<any[]>([]);
 
@@ -840,14 +838,15 @@ const MessagesScreen: React.FC = () => {
             >
                 {/* Avatar */}
                 <View style={styles.avatarWrap}>
-                    <Image
-                        source={{
-                            uri:
-                                participant.avatar ||
-                                DEFAULT_AVATAR,
-                        }}
+                    {participant.avatar && !failedAvatars[participant.avatar] ? <Image
+                        source={{ uri: participant.avatar }}
                         style={styles.avatar}
-                    />
+                        onError={() => setFailedAvatars(previous => ({ ...previous, [participant.avatar]: true }))}
+                    /> : <View style={[styles.avatar, { backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center' }]}>
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20 }}>
+                            {(participant.displayName || participant.name || '?').trim().charAt(0).toUpperCase() || '?'}
+                        </Text>
+                    </View>}
 
                     {isOnline && (
                         <View

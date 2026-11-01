@@ -127,3 +127,28 @@ test('chat header displays the saved photo and falls back to the initial when mi
  imageProps.onError();assert.match(render(),/<span>B/);assert.doesNotMatch(render(),/<img/);
  avatar='';assert.match(render(),/<span>B/);
 });
+
+test('conversation list uses a client photo or the name initial, never a dummy portrait',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const src=fs.readFileSync('components/vendormessages/VendorMessagesIndex.tsx','utf8');
+ const start=src.indexOf('<View style={styles.avatarWrap}>'),end=src.indexOf('{/* Text */}',start);
+ assert.ok(start>0&&end>start);
+ const code=ts.transpileModule(`import React from 'react';import {View,Text,Image} from 'react-native';export default function Avatar({participant,failedAvatars,setFailedAvatars}){const styles={},PRIMARY='purple',isOnline=true;return <>${src.slice(start,end)}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ let props,failed={};const m={exports:{}},native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),Image:p=>{props=p;return React.createElement('img',{src:p.source.uri})}};
+ vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:require(p)});
+ const render=avatar=>renderToStaticMarkup(React.createElement(m.exports.default,{participant:{name:'Muniba',avatar},failedAvatars:failed,setFailedAvatars:fn=>failed=fn(failed)}));
+ assert.match(render('client.jpg'),/client.jpg/);assert.doesNotMatch(render('client.jpg'),/<span>M/);
+ props.onError();assert.match(render('client.jpg'),/M/);assert.doesNotMatch(render('client.jpg'),/<img/);
+ assert.match(render(''),/M/);assert.doesNotMatch(render(''),/<img/);
+});
+test('order chat passes the selected client photo and clears a previous photo when absent',async()=>{
+ const src=fs.readFileSync('components/vendorordersummary/VendorOrderSummaryIndex.tsx','utf8');
+ const start=src.indexOf('const handleMessageButtonClick ='),end=src.indexOf('\n    return (',start);
+ const code=ts.transpileModule(src.slice(start,end)+';module.exports=handleMessageButtonClick;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const stored={},m={exports:{}};
+ vm.runInNewContext(code,{module:m,getUserData:async()=>({_id:'vendor'}),createConversation:async()=>({chatId:'same'}),saveSecureData:async(k,v)=>stored[k]=v,router:{push:()=>{}},reportMarketplaceLoadError:()=>{},alert:()=>{throw Error('unexpected')}});
+ await m.exports({_id:'first',name:'Muniba',profileImage:'client.jpg'});
+ assert.equal(stored.receiverAvatar,'client.jpg');assert.equal(stored.receiverName,'Muniba');
+ await m.exports({_id:'second',name:'Sara'},'closed');
+ assert.equal(stored.receiverAvatar,'');assert.equal(stored.receiverName,'Sara');assert.equal(stored.receiverId,'second');
+});
