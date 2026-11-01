@@ -436,7 +436,7 @@ const OrderSummary = () => {
     };
 
     // Create or get existing conversation/chat
-    const handleMessageButtonClick = async (vendorId: string) => {
+    const handleMessageButtonClick = async (vendorId: string, historyBookingId?: string) => {
         try {
             const user = await getUserData();
             if (!user) {
@@ -444,10 +444,11 @@ const OrderSummary = () => {
             }
 
             // Call backend to check for an existing conversation or create a new one
-            const { chatId } = await createConversation(user._id, vendorId);
+            const { chatId } = await createConversation(user._id, vendorId, historyBookingId);
+            if (!chatId) { Alert.alert("No chat history", "No previous conversation is available for this booking."); return; }
             await saveSecureData("chatId", chatId);
             await saveSecureData("receiverId", vendorId);
-            router.push(`/message`);
+            router.push(historyBookingId ? `/message?history=true` : `/message`);
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);
         } catch (error) {
@@ -886,6 +887,14 @@ const OrderSummary = () => {
                                     {(item.vendorOrders || []).map((booking: any) => (
                                         <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={isAcceptanceDisabled(booking, lateAcceptanceId)} onUpdated={refreshScreenData} />
                                     ))}
+                                    {(isClosedVendorStatus(getVendorStatus(item)) || getVendorStatus(item) === 'cancelled') && <View style={styles.actionButtons}>
+                                        <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId?._id, item.vendorOrders?.[0]?._id)}>
+                                            <Text style={styles.buttonText}>View chat history</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
+                                            <Text style={styles.buttonText}>Contact Support</Text>
+                                        </TouchableOpacity>
+                                    </View>}
                                     {isClosedVendorStatus(getVendorStatus(item)) ? (
                                         <View style={styles.closedBookingBox}>
                                             <Ionicons name="lock-closed-outline" size={16} color={PRIMARY} />
@@ -897,7 +906,7 @@ const OrderSummary = () => {
                                                     {getVendorStatus(item) === PAYMENT_EXPIRED_STATUS
                                                         ? "The client did not complete the required payment before the deadline. This booking is now history only and the reserved slot has been released."
                                                         : getVendorStatus(item) === EXPIRED_STATUS
-                                                        ? "This request was not accepted before the service started. It is kept for your history; booking actions and messaging are no longer available here."
+                                                        ? "This request was not accepted before the service started. It is kept for your history; new booking actions and messages are unavailable. You can still view chat history."
                                                         : "This record is available for your history only. No further actions are required."}
                                                 </Text>
                                             </View>
@@ -961,13 +970,13 @@ const OrderSummary = () => {
                                             ) : null
                                         )}
 
-                                        <TouchableOpacity
+                                        {getVendorStatus(item) !== "cancelled" && <TouchableOpacity
                                             style={styles.messageButton}
                                             onPress={() => handleMessageButtonClick(item.organizerId?._id)}
                                         >
                                             <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
                                             <Text style={styles.buttonText}>Message</Text>
-                                        </TouchableOpacity>
+                                        </TouchableOpacity>}
                                     </View>
                                     )}
                                 </View>

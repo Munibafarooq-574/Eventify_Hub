@@ -18,7 +18,7 @@ import uploadChatAudio from "@/services/uploadChatAudio";
 import VoiceRecorderButton from "./Voice/VoiceRecorderButton";
 import VoiceMessageBubble from "./Voice/VoiceMessageBubble";
 import { Paths } from "expo-file-system";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -315,6 +315,10 @@ useEffect(() => {
   const pendingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const seenMessageIdsRef = useRef<Set<string>>(new Set()); // avoid re-emitting messageSeen for the same id
   const router = useRouter();
+  const { history } = useLocalSearchParams<{ history?: string }>();
+  const [readOnly, setReadOnly] = useState(true);
+  const readOnlyRef = useRef(true);
+  readOnlyRef.current = readOnly;
   const messagesRef = useRef<any[]>([]);
   useEffect(() => {
     messagesRef.current = messages;
@@ -367,7 +371,7 @@ useEffect(() => {
 
   const emitMessage = useCallback(
     (tempId: string, text: string, repliedToMessageId: string | null = null) => {
-      if (!userRef.current) return;
+      if (readOnlyRef.current || !userRef.current) return;
 
       sendChatMessage({
         user: userRef.current._id,
@@ -412,6 +416,7 @@ useEffect(() => {
         const stuck = prev.filter(
           (m) => m.temp && (m.status === "sending" || m.status === "failed")
         );
+        if (readOnlyRef.current) return prev;
         stuck.forEach((m) => {
           const rid = idStr(getRepliedTo(m)) || null;
           emitMessage(m._id, getMsgText(m), rid);
@@ -424,6 +429,14 @@ useEffect(() => {
       });
     };
     socket.on("connect", handleConnect);
+    const handleChatError = (error: any) => {
+      if (/booking is closed/i.test(error?.message || '')) {
+        readOnlyRef.current = true;
+        setReadOnly(true);
+        setReplyingTo(null);
+      }
+    };
+    socket.on('chatError', handleChatError);
 
     const offNewMessage = onNewMessage((incoming: any) => {
       if (!isMounted) return;
@@ -563,11 +576,15 @@ useEffect(() => {
           });
         }
 
-        const messagesData = await getConversationMessages(
+        const chatData = await getConversationMessages(
           chatIdValue,
-          user._id
+          user._id,
+          true
         );
         if (!isMounted) return;
+        readOnlyRef.current = history === "true" || chatData.readOnly === true;
+        setReadOnly(readOnlyRef.current);
+        const messagesData = chatData.messages;
         const loaded = sortDesc(
   dedupeById((messagesData || []).map((m: any) => ({ ...m, status: deriveStatus(m) })))
 );
@@ -601,6 +618,7 @@ useEffect(() => {
     return () => {
       isMounted = false;
       socket.off("connect", handleConnect);
+      socket.off("chatError", handleChatError);
       offNewMessage();
       offMessagesSeen();
       offDelivered();
@@ -645,6 +663,7 @@ useEffect(() => {
       : null;
 
   const handleSendMessage = async () => {
+    if (readOnly) return;
     const trimmed = message.trim();
     if (!trimmed || !userRef.current) return;
 
@@ -675,6 +694,7 @@ useEffect(() => {
   };
 
   const sendImageMessage = async (imageUri: string) => {
+    if (readOnly) return;
     if (!userRef.current) return;
     setUploading(true);
     const replySnapshot = buildReplySnapshot(replyingTo);
@@ -722,7 +742,7 @@ useEffect(() => {
   videoUri: string,
   durationMs: number = 0
 ) => {
-  if (!userRef.current) return;
+  if (readOnlyRef.current || !userRef.current) return;
 
   setUploading(true);
   setUploadProgress(0);
@@ -822,6 +842,7 @@ useEffect(() => {
 };
 
   const sendVoiceMessage = async (audioUri: string, durationMs: number) => {
+    if (readOnly) return;
     if (!userRef.current) return;
     setUploading(true);
     const replySnapshot = buildReplySnapshot(replyingTo);
@@ -1108,6 +1129,7 @@ const processPickedVideo = async (videoUri: string, durationMs: number) => {
 };
 
   const handleRetry = (msg: any) => {
+    if (readOnly) return;
     setMessages((prev) =>
       prev.map((m) => (m._id === msg._id ? { ...m, status: "sending", timestamp: new Date().toISOString() } : m))
     );
@@ -1225,6 +1247,7 @@ const handleConfirmPin = () => {
 };
 
   const handleLongPressMessage = (item: any) => {
+  if (readOnly) return;
   if (item.isDeletedForEveryone || item.temp) return;
 
   setSelectedMessage(item);
@@ -1707,7 +1730,12 @@ const handleMessageOption = (
 )}
 
             {/* Footer */}
-            <View style={styles.footer}>
+            {readOnly ? <View style={[styles.footer, { flexDirection: 'column', padding: 16 }]}>
+              <Text style={{ color: PRIMARY }}>Chat history only. You cannot send messages from this closed booking.</Text>
+              <TouchableOpacity accessibilityRole="button" style={{ paddingVertical: 12 }} onPress={() => router.push('/contactus')}>
+                <Text style={{ color: PRIMARY, fontWeight: '700' }}>Contact Support</Text>
+              </TouchableOpacity>
+            </View> : <View style={styles.footer}>
               <TouchableOpacity
                 style={styles.attachButton}
                 onPress={handleAttachPress}
@@ -1742,7 +1770,8 @@ const handleMessageOption = (
                 />
               )}
             </View>
-            <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>
+            }
+            {!readOnly && <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>}
           </>
         )}
       </KeyboardAvoidingView>

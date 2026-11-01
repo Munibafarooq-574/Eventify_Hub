@@ -29,7 +29,18 @@ export class ChatService {
     ) { }
 
     async assertBookingChatAccess(chatId: string, userId: string) {
-        await this.bookingAccess.assertChat(chatId, userId);
+        await this.bookingAccess.assertChat(chatId, userId, true);
+    }
+
+    async openBookingHistory(bookingId: string, userId: string, peerId: string) {
+        await this.bookingAccess.assertHistoryBooking(bookingId, userId, peerId);
+        const chatId = [userId, peerId].sort().join('-');
+        const conversation = await this.conversationModel.findOne({ chatId });
+        return { chatId: conversation?.chatId || null, readOnly: true };
+    }
+
+    async chatReadOnly(chatId: string, userId: string) {
+        return this.bookingAccess.assertChat(chatId, userId, true);
     }
 
     // Create a new conversation
@@ -123,7 +134,7 @@ export class ChatService {
 
     // Get all messages for a conversation (chatId)
     async getConversationMessages(chatId: string, userId?: string): Promise<Message[]> {
-        if (userId) await this.bookingAccess.assertChat(chatId, userId);
+        if (userId) await this.bookingAccess.assertChat(chatId, userId, true);
         const filter: any = { chatId };
         if (userId) {
             filter.deletedFor = { $ne: userId };
@@ -347,6 +358,7 @@ await this.sendPushNotification(
         }
 
 
+        await this.bookingAccess.assertChat(msg.chatId, userId);
         msg.isDeletedForEveryone = true;
 
         await msg.save();
@@ -481,6 +493,7 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
         userId: string,
         query: string,
     ): Promise<Message[]> {
+        await this.bookingAccess.assertChat(chatId, userId, true);
         const isMember = await this.isUserInConversation(chatId, userId);
         if (!isMember) {
             throw new ForbiddenException('You do not belong to this conversation');
@@ -513,6 +526,7 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
     userId: string,
     duration?: PinDuration | null,
 ): Promise<{ conversation: Conversation; previousPinnedMessageId: string | null }> {
+    await this.bookingAccess.assertChat(chatId, userId);
     const isMember = await this.isUserInConversation(chatId, userId);
     if (!isMember) {
         throw new ForbiddenException('You do not belong to this conversation');
@@ -567,6 +581,7 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
 }
 
     async unpinMessage(chatId: string, messageId: string, userId: string): Promise<Conversation> {
+    await this.bookingAccess.assertChat(chatId, userId);
     const isMember = await this.isUserInConversation(chatId, userId);
     if (!isMember) {
         throw new ForbiddenException('You do not belong to this conversation');
@@ -626,6 +641,7 @@ async markMessageIdsSeen(messageIds: string[], seenAt: Date): Promise<void> {
     }
 
     async getPinnedMessages(chatId: string, userId: string): Promise<Message[]> {
+    await this.bookingAccess.assertChat(chatId, userId, true);
     const isMember = await this.isUserInConversation(chatId, userId);
     if (!isMember) {
         throw new ForbiddenException('You do not belong to this conversation');

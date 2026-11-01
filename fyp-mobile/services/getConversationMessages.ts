@@ -6,7 +6,8 @@ import axios from "axios";
 
 export default async function getConversationMessages(
     chatId: string,
-    userId: string
+    userId: string,
+    includeAccess = false
 ) {
     const token = await getSecureData('token');
     if (!token) throw new Error('Your session has expired. Please sign in again.');
@@ -20,7 +21,7 @@ export default async function getConversationMessages(
             url,
         });
 
-        return response.data.messages;
+        return includeAccess ? response.data : response.data.messages;
 
     } catch (error) {
         reportMarketplaceLoadError('Booking chat unavailable', error);

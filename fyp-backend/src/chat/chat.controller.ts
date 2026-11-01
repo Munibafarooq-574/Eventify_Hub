@@ -158,6 +158,12 @@ async uploadChatVideo(
   // vendorId = "video"
   // ============================================================
 
+  @Get('booking-history/:bookingId/:peerId')
+  @UseGuards(JwtAuthGuard)
+  async bookingHistory(@Param('bookingId') bookingId: string, @Param('peerId') peerId: string, @Req() req: any) {
+    return this.chatService.openBookingHistory(bookingId, String(req.user.id), peerId);
+  }
+
   @Post(':userId/:vendorId')
   @UseGuards(JwtAuthGuard)
   async createOrGetConversation(
@@ -215,6 +221,7 @@ async uploadChatVideo(
 
     return {
       messages,
+      readOnly: await this.chatService.chatReadOnly(chatId, userId),
     };
   }
 

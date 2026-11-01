@@ -81,7 +81,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'messages-history', title: 'Messages, history and event removal', summary: 'Contact your vendor and keep decisions clear.', steps: [
         'Use Message on the relevant available booking to open that vendor’s conversation. Chatting alone does not change a date, payment or booking status.',
-        'Review Booking history for cancelled, rejected, expired or replaced vendors and their recorded decisions. A missing history timestamp is not a new action time.',
+        'Review Booking history for closed bookings and recorded decisions. View chat history opens previous messages without sending new ones. If there is no previous chat, the app tells you. Contact Support for help with refunds or penalties.',
         'The event’s delete icon is separate from cancelling one vendor. Read its confirmation carefully; do not use event removal as a way to request cancellation or a refund.',
       ] },
     ],
@@ -112,7 +112,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       { id: 'subscription', title: 'If your subscription expires', summary: 'Continue managing legitimate existing bookings.', steps: [
         'Subscription expiry affects access to subscription features and visibility to new clients. It does not automatically cancel existing customer bookings.',
         'Open My Orders to manage existing bookings. If Messages shows a booking-messages notice, open the relevant valid booking and tap Message to contact its client.',
-        'Expired or no-longer-assigned bookings are history records and do not offer the same actions as valid pending, accepted or completed bookings.',
+        'Cancelled, expired or no-longer-assigned bookings offer View chat history and Contact Support. You cannot send new messages from these closed bookings. A separate valid booking with the same client can still offer Message.',
       ] },
     ],
   },
@@ -135,7 +135,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Payment Required means the client still needs to secure the advance. Awaiting confirmation means a payment was submitted but has not become successful.',
         'Confirmed / Partially Paid means the required advance is secured. Paid means the full recorded booking amount has been paid. If no advance is required, zero paid can be correct.',
         'An unpaid booking can expire at its payment deadline. A pending payment past the preparation cutoff is overdue and the service is not secured; do not treat it as paid.',
-        'Request Expired and No longer assigned records are kept for history. They do not offer normal acceptance, completion or booking-message actions. Payment expiry for one assignment does not expire other vendors.',
+        'Request Expired and No longer assigned records are kept for history. They do not offer acceptance, completion or new messages. View chat history lets you read previous messages; Contact Support is available for help. Payment expiry for one assignment does not expire other vendors.',
         'After service completion, the client handles any remaining balance using the displayed remaining-payment deadline. Refresh to check the recorded result.',
       ] },
       { id: 'later', title: 'Ask the client for a later time', summary: 'Send a request without changing the event yourself.', steps: [

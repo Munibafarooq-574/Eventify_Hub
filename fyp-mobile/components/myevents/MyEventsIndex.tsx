@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
 import CancellationReplacementActions from '../booking/CancellationReplacementActions';
@@ -408,13 +409,14 @@ const MyEventsScreen = () => {
     );
   };
 
-  const handleMessage = async (vendor: any) => {
+  const handleMessage = async (vendor: any, historyOnly = false) => {
     try {
       const user = await resolveUser();
       if (!user || !user._id) {
         throw new Error('User not found');
       }
-      const { chatId } = await createConversation(user._id, vendor?.vendorId?._id);
+      const { chatId } = await createConversation(user._id, vendor?.vendorId?._id, historyOnly ? vendor._id : undefined);
+      if (!chatId) { Alert.alert("No chat history", "No previous conversation is available for this booking."); return; }
 
       const displayName =
         vendor?.vendorId?.contactDetails?.brandName || // brand name (agar backend business info bhi populate karta ho)
@@ -426,9 +428,10 @@ const MyEventsScreen = () => {
       await saveSecureData('receiverName', displayName);
       await saveSecureData('receiverAvatar', vendor?.vendorId?.contactDetails?.brandLogo || '');
 
-      router.push(`/message`);
+      router.push(historyOnly ? `/message?history=true` : `/message`);
     } catch (error) {
-      console.error('Error initiating conversation:', error);
+      reportMarketplaceLoadError('Booking chat unavailable', error);
+      Alert.alert('Conversation unavailable', 'Please refresh this booking and try again.');
     }
   };
 
@@ -1513,6 +1516,14 @@ const MyEventsScreen = () => {
                               {['Request Expired', 'Payment Expired'].includes(historyLabel) && <Text style={styles.inactiveHistoryHint}>{historyLabel === 'Payment Expired'
                                 ? 'The vendor accepted, but the required down payment was not confirmed before the deadline. This booking is now closed.'
                                 : 'The vendor did not accept before the service started. This request is now closed.'}</Text>}
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 12 }}>
+                                <TouchableOpacity style={styles.messageButton} onPress={() => handleMessage(vendor, true)}>
+                                  <Text style={styles.messageButtonText}>View chat history</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
+                                  <Text style={styles.messageButtonText}>Contact Support</Text>
+                                </TouchableOpacity>
+                              </View>
                               <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
                               <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />

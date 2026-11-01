@@ -1054,8 +1054,9 @@ export class ChatGateway
                         0,
                 );
 
-        } catch {
-            client.emit('chatError', { message: 'Unable to send. Open an existing booking and tap Message, or try again shortly.' });
+        } catch (error) {
+            const closed = error instanceof Error && error.message === 'This booking is closed. You can view chat history, but cannot send new messages.';
+            client.emit('chatError', { message: closed ? error.message : 'Unable to send. Open an existing booking and tap Message, or try again shortly.' });
             return;
         }
 

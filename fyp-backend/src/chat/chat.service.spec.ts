@@ -47,7 +47,7 @@ describe('ChatService', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 ChatService,
-                { provide: BookingChatAccessService, useValue: { assertPair:jest.fn(), assertList:jest.fn(), assertChat:jest.fn() } },
+                { provide: BookingChatAccessService, useValue: { assertPair:jest.fn(), assertList:jest.fn(), assertChat:jest.fn(), assertHistoryBooking:jest.fn() } },
                 { provide: getModelToken(Conversation.name), useValue: mockConversationModel },
                 { provide: getModelToken(Message.name), useValue: mockMessageModel },
                 { provide: getModelToken(User.name), useValue: mockUserModel },
@@ -136,3 +136,30 @@ describe('ChatService', () => {
     });
 });
 
+
+
+describe('Opening closed booking history',()=>{
+ it('returns no history without creating a conversation',async()=>{
+  const service:any=Object.create(ChatService.prototype);
+  service.bookingAccess={assertHistoryBooking:jest.fn()};
+  service.conversationModel={findOne:jest.fn(async()=>null)};
+  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,readOnly:true});
+  expect(service.bookingAccess.assertHistoryBooking).toHaveBeenCalledWith('booking','vendor','client');
+ });
+ it('reuses the same existing conversation without changing it',async()=>{
+  const service:any=Object.create(ChatService.prototype);
+  service.bookingAccess={assertHistoryBooking:jest.fn()};
+  service.conversationModel={findOne:jest.fn(async()=>({chatId:'client-vendor'}))};
+  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:'client-vendor',readOnly:true});
+  expect(service.conversationModel.findOne).toHaveBeenCalledWith({chatId:'client-vendor'});
+ });
+ it('checks write permission before saving a message or shared history changes',async()=>{
+  const service:any=Object.create(ChatService.prototype);
+  service.bookingAccess={assertChat:jest.fn(async()=>{throw Error('closed')})};
+  service.messageModel=jest.fn();
+  await expect(service.createMessage('chat','vendor','client','hello')).rejects.toThrow('closed');
+  expect(service.messageModel).not.toHaveBeenCalled();
+  await expect(service.pinMessage('chat','message','vendor')).rejects.toThrow('closed');
+  await expect(service.unpinMessage('chat','message','vendor')).rejects.toThrow('closed');
+ });
+});

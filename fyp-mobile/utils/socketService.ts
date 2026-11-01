@@ -14,7 +14,7 @@ export function connectSocket(): Socket {
   if (socket) return socket;
 
   socket = io(SOCKET_URL);
-  socket.on('chatError', () => Alert.alert('Booking chat', 'Unable to open or send this conversation. Open an existing booking and tap Message. If the issue continues, sign in again.'));
+  socket.on('chatError', (error) => Alert.alert('Booking chat', /booking is closed/i.test(error?.message || '') ? 'This booking is closed. You can still view chat history. Contact Support if you need help.' : 'Unable to open or send this conversation. Open an existing booking and tap Message. If the issue continues, sign in again.'));
 
   socket.on("connect", () => {
     // Re-announce identity on every (re)connect so the backend's presence
