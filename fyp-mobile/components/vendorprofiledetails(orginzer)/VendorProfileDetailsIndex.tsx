@@ -2544,7 +2544,7 @@ const serviceCityNamesFromIds =
                         styles.perHead
                       }
                     >
-                      Lowest package base price
+                      Starting price
                     </Text>
                   </View>
                 </View>
