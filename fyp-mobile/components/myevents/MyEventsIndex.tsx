@@ -613,7 +613,7 @@ const MyEventsScreen = () => {
                           </View>
 
                           <View style={{ flex: 1, marginLeft: 12 }}>
-                            <Text style={styles.eventName} numberOfLines={1}>
+                            <Text style={styles.eventName}>
                               {event.eventName}
                             </Text>
 
