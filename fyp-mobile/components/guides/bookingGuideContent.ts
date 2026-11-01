@@ -80,6 +80,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'If the vendor cancels, read the booking’s refund details. When Find replacement or Continue without is available, it applies to that vendor; other vendor bookings remain in place.',
       ] },
       { id: 'messages-history', title: 'Messages, history and event removal', summary: 'Contact your vendor and keep decisions clear.', steps: [
+        'Open Messages to see your conversations. Clients do not need a vendor subscription.',
         'Use Message on the relevant available booking to open that vendor’s conversation. Chatting alone does not change a date, payment or booking status.',
         'Review Booking history for closed bookings and recorded decisions. View chat history opens previous messages without sending new ones. If no messages were exchanged, the history screen shows No previous messages for this booking. Contact Support for help with refunds or penalties.',
         'The event’s delete icon is separate from cancelling one vendor. Read its confirmation carefully; do not use event removal as a way to request cancellation or a refund.',

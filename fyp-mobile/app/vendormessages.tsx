@@ -11,6 +11,10 @@ export default function VendorMessagesScreen() {
     let mounted=true;setState('loading');
     void (async()=>{try{
       const user=await getUserData();if(!user?._id)throw new Error('Sign in required');
+      if(String(user.role).toLowerCase()!=='vendor'){
+        if(mounted)setState('allowed');
+        return;
+      }
       const access=await getSubscriptionAccessState(String(user._id));
       const end=access.subscription?.endDate;
       const allowed=access.accessAllowed && !access.subscriptionRequired && Boolean(end) && new Date(end!).getTime()>Date.now();

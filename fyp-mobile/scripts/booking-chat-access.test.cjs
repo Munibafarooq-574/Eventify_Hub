@@ -69,3 +69,28 @@ test('closed history loads messages once by booking and never uses a stale chat 
   assert.equal(calls.length,1);assert.equal(calls[0].join(','),'vendor,client,closed');assert.equal(errors.length,0);assert.equal(loaded[0].length,rows.length);
  }
 });
+
+function messagingRoute(user,access,fail=false){
+ const React=require('react');let focus,subscriptionCalls=0,mounted=true,clean;
+ const state=['loading',0];let hook=0;
+ const code=ts.transpileModule(fs.readFileSync('app/vendormessages.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const m={exports:{}};
+ const imports={'react':{...React,useState:init=>{const i=hook++;return[state[i],v=>state[i]=v]},useCallback:f=>f},'expo-router':{router:{replace:()=>{}},useFocusEffect:f=>{focus=f}},'react-native':{View:()=>null,Text:()=>null,TouchableOpacity:()=>null,ActivityIndicator:()=>null},'@/components/vendormessages/VendorMessagesIndex':{default:()=>null},'@/store':{getUserData:async()=>user},'@/services/getSubscriptionAccessState':{getSubscriptionAccessState:async()=>{subscriptionCalls++;if(fail)throw Error('offline');return access}}};
+ vm.runInNewContext(code,{module:m,exports:m.exports,Date,require:p=>imports[p]||require(p)});m.exports.default();clean=focus();
+ return{state,ready:()=>new Promise(r=>setImmediate(r)),calls:()=>subscriptionCalls,blur:()=>clean()};
+}
+test('client opens the conversation list without any vendor subscription request',async()=>{
+ for(const role of ['Organizer','Client','organizer']){
+  const f=messagingRoute({_id:'client',role},null,true);await f.ready();assert.equal(f.state[0],'allowed');assert.equal(f.calls(),0);
+ }
+});
+test('vendor messaging still checks active and expired subscription access',async()=>{
+ for(const [active,expected] of [[true,'allowed'],[false,'restricted']]){
+  const f=messagingRoute({_id:'vendor',role:'Vendor'},{accessAllowed:active,subscriptionRequired:!active,subscription:{endDate:active?'2099-01-01':'2000-01-01'}});
+  await f.ready();assert.equal(f.state[0],expected);assert.equal(f.calls(),1);
+ }
+});
+test('vendor verification failure and signed-out sessions do not open a conversation list',async()=>{
+ const failed=messagingRoute({_id:'vendor',role:'Vendor'},null,true);await failed.ready();assert.equal(failed.state[0],'error');
+ const signedOut=messagingRoute(null,null);await signedOut.ready();assert.equal(signedOut.state[0],'error');assert.equal(signedOut.calls(),0);
+});
