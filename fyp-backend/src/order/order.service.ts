@@ -746,101 +746,58 @@ export class OrderService {
                             | number
                             | null = null;
 
-                        if (
-                            packageDoc.bookingType ===
-                            'DURATION_BASED'
-                        ) {
-                            const durationOption =
-                                (
-                                    packageDoc.durations ??
-                                    []
-                                ).find(
-                                    (
-                                        duration: any,
-                                    ) => {
-                                        const value =
-                                            Number(
-                                                duration.value,
-                                            );
+                        if (packageDoc.bookingType === 'DURATION_BASED') {
+                            const tiers = (packageDoc.durations ?? []).map((option: any) => ({
+                                minutes: Number(option.value) * (option.unit === 'DAYS' ? 1440 : 60),
+                                price: Number(option.price),
+                            }));
+                            const included = Number(packageDoc.baseIncludedDurationMinutes);
+                            const basePrice = Number(packageDoc.price);
+                            const hasIncluded = Number.isFinite(included) && included > 0;
+                            const exact = tiers.find((tier) => tier.minutes === selectedDurationMinutes);
 
-                                        const minutes =
-                                            duration.unit ===
-                                            'DAYS'
-                                                ? value *
-                                                  1440
-                                                : duration.unit ===
-                                                    'HOURS'
-                                                  ? value *
-                                                    60
-                                                  : NaN;
-
-                                        return (
-                                            minutes ===
-                                            selectedDurationMinutes
-                                        );
-                                    },
-                                );
-
-                            if (
-                                durationOption
-                            ) {
-                                unitPrice =
-                                    Number(
-                                        durationOption.price,
-                                    );
-                            } else if (
-                                packageDoc
-                                    .allowCustomDuration
-                            ) {
-                                const unitMinutes =
-                                    packageDoc
-                                        .customDurationUnit ===
-                                    'DAYS'
-                                        ? 1440
-                                        : packageDoc
-                                                .customDurationUnit ===
-                                            'HOURS'
-                                          ? 60
-                                          : 0;
-
-                                const customRate =
-                                    Number(
-                                        packageDoc
-                                            .customDurationRate,
-                                    );
-
-                                if (
-                                    unitMinutes <=
-                                        0 ||
-                                    selectedDurationMinutes %
-                                        unitMinutes !==
-                                        0 ||
-                                    !Number.isFinite(
-                                        customRate,
-                                    ) ||
-                                    customRate <
-                                        0
-                                ) {
-                                    throw new BadRequestException(
-                                        'Package custom duration pricing is invalid',
-                                    );
+                            if (hasIncluded && selectedDurationMinutes < included) {
+                                throw new BadRequestException('Duration is below the package included time');
+                            }
+                            if (hasIncluded && selectedDurationMinutes === included) {
+                                unitPrice = basePrice;
+                            } else if (exact) {
+                                unitPrice = exact.price;
+                            } else if (packageDoc.allowCustomDuration) {
+                                const unitMinutes = packageDoc.customDurationUnit === 'DAYS' ? 1440 :
+                                    packageDoc.customDurationUnit === 'HOURS' ? 60 : 0;
+                                const rate = Number(packageDoc.customDurationRate);
+                                if (!unitMinutes || !Number.isFinite(rate) || rate <= 0) {
+                                    throw new BadRequestException('Package custom duration pricing is invalid');
                                 }
-
-                                unitPrice =
-                                    (selectedDurationMinutes /
-                                        unitMinutes) *
-                                    customRate;
+                                if (hasIncluded) {
+                                    const sortedTiers = [{ minutes: included, price: basePrice }, ...tiers]
+                                        .sort((a, b) => a.minutes - b.minutes);
+                                    const lower = [...sortedTiers].reverse()
+                                        .find((tier) => tier.minutes < selectedDurationMinutes);
+                                    const upper = sortedTiers.find((tier) => tier.minutes > selectedDurationMinutes);
+                                    if (!lower) {
+                                        throw new BadRequestException('Duration is below the package minimum');
+                                    }
+                                    const calculated = basePrice + rate *
+                                        (selectedDurationMinutes - included) / unitMinutes;
+                                    unitPrice = Math.round(Math.max(lower.price,
+                                        upper ? Math.min(calculated, upper.price) : calculated));
+                                } else {
+                                    // Legacy packages: their custom rate covers the full duration.
+                                    if (selectedDurationMinutes % unitMinutes !== 0) {
+                                        throw new BadRequestException('Package custom duration pricing is invalid');
+                                    }
+                                    unitPrice = (selectedDurationMinutes / unitMinutes) * rate;
+                                }
+                            } else if (!hasIncluded) {
+                                // Preserve existing legacy package fallback.
+                                unitPrice = basePrice;
                             } else {
-                                unitPrice =
-                                    Number(
-                                        packageDoc.price,
-                                    );
+                                throw new BadRequestException('This duration is not offered by the vendor');
                             }
                         } else {
-                            unitPrice =
-                                Number(
-                                    packageDoc.price,
-                                );
+                            unitPrice = Number(packageDoc.price);
                         }
 
                         if (
