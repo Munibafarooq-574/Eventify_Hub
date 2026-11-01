@@ -71,6 +71,11 @@ export class PackageDto {
   durations?: PackageDurationOptionDto[];
 
   @IsOptional()
+  @IsNumber()
+  @Min(1)
+  baseIncludedDurationMinutes?: number;
+
+  @IsOptional()
   @IsBoolean()
   allowCustomDuration?: boolean;
 
