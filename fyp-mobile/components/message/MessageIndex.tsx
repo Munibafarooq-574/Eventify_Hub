@@ -1557,7 +1557,7 @@ const handleMessageOption = (
               <View style={styles.headerAvatarCircle}>
                 {receiverAvatar ? <ExpoImage
                   source={{ uri: receiverAvatar }}
-                  style={{ width: 34, height: 34, borderRadius: 17 }}
+                  style={{ width: 44, height: 44, borderRadius: 22 }}
                   contentFit="cover"
                   cachePolicy="disk"
                   onError={() => setReceiverAvatar('')}
@@ -2441,9 +2441,9 @@ pinDurationConfirmText: {
     justifyContent: "center",
   },
   headerAvatarCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.25)",
     justifyContent: "center",
     alignItems: "center",
@@ -2452,7 +2452,7 @@ pinDurationConfirmText: {
   headerAvatarInitial: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 18,
   },
   onlineDot: {
     position: "absolute",
