@@ -747,7 +747,7 @@ export class OrderService {
                             | null = null;
 
                         if (packageDoc.bookingType === 'DURATION_BASED') {
-                            const tiers = (packageDoc.durations ?? []).map((option: any) => ({
+                            const tiers: { minutes: number; price: number }[] = (packageDoc.durations ?? []).map((option: any) => ({
                                 minutes: Number(option.value) * (option.unit === 'DAYS' ? 1440 : 60),
                                 price: Number(option.price),
                             }));
