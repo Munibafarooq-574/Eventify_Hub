@@ -1001,17 +1001,9 @@ if (eventDetailsRaw) {
                                                                     </Text>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {pkg.customDurationUnit === 'DAYS'
-                                                                            ? `${Number(pkg.durationMinutes) / (24 * 60)} day(s)`
-                                                                            : `${Number(pkg.durationMinutes) / 60} hour(s)`}
-                                                                        {' × Rs. '}
-                                                                        {formatCurrency(
-                                                                            Number(pkg.customDurationRate)
-                                                                        )}
-                                                                        {' = Rs. '}
-                                                                        {formatCurrency(
-                                                                            Number(pkg.price)
-                                                                        )}
+                                                                        {Number(pkg.baseIncludedDurationMinutes) > 0
+                                                                            ? `Base Rs. ${formatCurrency(Number(pkg.basePrice))} includes ${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s). Extra time at the shown rate. Total Rs. ${formatCurrency(Number(pkg.price))}`
+                                                                            : `${pkg.customDurationUnit === 'DAYS' ? Number(pkg.durationMinutes) / 1440 : Number(pkg.durationMinutes) / 60} unit(s) × Rs. ${formatCurrency(Number(pkg.customDurationRate))} = Rs. ${formatCurrency(Number(pkg.price))}`}
                                                                     </Text>
                                                                 </View>
                                                             </View>
