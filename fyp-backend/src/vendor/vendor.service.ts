@@ -793,6 +793,7 @@ async addPackages(
         serviceWindowEndOffsetMinutes:
             pkg.serviceWindowEndOffsetMinutes,
         durations: pkg.durations ?? [],
+        baseIncludedDurationMinutes: pkg.baseIncludedDurationMinutes,
         allowCustomDuration: pkg.allowCustomDuration ?? false,
         customDurationUnit: pkg.customDurationUnit,
         customDurationRate: pkg.customDurationRate,
@@ -1382,6 +1383,10 @@ async updatePackage(
     if (updateDto.durations !== undefined) {
         updatePayload['packages.$.durations'] =
             updateDto.durations;
+    }
+
+    if (updateDto.baseIncludedDurationMinutes !== undefined) {
+        updatePayload['packages.$.baseIncludedDurationMinutes'] = updateDto.baseIncludedDurationMinutes;
     }
 
     if (updateDto.allowCustomDuration !== undefined) {
