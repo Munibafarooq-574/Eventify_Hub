@@ -401,7 +401,12 @@ const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData
     const rating = review?.averageRating ? Number(review.averageRating).toFixed(1) : "0.0";
     const reviewCount = review?.totalReviews || 0;
 
-    const price = vendorStartingPrice(item);
+    const packageBasePrices = (vendorPackages[item._id] || [])
+      .map((pkg: any) => Number(pkg?.price))
+      .filter((value: number) => Number.isFinite(value) && value >= 0);
+    const price = packageBasePrices.length > 0
+      ? Math.min(...packageBasePrices)
+      : vendorStartingPrice(item);
     const brandName = item?.contactDetails?.brandName || item?.ContactDetails?.brandName || item?.BusinessDetails?.brandName || "Vendor";
     const vendorName = item?.name || item?.vendorName || item?.ownerName || "Vendor";
     const categoryName = item?.buisnessCategory?.name || item?.buisnessCategory?.categoryName || item?.category?.name || item?.categoryName || item?.serviceName || categoryIdToName[item?._matchedCategoryId] || "Category";
