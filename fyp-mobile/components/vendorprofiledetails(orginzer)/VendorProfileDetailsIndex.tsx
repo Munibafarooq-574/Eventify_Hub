@@ -4652,9 +4652,6 @@ const serviceCityNamesFromIds =
       </Text>
     </View>
 
-    {Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
-       <Text style={styles.noDurationText}>Base price: Rs. {Number(selectedPackage.price || 0).toLocaleString()} includes {Number(selectedPackage.baseIncludedDurationMinutes) % 1440 === 0 ? `${Number(selectedPackage.baseIncludedDurationMinutes) / 1440} day(s)` : `${Number(selectedPackage.baseIncludedDurationMinutes) / 60} hour(s)`}</Text>
-     )}
 
      {Array.isArray(selectedPackage.durations) &&
     selectedPackage.durations.length > 0 ? (
