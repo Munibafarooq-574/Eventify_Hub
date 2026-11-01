@@ -284,6 +284,7 @@ const ChatScreen: React.FC = () => {
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [canViewVendorInfo, setCanViewVendorInfo] = useState(false);
   const [contactDetails, setContactDetails] = useState<any>(null);
   const [contactLoading, setContactLoading] = useState(false);
   // 🔵 NEW (Phase 7.1)
@@ -567,6 +568,7 @@ useEffect(() => {
         const user = await getUserData();
         if (!user) throw new Error("user not found");
         userRef.current = user;
+        setCanViewVendorInfo(['organizer', 'client'].includes(String(user.role).toLowerCase()));
 
         const chatIdValue = (await getSecureData("chatId")) || "";
         const rName = (await getSecureData("receiverName")) || "Conversation";
@@ -942,6 +944,7 @@ useEffect(() => {
   };
 
   const handleOpenContactDetails = async () => {
+    if (!canViewVendorInfo) return;
     setContactModalVisible(true);
     if (contactDetails) return; // already fetched once, cache use karo
 
@@ -1549,6 +1552,7 @@ const handleMessageOption = (
               style={styles.headerCenterWrap}
               activeOpacity={0.8}
               onPress={handleOpenContactDetails}
+              disabled={!canViewVendorInfo}
             >
               <View style={styles.headerAvatarCircle}>
                 {receiverAvatar ? <ExpoImage
@@ -1567,12 +1571,12 @@ const handleMessageOption = (
                   <Text style={styles.title} numberOfLines={1}>
                     {receiverName}
                   </Text>
-                  <Ionicons
+                  {canViewVendorInfo && <Ionicons
                     name="information-circle-outline"
                     size={16}
                     color="rgba(255,255,255,0.85)"
                     style={styles.headerInfoIcon}
-                  />
+                  />}
                 </View>
                 {!!headerSubtitle && (
                   <Text
@@ -1855,7 +1859,7 @@ const handleMessageOption = (
         </View>
       </Modal>
       <Modal
-        visible={contactModalVisible}
+        visible={canViewVendorInfo && contactModalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setContactModalVisible(false)}

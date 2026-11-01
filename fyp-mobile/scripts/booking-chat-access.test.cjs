@@ -63,7 +63,7 @@ test('closed history loads messages once by booking and never uses a stale chat 
  for(const rows of [[],[{_id:'old',message:'Hello'}]]){
   const calls=[],loaded=[],errors=[],m={exports:{}};
   const context={module:m,isMounted:true,history:'true',bookingId:'closed',chatIdRef:{current:''},receiverIdRef:{current:''},userRef:{current:null},readOnlyRef:{current:true},socket:{connected:true},
-   setLoading:()=>{},setLoadError:v=>{if(v)errors.push(v)},setReadOnly:()=>{},setReceiverName:()=>{},setReceiverAvatar:()=>{},setMessages:rows=>loaded.push(rows),getUserData:async()=>({_id:'vendor'}),getSecureData:async key=>key==='receiverId'?'client':key==='chatId'?'stale-chat':'Client',saveSecureData:async()=>{},registerUser:()=>{},getUserPresence:async()=>({}),setPresence:()=>{},
+   setLoading:()=>{},setLoadError:v=>{if(v)errors.push(v)},setReadOnly:()=>{},setCanViewVendorInfo:()=>{},setReceiverName:()=>{},setReceiverAvatar:()=>{},setMessages:rows=>loaded.push(rows),getUserData:async()=>({_id:'vendor'}),getSecureData:async key=>key==='receiverId'?'client':key==='chatId'?'stale-chat':'Client',saveSecureData:async()=>{},registerUser:()=>{},getUserPresence:async()=>({}),setPresence:()=>{},
    createConversation:async(...args)=>{calls.push(args);return{chatId:rows.length?'client-vendor':null,messages:rows,readOnly:true}},getConversationMessages:async()=>{throw Error('must not call normal chat')},getPinnedMessages:()=>{throw Error('history must not request pins')},setPinnedMessages:()=>{},sortDesc:r=>r,dedupeById:r=>r,deriveStatus:()=> 'sent',markVisibleMessagesSeen:()=>{throw Error('history must not send read updates')},joinConversation:()=>{throw Error('history must not join live chat')},reportMarketplaceLoadError:()=>{errors.push('failed')}};
   vm.runInNewContext(code,context);await m.exports();
   assert.equal(calls.length,1);assert.equal(calls[0].join(','),'vendor,client,closed');assert.equal(errors.length,0);assert.equal(loaded[0].length,rows.length);
@@ -151,4 +151,27 @@ test('order chat passes the selected client photo and clears a previous photo wh
  assert.equal(stored.receiverAvatar,'client.jpg');assert.equal(stored.receiverName,'Muniba');
  await m.exports({_id:'second',name:'Sara'},'closed');
  assert.equal(stored.receiverAvatar,'');assert.equal(stored.receiverName,'Sara');assert.equal(stored.receiverId,'second');
+});
+
+test('vendor header taps never request client details; client vendor-info flow remains available',async()=>{
+ const src=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=src.indexOf('const handleOpenContactDetails ='),end=src.indexOf('const handleAttachPress',start);
+ const code=ts.transpileModule(src.slice(start,end)+';module.exports=handleOpenContactDetails;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ for(const allowed of [false,true]){
+  const calls=[],modal=[],m={exports:{}};
+  vm.runInNewContext(code,{module:m,canViewVendorInfo:allowed,contactDetails:null,receiverIdRef:{current:'peer'},setContactModalVisible:v=>modal.push(v),setContactLoading:()=>{},setContactDetails:()=>{},getVendorContactDetails:async id=>{calls.push(id);return{brandName:'Brand'}}});
+  await m.exports();assert.equal(calls.length,allowed?1:0);assert.equal(modal.length,allowed?1:0);
+ }
+});
+test('chat header hides the info icon for vendors while retaining the contact name and photo',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const src=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=src.indexOf('<TouchableOpacity\n              style={styles.headerCenterWrap}'),end=src.indexOf('{/* 🟢 NEW (Search feature)',start);
+ assert.ok(start>0&&end>start);
+ const code=ts.transpileModule(`import React from 'react';import {View,Text,TouchableOpacity} from 'react-native';import {Ionicons} from '@expo/vector-icons';import {Image as ExpoImage} from 'expo-image';export default function Header({canViewVendorInfo}){const styles={},handleOpenContactDetails=()=>{},receiverName='Muniba',receiverAvatar='client.jpg',setReceiverAvatar=()=>{},presence={isOnline:true},headerSubtitle='Online',isReceiverTyping=false;return <>${src.slice(start,end)}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),TouchableOpacity:({children,disabled})=>React.createElement('button',{disabled},children)};
+ const m={exports:{}};vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:p==='@expo/vector-icons'?{Ionicons:({name})=>React.createElement('i',null,name)}:p==='expo-image'?{Image:({source})=>React.createElement('img',{src:source.uri})}:require(p)});
+ const render=allowed=>renderToStaticMarkup(React.createElement(m.exports.default,{canViewVendorInfo:allowed}));
+ assert.match(render(false),/disabled/);assert.match(render(false),/Muniba/);assert.match(render(false),/client.jpg/);assert.doesNotMatch(render(false),/information-circle-outline/);
+ assert.match(render(true),/information-circle-outline/);assert.doesNotMatch(render(true),/disabled/);
 });
