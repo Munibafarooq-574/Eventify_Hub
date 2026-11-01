@@ -867,6 +867,13 @@ const todayAvailabilitySummary =
   phase6AvailablePackageIds,
 ]);
 
+const lowestPackageBasePrice = useMemo(() => {
+  const prices = (Array.isArray(vendorData?.packages) ? vendorData.packages : [])
+    .map((pkg: any) => Number(pkg?.price))
+    .filter((price: number) => Number.isFinite(price) && price > 0);
+  return prices.length ? Math.min(...prices) : null;
+}, [vendorData?.packages]);
+
 const getApplicablePublicCoupon = (
   packageId: string,
 ) => {
@@ -2528,8 +2535,7 @@ const serviceCityNamesFromIds =
                       }
                     >
                       Rs.{' '}
-                      {businessDetails?.minimumPrice ??
-                        'N/A'}
+                      {lowestPackageBasePrice !== null ? lowestPackageBasePrice.toLocaleString() : 'N/A'}
                       /-
                     </Text>
 
@@ -2538,7 +2544,7 @@ const serviceCityNamesFromIds =
                         styles.perHead
                       }
                     >
-                      Starting price
+                      Lowest package base price
                     </Text>
                   </View>
                 </View>
@@ -4337,7 +4343,7 @@ const serviceCityNamesFromIds =
               isActive && styles.pkgFromLabelActive,
             ]}
           >
-            Starting from
+            Base Price
           </Text>
           <Text
             style={[
@@ -4347,6 +4353,14 @@ const serviceCityNamesFromIds =
           >
             Rs. {Number(pkg.price || 0).toLocaleString()}
           </Text>
+          {pkg.bookingType === 'DURATION_BASED' &&
+            Number(pkg.baseIncludedDurationMinutes) > 0 && (
+              <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
+                Includes {Number(pkg.baseIncludedDurationMinutes) % 1440 === 0
+                  ? `${Number(pkg.baseIncludedDurationMinutes) / 1440} day(s)`
+                  : `${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s)`}
+              </Text>
+            )}
         </View>
 
         <View
@@ -4639,7 +4653,7 @@ const serviceCityNamesFromIds =
     </View>
 
     {Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
-       <Text style={styles.noDurationText}>Base price: Rs. {Number(selectedPackage.price || 0).toLocaleString()} includes {Number(selectedPackage.baseIncludedDurationMinutes) / 60} hours</Text>
+       <Text style={styles.noDurationText}>Base price: Rs. {Number(selectedPackage.price || 0).toLocaleString()} includes {Number(selectedPackage.baseIncludedDurationMinutes) % 1440 === 0 ? `${Number(selectedPackage.baseIncludedDurationMinutes) / 1440} day(s)` : `${Number(selectedPackage.baseIncludedDurationMinutes) / 60} hour(s)`}</Text>
      )}
 
      {Array.isArray(selectedPackage.durations) &&
