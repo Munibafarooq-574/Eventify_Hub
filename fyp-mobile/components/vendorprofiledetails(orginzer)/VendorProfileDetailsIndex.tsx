@@ -4862,8 +4862,7 @@ const serviceCityNamesFromIds =
                               styles.priceFooterLabel
                             }
                           >
-                            Starting
-                            Price
+                            Base Price
                           </Text>
 
                           <Text
@@ -4879,6 +4878,14 @@ const serviceCityNamesFromIds =
                             ).toLocaleString()}
                             /-
                           </Text>
+                           {selectedPackage.bookingType === 'DURATION_BASED' &&
+                             Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
+                               <Text style={styles.priceFooterLabel}>
+                                 Includes {Number(selectedPackage.baseIncludedDurationMinutes) % 1440 === 0
+                                   ? `${Number(selectedPackage.baseIncludedDurationMinutes) / 1440} day(s)`
+                                   : `${Number(selectedPackage.baseIncludedDurationMinutes) / 60} hour(s)`}
+                               </Text>
+                             )}
                         </View>
 
                         {isEventMode && availabilityCheck && (
