@@ -3,6 +3,8 @@ import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
 import { VendorBadgeChips } from "../VendorFeature/VendorBadgeChips";
 import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
+import { getSubscriptionHistory } from "@/services/getSubscriptionHistory";
+import { PaymentStatus, VendorSubscription } from "@/types/subscription.types";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import {
     SubscriptionAccessState,
@@ -102,6 +104,7 @@ const DashboardScreen = () => {
     // at 0 forever — track it separately so we can show a small
     // "tap to retry" banner instead of a wrong-looking dashboard.
     const [orderStatsError, setOrderStatsError] = useState<boolean>(false);
+    const [latestPayment, setLatestPayment] = useState<VendorSubscription | null>(null);
     const [subscriptionAccess, setSubscriptionAccess] =
     useState<SubscriptionAccessState | null>(null);
 
@@ -358,8 +361,15 @@ const fetchSubscriptionAccess = React.useCallback(async () => {
         setSubscriptionError(false);
 
         const access = await getSubscriptionAccessState(user._id);
-
         setSubscriptionAccess(access);
+        try {
+            const history = await getSubscriptionHistory(user._id);
+            const payments = history.filter(item => item.paymentSubmittedAt);
+            payments.sort((a, b) => new Date(b.paymentSubmittedAt!).getTime() - new Date(a.paymentSubmittedAt!).getTime());
+            setLatestPayment(payments[0] ?? null);
+        } catch (historyError) {
+            console.warn("Unable to load subscription payment history:", historyError);
+        }
     } catch (error) {
         console.error("Error fetching subscription access:", error);
 
@@ -651,21 +661,40 @@ if (!hasValidSubscription) {
                     : "Your subscription is inactive. Renew your plan to restore your dashboard and become visible to new clients. You can still manage existing bookings and chats."}
             </Text>
 
-            {!subscriptionError && subscriptionAccess?.hasPendingPayment && (
+            {!subscriptionError && latestPayment && (
                 <View style={{
-                    backgroundColor: "#FFF7ED",
-                    borderColor: "#F2D4A9",
-                    borderWidth: 1,
-                    borderRadius: 12,
-                    padding: 16,
-                    marginBottom: 14,
+                    backgroundColor: latestPayment.paymentStatus === PaymentStatus.FAILED ? "#FEF2F2" : latestPayment.paymentStatus === PaymentStatus.PAID ? "#F0FDF4" : "#FFF7ED",
+                    borderColor: latestPayment.paymentStatus === PaymentStatus.FAILED ? "#FECACA" : latestPayment.paymentStatus === PaymentStatus.PAID ? "#BBF7D0" : "#F2D4A9",
+                    borderWidth: 1, borderRadius: 12, padding: 16, marginBottom: 14,
                 }}>
-                    <Text style={{ color: "#92400E", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
-                        Payment Pending Verification
+                    <Text style={{
+                        color: latestPayment.paymentStatus === PaymentStatus.FAILED ? "#B91C1C" : latestPayment.paymentStatus === PaymentStatus.PAID ? "#15803D" : "#92400E",
+                        fontSize: 16, fontWeight: "700", marginBottom: 6,
+                    }}>
+                        {latestPayment.paymentStatus === PaymentStatus.FAILED
+                            ? "Payment Rejected"
+                            : latestPayment.paymentStatus === PaymentStatus.PAID
+                            ? "Payment Approved"
+                            : "Payment Pending Verification"}
                     </Text>
                     <Text style={{ color: "#6B7280", fontSize: 14, lineHeight: 21 }}>
-                        Your renewal payment has been submitted and is awaiting Admin verification. Your subscription will be restored after approval.
+                        {latestPayment.paymentStatus === PaymentStatus.FAILED
+                            ? "Your payment was not approved. You can submit a new payment request."
+                            : latestPayment.paymentStatus === PaymentStatus.PAID
+                            ? "Your payment has been verified."
+                            : "Your renewal payment is awaiting Admin verification."}
                     </Text>
+                    <Text style={{ color: "#6B7280", marginTop: 8, fontSize: 13 }}>
+                        Submitted: {new Date(latestPayment.paymentSubmittedAt!).toLocaleString("en-PK", { dateStyle: "medium", timeStyle: "short" })}
+                    </Text>
+                    {latestPayment.verifiedAt && (
+                        <Text style={{ color: "#6B7280", marginTop: 4, fontSize: 13 }}>
+                            {latestPayment.paymentStatus === PaymentStatus.FAILED ? "Reviewed" : "Verified"}: {new Date(latestPayment.verifiedAt).toLocaleString("en-PK", { dateStyle: "medium", timeStyle: "short" })}
+                        </Text>
+                    )}
+                    {latestPayment.paymentStatus === PaymentStatus.FAILED && !!latestPayment.rejectionReason && (
+                        <Text style={{ color: "#B91C1C", marginTop: 6 }}>Reason: {latestPayment.rejectionReason}</Text>
+                    )}
                     <TouchableOpacity
                         disabled={subscriptionLoading}
                         onPress={() => void fetchSubscriptionAccess()}
@@ -676,18 +705,6 @@ if (!hasValidSubscription) {
                         <Text style={{ color: "#7D0C72", textAlign: "center", fontWeight: "700" }}>
                             {subscriptionLoading ? "Checking..." : "Refresh Status"}
                         </Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-            {!subscriptionError && !subscriptionAccess?.hasPendingPayment &&
-                subscriptionAccess?.subscription?.status === SubscriptionStatus.REJECTED && (
-                <View style={{ backgroundColor: "#FEF2F2", borderRadius: 12, padding: 16, marginBottom: 14 }}>
-                    <Text style={{ color: "#B91C1C", fontWeight: "700", fontSize: 16 }}>Payment Verification Failed</Text>
-                    <Text style={{ color: "#6B7280", marginTop: 6 }}>
-                        Your subscription payment was not approved. Review your payment details and submit a new request.
-                    </Text>
-                    <TouchableOpacity onPress={() => void fetchSubscriptionAccess()} style={{ paddingVertical: 12 }}>
-                        <Text style={{ color: "#7D0C72", fontWeight: "700" }}>Refresh Status</Text>
                     </TouchableOpacity>
                 </View>
             )}
