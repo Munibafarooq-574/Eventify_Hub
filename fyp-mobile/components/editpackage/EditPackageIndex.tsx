@@ -246,6 +246,7 @@ const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowE
 
   const [customDurationRate, setCustomDurationRate] =
     useState("");
+  const [baseIncludedHours, setBaseIncludedHours] = useState("");
 
   const [existingImages, setExistingImages] =
   useState<string[]>([]);
@@ -559,6 +560,7 @@ setWindowEnd(minutesToOffset(packageDetails.serviceWindowEndOffsetMinutes));
         : [],
     );
 
+    setBaseIncludedHours(packageDetails.baseIncludedDurationMinutes != null ? String(Number(packageDetails.baseIncludedDurationMinutes) / 60) : "");
     setAllowCustomDuration(
       Boolean(
         packageDetails.allowCustomDuration,
@@ -822,6 +824,10 @@ const removeExistingImage = (index: number) => {
   }
 
   if (bookingType === "DURATION_BASED") {
+    const includedMinutes = Number(baseIncludedHours) * 60;
+    if (!baseIncludedHours.trim() || !Number.isFinite(includedMinutes) || includedMinutes <= 0) return false;
+    const tiers = [{ minutes: includedMinutes, price: numericPrice }, ...editableDurations.map(d => ({ minutes: Number(d.value) * (d.unit === "DAYS" ? 1440 : 60), price: Number(d.price) }))].sort((a,b) => a.minutes - b.minutes);
+    if (tiers.some((t,i) => !Number.isFinite(t.minutes) || !Number.isFinite(t.price) || (i > 0 && (t.minutes <= tiers[i-1].minutes || t.price < tiers[i-1].price)))) return false;
     const validDurations = editableDurations.every(
       (duration) =>
         Number(duration.value) > 0 &&
@@ -830,7 +836,7 @@ const removeExistingImage = (index: number) => {
 
     const customValid = allowCustomDuration
       ? customDurationRate.trim().length > 0 &&
-        Number(customDurationRate) >= 0
+        Number(customDurationRate) > 0
       : true;
 
     return validDurations && customValid;
@@ -862,6 +868,7 @@ const removeExistingImage = (index: number) => {
   editablePrice,
   bookingType,
   editableDurations,
+  baseIncludedHours,
   allowCustomDuration,
   customDurationRate,
   requiredServiceDurationMinutesValue,
@@ -947,6 +954,8 @@ const removeExistingImage = (index: number) => {
     bookingType === "CUSTOM"
       ? serviceWindowEndOffsetMinutesValue
       : undefined,
+
+  baseIncludedDurationMinutes: bookingType === "DURATION_BASED" ? Number(baseIncludedHours) * 60 : undefined,
 
   durations:
     bookingType === "DURATION_BASED"
@@ -1712,6 +1721,12 @@ Alert.alert(
 
 {bookingType === "DURATION_BASED" && (
   <>
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>Base Package Included Time</Text>
+      <Text style={styles.sectionSubtitle}>How many hours are included in the base package price?</Text>
+      <TextInput style={styles.priceInputSmall} keyboardType="decimal-pad" placeholder="e.g. 2" value={baseIncludedHours} onChangeText={setBaseIncludedHours} />
+      <Text style={styles.sectionSubtitle}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
+    </View>
             {/* -------------------------------------------
                 Fixed Durations
             ------------------------------------------- */}

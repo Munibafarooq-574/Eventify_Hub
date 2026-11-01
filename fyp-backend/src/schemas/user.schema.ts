@@ -812,6 +812,10 @@ export class Package {
   })
   durations: PackageDurationOption[];
 
+  // Time covered by the base package price.
+  @Prop({ required: false, min: 1 })
+  baseIncludedDurationMinutes?: number;
+
   // Custom duration allow karni hai ya nahi
   @Prop({ default: false })
   allowCustomDuration: boolean;

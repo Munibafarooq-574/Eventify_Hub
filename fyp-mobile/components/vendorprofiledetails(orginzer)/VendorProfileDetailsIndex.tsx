@@ -474,7 +474,7 @@ const phase6AvailablePackageIds = useMemo(() => {
       useState('');
 
     const scrollViewRef =
-      useRef<ScrollView>(null);
+      useRef<React.ComponentRef<typeof ScrollView>>(null);
 
     const sponsoredVisitRecordedRef =
       useRef<string | null>(null);
@@ -1505,44 +1505,41 @@ Toast.show({
     // ---------------------------------------------------------
 
         const resolvePackagePrice = (
-      pkg: any,
-      selectedDurationMinutes: number,
+      pkg: any, selectedDurationMinutes: number,
     ): { price: number | null; reason?: string; basis?: 'fixed' | 'custom' } => {
       const durations = Array.isArray(pkg.durations) ? pkg.durations : [];
-      const selectedHours = selectedDurationMinutes / 60;
-
-      // Step 1 — exact fixed-duration match
-      const exactMatch = durations.find((d: any) => {
-        const value = Number(d.value);
-        if (d.unit === 'HOURS') {
-          return value === selectedHours;
+      const hours = selectedDurationMinutes / 60;
+      const included = Number(pkg.baseIncludedDurationMinutes);
+      if (!(included > 0)) {
+        const exact = durations.find((d: any) => Number(d.value) * (d.unit === 'DAYS' ? 24 : 1) === hours);
+        if (exact) return { price: Number(exact.price), basis: 'fixed' };
+        if (pkg.allowCustomDuration && Number(pkg.customDurationRate) > 0) {
+          return { price: Math.round(Number(pkg.customDurationRate) * (pkg.customDurationUnit === 'DAYS' ? hours / 24 : hours)), basis: 'custom' };
         }
-        if (d.unit === 'DAYS') {
-          return value * 24 === selectedHours;
-        }
-        return false;
-      });
-      if (exactMatch) {
-        return { price: Number(exactMatch.price), basis: 'fixed' };
+        return { price: null, reason: 'This duration is not offered by the vendor.' };
       }
-
-      // Step 2 — custom duration rate
-      if (pkg.allowCustomDuration && Number(pkg.customDurationRate) > 0) {
-        const rate = Number(pkg.customDurationRate);
-        const multiplier =
-          pkg.customDurationUnit === 'DAYS'
-            ? selectedHours / 24
-            : selectedHours;
-
-        return { price: Math.round(rate * multiplier), basis: 'custom' };
-      }
-
-      // Step 3 — no match, custom not allowed
-      return {
-        price: null,
-        reason:
-          "This vendor doesn't offer this exact duration and doesn't support custom durations. Please choose a different duration or package.",
-      };
+      const base = Number(pkg.price);
+      if (!Number.isFinite(base) || base < 0 || selectedDurationMinutes < included)
+        return { price: null, reason: 'Please select at least the included duration.' };
+      const tiers = [{ minutes: included, price: base }, ...durations.map((d: any) => ({
+        minutes: Number(d.value) * (d.unit === 'DAYS' ? 1440 : 60), price: Number(d.price),
+      }))].sort((a,b) => a.minutes - b.minutes);
+      if (tiers.some((t,i) => !Number.isFinite(t.minutes) || !Number.isFinite(t.price) || t.price < 0 ||
+        (i > 0 && (t.minutes <= tiers[i-1].minutes || t.price < tiers[i-1].price))))
+        return { price: null, reason: 'Vendor pricing needs correction before booking.' };
+      const exact = tiers.find(t => Math.abs(t.minutes - selectedDurationMinutes) < 0.001);
+      if (exact) return { price: exact.price, basis: 'fixed' };
+      const rate = Number(pkg.customDurationRate);
+      if (!pkg.allowCustomDuration || !Number.isFinite(rate) || rate <= 0)
+        return { price: null, reason: 'This duration is not offered by the vendor.' };
+      const lower = [...tiers].reverse().find(t => t.minutes < selectedDurationMinutes);
+      const upper = tiers.find(t => t.minutes > selectedDurationMinutes);
+      if (!lower) return { price: null, reason: 'Duration is below the minimum.' };
+      // Custom time is charged beyond the base included duration, not
+      // beyond a discounted fixed tier. Fixed tiers remain exact overrides.
+      const calculated = base + rate * (selectedDurationMinutes - included) / (pkg.customDurationUnit === 'DAYS' ? 1440 : 60);
+      const monotonicPrice = Math.max(lower.price, upper ? Math.min(calculated, upper.price) : calculated);
+      return { price: Math.round(monotonicPrice), basis: 'custom' };
     };
 
        const handleAddToCart = async (pkg: any) => {
@@ -1670,6 +1667,7 @@ Toast.show({
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
           basePrice: Number(pkg.price || 0),
+          baseIncludedDurationMinutes: pkg.baseIncludedDurationMinutes,
           priceBasis: basis || 'fixed',
           bookingType:
           pkg.bookingType || 'DURATION_BASED',
@@ -4640,7 +4638,11 @@ const serviceCityNamesFromIds =
       </Text>
     </View>
 
-    {Array.isArray(selectedPackage.durations) &&
+    {Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
+       <Text style={styles.noDurationText}>Base price: Rs. {Number(selectedPackage.price || 0).toLocaleString()} includes {Number(selectedPackage.baseIncludedDurationMinutes) / 60} hours</Text>
+     )}
+
+     {Array.isArray(selectedPackage.durations) &&
     selectedPackage.durations.length > 0 ? (
       <View style={styles.durationList}>
         {selectedPackage.durations.map(

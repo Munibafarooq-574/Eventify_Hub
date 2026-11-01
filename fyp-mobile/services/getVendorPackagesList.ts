@@ -37,6 +37,9 @@ export interface VendorPackageListItem {
 
   serviceWindowEndOffsetMinutes?: number;
 
+  // Base package time included in the displayed price (minutes)
+  baseIncludedDurationMinutes?: number;
+
   // Fixed duration options
   durations?: VendorPackageDuration[];
 
