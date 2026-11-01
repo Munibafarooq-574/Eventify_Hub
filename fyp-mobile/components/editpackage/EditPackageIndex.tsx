@@ -247,6 +247,8 @@ const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowE
   const [customDurationRate, setCustomDurationRate] =
     useState("");
   const [baseIncludedHours, setBaseIncludedHours] = useState("");
+  const [baseIncludedUnit, setBaseIncludedUnit] = useState<"HOURS" | "DAYS">("HOURS");
+  const includedMinutes = Number(baseIncludedHours) * (baseIncludedUnit === "DAYS" ? 1440 : 60);
 
   const [existingImages, setExistingImages] =
   useState<string[]>([]);
@@ -561,6 +563,7 @@ setWindowEnd(minutesToOffset(packageDetails.serviceWindowEndOffsetMinutes));
     );
 
     setBaseIncludedHours(packageDetails.baseIncludedDurationMinutes != null ? String(Number(packageDetails.baseIncludedDurationMinutes) / 60) : "");
+    setBaseIncludedUnit("HOURS");
     setAllowCustomDuration(
       Boolean(
         packageDetails.allowCustomDuration,
@@ -824,7 +827,6 @@ const removeExistingImage = (index: number) => {
   }
 
   if (bookingType === "DURATION_BASED") {
-    const includedMinutes = Number(baseIncludedHours) * 60;
     if (!baseIncludedHours.trim() || !Number.isFinite(includedMinutes) || includedMinutes <= 0) return false;
     const tiers = [{ minutes: includedMinutes, price: numericPrice }, ...editableDurations.map(d => ({ minutes: Number(d.value) * (d.unit === "DAYS" ? 1440 : 60), price: Number(d.price) }))].sort((a,b) => a.minutes - b.minutes);
     if (tiers.some((t,i) => !Number.isFinite(t.minutes) || !Number.isFinite(t.price) || (i > 0 && (t.minutes <= tiers[i-1].minutes || t.price < tiers[i-1].price)))) return false;
@@ -955,7 +957,7 @@ const removeExistingImage = (index: number) => {
       ? serviceWindowEndOffsetMinutesValue
       : undefined,
 
-  baseIncludedDurationMinutes: bookingType === "DURATION_BASED" ? Number(baseIncludedHours) * 60 : undefined,
+  baseIncludedDurationMinutes: bookingType === "DURATION_BASED" ? includedMinutes : undefined,
 
   durations:
     bookingType === "DURATION_BASED"
@@ -1723,9 +1725,25 @@ Alert.alert(
   <>
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Base Package Included Time</Text>
-      <Text style={styles.sectionSubtitle}>How many hours are included in the base package price?</Text>
-      <TextInput style={styles.priceInputSmall} keyboardType="decimal-pad" placeholder="e.g. 2" value={baseIncludedHours} onChangeText={setBaseIncludedHours} />
-      <Text style={styles.sectionSubtitle}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
+      <Text style={styles.sectionSubtitle}>Choose how much coverage is included in the base price.</Text>
+      <View style={styles.includedTimePanel}>
+        <Text style={styles.includedTimeLabel}>Included duration</Text>
+        <View style={styles.includedTimeRow}>
+          <TextInput style={styles.includedTimeInput} keyboardType="decimal-pad" placeholder="e.g. 2" value={baseIncludedHours} onChangeText={setBaseIncludedHours} />
+          {(["HOURS", "DAYS"] as const).map((unit) => (
+            <TouchableOpacity key={unit} style={[styles.includedTimeUnit, baseIncludedUnit === unit && styles.includedTimeUnitActive]} onPress={() => {
+              if (unit !== baseIncludedUnit) {
+                if (baseIncludedHours.trim() && Number.isFinite(Number(baseIncludedHours))) setBaseIncludedHours(String(Number((unit === "DAYS" ? Number(baseIncludedHours) / 24 : Number(baseIncludedHours) * 24).toFixed(4))));
+                setBaseIncludedUnit(unit);
+              }
+            }}>
+              <Text style={[styles.includedTimeUnitText, baseIncludedUnit === unit && styles.includedTimeUnitTextActive]}>{unit === "HOURS" ? "Hours" : "Days"}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {includedMinutes > 0 && Number.isFinite(includedMinutes) && <Text style={styles.includedTimeSummary}>Base Rs. {Number(editablePrice || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
+      </View>
+      <Text style={styles.includedTimeHint}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
     </View>
             {/* -------------------------------------------
                 Fixed Durations
@@ -2838,6 +2856,9 @@ Alert.alert(
               </Text>
             )}
 
+    {bookingType === "DURATION_BASED" && includedMinutes > 0 && Number.isFinite(includedMinutes) && (
+      <View style={styles.previewDurationRow}><Text style={styles.previewDurationText}>Base price includes</Text><Text style={styles.previewDurationPrice}>{baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text></View>
+    )}
     {/* Booking Type Preview — shown exactly once */}
 
 <View style={styles.previewDurationSection}>
@@ -3316,6 +3337,16 @@ container: {
   paddingTop: 55,
 },
 
+  includedTimePanel: { backgroundColor: "#FCF7FB", borderWidth: 1, borderColor: "#EAD8E5", borderRadius: 16, padding: 14, marginTop: 14 },
+  includedTimeLabel: { color: "#806D7B", fontWeight: "700", fontSize: 13 },
+  includedTimeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  includedTimeInput: { flex: 1, minWidth: 55, borderWidth: 1, borderColor: "#E6D6E1", borderRadius: 12, backgroundColor: "#FFFFFF", color: "#221A20", paddingHorizontal: 12, paddingVertical: 10, fontSize: 17, fontWeight: "700" },
+  includedTimeUnit: { paddingHorizontal: 12, paddingVertical: 13, borderWidth: 1, borderColor: "#E6D6E1", borderRadius: 12, backgroundColor: "#FFFFFF" },
+  includedTimeUnitActive: { backgroundColor: "#7B2869", borderColor: "#7B2869" },
+  includedTimeUnitText: { color: "#806D7B", fontWeight: "700" },
+  includedTimeUnitTextActive: { color: "#FFFFFF" },
+  includedTimeSummary: { marginTop: 13, color: "#7B2869", fontWeight: "700", fontSize: 12 },
+  includedTimeHint: { marginTop: 12, color: "#8A7A85", fontSize: 12, lineHeight: 19 },
   header: {
     flexDirection: "row",
     alignItems: "center",
