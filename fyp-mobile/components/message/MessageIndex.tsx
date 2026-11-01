@@ -1,9 +1,10 @@
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
+import createConversation from "@/services/createConversation";
 import getConversationMessages from "@/services/getConversationMessages";
 import getVendorContactDetails from "@/services/getVendorContactDetails";
 import getUserPresence from "@/services/getUserPresence";
 import getPinnedMessages from "@/services/getPinnedMessages";
-import { getSecureData, getUserData } from "@/store";
+import { getSecureData, getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 //import * as MediaLibrary from "expo-media-library";
@@ -274,7 +275,6 @@ const ChatScreen: React.FC = () => {
   const [receiverName, setReceiverName] = useState<string>("Conversation");
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState(false);
-  const [reloadCount, setReloadCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -317,7 +317,7 @@ useEffect(() => {
   const pendingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const seenMessageIdsRef = useRef<Set<string>>(new Set()); // avoid re-emitting messageSeen for the same id
   const router = useRouter();
-  const { history } = useLocalSearchParams<{ history?: string }>();
+  const { history, bookingId } = useLocalSearchParams<{ history?: string; bookingId?: string }>();
   const [readOnly, setReadOnly] = useState(true);
   const readOnlyRef = useRef(true);
   readOnlyRef.current = readOnly;
@@ -410,7 +410,7 @@ useEffect(() => {
     const socket = connectSocket();
     const handleConnect = () => {
       // Always re-join using the CURRENT chatId (via ref), not a stale one.
-      if (chatIdRef.current) {
+      if (history !== "true" && chatIdRef.current) {
         joinConversation(chatIdRef.current, userRef.current?._id);
       }
       // Flush anything that never made it out because the socket was down.
@@ -581,12 +581,15 @@ useEffect(() => {
           });
         }
 
-        const chatData = await getConversationMessages(
-          chatIdValue,
-          user._id,
-          true
-        );
+        if (history === "true" && !bookingId) throw new Error('Please open chat history from your booking.');
+        const chatData = history === "true"
+          ? await createConversation(user._id, rId, bookingId || '')
+          : await getConversationMessages(chatIdValue, user._id, true);
         if (!isMounted) return;
+        if (history === "true") {
+          chatIdRef.current = chatData.chatId || '';
+          await saveSecureData('chatId', chatIdRef.current);
+        }
         readOnlyRef.current = history === "true" || chatData.readOnly === true;
         setReadOnly(readOnlyRef.current);
         const messagesData = chatData.messages;
@@ -594,11 +597,11 @@ useEffect(() => {
   dedupeById((messagesData || []).map((m: any) => ({ ...m, status: deriveStatus(m) })))
 );
         setMessages(loaded);
-        markVisibleMessagesSeen(loaded);
+        if (history !== "true") markVisibleMessagesSeen(loaded);
 
         // 🟢 NEW (Pin feature) — initial pinned-messages snapshot.
-        if (chatIdValue) {
-          getPinnedMessages(chatIdValue, user._id)
+        if (history !== "true" && chatIdRef.current) {
+          getPinnedMessages(chatIdRef.current, user._id)
             .then((pinned) => {
               if (isMounted) setPinnedMessages(pinned || []);
             })
@@ -607,8 +610,8 @@ useEffect(() => {
             });
         }
 
-        if (socket.connected) {
-          joinConversation(chatIdValue, user._id);
+        if (history !== "true" && socket.connected && chatIdRef.current) {
+          joinConversation(chatIdRef.current, user._id);
         }
       } catch (error) {
         reportMarketplaceLoadError('Booking chat unavailable', error);
@@ -638,7 +641,7 @@ useEffect(() => {
       Object.values(pendingTimeouts.current).forEach(clearTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadCount, history]);
+  }, [history, bookingId]);
 
   const handleChangeMessage = (text: string) => {
     setMessage(text);
@@ -1658,10 +1661,7 @@ const handleMessageOption = (
             {!loading && loadError ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>Messages could not be loaded</Text>
-                <Text style={styles.emptySubtitle}>Please check your connection and try again. Your messages have not been removed.</Text>
-                <TouchableOpacity accessibilityRole="button" style={{ padding: 16 }} onPress={() => setReloadCount(value => value + 1)}>
-                  <Text style={{ color: PRIMARY, fontWeight: '700' }}>Try again</Text>
-                </TouchableOpacity>
+                <Text style={styles.emptySubtitle}>Please return to your booking and open the chat again.</Text>
               </View>
             ) : !loading && messages.length === 0 ? (
               <View style={styles.emptyState}>

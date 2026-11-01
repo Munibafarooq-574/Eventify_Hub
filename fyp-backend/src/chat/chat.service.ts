@@ -36,8 +36,8 @@ export class ChatService {
         await this.bookingAccess.assertHistoryBooking(bookingId, userId, peerId);
         const chatId = [userId, peerId].sort().join('-');
         const conversation = await this.conversationModel.findOne({ chatId });
-        const hasMessages = conversation && await this.messageModel.exists({ chatId, deletedFor: { $ne: userId } });
-        return { chatId: hasMessages ? conversation.chatId : null, readOnly: true };
+        const messages = conversation ? await this.readMessages(chatId, userId) : [];
+        return { chatId: messages.length ? chatId : null, messages, readOnly: true };
     }
 
     async chatReadOnly(chatId: string, userId: string) {
@@ -136,6 +136,10 @@ export class ChatService {
     // Get all messages for a conversation (chatId)
     async getConversationMessages(chatId: string, userId?: string): Promise<Message[]> {
         if (userId) await this.bookingAccess.assertChat(chatId, userId, true);
+        return this.readMessages(chatId, userId);
+    }
+
+    private readMessages(chatId: string, userId?: string): Promise<Message[]> {
         const filter: any = { chatId };
         if (userId) {
             filter.deletedFor = { $ne: userId };

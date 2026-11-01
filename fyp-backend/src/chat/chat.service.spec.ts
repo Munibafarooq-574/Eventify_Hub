@@ -143,15 +143,15 @@ describe('Opening closed booking history',()=>{
   const service:any=Object.create(ChatService.prototype);
   service.bookingAccess={assertHistoryBooking:jest.fn()};
   service.conversationModel={findOne:jest.fn(async()=>null)};
-  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,readOnly:true});
+  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,messages:[],readOnly:true});
   expect(service.bookingAccess.assertHistoryBooking).toHaveBeenCalledWith('booking','vendor','client');
  });
  it('reuses the same existing conversation without changing it',async()=>{
   const service:any=Object.create(ChatService.prototype);
   service.bookingAccess={assertHistoryBooking:jest.fn()};
   service.conversationModel={findOne:jest.fn(async()=>({chatId:'client-vendor'}))};
-  service.messageModel={exists:jest.fn(async()=>({_id:'message'}))};
-  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:'client-vendor',readOnly:true});
+  service.messageModel={find:jest.fn(()=>({sort:()=>({populate:()=>({exec:async()=>[{_id:'message'}]})})}))};
+  await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:'client-vendor',messages:[{_id:'message'}],readOnly:true});
   expect(service.conversationModel.findOne).toHaveBeenCalledWith({chatId:'client-vendor'});
  });
  it('checks write permission before saving a message or shared history changes',async()=>{
@@ -166,26 +166,34 @@ describe('Opening closed booking history',()=>{
 });
 
 
-describe('Empty booking conversations',()=>{
- const fixture=(hasMessages:boolean)=>{
+describe('Booking-authorized chat history',()=>{
+ const fixture=(messages:any[])=>{
   const service:any=Object.create(ChatService.prototype);
-  service.bookingAccess={assertHistoryBooking:jest.fn()};
+  service.bookingAccess={assertHistoryBooking:jest.fn(),assertChat:jest.fn(async()=>{throw Error('normal chat not available')})};
   service.conversationModel={findOne:jest.fn(async()=>({chatId:'client-vendor'}))};
-  service.messageModel={exists:jest.fn(async()=>hasMessages?{_id:'previous'}:null)};
-  return service;
+  const query:any={sort:()=>query,populate:()=>query,exec:jest.fn(async()=>messages)};
+  service.messageModel={find:jest.fn(()=>query)};
+  return {service,query};
  };
- it('does not open a conversation record that has no messages',async()=>{
-  const s=fixture(false);
-  await expect(s.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,readOnly:true});
-  expect(s.messageModel.exists).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'vendor'}});
+ it('returns empty messages for an empty conversation without normal-chat requests',async()=>{
+  const {service:s}=fixture([]);
+  await expect(s.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,messages:[],readOnly:true});
+  expect(s.messageModel.find).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'vendor'}});
+  expect(s.bookingAccess.assertChat).not.toHaveBeenCalled();
  });
- it('preserves history visible to each signed-in participant',async()=>{
-  const s=fixture(true);
-  await expect(s.openBookingHistory('booking','client','vendor')).resolves.toEqual({chatId:'client-vendor',readOnly:true});
-  expect(s.messageModel.exists).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'client'}});
+ it('returns actual visible history in the same authorized response',async()=>{
+  const messages=[{_id:'old',message:'Hello'}];const {service:s}=fixture(messages);
+  await expect(s.openBookingHistory('booking','client','vendor')).resolves.toEqual({chatId:'client-vendor',messages,readOnly:true});
+  expect(s.bookingAccess.assertHistoryBooking).toHaveBeenCalledWith('booking','client','vendor');
+  expect(s.messageModel.find).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'client'}});
  });
  it('does not mistake a database failure for empty history',async()=>{
-  const s=fixture(false);s.messageModel.exists.mockRejectedValue(Error('unavailable'));
+  const {service:s,query}=fixture([]);query.exec.mockRejectedValue(Error('unavailable'));
   await expect(s.openBookingHistory('booking','vendor','client')).rejects.toThrow('unavailable');
+ });
+ it('denies a different booking owner before returning messages',async()=>{
+  const {service:s}=fixture([]);s.bookingAccess.assertHistoryBooking.mockRejectedValue(Error('not yours'));
+  await expect(s.openBookingHistory('booking','other','vendor')).rejects.toThrow('not yours');
+  expect(s.messageModel.find).not.toHaveBeenCalled();
  });
 });

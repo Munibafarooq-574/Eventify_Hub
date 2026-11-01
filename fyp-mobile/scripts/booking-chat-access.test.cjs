@@ -5,7 +5,7 @@ for(const name of ['createConversation','getConversationList','getConversationMe
  test(name+' never opens raw error overlay',async()=>{const f=load('token',true);await assert.rejects(f.run('first','second'),/temporary/);assert.equal(f.calls.length,1)});
 }
 test('Messages route checks current entitlement before mounting the conversation list',()=>{const s=fs.readFileSync('app/vendormessages.tsx','utf8');assert.match(s,/useFocusEffect/);assert.match(s,/state==='allowed'/);assert.match(s,/Open an existing booking and tap Message/);assert.match(s,/View My Orders/);assert.match(s,/setState\('error'\)/)});
-test('order Message still reuses the existing conversation and opens direct chat',()=>{const s=fs.readFileSync('components/vendorordersummary/VendorOrderSummaryIndex.tsx','utf8');assert.match(s,/createConversation\(user\._id, vendorId, historyBookingId\)/);assert.match(s,/saveSecureData\("chatId", chatId\)/);assert.match(s,/router.push\(historyBookingId \? `\/message\?history=true` : `\/message`\)/)});
+test('order Message still reuses the existing conversation and opens direct chat',()=>{const s=fs.readFileSync('components/vendorordersummary/VendorOrderSummaryIndex.tsx','utf8');assert.match(s,/createConversation\(user\._id, vendorId\)/);assert.match(s,/saveSecureData\("chatId", chatId\)/);assert.match(s,/router.push\(historyBookingId \? `\/message\?history=true&bookingId=\$\{historyBookingId\}` : `\/message`\)/)});
 test('socket chat requests carry a token without creating another conversation',()=>{const s=fs.readFileSync('utils/socketService.ts','utf8');assert.match(s,/emit\('joinConversation', \{ chatId, userId, token \}\)/);assert.match(s,/emit\('sendMessage', \{ \.\.\.payload, token \}\)/);assert.match(s,/socket.on\('chatError'/)});
 
 function service(name, data) {
@@ -52,6 +52,20 @@ test('empty chat display separates closed history, active chat and load failure'
  assert.match(render({}),/No previous messages for this booking/);assert.doesNotMatch(render({}),/Say hi|Start the conversation/);
  assert.match(render({readOnly:false}),/Say hi/);
  const failed=render({loadError:true});assert.match(failed,/Messages could not be loaded/);assert.doesNotMatch(failed,/No previous messages|Say hi/);
- buttons.at(-1)();assert.equal(retries,1);
+ assert.equal(buttons.length,0);assert.doesNotMatch(failed,/Try again/);
  assert.equal(render({loading:true}),'');
+});
+
+test('closed history loads messages once by booking and never uses a stale chat request',async()=>{
+ const src=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=src.indexOf('const fetchMessages = async () => {'),end=src.indexOf('\n    fetchMessages();',start);
+ const code=ts.transpileModule(src.slice(start,end)+';module.exports=fetchMessages;', {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ for(const rows of [[],[{_id:'old',message:'Hello'}]]){
+  const calls=[],loaded=[],errors=[],m={exports:{}};
+  const context={module:m,isMounted:true,history:'true',bookingId:'closed',chatIdRef:{current:''},receiverIdRef:{current:''},userRef:{current:null},readOnlyRef:{current:true},socket:{connected:true},
+   setLoading:()=>{},setLoadError:v=>{if(v)errors.push(v)},setReadOnly:()=>{},setReceiverName:()=>{},setMessages:rows=>loaded.push(rows),getUserData:async()=>({_id:'vendor'}),getSecureData:async key=>key==='receiverId'?'client':key==='chatId'?'stale-chat':'Client',saveSecureData:async()=>{},registerUser:()=>{},getUserPresence:async()=>({}),setPresence:()=>{},
+   createConversation:async(...args)=>{calls.push(args);return{chatId:rows.length?'client-vendor':null,messages:rows,readOnly:true}},getConversationMessages:async()=>{throw Error('must not call normal chat')},getPinnedMessages:()=>{throw Error('history must not request pins')},setPinnedMessages:()=>{},sortDesc:r=>r,dedupeById:r=>r,deriveStatus:()=> 'sent',markVisibleMessagesSeen:()=>{throw Error('history must not send read updates')},joinConversation:()=>{throw Error('history must not join live chat')},reportMarketplaceLoadError:()=>{errors.push('failed')}};
+  vm.runInNewContext(code,context);await m.exports();
+  assert.equal(calls.length,1);assert.equal(calls[0].join(','),'vendor,client,closed');assert.equal(errors.length,0);assert.equal(loaded[0].length,rows.length);
+ }
 });

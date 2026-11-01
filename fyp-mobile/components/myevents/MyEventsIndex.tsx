@@ -415,8 +415,7 @@ const MyEventsScreen = () => {
       if (!user || !user._id) {
         throw new Error('User not found');
       }
-      const { chatId } = await createConversation(user._id, vendor?.vendorId?._id, historyOnly ? vendor._id : undefined);
-      if (!chatId) { Alert.alert("No previous messages", "No previous messages for this booking."); return; }
+      const { chatId } = historyOnly ? { chatId: '' } : await createConversation(user._id, vendor?.vendorId?._id);
 
       const displayName =
         vendor?.vendorId?.contactDetails?.brandName || // brand name (agar backend business info bhi populate karta ho)
@@ -428,7 +427,7 @@ const MyEventsScreen = () => {
       await saveSecureData('receiverName', displayName);
       await saveSecureData('receiverAvatar', vendor?.vendorId?.contactDetails?.brandLogo || '');
 
-      router.push(historyOnly ? `/message?history=true` : `/message`);
+      router.push(historyOnly ? `/message?history=true&bookingId=${vendor._id}` : `/message`);
     } catch (error) {
       reportMarketplaceLoadError('Booking chat unavailable', error);
       Alert.alert('Conversation unavailable', 'Please refresh this booking and try again.');
