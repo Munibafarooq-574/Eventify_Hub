@@ -520,6 +520,7 @@ const existingPackage =
             : [],
         );
 
+        setBaseIncludedHours(existingPackage.baseIncludedDurationMinutes != null ? String(Number(existingPackage.baseIncludedDurationMinutes) / 60) : "");
         setAllowCustomDuration(
           Boolean(
             existingPackage.allowCustomDuration,
