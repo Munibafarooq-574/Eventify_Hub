@@ -240,6 +240,8 @@ const serviceWindowEndOffsetMinutesValue = useMemo(
   const [customDurationUnit, setCustomDurationUnit] = useState<DurationUnit>("HOURS");
   const [customDurationRate, setCustomDurationRate] = useState("");
   const [baseIncludedHours, setBaseIncludedHours] = useState("");
+  const [baseIncludedUnit, setBaseIncludedUnit] = useState<DurationUnit>("HOURS");
+  const includedMinutes = Number(baseIncludedHours) * (baseIncludedUnit === "DAYS" ? 1440 : 60);
 const [existingImages, setExistingImages] = useState<string[]>([]);
 const [imageAssets, setImageAssets] = useState<PackageImageAsset[]>([]);
 const [uploadProgress, setUploadProgress] = useState(0);
@@ -521,6 +523,7 @@ const existingPackage =
         );
 
         setBaseIncludedHours(existingPackage.baseIncludedDurationMinutes != null ? String(Number(existingPackage.baseIncludedDurationMinutes) / 60) : "");
+        setBaseIncludedUnit("HOURS");
         setAllowCustomDuration(
           Boolean(
             existingPackage.allowCustomDuration,
@@ -776,7 +779,6 @@ const removeImageAsset = (index: number) => {
   }
 
   if (bookingType === "DURATION_BASED") {
-    const includedMinutes = Number(baseIncludedHours) * 60;
     if (!baseIncludedHours.trim() || !Number.isFinite(includedMinutes) || includedMinutes <= 0) return false;
     const tiers = [{ minutes: includedMinutes, price: numericPrice }, ...durations.map(d => ({ minutes: Number(d.value) * (d.unit === "DAYS" ? 1440 : 60), price: Number(d.price) }))].sort((a,b) => a.minutes - b.minutes);
     if (tiers.some((t,i) => !Number.isFinite(t.minutes) || !Number.isFinite(t.price) || (i > 0 && (t.minutes <= tiers[i-1].minutes || t.price < tiers[i-1].price)))) return false;
@@ -821,6 +823,7 @@ const removeImageAsset = (index: number) => {
   bookingType,
   durations,
   baseIncludedHours,
+  baseIncludedUnit,
   allowCustomDuration,
   customDurationRate,
   requiredServiceDurationMinutesValue,
@@ -967,7 +970,7 @@ if (!userId) {
       ? serviceWindowEndOffsetMinutesValue
       : undefined,
 
-  baseIncludedDurationMinutes: bookingType === "DURATION_BASED" ? Number(baseIncludedHours) * 60 : undefined,
+  baseIncludedDurationMinutes: bookingType === "DURATION_BASED" ? includedMinutes : undefined,
 
   durations:
     bookingType === "DURATION_BASED"
@@ -1195,40 +1198,12 @@ if (!userId) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Back button */}
-
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-          hitSlop={{
-            top: 10,
-            bottom: 10,
-            left: 10,
-            right: 10,
-          }}
-        >
-          <Text style={styles.backButtonIcon}>
-            ‹
-          </Text>
-        </TouchableOpacity>
-
-        {/* Header */}
-
-        <View style={styles.headerWrap}>
-          <Text style={styles.heading}>
-            {isEditMode
-              ? "Edit Package"
-              : "Add New Package"}
-          </Text>
-
-          <Text style={styles.subheading}>
-            {isEditMode
-              ? "Update the details of this package"
-              : "Build a package clients will love"}
-          </Text>
+        <View style={styles.topHeaderRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}><Text style={styles.backButtonIcon}>‹</Text></TouchableOpacity>
+          <Text style={styles.topHeaderTitle}>{isEditMode ? "Edit Package" : "Add New Package"}</Text>
+          <View style={{ width: 42 }} />
         </View>
-
+        <Text style={styles.topHeaderSubtitle}>{isEditMode ? "Update the details of this package" : "Build a package clients will love"}</Text>
         {/* -------------------------------------------------
             Package Basic Information
         ------------------------------------------------- */}
@@ -1400,9 +1375,25 @@ if (!userId) {
   <>
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Base Package Included Time</Text>
-      <Text style={styles.sectionSubtitle}>How many hours are included in your base package price?</Text>
-      <TextInput style={styles.priceInputSmall} keyboardType="decimal-pad" placeholder="e.g. 2" value={baseIncludedHours} onChangeText={setBaseIncludedHours} />
-      <Text style={styles.sectionSubtitle}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
+      <Text style={styles.sectionSubtitle}>Choose how much coverage is included in the base price.</Text>
+      <View style={styles.includedTimePanel}>
+        <Text style={styles.smallLabel}>Included duration</Text>
+        <View style={styles.includedTimeRow}>
+          <TextInput style={styles.includedTimeInput} keyboardType="decimal-pad" placeholder="e.g. 2" value={baseIncludedHours} onChangeText={setBaseIncludedHours} />
+          {(["HOURS", "DAYS"] as DurationUnit[]).map((unit) => (
+            <TouchableOpacity key={unit} style={[styles.includedTimeUnit, baseIncludedUnit === unit && styles.includedTimeUnitActive]} onPress={() => {
+              if (unit !== baseIncludedUnit) {
+                if (baseIncludedHours.trim() && Number.isFinite(Number(baseIncludedHours))) setBaseIncludedHours(String(Number((unit === "DAYS" ? Number(baseIncludedHours) / 24 : Number(baseIncludedHours) * 24).toFixed(4))));
+                setBaseIncludedUnit(unit);
+              }
+            }}>
+              <Text style={[styles.includedTimeUnitText, baseIncludedUnit === unit && styles.includedTimeUnitTextActive]}>{unit === "HOURS" ? "Hours" : "Days"}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {Number.isFinite(includedMinutes) && includedMinutes > 0 && <Text style={styles.includedTimeSummary}>Base Rs. {Number(price || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
+      </View>
+      <Text style={styles.includedTimeHint}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
     </View>
         <View style={styles.card}>
           <View style={styles.sectionHeaderRow}>
@@ -2457,6 +2448,9 @@ if (!userId) {
               </Text>
             )}
 
+    {bookingType === "DURATION_BASED" && includedMinutes > 0 && Number.isFinite(includedMinutes) && (
+      <View style={styles.previewDurationRow}><Text style={styles.previewDurationText}>Base price includes</Text><Text style={styles.previewDurationPrice}>{baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text></View>
+    )}
     {/* Booking Type Preview — shown exactly once */}
 
 <View style={styles.previewDurationSection}>
@@ -2846,6 +2840,18 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
+  topHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, marginBottom: 8 },
+  topHeaderTitle: { flex: 1, textAlign: "center", color: "#221A20", fontSize: 21, fontWeight: "800" },
+  topHeaderSubtitle: { textAlign: "center", fontSize: 13, color: "#8A7A85", marginBottom: 24 },
+  includedTimePanel: { backgroundColor: "#FCF7FB", borderWidth: 1, borderColor: "#EAD8E5", borderRadius: 16, padding: 14, marginTop: 14 },
+  includedTimeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  includedTimeInput: { flex: 1, minWidth: 55, borderWidth: 1, borderColor: "#E6D6E1", borderRadius: 12, backgroundColor: "#FFFFFF", color: "#221A20", paddingHorizontal: 12, paddingVertical: 10, fontSize: 17, fontWeight: "700" },
+  includedTimeUnit: { paddingHorizontal: 12, paddingVertical: 13, borderWidth: 1, borderColor: "#E6D6E1", borderRadius: 12, backgroundColor: "#FFFFFF" },
+  includedTimeUnitActive: { backgroundColor: "#7B2869", borderColor: "#7B2869" },
+  includedTimeUnitText: { color: "#806D7B", fontWeight: "700" },
+  includedTimeUnitTextActive: { color: "#FFFFFF" },
+  includedTimeSummary: { marginTop: 13, color: "#7B2869", fontWeight: "700", fontSize: 12 },
+  includedTimeHint: { marginTop: 12, color: "#8A7A85", fontSize: 12, lineHeight: 19 },
   headerWrap: {
     alignItems: "center",
     marginTop: 16,
