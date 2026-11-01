@@ -48,6 +48,7 @@ interface PackageDetails {
 
   serviceWindowEndOffsetMinutes?: number;
 
+  baseIncludedDurationMinutes?: number;
   durations?: PackageDuration[];
 
   allowCustomDuration?: boolean;
@@ -467,6 +468,21 @@ const PackageScreen = () => {
                   : "N/A"}
               </Text>
             </View>
+
+            {packageDetails.bookingType === "DURATION_BASED" &&
+              Number.isFinite(Number(packageDetails.baseIncludedDurationMinutes)) &&
+              Number(packageDetails.baseIncludedDurationMinutes) > 0 && (
+                <View style={{ alignItems: "center", paddingVertical: 12, marginBottom: 8 }}>
+                  <Text style={{ color: "#7B2869", fontSize: 12, fontWeight: "700", letterSpacing: 0.5 }}>
+                    BASE PACKAGE INCLUDED TIME
+                  </Text>
+                  <Text style={{ color: "#221A20", fontSize: 16, fontWeight: "800", marginTop: 4 }}>
+                    {Number(packageDetails.baseIncludedDurationMinutes) % 1440 === 0
+                      ? `${Number(packageDetails.baseIncludedDurationMinutes) / 1440} Day(s)`
+                      : `${Number(packageDetails.baseIncludedDurationMinutes) / 60} Hour(s)`}
+                  </Text>
+                </View>
+              )}
 
             {/* ---------------------------------------------
                 Package Images
