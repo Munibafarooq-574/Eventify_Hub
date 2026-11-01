@@ -1535,8 +1535,11 @@ Toast.show({
       const lower = [...tiers].reverse().find(t => t.minutes < selectedDurationMinutes);
       const upper = tiers.find(t => t.minutes > selectedDurationMinutes);
       if (!lower) return { price: null, reason: 'Duration is below the minimum.' };
-      const calculated = lower.price + rate * (selectedDurationMinutes - lower.minutes) / (pkg.customDurationUnit === 'DAYS' ? 1440 : 60);
-      return { price: Math.round(upper ? Math.min(calculated, upper.price) : calculated), basis: 'custom' };
+      // Custom time is charged beyond the base included duration, not
+      // beyond a discounted fixed tier. Fixed tiers remain exact overrides.
+      const calculated = base + rate * (selectedDurationMinutes - included) / (pkg.customDurationUnit === 'DAYS' ? 1440 : 60);
+      const monotonicPrice = Math.max(lower.price, upper ? Math.min(calculated, upper.price) : calculated);
+      return { price: Math.round(monotonicPrice), basis: 'custom' };
     };
 
        const handleAddToCart = async (pkg: any) => {
@@ -1664,6 +1667,7 @@ Toast.show({
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
           basePrice: Number(pkg.price || 0),
+          baseIncludedDurationMinutes: pkg.baseIncludedDurationMinutes,
           priceBasis: basis || 'fixed',
           bookingType:
           pkg.bookingType || 'DURATION_BASED',
