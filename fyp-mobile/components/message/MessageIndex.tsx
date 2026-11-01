@@ -22,6 +22,7 @@ import { Paths } from "expo-file-system";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -1658,7 +1659,11 @@ const handleMessageOption = (
             )}
 
             {/* Chat Area */}
-            {!loading && loadError ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator color={PRIMARY} accessibilityLabel="Loading messages" />
+              </View>
+            ) : loadError ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>Messages could not be loaded</Text>
                 <Text style={styles.emptySubtitle}>Please return to your booking and open the chat again.</Text>
@@ -1694,7 +1699,7 @@ const handleMessageOption = (
             )}
 
             {/* 🟢 NEW (Reply feature) — reply preview above composer */}
-            {replyingTo && (
+            {!loading && !loadError && !readOnly && replyingTo && (
               <View style={styles.replyPreviewBar}>
                 <View style={styles.replyPreviewAccent} />
                 <View style={{ flex: 1 }}>
@@ -1743,8 +1748,8 @@ const handleMessageOption = (
 )}
 
             {/* Footer */}
-            {readOnly ? <View style={[styles.footer, { flexDirection: 'column', padding: 16 }]}>
-              <Text style={{ color: PRIMARY }}>{loadError ? "Messaging is unavailable until messages load." : "Chat history only. You cannot send messages from this closed booking."}</Text>
+            {!loading && !loadError && (readOnly ? <View style={[styles.footer, { flexDirection: 'column', padding: 16 }]}>
+              <Text style={{ color: PRIMARY }}>Chat history only. You cannot send messages from this closed booking.</Text>
               <TouchableOpacity accessibilityRole="button" style={{ paddingVertical: 12 }} onPress={() => router.push('/contactus')}>
                 <Text style={{ color: PRIMARY, fontWeight: '700' }}>Contact Support</Text>
               </TouchableOpacity>
@@ -1782,9 +1787,8 @@ const handleMessageOption = (
                   onSend={(uri, durationMs) => sendVoiceMessage(uri, durationMs)}
                 />
               )}
-            </View>
-            }
-            {!readOnly && <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>}
+            </View>)}
+            {!loading && !loadError && !readOnly && <Text style={styles.footerText}>Messages are sent to each guest privately.</Text>}
           </>
         )}
       </KeyboardAvoidingView>

@@ -39,12 +39,12 @@ test('history screen and booking views compile with the existing chat screen',()
 test('empty chat display separates closed history, active chat and load failure',()=>{
  const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
  const source=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
- const start=source.indexOf('{!loading && loadError ? (');
+ const start=source.indexOf('{loading ? (',source.indexOf('{/* Chat Area */}'));
  const end=source.indexOf(': (\n              <FlatList',start);
  assert.ok(start>0&&end>start);
  const fragment=source.slice(start,end)+': null}';
- const code=ts.transpileModule(`import React from 'react';import {View,Text,TouchableOpacity} from 'react-native';import {Ionicons} from '@expo/vector-icons';export default function Empty({loading,loadError,readOnly,messages,onRetry}){const styles={},PRIMARY='purple',setReloadCount=onRetry;return <>${fragment}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
- const buttons=[],native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),TouchableOpacity:({children,onPress})=>{buttons.push(onPress);return React.createElement('button',null,children)}};
+ const code=ts.transpileModule(`import React from 'react';import {View,Text,TouchableOpacity,ActivityIndicator} from 'react-native';import {Ionicons} from '@expo/vector-icons';export default function Empty({loading,loadError,readOnly,messages,onRetry}){const styles={},PRIMARY='purple',setReloadCount=onRetry;return <>${fragment}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const buttons=[],native={ActivityIndicator:()=>React.createElement('i',null,'Loading messages'),View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),TouchableOpacity:({children,onPress})=>{buttons.push(onPress);return React.createElement('button',null,children)}};
  const m={exports:{}};
  vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:p==='@expo/vector-icons'?{Ionicons:()=>null}:require(p)});
  let retries=0;
@@ -53,7 +53,7 @@ test('empty chat display separates closed history, active chat and load failure'
  assert.match(render({readOnly:false}),/Say hi/);
  const failed=render({loadError:true});assert.match(failed,/Messages could not be loaded/);assert.doesNotMatch(failed,/No previous messages|Say hi/);
  assert.equal(buttons.length,0);assert.doesNotMatch(failed,/Try again/);
- assert.equal(render({loading:true}),'');
+ assert.match(render({loading:true}),/Loading messages/);assert.doesNotMatch(render({loading:true}),/No previous messages|Say hi|Messages could not/);
 });
 
 test('closed history loads messages once by booking and never uses a stale chat request',async()=>{
@@ -93,4 +93,22 @@ test('vendor messaging still checks active and expired subscription access',asyn
 test('vendor verification failure and signed-out sessions do not open a conversation list',async()=>{
  const failed=messagingRoute({_id:'vendor',role:'Vendor'},null,true);await failed.ready();assert.equal(failed.state[0],'error');
  const signedOut=messagingRoute(null,null);await signedOut.ready();assert.equal(signedOut.state[0],'error');assert.equal(signedOut.calls(),0);
+});
+
+test('chat footer stays hidden until access is loaded and never labels a load failure closed',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const source=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=source.indexOf('{!loading && !loadError && (readOnly ?');
+ const end=source.indexOf('\n          </>',start);
+ assert.ok(start>0&&end>start);
+ const fragment=source.slice(start,end);
+ const code=ts.transpileModule(`import React from 'react';import {View,Text,TouchableOpacity,TextInput} from 'react-native';import {Ionicons} from '@expo/vector-icons';const VoiceRecorderButton=()=>null;export default function Footer({loading,loadError,readOnly}){const styles={},PRIMARY='purple',uploading=false,message='',router={push:()=>{}},handleAttachPress=()=>{},handleChangeMessage=()=>{},handleSendMessage=()=>{},sendVoiceMessage=()=>{};return <>${fragment}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),TouchableOpacity:({children})=>React.createElement('button',null,children),TextInput:({placeholder})=>React.createElement('input',{placeholder})};
+ const m={exports:{}};vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:p==='@expo/vector-icons'?{Ionicons:()=>null}:require(p)});
+ const render=props=>renderToStaticMarkup(React.createElement(m.exports.default,{loading:false,loadError:false,readOnly:false,...props}));
+ for(const readOnly of [true,false]){
+  assert.equal(render({loading:true,readOnly}),'');assert.equal(render({loadError:true,readOnly}),'');
+ }
+ assert.match(render({}),/Write a message/);assert.doesNotMatch(render({}),/Chat history only/);
+ assert.match(render({readOnly:true}),/Chat history only/);assert.doesNotMatch(render({readOnly:true}),/Write a message/);
 });
