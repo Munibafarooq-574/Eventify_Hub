@@ -651,6 +651,47 @@ if (!hasValidSubscription) {
                     : "Your subscription is inactive. Renew your plan to restore your dashboard and become visible to new clients. You can still manage existing bookings and chats."}
             </Text>
 
+            {!subscriptionError && subscriptionAccess?.hasPendingPayment && (
+                <View style={{
+                    backgroundColor: "#FFF7ED",
+                    borderColor: "#F2D4A9",
+                    borderWidth: 1,
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 14,
+                }}>
+                    <Text style={{ color: "#92400E", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
+                        Payment Pending Verification
+                    </Text>
+                    <Text style={{ color: "#6B7280", fontSize: 14, lineHeight: 21 }}>
+                        Your renewal payment has been submitted and is awaiting Admin verification. Your subscription will be restored after approval.
+                    </Text>
+                    <TouchableOpacity
+                        disabled={subscriptionLoading}
+                        onPress={() => void fetchSubscriptionAccess()}
+                        accessibilityRole="button"
+                        accessibilityLabel="Refresh subscription payment status"
+                        style={{ marginTop: 14, borderRadius: 10, borderWidth: 1, borderColor: "#7D0C72", paddingVertical: 12 }}
+                    >
+                        <Text style={{ color: "#7D0C72", textAlign: "center", fontWeight: "700" }}>
+                            {subscriptionLoading ? "Checking..." : "Refresh Status"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+            {!subscriptionError && !subscriptionAccess?.hasPendingPayment &&
+                subscriptionAccess?.subscription?.status === SubscriptionStatus.REJECTED && (
+                <View style={{ backgroundColor: "#FEF2F2", borderRadius: 12, padding: 16, marginBottom: 14 }}>
+                    <Text style={{ color: "#B91C1C", fontWeight: "700", fontSize: 16 }}>Payment Verification Failed</Text>
+                    <Text style={{ color: "#6B7280", marginTop: 6 }}>
+                        Your subscription payment was not approved. Review your payment details and submit a new request.
+                    </Text>
+                    <TouchableOpacity onPress={() => void fetchSubscriptionAccess()} style={{ paddingVertical: 12 }}>
+                        <Text style={{ color: "#7D0C72", fontWeight: "700" }}>Refresh Status</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <TouchableOpacity
                 onPress={() => {
                     if (subscriptionError) {
