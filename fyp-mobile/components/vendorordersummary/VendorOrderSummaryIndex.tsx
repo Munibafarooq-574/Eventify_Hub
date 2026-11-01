@@ -447,6 +447,7 @@ const OrderSummary = () => {
             const { chatId } = historyBookingId ? { chatId: '' } : await createConversation(user._id, vendorId);
             await saveSecureData("chatId", chatId);
             await saveSecureData("receiverId", vendorId);
+            await saveSecureData("receiverAvatar", "");
             router.push(historyBookingId ? `/message?history=true&bookingId=${historyBookingId}` : `/message`);
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);

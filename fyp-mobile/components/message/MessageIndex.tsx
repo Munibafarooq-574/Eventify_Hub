@@ -274,6 +274,7 @@ const ChatScreen: React.FC = () => {
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<any[]>([]);
   const [receiverName, setReceiverName] = useState<string>("Conversation");
+  const [receiverAvatar, setReceiverAvatar] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -570,11 +571,13 @@ useEffect(() => {
         const chatIdValue = (await getSecureData("chatId")) || "";
         const rName = (await getSecureData("receiverName")) || "Conversation";
         const rId = (await getSecureData("receiverId")) || "";
+        const avatar = (await getSecureData('receiverAvatar')) || '';
         chatIdRef.current = chatIdValue;
         receiverIdRef.current = rId;
 
         if (!isMounted) return;
         setReceiverName(rName);
+        setReceiverAvatar(avatar);
         registerUser(user._id);
         if (rId) {
           getUserPresence(rId).then((p) => {
@@ -1548,9 +1551,15 @@ const handleMessageOption = (
               onPress={handleOpenContactDetails}
             >
               <View style={styles.headerAvatarCircle}>
-                <Text style={styles.headerAvatarInitial}>
+                {receiverAvatar ? <ExpoImage
+                  source={{ uri: receiverAvatar }}
+                  style={{ width: 34, height: 34, borderRadius: 17 }}
+                  contentFit="cover"
+                  cachePolicy="disk"
+                  onError={() => setReceiverAvatar('')}
+                /> : <Text style={styles.headerAvatarInitial}>
                   {receiverName?.trim()?.charAt(0)?.toUpperCase() || "?"}
-                </Text>
+                </Text>}
                 {presence.isOnline && <View style={styles.onlineDot} />}
               </View>
               <View style={styles.headerTextCol}>

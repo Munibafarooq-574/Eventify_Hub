@@ -63,7 +63,7 @@ test('closed history loads messages once by booking and never uses a stale chat 
  for(const rows of [[],[{_id:'old',message:'Hello'}]]){
   const calls=[],loaded=[],errors=[],m={exports:{}};
   const context={module:m,isMounted:true,history:'true',bookingId:'closed',chatIdRef:{current:''},receiverIdRef:{current:''},userRef:{current:null},readOnlyRef:{current:true},socket:{connected:true},
-   setLoading:()=>{},setLoadError:v=>{if(v)errors.push(v)},setReadOnly:()=>{},setReceiverName:()=>{},setMessages:rows=>loaded.push(rows),getUserData:async()=>({_id:'vendor'}),getSecureData:async key=>key==='receiverId'?'client':key==='chatId'?'stale-chat':'Client',saveSecureData:async()=>{},registerUser:()=>{},getUserPresence:async()=>({}),setPresence:()=>{},
+   setLoading:()=>{},setLoadError:v=>{if(v)errors.push(v)},setReadOnly:()=>{},setReceiverName:()=>{},setReceiverAvatar:()=>{},setMessages:rows=>loaded.push(rows),getUserData:async()=>({_id:'vendor'}),getSecureData:async key=>key==='receiverId'?'client':key==='chatId'?'stale-chat':'Client',saveSecureData:async()=>{},registerUser:()=>{},getUserPresence:async()=>({}),setPresence:()=>{},
    createConversation:async(...args)=>{calls.push(args);return{chatId:rows.length?'client-vendor':null,messages:rows,readOnly:true}},getConversationMessages:async()=>{throw Error('must not call normal chat')},getPinnedMessages:()=>{throw Error('history must not request pins')},setPinnedMessages:()=>{},sortDesc:r=>r,dedupeById:r=>r,deriveStatus:()=> 'sent',markVisibleMessagesSeen:()=>{throw Error('history must not send read updates')},joinConversation:()=>{throw Error('history must not join live chat')},reportMarketplaceLoadError:()=>{errors.push('failed')}};
   vm.runInNewContext(code,context);await m.exports();
   assert.equal(calls.length,1);assert.equal(calls[0].join(','),'vendor,client,closed');assert.equal(errors.length,0);assert.equal(loaded[0].length,rows.length);
@@ -111,4 +111,19 @@ test('chat footer stays hidden until access is loaded and never labels a load fa
  }
  assert.match(render({}),/Write a message/);assert.doesNotMatch(render({}),/Chat history only/);
  assert.match(render({readOnly:true}),/Chat history only/);assert.doesNotMatch(render({readOnly:true}),/Write a message/);
+});
+
+test('chat header displays the saved photo and falls back to the initial when missing or broken',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const src=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=src.indexOf('<View style={styles.headerAvatarCircle}>'),end=src.indexOf('<View style={styles.headerTextCol}>',start);
+ assert.ok(start>0&&end>start);
+ const code=ts.transpileModule(`import React from 'react';import {View,Text} from 'react-native';import {Image as ExpoImage} from 'expo-image';export default function Avatar({receiverAvatar,receiverName,setReceiverAvatar}){const styles={},presence={isOnline:true};return <>${src.slice(start,end)}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ let imageProps,avatar='https://example.com/vendor.jpg';
+ const m={exports:{}},native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children)};
+ vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:p==='expo-image'?{Image:props=>{imageProps=props;return React.createElement('img',{src:props.source.uri})}}:require(p)});
+ const render=()=>renderToStaticMarkup(React.createElement(m.exports.default,{receiverAvatar:avatar,receiverName:'Brand',setReceiverAvatar:v=>avatar=v}));
+ assert.match(render(),/vendor.jpg/);assert.doesNotMatch(render(),/<span>B/);
+ imageProps.onError();assert.match(render(),/<span>B/);assert.doesNotMatch(render(),/<img/);
+ avatar='';assert.match(render(),/<span>B/);
 });
