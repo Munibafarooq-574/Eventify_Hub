@@ -2096,7 +2096,7 @@ if (
     downPaymentConfig.type ===
         'PERCENTAGE' &&
     (
-        configValue <= 0 ||
+        configValue < 0 ||
         configValue > 100
     )
 ) {
