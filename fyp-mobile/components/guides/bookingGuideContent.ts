@@ -81,7 +81,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'messages-history', title: 'Messages, history and event removal', summary: 'Contact your vendor and keep decisions clear.', steps: [
         'Use Message on the relevant available booking to open that vendor’s conversation. Chatting alone does not change a date, payment or booking status.',
-        'Review Booking history for closed bookings and recorded decisions. View chat history opens previous messages without sending new ones. If there is no previous chat, the app tells you. Contact Support for help with refunds or penalties.',
+        'Review Booking history for closed bookings and recorded decisions. View chat history opens previous messages without sending new ones. If no messages were exchanged, the app shows No previous messages. If messages cannot load, use Try again; this does not mean your history is empty. Contact Support for help with refunds or penalties.',
         'The event’s delete icon is separate from cancelling one vendor. Read its confirmation carefully; do not use event removal as a way to request cancellation or a refund.',
       ] },
     ],

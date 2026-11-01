@@ -150,6 +150,7 @@ describe('Opening closed booking history',()=>{
   const service:any=Object.create(ChatService.prototype);
   service.bookingAccess={assertHistoryBooking:jest.fn()};
   service.conversationModel={findOne:jest.fn(async()=>({chatId:'client-vendor'}))};
+  service.messageModel={exists:jest.fn(async()=>({_id:'message'}))};
   await expect(service.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:'client-vendor',readOnly:true});
   expect(service.conversationModel.findOne).toHaveBeenCalledWith({chatId:'client-vendor'});
  });
@@ -161,5 +162,30 @@ describe('Opening closed booking history',()=>{
   expect(service.messageModel).not.toHaveBeenCalled();
   await expect(service.pinMessage('chat','message','vendor')).rejects.toThrow('closed');
   await expect(service.unpinMessage('chat','message','vendor')).rejects.toThrow('closed');
+ });
+});
+
+
+describe('Empty booking conversations',()=>{
+ const fixture=(hasMessages:boolean)=>{
+  const service:any=Object.create(ChatService.prototype);
+  service.bookingAccess={assertHistoryBooking:jest.fn()};
+  service.conversationModel={findOne:jest.fn(async()=>({chatId:'client-vendor'}))};
+  service.messageModel={exists:jest.fn(async()=>hasMessages?{_id:'previous'}:null)};
+  return service;
+ };
+ it('does not open a conversation record that has no messages',async()=>{
+  const s=fixture(false);
+  await expect(s.openBookingHistory('booking','vendor','client')).resolves.toEqual({chatId:null,readOnly:true});
+  expect(s.messageModel.exists).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'vendor'}});
+ });
+ it('preserves history visible to each signed-in participant',async()=>{
+  const s=fixture(true);
+  await expect(s.openBookingHistory('booking','client','vendor')).resolves.toEqual({chatId:'client-vendor',readOnly:true});
+  expect(s.messageModel.exists).toHaveBeenCalledWith({chatId:'client-vendor',deletedFor:{$ne:'client'}});
+ });
+ it('does not mistake a database failure for empty history',async()=>{
+  const s=fixture(false);s.messageModel.exists.mockRejectedValue(Error('unavailable'));
+  await expect(s.openBookingHistory('booking','vendor','client')).rejects.toThrow('unavailable');
  });
 });

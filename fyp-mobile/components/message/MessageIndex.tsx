@@ -273,6 +273,8 @@ const ChatScreen: React.FC = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [receiverName, setReceiverName] = useState<string>("Conversation");
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -557,6 +559,9 @@ useEffect(() => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
+        readOnlyRef.current = true;
+        setReadOnly(true);
         const user = await getUserData();
         if (!user) throw new Error("user not found");
         userRef.current = user;
@@ -607,7 +612,7 @@ useEffect(() => {
         }
       } catch (error) {
         reportMarketplaceLoadError('Booking chat unavailable', error);
-        Alert.alert('Conversation unavailable', 'Please open an existing booking and tap Message. If the issue continues, sign in again.');
+        if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -633,7 +638,7 @@ useEffect(() => {
       Object.values(pendingTimeouts.current).forEach(clearTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reloadCount, history]);
 
   const handleChangeMessage = (text: string) => {
     setMessage(text);
@@ -1650,11 +1655,19 @@ const handleMessageOption = (
             )}
 
             {/* Chat Area */}
-            {!loading && messages.length === 0 ? (
+            {!loading && loadError ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Messages could not be loaded</Text>
+                <Text style={styles.emptySubtitle}>Please check your connection and try again. Your messages have not been removed.</Text>
+                <TouchableOpacity accessibilityRole="button" style={{ padding: 16 }} onPress={() => setReloadCount(value => value + 1)}>
+                  <Text style={{ color: PRIMARY, fontWeight: '700' }}>Try again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : !loading && messages.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-ellipses-outline" size={40} color={PRIMARY} />
-                <Text style={styles.emptyTitle}>Say hi 👋</Text>
-                <Text style={styles.emptySubtitle}>No messages yet. Start the conversation below.</Text>
+                <Text style={styles.emptyTitle}>{readOnly ? "No previous messages" : "Say hi 👋"}</Text>
+                <Text style={styles.emptySubtitle}>{readOnly ? "No previous messages for this booking." : "No messages yet. Start the conversation below."}</Text>
               </View>
             ) : (
               <FlatList
@@ -1731,7 +1744,7 @@ const handleMessageOption = (
 
             {/* Footer */}
             {readOnly ? <View style={[styles.footer, { flexDirection: 'column', padding: 16 }]}>
-              <Text style={{ color: PRIMARY }}>Chat history only. You cannot send messages from this closed booking.</Text>
+              <Text style={{ color: PRIMARY }}>{loadError ? "Messaging is unavailable until messages load." : "Chat history only. You cannot send messages from this closed booking."}</Text>
               <TouchableOpacity accessibilityRole="button" style={{ paddingVertical: 12 }} onPress={() => router.push('/contactus')}>
                 <Text style={{ color: PRIMARY, fontWeight: '700' }}>Contact Support</Text>
               </TouchableOpacity>

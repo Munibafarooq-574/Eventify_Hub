@@ -35,3 +35,23 @@ test('history screen and booking views compile with the existing chat screen',()
   assert.equal(out.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0,p);
  }
 });
+
+test('empty chat display separates closed history, active chat and load failure',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const source=fs.readFileSync('components/message/MessageIndex.tsx','utf8');
+ const start=source.indexOf('{!loading && loadError ? (');
+ const end=source.indexOf(': (\n              <FlatList',start);
+ assert.ok(start>0&&end>start);
+ const fragment=source.slice(start,end)+': null}';
+ const code=ts.transpileModule(`import React from 'react';import {View,Text,TouchableOpacity} from 'react-native';import {Ionicons} from '@expo/vector-icons';export default function Empty({loading,loadError,readOnly,messages,onRetry}){const styles={},PRIMARY='purple',setReloadCount=onRetry;return <>${fragment}</>}`,{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
+ const buttons=[],native={View:({children})=>React.createElement('div',null,children),Text:({children})=>React.createElement('span',null,children),TouchableOpacity:({children,onPress})=>{buttons.push(onPress);return React.createElement('button',null,children)}};
+ const m={exports:{}};
+ vm.runInNewContext(code,{module:m,exports:m.exports,require:p=>p==='react-native'?native:p==='@expo/vector-icons'?{Ionicons:()=>null}:require(p)});
+ let retries=0;
+ const render=props=>renderToStaticMarkup(React.createElement(m.exports.default,{loading:false,loadError:false,readOnly:true,messages:[],onRetry:fn=>{retries=fn(retries)},...props}));
+ assert.match(render({}),/No previous messages for this booking/);assert.doesNotMatch(render({}),/Say hi|Start the conversation/);
+ assert.match(render({readOnly:false}),/Say hi/);
+ const failed=render({loadError:true});assert.match(failed,/Messages could not be loaded/);assert.doesNotMatch(failed,/No previous messages|Say hi/);
+ buttons.at(-1)();assert.equal(retries,1);
+ assert.equal(render({loading:true}),'');
+});

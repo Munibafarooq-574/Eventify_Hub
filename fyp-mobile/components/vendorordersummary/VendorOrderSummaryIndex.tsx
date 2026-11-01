@@ -445,7 +445,7 @@ const OrderSummary = () => {
 
             // Call backend to check for an existing conversation or create a new one
             const { chatId } = await createConversation(user._id, vendorId, historyBookingId);
-            if (!chatId) { Alert.alert("No chat history", "No previous conversation is available for this booking."); return; }
+            if (!chatId) { Alert.alert("No previous messages", "No previous messages for this booking."); return; }
             await saveSecureData("chatId", chatId);
             await saveSecureData("receiverId", vendorId);
             router.push(historyBookingId ? `/message?history=true` : `/message`);

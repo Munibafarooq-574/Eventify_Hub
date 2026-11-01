@@ -416,7 +416,7 @@ const MyEventsScreen = () => {
         throw new Error('User not found');
       }
       const { chatId } = await createConversation(user._id, vendor?.vendorId?._id, historyOnly ? vendor._id : undefined);
-      if (!chatId) { Alert.alert("No chat history", "No previous conversation is available for this booking."); return; }
+      if (!chatId) { Alert.alert("No previous messages", "No previous messages for this booking."); return; }
 
       const displayName =
         vendor?.vendorId?.contactDetails?.brandName || // brand name (agar backend business info bhi populate karta ho)
