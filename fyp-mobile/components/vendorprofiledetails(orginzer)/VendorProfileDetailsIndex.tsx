@@ -4005,81 +4005,32 @@ const serviceCityNamesFromIds =
 
 
                   {/* Final Required Service Window */}
-
-{availabilityCheck?.available &&
-  availabilityCheck.requiredServiceWindow && (
-    <View
-      style={
-        styles.availabilityInfoRow
-      }
-    >
-      <View
-        style={
-          styles.availabilityLabelRow
-        }
-      >
-        <Ionicons
-          name="time-outline"
-          size={15}
-          color={TEXT_MUTED}
-        />
-
-       <Text
-  style={
-    styles.availabilityLabel
-  }
->
-  {selectedBookingType ===
-  'DELIVERY_BASED'
-    ? 'Delivered At'
-    : selectedBookingType ===
-      'SETUP_BASED'
-    ? 'Setup Window'
-    : selectedBookingType ===
-      'TIME_SLOT_BASED'
-    ? 'Appointment Time'
-    : selectedBookingType ===
-      'CUSTOM'
-    ? 'Service Window'
-    : 'Service Window'}
-</Text>
-      </View>
-
-      <Text
-        style={
-          styles.availabilityValue
-        }
-      >
-   {selectedBookingType ===
-'DELIVERY_BASED'
-  ? deliveredAtTime ||
-    'Delivery time unavailable'
-  : `${new Date(
-      availabilityCheck
-        .requiredServiceWindow
-        .startDateTime,
-    ).toLocaleTimeString(
-      'en-US',
-      {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      },
-    )} - ${new Date(
-      availabilityCheck
-        .requiredServiceWindow
-        .endDateTime,
-    ).toLocaleTimeString(
-      'en-US',
-      {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      },
-    )}`}
+{(selectedBookingType === 'TIME_SLOT_BASED' ||
+  (availabilityCheck?.available && availabilityCheck.requiredServiceWindow)) && (
+  <View style={styles.availabilityInfoRow}>
+    <View style={styles.availabilityLabelRow}>
+      <Ionicons name="time-outline" size={15} color={TEXT_MUTED} />
+      <Text style={styles.availabilityLabel}>
+        {selectedBookingType === 'DELIVERY_BASED'
+          ? 'Delivered At'
+          : selectedBookingType === 'SETUP_BASED'
+            ? 'Setup Window'
+            : selectedBookingType === 'TIME_SLOT_BASED'
+              ? 'Appointment Time'
+              : 'Service Window'}
       </Text>
     </View>
-  )}
+    <Text style={styles.availabilityValue}>
+      {selectedBookingType === 'TIME_SLOT_BASED'
+        ? selectedAppointment?.available
+          ? `${new Date(selectedAppointment.startDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(selectedAppointment.endDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })}`
+          : 'Select your appointment time'
+        : selectedBookingType === 'DELIVERY_BASED'
+          ? deliveredAtTime || 'Delivery time unavailable'
+          : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+    </Text>
+  </View>
+)}
                   {/* Vendor Slots */}
                   <View
                     style={
