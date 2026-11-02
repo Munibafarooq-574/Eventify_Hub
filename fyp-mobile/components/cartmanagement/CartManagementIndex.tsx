@@ -388,31 +388,15 @@ if (eventDetailsRaw) {
         };
     }
 
-    // -----------------------------------------
-    // TIME_SLOT_BASED
-    // Event start + package required duration
-    // -----------------------------------------
+    // TIME_SLOT_BASED: use the client's selected appointment, not event start.
     if (bookingType === 'TIME_SLOT_BASED') {
-        const duration =
-            Number(
-                pkg?.requiredServiceDurationMinutes,
-            );
-
-        if (
-            !Number.isFinite(duration) ||
-            duration <= 0
-        ) {
-            return null;
-        }
-
-        return {
-            bookingType,
-            start: eventStart,
-            end: new Date(
-                eventStart.getTime() +
-                duration * 60000,
-            ),
-        };
+        const selectedWindow = pkg?.requiredServiceWindow;
+        if (!selectedWindow?.startDateTime || !selectedWindow?.endDateTime) return null;
+        const start = new Date(selectedWindow.startDateTime);
+        const end = new Date(selectedWindow.endDateTime);
+        if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+            end.getTime() <= start.getTime()) return null;
+        return { bookingType, start, end };
     }
 
     // -----------------------------------------
