@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { VendorAvailabilityService } from './vendor-availability.service';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
@@ -57,6 +58,34 @@ setAvailability(
       start,
       end,
       dto.packageId, dto.replacementMode === true, timeZone,
+    );
+  }
+
+  @Post('appointment-candidates')
+  async appointmentCandidates(
+    @Body() dto: {
+      vendorId: string;
+      packageId: string;
+      eventCityId: string;
+      eventDate: string;
+      eventStartTime: string;
+      eventDurationMinutes: number;
+    },
+  ) {
+    if (
+      !dto || !dto.vendorId || !dto.packageId || !dto.eventCityId ||
+      !/^\\d{4}-\\d{2}-\\d{2}$/.test(dto.eventDate ?? '') ||
+      !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(dto.eventStartTime ?? '') ||
+      !Number.isSafeInteger(dto.eventDurationMinutes) ||
+      dto.eventDurationMinutes < 1 || dto.eventDurationMinutes > 1440
+    ) {
+      throw new BadRequestException('Invalid appointment search request');
+    }
+    const timeZone = await this.cityService.requireCityTimeZone(dto.eventCityId);
+    const start = eventLocalToUtc(dto.eventDate, dto.eventStartTime, timeZone);
+    const end = new Date(start.getTime() + dto.eventDurationMinutes * 60000);
+    return this.service.getAppointmentCandidates(
+      dto.vendorId, dto.packageId, start, end, timeZone,
     );
   }
 
