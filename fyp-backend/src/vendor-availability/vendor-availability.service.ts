@@ -18,6 +18,7 @@ import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CityService } from '../city/city.service';
 import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
+import { buildAppointmentCandidates } from './appointment-candidates';
 import { minimumWorkingWindowMinutes, workingWindowMinutes } from './working-window';
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -803,6 +804,54 @@ return {
   overlapCount,
   maxConcurrentBookings,
 };
+  }
+
+  /**
+   * Read-only appointment discovery. All candidates are checked using the
+   * existing authoritative availability engine; no duplicate availability rules.
+   * The selected appointment still needs order-level persistence and revalidation.
+   */
+  async getAppointmentCandidates(
+    vendorId: string,
+    packageId: string,
+    eventStart: Date,
+    eventEnd: Date,
+    eventTimeZone: string,
+  ) {
+    if (!Types.ObjectId.isValid(vendorId) || !Types.ObjectId.isValid(packageId)) {
+      throw new BadRequestException('Invalid vendor or package identifier');
+    }
+    const vendor = await this.userModel.findById(vendorId).select('role packages').lean();
+    if (!vendor || vendor.role !== 'Vendor') {
+      throw new NotFoundException('Vendor not found');
+    }
+    const selectedPackage: any = (vendor.packages ?? []).find(
+      (pkg: any) => String(pkg._id) === packageId,
+    );
+    if (!selectedPackage || selectedPackage.bookingType !== 'TIME_SLOT_BASED') {
+      throw new BadRequestException('A Time Slot Based package is required');
+    }
+    const duration = selectedPackage.requiredServiceDurationMinutes;
+    const candidates = buildAppointmentCandidates(eventStart, eventEnd, duration);
+    const results = await Promise.all(candidates.map(async candidate => {
+      const result = await this.checkVendorAvailability(
+        vendorId,
+        candidate.startDateTime,
+        candidate.endDateTime,
+        packageId,
+        undefined,
+        undefined,
+        false,
+        eventTimeZone,
+      );
+      return {
+        startDateTime: candidate.startDateTime,
+        endDateTime: candidate.endDateTime,
+        available: result.available,
+        reason: result.reason,
+      };
+    }));
+    return { vendorId, packageId, durationMinutes: duration, slots: results };
   }
 
     async checkMany(

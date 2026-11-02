@@ -675,6 +675,33 @@ export class OrderService {
                             );
                         }
 
+                        // Time Slot Based: the client chooses a service window
+                        // inside the event. Never accept a different duration
+                        // or an appointment outside the parent event.
+                        let appointmentStartDateTime = eventStartDateTime;
+                        if (packageDoc.bookingType === 'TIME_SLOT_BASED') {
+                            const requiredMinutes = Number(packageDoc.requiredServiceDurationMinutes);
+                            if (!Number.isSafeInteger(requiredMinutes) || requiredMinutes <= 0) {
+                                throw new BadRequestException('Invalid package appointment duration');
+                            }
+                            const suppliedWindow = service.requiredServiceWindow;
+                            if (!suppliedWindow?.startDateTime || !suppliedWindow?.endDateTime) {
+                                throw new BadRequestException('Select an appointment time for this package');
+                            }
+                            const selectedStart = new Date(suppliedWindow.startDateTime);
+                            const selectedEnd = new Date(suppliedWindow.endDateTime);
+                            if (
+                                !Number.isFinite(selectedStart.getTime()) ||
+                                !Number.isFinite(selectedEnd.getTime()) ||
+                                selectedStart < eventStartDateTime ||
+                                selectedEnd > eventEndDateTime ||
+                                selectedEnd.getTime() - selectedStart.getTime() !== requiredMinutes * 60000
+                            ) {
+                                throw new BadRequestException('Appointment must fit within the event and match package duration');
+                            }
+                            appointmentStartDateTime = selectedStart;
+                        }
+
                         const requestedEndDateTime =
                             new Date(
                                 eventStartDateTime.getTime() +
@@ -692,8 +719,10 @@ export class OrderService {
                                     String(
                                         service.vendorId,
                                     ),
-                                    eventStartDateTime,
-                                    requestedEndDateTime,
+                                    appointmentStartDateTime,
+                                    packageDoc.bookingType === 'TIME_SLOT_BASED'
+                                        ? new Date(appointmentStartDateTime.getTime() + Number(packageDoc.requiredServiceDurationMinutes) * 60000)
+                                        : requestedEndDateTime,
                                     String(
                                         service.packageId,
                                     ),

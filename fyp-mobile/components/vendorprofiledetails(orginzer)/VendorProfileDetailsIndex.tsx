@@ -32,6 +32,7 @@ import getVendorAvailability, {
   VendorAvailabilityResponse,
 } from '@/services/getVendorAvailability';
 import checkVendorsAvailability from '@/services/checkVendorsAvailability';
+import getTimeSlotAppointments, { TimeSlotAppointment } from '@/services/getTimeSlotAppointments';
 import getMarketplaceEventContext from '@/services/getMarketplaceEventContext';
 import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
 import { trackVendorView } from '@/services/trackVendorView';
@@ -451,6 +452,9 @@ const phase6AvailablePackageIds = useMemo(() => {
 
     const [activePackage, setActivePackage] =
       useState<string | null>(null);
+    const [appointmentSlots, setAppointmentSlots] = useState<TimeSlotAppointment[]>([]);
+    const [selectedAppointment, setSelectedAppointment] = useState<TimeSlotAppointment | null>(null);
+    const [appointmentLoading, setAppointmentLoading] = useState(false);
 
     const [vendorData, setVendorData] =
       useState<any>(null);
@@ -675,6 +679,34 @@ const [availabilityCheck, setAvailabilityCheck] =
   bookingMode,
   activePackage,
 ]);
+
+useEffect(() => {
+  let active = true;
+  setSelectedAppointment(null);
+  setAppointmentSlots([]);
+  const pkg = vendorData?.packages?.find((item: any) => String(item._id) === String(activePackage));
+  if (!isEventMode || !vendorData?._id || pkg?.bookingType !== 'TIME_SLOT_BASED') return;
+  const date = String(Array.isArray(eventDate) ? eventDate[0] : eventDate || '');
+  const time = String(Array.isArray(startTime) ? startTime[0] : startTime || '');
+  const city = String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || '');
+  if (!date || !time || !city || !Number(durationMinutes)) return;
+  setAppointmentLoading(true);
+  getTimeSlotAppointments({
+    vendorId: String(vendorData._id),
+    packageId: String(pkg._id),
+    eventCityId: city,
+    eventDate: date,
+    eventStartTime: time,
+    eventDurationMinutes: Number(durationMinutes),
+  }).then(result => {
+    if (active) setAppointmentSlots(result.slots || []);
+  }).catch(() => {
+    if (active) setAppointmentSlots([]);
+  }).finally(() => {
+    if (active) setAppointmentLoading(false);
+  });
+  return () => { active = false; };
+}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
 
 const fetchPublicCoupons = async () => {
   if (!vendorData?._id) {
@@ -1565,7 +1597,7 @@ Toast.show({
 
       // Event mode:
       // Vendor must be available for the selected event.
-      if (!availabilityCheck?.available) {
+      if (pkg.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck?.available) {
         Toast.show({
           type: 'error',
           text1: 'Vendor Not Available',
@@ -1576,6 +1608,8 @@ Toast.show({
         });
         return;
       }
+
+      if (pkg.bookingType === 'TIME_SLOT_BASED' && !selectedAppointment) return;
 
       const resolvedEventId = String(
         Array.isArray(eventId) ? eventId[0] : eventId || '',
@@ -1712,7 +1746,9 @@ Toast.show({
           durationMinutes: selectedDurationMinutes,
           quantity: 1,
           requiredServiceWindow:
-         availabilityCheck?.requiredServiceWindow
+         pkg.bookingType === 'TIME_SLOT_BASED' && selectedAppointment
+    ? { startDateTime: selectedAppointment.startDateTime, endDateTime: selectedAppointment.endDateTime }
+    : availabilityCheck?.requiredServiceWindow
     ? {
         startDateTime:
           availabilityCheck.requiredServiceWindow.startDateTime,
@@ -4739,6 +4775,32 @@ const serviceCityNamesFromIds =
 
           {selectedPackage.bookingType === 'TIME_SLOT_BASED' && (
             <View style={styles.packageInfoSection}>
+              <Text style={{ color: PRIMARY, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Select Appointment Slot</Text>
+              {appointmentLoading ? <ActivityIndicator color={PRIMARY} /> : appointmentSlots.length === 0 ? (
+                <Text style={{ color: '#777' }}>No appointment options available for this event.</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {appointmentSlots.map(slot => {
+                    const chosen = selectedAppointment?.startDateTime === slot.startDateTime;
+                    const label = (date: string) => new Date(date).toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit' });
+                    return (
+                      <TouchableOpacity
+                        key={slot.startDateTime}
+                        disabled={!slot.available}
+                        onPress={() => setSelectedAppointment(slot)}
+                        style={{ borderWidth: 1, borderColor: chosen ? PRIMARY : '#DDD', backgroundColor: chosen ? '#F9EAF5' : '#FFF', opacity: slot.available ? 1 : 0.45, borderRadius: 12, padding: 12 }}
+                      >
+                        <Text style={{ color: chosen ? PRIMARY : '#333', fontWeight: '600' }}>{label(slot.startDateTime)} – {label(slot.endDateTime)}</Text>
+                        <Text style={{ color: slot.available ? '#328653' : '#A33', fontSize: 12 }}>{slot.available ? 'Available' : 'Unavailable'}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+          {selectedPackage.bookingType === 'TIME_SLOT_BASED' && (
+            <View style={styles.packageInfoSection}>
               <View style={styles.sectionTitleWithIcon}>
                 <Ionicons
                   name="time-outline"
@@ -4888,9 +4950,9 @@ const serviceCityNamesFromIds =
                         {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={!availabilityCheck.available}
-                              accessibilityState={{ disabled: !availabilityCheck.available }}
-                              style={[styles.cartButton, !availabilityCheck.available && { opacity: 0.45 }]}
+                              disabled={selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available}
+                              accessibilityState={{ disabled: selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available }}
+                              style={[styles.cartButton, (selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available) && { opacity: 0.45 }]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,
