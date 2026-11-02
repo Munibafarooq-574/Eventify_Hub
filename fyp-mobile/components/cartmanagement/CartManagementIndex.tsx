@@ -22,6 +22,20 @@ const TEXT = '#2A1F27';
 const MUTED = '#8A7F87';
 const BORDER = '#F0DCE7';
 
+const formatCartDuration = (rawMinutes: unknown): string => {
+    const minutes = Number(rawMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) return 'Duration N/A';
+    if (minutes % 1440 === 0) {
+        const days = minutes / 1440;
+        return `${days} ${days === 1 ? 'Day' : 'Days'}`;
+    }
+    if (minutes % 60 === 0) {
+        const hours = minutes / 60;
+        return `${hours} ${hours === 1 ? 'Hour' : 'Hours'}`;
+    }
+    return `${minutes} ${minutes === 1 ? 'Minute' : 'Minutes'}`;
+};
+
 const CartManagementIndexScreen: React.FC = () => {
 const router = useRouter();
 const navigation = useNavigation();
@@ -932,30 +946,11 @@ if (eventDetailsRaw) {
                                                                     </View>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {resolvedTiming?.bookingType ===
-                                                                        'TIME_SLOT_BASED'
-                                                                            ? `${Number(
-                                                                                pkg?.requiredServiceDurationMinutes || 0,
-                                                                            ) / 60} ${
-                                                                                Number(
-                                                                                    pkg?.requiredServiceDurationMinutes || 0,
-                                                                                ) === 60
-                                                                                    ? 'Hour'
-                                                                                    : 'Hours'
-                                                                            }`
-                                                                            : pkg.durationMinutes
-                                                                            ? `${(
-                                                                                pkg.durationMinutes / 60
-                                                                            ).toFixed(
-                                                                                pkg.durationMinutes % 60 === 0
-                                                                                    ? 0
-                                                                                    : 1,
-                                                                            )} ${
-                                                                                pkg.durationMinutes === 60
-                                                                                    ? 'Hour'
-                                                                                    : 'Hours'
-                                                                            }`
-                                                                            : 'Duration N/A'}
+                                                                        {formatCartDuration(
+                                                                            resolvedTiming?.bookingType === 'TIME_SLOT_BASED'
+                                                                                ? pkg?.requiredServiceDurationMinutes
+                                                                                : pkg?.durationMinutes
+                                                                        )}
                                                                     </Text>
                                                                 </View>
                                                             )}
