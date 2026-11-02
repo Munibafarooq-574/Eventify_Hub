@@ -1,3 +1,4 @@
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import DeliveryPackageFields from '@/components/booking/DeliveryPackageFields';
 import { deliveryWindowExample, defaultDelivery, deliverySettings, deliverySettingsError, DeliverySettings } from '@/utils/deliveryBooking';
 // fyp-mobile/components/VPDAddNewPackages/VPDAddNewPackages.tsx
@@ -2500,6 +2501,7 @@ if (!userId) {
 
   {bookingType === "DELIVERY_BASED" && (
     <>
+      <DeliveryDetails pkg={delivery} showConfiguration />
 
 
       <View style={styles.previewDurationRow}>

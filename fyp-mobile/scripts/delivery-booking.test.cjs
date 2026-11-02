@@ -24,3 +24,15 @@ test('delivery time picker waits for availability, disables unavailable choices 
  props.eventStartTime='15:00';render();render();assert.equal(changes.at(-1),null);assert.equal(pending.length,2);assert.match(render(),/Checking delivery/);
  pending[1].reject(new Error('Unavailable'));await new Promise(setImmediate);assert.match(render(),/Try again/);assert.equal(changes.at(-1),null);
 });
+
+test('add and edit preview show selected delivery charges, weight rule and reserved time only',()=>{
+ const C=load('components/booking/DeliveryDetails.tsx',{'react-native':native,'@/utils/deliveryBooking':utils}).default;
+ const preview=pkg=>renderToStaticMarkup(React.createElement(C,{pkg,showConfiguration:true}));
+ const weighted=preview({...paid,deliveryWeightKg:1,deliveryReserveMinutes:60});
+ assert.match(weighted,/Delivery: Rs\. 300/);assert.match(weighted,/Covers 1 kg; Rs\. 100/);assert.match(weighted,/Extra weight charges: On/);assert.match(weighted,/Delivery weight: 1 kg per package/);assert.match(weighted,/Time reserved for each delivery: 60 minutes/);
+ assert.match(preview({...paid,deliveryWeightBasis:'PER_GUEST'}),/per guest \(Catering\)/);
+ const fixed=preview({...paid,deliveryExtraWeightEnabled:false});assert.match(fixed,/Extra weight charges: Off/);assert.doesNotMatch(fixed,/Covers|Delivery weight:/);
+ const free=preview({...paid,deliveryFeeType:'FREE'});assert.match(free,/Free Delivery/);assert.doesNotMatch(free,/Extra weight charges|Covers|Delivery weight:|Delivery: Rs/);assert.match(free,/Time reserved for each delivery: 30 minutes/);
+ const normal=renderToStaticMarkup(React.createElement(C,{pkg:paid}));assert.doesNotMatch(normal,/Time reserved for each delivery|Extra weight charges: On/);
+ for(const path of ['components/VPDAddNewPackages/VPDAddNewPackages.tsx','components/editpackage/EditPackageIndex.tsx']){const source=fs.readFileSync(path,'utf8');assert.equal((source.match(/<DeliveryDetails pkg=\{delivery\} showConfiguration \/>/g)||[]).length,1);compile(path);}
+});
