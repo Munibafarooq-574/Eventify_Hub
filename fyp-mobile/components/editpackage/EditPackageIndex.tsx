@@ -1,7 +1,8 @@
+import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import DeliveryPackageFields from '@/components/booking/DeliveryPackageFields';
-import { deliveryWindowExample, defaultDelivery, deliverySettings, deliverySettingsError, DeliverySettings } from '@/utils/deliveryBooking';
+import { deliveryWindowHelp, defaultDelivery, deliverySettings, deliverySettingsError, DeliverySettings } from '@/utils/deliveryBooking';
 
 // fyp-mobile/components/vendorpackages/EditPackageIndex.tsx
 
@@ -1678,13 +1679,13 @@ Alert.alert(
             {/* Booking Type */}
 
 <View style={styles.card}>
-  <Text style={styles.sectionTitle}>
-    Booking Type
-  </Text>
-
-  <Text style={styles.sectionSubtitle}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+    <Text style={styles.sectionTitle}>Booking Type</Text>
+    {bookingType === "DELIVERY_BASED" && <InfoHelp title="Booking Type" message="Select how this package uses vendor availability. Delivery Based lets customers choose an available delivery time." />}
+  </View>
+  {bookingType !== "DELIVERY_BASED" && <Text style={styles.sectionSubtitle}>
     Select how this package uses vendor availability.
-  </Text>
+  </Text>}
 
   <View style={{ marginTop: 14, gap: 10 }}>
     {bookingTypeOptions.map((option) => {
@@ -2248,11 +2249,11 @@ Alert.alert(
 
 {bookingType === "DELIVERY_BASED" && <>
   <DeliveryPackageFields value={delivery} onChange={setDelivery} />
-  <Text style={{color:'#766572',marginBottom:12,lineHeight:20}}>{deliveryWindowExample(serviceWindowStartOffsetMinutesValue,serviceWindowEndOffsetMinutesValue)}</Text>
 </>}
 {bookingType !== "DURATION_BASED" && (
   <View style={styles.card}>
-    <Text style={styles.sectionTitle}>
+    <View style={{flexDirection:"row",alignItems:"center",gap:6}}>
+    <Text style={[styles.sectionTitle,{flexShrink:1}]}>
       {bookingType === "TIME_SLOT_BASED"
         ? "How long does this take?"
         : bookingType === "DELIVERY_BASED"
@@ -2261,16 +2262,16 @@ Alert.alert(
         ? "Setup Duration & Allowed Window"
         : "Custom Service Timing"}
     </Text>
+    {bookingType === "DELIVERY_BASED" && <InfoHelp title="Delivery Window" message={deliveryWindowHelp(serviceWindowStartOffsetMinutesValue,serviceWindowEndOffsetMinutesValue)} />}
+    </View>
 
-    <Text style={styles.sectionSubtitle}>
+    {bookingType !== "DELIVERY_BASED" && <Text style={styles.sectionSubtitle}>
       {bookingType === "TIME_SLOT_BASED"
         ? "This is how much of your time a single booking takes — e.g. a makeup session or a transport trip."
-        : bookingType === "DELIVERY_BASED"
-        ? "Choose the earliest and latest delivery times relative to the event start. Delivery must happen within this window."
         : bookingType === "SETUP_BASED"
         ? "Enter how long setup takes, the earliest it may start, and when it must be finished. The setup duration must fit inside this window."
         : "Choose when the service may start and when it must finish, relative to the event start. Duration is optional; if entered, it must fit inside this window."}
-    </Text>
+    </Text>}
 
     {/* --------------------------------------------------
         How long does it take (duration)
@@ -2537,7 +2538,7 @@ Alert.alert(
             )}
           </View>
 
-          {serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (
+          {serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (bookingType !== "DELIVERY_BASED" || !!serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, undefined)) && (
             <Text style={[styles.sectionSubtitle, { marginTop: 12 },
               serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ? { color: "#B42318" } : {}]}>
               {serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ||
@@ -2545,10 +2546,10 @@ Alert.alert(
             </Text>
           )}
 
-          <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
+          {bookingType !== "DELIVERY_BASED" && <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
             Tip: enter 0 + "After event starts" to mean right when the
             event begins.
-          </Text>
+          </Text>}
         </View>
       </>
     )}

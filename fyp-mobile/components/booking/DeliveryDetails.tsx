@@ -1,6 +1,7 @@
+import InfoHelp from './InfoHelp';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { deliveryFee, deliveryDateTime, displayDeliveryWeight, displayDeliveryRate, DELIVERY_WEIGHT_UNITS } from '@/utils/deliveryBooking';
+import { deliveryFee, deliveryDateTime, displayDeliveryWeight, displayDeliveryRate, formatDeliveryReserve, DELIVERY_WEIGHT_UNITS } from '@/utils/deliveryBooking';
 export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCatering = false, timeZone = 'UTC', showConfiguration = false }: { pkg:any; quantity?:number; guests?:number; isCatering?:boolean; timeZone?:string; showConfiguration?:boolean }) {
   const d = pkg.delivery || pkg;
   if (!d.deliveryFeeType || (pkg.bookingType && pkg.bookingType !== 'DELIVERY_BASED')) return null;
@@ -21,12 +22,11 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
         ['Weight measured',d.deliveryWeightBasis === 'PER_GUEST' ? 'Per guest (Catering)' : 'Per package'],
         ['Delivery weight',`${weight(Number(d.deliveryWeightKg || 0))} ${unit}`],
       ] : []),
-      ['Time reserved',`${d.deliveryReserveMinutes || 0} minutes per delivery`],
+      ['Time reserved',`${formatDeliveryReserve(d.deliveryReserveMinutes)} per delivery`],
     ];
     return <View style={s.card}>
-      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><Text style={s.title}>Delivery details</Text><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
+      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
       {rows.map(([label,value]) => <View key={label} style={s.row}><Text style={s.label}>{label}</Text><Text style={s.value}>{value}</Text></View>)}
-      {paid && d.deliveryExtraWeightEnabled && <Text style={s.note}>Each started additional {unit} is charged at the shown rate.</Text>}
     </View>;
   }
   return <View style={{marginVertical:8,gap:4}}>
@@ -47,5 +47,4 @@ const s = StyleSheet.create({
   badge:{fontSize:11,fontWeight:'700',color:'#7B2869',backgroundColor:'#F4E7F1',paddingHorizontal:9,paddingVertical:5,borderRadius:8},free:{color:'#246C44',backgroundColor:'#E4F6EB'},
   row:{flexDirection:'row',alignItems:'flex-start',gap:12,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#F4EAF1'},
   label:{flex:1,minWidth:0,fontSize:12,color:'#88717F',lineHeight:18},value:{flex:1.2,minWidth:0,fontSize:12,fontWeight:'700',color:'#542046',textAlign:'right',lineHeight:18,flexShrink:1},
-  note:{fontSize:11,color:'#88717F',lineHeight:17,marginTop:10},
 });
