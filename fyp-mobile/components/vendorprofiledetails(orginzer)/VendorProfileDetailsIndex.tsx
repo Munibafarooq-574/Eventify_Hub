@@ -1,3 +1,6 @@
+import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
+import { deliverySettings } from '@/utils/deliveryBooking';
 import { growthApi } from '@/services/growthApiClient';
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import BookingReviewNotice from './BookingReviewNotice';
@@ -452,6 +455,9 @@ const phase6AvailablePackageIds = useMemo(() => {
 
     const [activePackage, setActivePackage] =
       useState<string | null>(null);
+    const [selectedDelivery, setSelectedDelivery] = useState<DeliveryChoice | null>(null);
+    const [deliveryCity, setDeliveryCity] = useState('');
+    const [deliveryGuests, setDeliveryGuests] = useState(1);
     const [appointmentSlots, setAppointmentSlots] = useState<TimeSlotAppointment[]>([]);
     const [selectedAppointment, setSelectedAppointment] = useState<TimeSlotAppointment | null>(null);
     const [appointmentLoading, setAppointmentLoading] = useState(false);
@@ -619,6 +625,9 @@ const [availabilityCheck, setAvailabilityCheck] =
             throw new Error('Select an event city before checking vendor availability');
           }
 
+          setDeliveryCity(resolvedEventCityId);
+          const savedDeliveryEvent = await getSecureData("eventDetails");
+          if (savedDeliveryEvent) setDeliveryGuests(Number(JSON.parse(savedDeliveryEvent).guests || 1));
           const checkResult =
   await checkVendorsAvailability({
     replacementMode: String(Array.isArray(replacementMode) ? replacementMode[0] : replacementMode || '') === 'true',
@@ -682,6 +691,7 @@ const [availabilityCheck, setAvailabilityCheck] =
 
 useEffect(() => {
   let active = true;
+  setSelectedDelivery(null);
   setSelectedAppointment(null);
   setAppointmentSlots([]);
   const pkg = vendorData?.packages?.find((item: any) => String(item._id) === String(activePackage));
@@ -1603,7 +1613,7 @@ Toast.show({
 
       // Event mode:
       // Vendor must be available for the selected event.
-      if (pkg.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck?.available) {
+      if (pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? !selectedDelivery?.available : pkg.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck?.available) {
         Toast.show({
           type: 'error',
           text1: 'Vendor Not Available',
@@ -1708,6 +1718,9 @@ Toast.show({
         }
 
         const cartPackageItem = {
+          ...(pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? deliverySettings(pkg) : {}),
+          deliveryStartDateTime: pkg.bookingType === 'DELIVERY_BASED' ? selectedDelivery?.startDateTime : undefined,
+          deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
           packageName: pkg.packageName,
           price: resolvedPrice,
@@ -1752,7 +1765,9 @@ Toast.show({
           durationMinutes: selectedDurationMinutes,
           quantity: 1,
           requiredServiceWindow:
-         pkg.bookingType === 'TIME_SLOT_BASED' && selectedAppointment
+         pkg.bookingType === 'DELIVERY_BASED' && selectedDelivery
+    ? { startDateTime:selectedDelivery.startDateTime, endDateTime:selectedDelivery.endDateTime }
+    : pkg.bookingType === 'TIME_SLOT_BASED' && selectedAppointment
     ? { startDateTime: selectedAppointment.startDateTime, endDateTime: selectedAppointment.endDateTime }
     : availabilityCheck?.requiredServiceWindow
     ? {
@@ -4032,7 +4047,7 @@ const serviceCityNamesFromIds =
           ? `${new Date(selectedAppointment.startDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(selectedAppointment.endDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })}`
           : 'Select your appointment time'
         : selectedBookingType === 'DELIVERY_BASED'
-          ? deliveredAtTime || 'Delivery time unavailable'
+          ? selectedPackage?.deliveryFeeType ? selectedDelivery ? new Date(selectedDelivery.startDateTime).toLocaleString('en-GB', {timeZone:selectedDelivery.timeZone,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}) : 'Choose a delivery time' : deliveredAtTime || 'Delivery time unavailable'
           : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
     </Text>
   </View>
@@ -4321,6 +4336,7 @@ const serviceCityNamesFromIds =
       >
         {pkg.packageName || 'Package'}
       </Text>
+      {pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType === 'FREE' && <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',padding:6,borderRadius:8,alignSelf:'flex-start',fontWeight:'700'}}>Free Delivery</Text>}
 
       {/* Footer: price + check */}
       <View
@@ -4792,6 +4808,11 @@ const serviceCityNamesFromIds =
                   Delivery Window
                 </Text>
               </View>
+              <DeliveryDetails pkg={selectedPackage} guests={deliveryGuests} isCatering={selectedPackage.deliveryWeightBasis === 'PER_GUEST'} />
+              {selectedPackage.deliveryFeeType && isEventMode && !isOwnerView && deliveryCity && <DeliveryTimePicker
+                key={String(selectedPackage._id)} vendorId={String(vendorData._id)} packageId={String(selectedPackage._id)} eventCityId={deliveryCity}
+                eventDate={String(Array.isArray(eventDate) ? eventDate[0] : eventDate)} eventStartTime={String(Array.isArray(startTime) ? startTime[0] : startTime)}
+                eventDurationMinutes={Number(durationMinutes)} onChange={setSelectedDelivery} />}
               <Text style={styles.packageDetailItem}>Delivery must happen between the earliest and latest delivery times, relative to the event start.</Text>
 
               <Text style={styles.packageDetailItem}>
@@ -4909,9 +4930,9 @@ const serviceCityNamesFromIds =
                         {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available}
-                              accessibilityState={{ disabled: selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available }}
-                              style={[styles.cartButton, (selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available) && { opacity: 0.45 }]}
+                              disabled={selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available}
+                              accessibilityState={{ disabled: selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available }}
+                              style={[styles.cartButton, (selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available) && { opacity: 0.45 }]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,
@@ -4932,7 +4953,7 @@ const serviceCityNamesFromIds =
                                   styles.cartButtonText
                                 }
                               >
-                                {availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
+                                {selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? selectedDelivery?.available ? 'Add to Cart' : 'Choose delivery time' : availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
                               </Text>
                             </TouchableOpacity>
                           )}

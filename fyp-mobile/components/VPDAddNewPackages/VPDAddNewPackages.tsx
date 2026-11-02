@@ -1,3 +1,5 @@
+import DeliveryPackageFields from '@/components/booking/DeliveryPackageFields';
+import { deliveryWindowExample, defaultDelivery, deliverySettings, deliverySettingsError, DeliverySettings } from '@/utils/deliveryBooking';
 // fyp-mobile/components/VPDAddNewPackages/VPDAddNewPackages.tsx
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -194,6 +196,7 @@ export default function VendorPackagesScreen() {
   const [description, setDescription] = useState("");
   const [services, setServices] = useState("");
 
+  const [delivery, setDelivery] = useState<DeliverySettings>({...defaultDelivery});
   const [bookingType, setBookingType] =
   useState<BookingType>("DURATION_BASED");
 
@@ -482,6 +485,7 @@ const existingPackage =
           existingPackage.services || "",
         );
 
+    setDelivery(deliverySettings(existingPackage));
          setBookingType(
           existingPackage.bookingType || "DURATION_BASED",
         );
@@ -808,6 +812,7 @@ const removeImageAsset = (index: number) => {
 
   const validWindow = !serviceWindowError(startOffset, endOffset, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue);
 
+  if (bookingType === "DELIVERY_BASED" && deliverySettingsError(delivery)) return false;
   if (bookingType === "CUSTOM" || bookingType === "DELIVERY_BASED") {
     return validWindow;
   }
@@ -820,6 +825,7 @@ const removeImageAsset = (index: number) => {
 }, [
   packageName,
   price,
+  delivery,
   bookingType,
   durations,
   baseIncludedHours,
@@ -940,6 +946,7 @@ if (!userId) {
       }));
 
     const payload = {
+  ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: packageName.trim(),
 
   price: Number(price),
@@ -1371,7 +1378,11 @@ if (!userId) {
         {/* -------------------------------------------------
             Fixed Duration Options
         ------------------------------------------------- */}
-         {bookingType === "DURATION_BASED" && (
+         {bookingType === "DELIVERY_BASED" && <>
+  <DeliveryPackageFields value={delivery} onChange={setDelivery} />
+  <Text style={{color:'#766572',marginBottom:12,lineHeight:20}}>{deliveryWindowExample(serviceWindowStartOffsetMinutesValue,serviceWindowEndOffsetMinutesValue)}</Text>
+</>}
+  {bookingType === "DURATION_BASED" && (
   <>
     <View style={styles.card}>
       <Text style={styles.sectionTitle}>Base Package Included Time</Text>
@@ -1981,6 +1992,7 @@ if (!userId) {
           </View>
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
             {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
               (direction) => {
                 const active = windowStart.direction === direction;
@@ -2076,6 +2088,7 @@ if (!userId) {
           </View>
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+            {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowEnd({...windowEnd,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
             {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
               (direction) => {
                 const active = windowEnd.direction === direction;

@@ -1,3 +1,5 @@
+import { deliveryDateTime } from '@/utils/deliveryBooking';
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
@@ -879,6 +881,7 @@ const MyEventsScreen = () => {
                                     </View>
                                   </View>
 
+                                  {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleResponseLabel}>Requested delivery: {deliveryDateTime(request.newServiceStartDateTime,event.eventCityId?.timeZone || 'UTC')}</Text>}
                                   {request.respondedAt && (() => {
                                     const respondedAt = new Date(request.respondedAt);
                                     return (
@@ -1056,7 +1059,7 @@ const MyEventsScreen = () => {
                         : null;
 
                       const bookingType = String(
-                        bookedPackage?.bookingType || 'DURATION_BASED',
+                        vendor?.bookingType || bookedPackage?.bookingType || 'DURATION_BASED',
                       ).toUpperCase();
 
                       const vStatus =
@@ -1204,6 +1207,7 @@ const MyEventsScreen = () => {
                               </View>
 
                               <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
+                              <DeliveryDetails pkg={vendor} timeZone={event.eventCityId?.timeZone || "UTC"} />
 
                               {bookingType !== 'DELIVERY_BASED' && (
                                 <DetailRow
@@ -1212,7 +1216,7 @@ const MyEventsScreen = () => {
                                 />
                               )}
 
-                              {bookingType === 'DELIVERY_BASED' ? (
+                              {bookingType === 'DELIVERY_BASED' ? (vendor.delivery ? null : (
                                 <DetailRow
                                   label="Delivered at"
                                   value={
@@ -1223,7 +1227,7 @@ const MyEventsScreen = () => {
                                       : 'N/A'
                                   }
                                 />
-                              ) : bookingType === 'SETUP_BASED' ? (
+                              )) : bookingType === 'SETUP_BASED' ? (
                                 <>
                                   <DetailRow
                                     label="Setup start"

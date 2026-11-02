@@ -1,3 +1,4 @@
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
 import deletePackage from "@/services/deletePackage";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
@@ -438,6 +439,7 @@ const PackageScreen = () => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <DeliveryDetails pkg={packageDetails} />
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator

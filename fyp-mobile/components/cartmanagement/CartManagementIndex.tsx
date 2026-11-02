@@ -1,3 +1,5 @@
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
+import { deliveryFee } from '@/utils/deliveryBooking';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -298,6 +300,7 @@ if (eventDetailsRaw) {
                 const quantity = Number(pkg?.quantity || 1);
                 const unitPrice = Number(pkg?.price || 0);
 
+                totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
                 totalAmount += isCatering
                     ? unitPrice * Number(guests || 0) * quantity
                     : unitPrice * quantity;
@@ -312,6 +315,7 @@ if (eventDetailsRaw) {
     // -----------------------------------------
 
     const getResolvedServiceTiming = (pkg: any) => {
+    if (pkg.deliveryFeeType && pkg.requiredServiceWindow) return {bookingType:'DELIVERY_BASED',start:new Date(pkg.requiredServiceWindow.startDateTime),end:new Date(pkg.requiredServiceWindow.endDateTime)};
     const bookingType = String(
         pkg?.bookingType || 'DURATION_BASED',
     ).toUpperCase();
@@ -795,6 +799,7 @@ if (eventDetailsRaw) {
                                                             return value.toLocaleTimeString(
                                                                 'en-US',
                                                                 {
+                                                                    timeZone: pkg.deliveryTimeZone || undefined,
                                                                     hour: 'numeric',
                                                                     minute: '2-digit',
                                                                     hour12: true,
@@ -810,11 +815,11 @@ if (eventDetailsRaw) {
                                                 const packagePrice =
                                                     Number(pkg?.price || 0);
 
-                                                const finalPrice =
+                                                const finalPrice = deliveryFee(pkg, Number(pkg.quantity || 1), Number(guests || 0), !!isCatering).totalFee + (
                                                     isCatering
                                                         ? packagePrice *
                                                           Number(guests || 0)
-                                                        : packagePrice;
+                                                        : packagePrice);
 
                                                 return (
                                                     <View
@@ -949,12 +954,13 @@ if (eventDetailsRaw) {
                                                                     </View>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {pkg.priceBasis === 'custom'
+{pkg.priceBasis === 'custom'
                                                                             ? 'Custom Duration'
                                                                             : 'Fixed Rate'}
                                                                     </Text>
                                                                 </View>
 
+                                                    <DeliveryDetails pkg={pkg} quantity={Number(pkg.quantity || 1)} guests={Number(guests || 0)} isCatering={!!isCatering} />
                                                     {pkg.priceBasis === 'custom' &&
                                                         Number(pkg.customDurationRate) > 0 &&
                                                         Number(pkg.durationMinutes) > 0 && (

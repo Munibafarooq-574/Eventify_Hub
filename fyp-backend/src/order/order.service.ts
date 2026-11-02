@@ -1,8 +1,10 @@
+import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
 import { getVendorDownPaymentConfig, effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
 import { Payment } from '../schemas/payment.schema';
 //fyp-backend/src/order/order.service.ts
 import {
   BadRequestException,
+  ForbiddenException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -83,6 +85,8 @@ export class OrderService {
         serviceName: string;
         price: number;
         packageId: string;
+        deliveryStartDateTime?: string;
+        expectedDeliveryFee?: number;
         durationMinutes?: number;
         quantity?: number;
         requiredServiceWindow?: {
@@ -366,6 +370,7 @@ export class OrderService {
 
     try {
         let savedOrder: Order | undefined;
+        let savedDeliveryServices: any[] = [];
 
         try {
             await session.withTransaction(
@@ -522,6 +527,8 @@ export class OrderService {
                     }
 
                     type ValidatedService = {
+                        delivery?: any;
+                        bookingType?: string;
                         policySnapshot: BookingPolicySnapshot;
                         serviceIndex: number;
                         vendorId: string;
@@ -702,6 +709,9 @@ export class OrderService {
                             appointmentStartDateTime = selectedStart;
                         }
 
+                        if (packageDoc.bookingType === 'DELIVERY_BASED' && packageDoc.deliveryFeeType && !service.deliveryStartDateTime) {
+                            throw new BadRequestException('Select a delivery date and time for this package.');
+                        }
                         const requestedEndDateTime =
                             new Date(
                                 eventStartDateTime.getTime() +
@@ -726,7 +736,8 @@ export class OrderService {
                                     String(
                                         service.packageId,
                                     ),
-                                    session,
+                                    session, undefined, false, eventTimeZone,
+                                    service.deliveryStartDateTime ? { startDateTime: service.deliveryStartDateTime } : undefined,
                                 );
 
                         if (
@@ -858,7 +869,7 @@ export class OrderService {
                                 'catering',
                             );
 
-                        const originalAmount =
+                        const packageAmount =
                             Number(unitPrice) *
                             quantity *
                             (isCatering
@@ -866,6 +877,19 @@ export class OrderService {
                                       guests,
                                   )
                                 : 1);
+
+                        const deliveryQuote = packageDoc.bookingType === 'DELIVERY_BASED' && packageDoc.deliveryFeeType
+                            ? quoteDelivery(packageDoc, quantity, Number(guests), isCatering) : undefined;
+                        const delivery = deliveryQuote ? {
+                            ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, packageDoc[field]])),
+                            ...deliveryQuote, packageAmount, timeZone: eventTimeZone,
+                            serviceWindowStartOffsetMinutes: packageDoc.serviceWindowStartOffsetMinutes,
+                            serviceWindowEndOffsetMinutes: packageDoc.serviceWindowEndOffsetMinutes,
+                        } : undefined;
+                        if (deliveryQuote && service.expectedDeliveryFee !== undefined && (
+                            !Number.isFinite(service.expectedDeliveryFee) || Math.abs(service.expectedDeliveryFee - deliveryQuote.totalFee) > 0.001
+                        )) throw new ConflictException('Delivery charges have changed. Please reopen the package and review the updated total.');
+                        const originalAmount = packageAmount + (deliveryQuote?.totalFee || 0);
 
                         if (
                             !Number.isFinite(
@@ -1009,7 +1033,7 @@ export class OrderService {
                         }
                         validatedServices.push(
                             {
-                                serviceIndex,
+                                serviceIndex, delivery, bookingType: packageDoc.bookingType === 'DELIVERY_BASED' ? packageDoc.bookingType : undefined,
                                 policySnapshot: this.cancellationService.buildBookingPolicySnapshot(vendor, bookingPolicyConfig),
                                 vendorId:
                                     String(
@@ -1172,6 +1196,8 @@ export class OrderService {
                                                 promotionSnapshot
                                                     ?.promotionCode ??
                                                 null,
+                                            delivery: validatedService.delivery,
+                                            bookingType: validatedService.bookingType,
                                             originalAmount:
                                                 validatedService.originalAmount,
                                             discountAmount:
@@ -1254,6 +1280,7 @@ export class OrderService {
                     }
 
                     savedOrder = order;
+                    savedDeliveryServices = validatedServices;
                 },
             );
         } catch (error: any) {
@@ -1282,11 +1309,11 @@ export class OrderService {
         // Notifications only after a successful transaction commit.
         try {
             for (
-                const service of services
+                const [index, service] of services.entries()
             ) {
                 await this.sendPushNotification(
                     'Order',
-                    'A new order has been placed',
+                    deliveryDescription(savedDeliveryServices[index]) || 'A new order has been placed',
                     service.vendorId,
                     'CREATE_ORDER',
                 );
@@ -2400,7 +2427,7 @@ async completeVendorOrder(vendorOrderId: string) {
     }
     const vendor = await this.userModel.findById(vendorOrder.vendorId).select('packages');
     const bookedPackage = vendor?.packages?.find((pkg: any) => String(pkg._id) === String(vendorOrder.packageId));
-    const completionTime = bookedPackage?.bookingType === 'DELIVERY_BASED'
+    const completionTime = (vendorOrder.bookingType || bookedPackage?.bookingType) === 'DELIVERY_BASED'
         ? vendorOrder.eventStartDateTime : vendorOrder.eventEndDateTime;
     if (!completionTime || !Number.isFinite(new Date(completionTime).getTime()) || new Date(completionTime).getTime() > Date.now()) {
         throw new ConflictException('Service cannot be completed before its scheduled delivery or service end time.');
@@ -2574,6 +2601,24 @@ async completeVendorOrder(vendorOrderId: string) {
     // Phase 13B — Client event date/time rescheduling
     // =========================================================
 
+    async getDeliveryRescheduleContext(orderId: string, requesterId: string) {
+        if (!Types.ObjectId.isValid(orderId)) throw new BadRequestException('Invalid booking.');
+        const order: any = await this.orderModel.findById(orderId).lean();
+        if (!order || String(order.organizerId) !== String(requesterId)) throw new ForbiddenException('You can only view your own booking.');
+        const bookings: any[] = await this.vendorOrderModel.find({ _id:{ $in:order.vendorOrders }, status:{ $in:['pending','accepted'] } }).lean();
+        return { order, bookings:bookings.filter(b => b.delivery) };
+    }
+
+    async getRescheduleDeliveryCandidates(orderId: string, requesterId: string, dto: any) {
+        const { order, bookings } = await this.getDeliveryRescheduleContext(orderId, requesterId);
+        const booking = bookings.find(b => String(b._id) === String(dto.vendorOrderId));
+        if (!booking) throw new BadRequestException('Delivery booking not found.');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dto.eventDate || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(dto.eventStartTime || '') || !Number.isSafeInteger(dto.eventDurationMinutes) || dto.eventDurationMinutes < 1 || (dto.deliveryDate && !/^\d{4}-\d{2}-\d{2}$/.test(dto.deliveryDate))) throw new BadRequestException('Choose a valid event and delivery date.');
+        const zone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+        const start = eventLocalToUtc(dto.eventDate,dto.eventStartTime,zone);
+        return this.availabilityService.getDeliveryCandidates(String(booking.vendorId),String(booking.packageId),start,new Date(start.getTime() + dto.eventDurationMinutes * 60000),zone,dto.deliveryDate,String(booking._id),booking.delivery);
+    }
+
     async requestEventReschedule(
         orderId: string,
         requesterId: string,
@@ -2662,6 +2707,15 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new ConflictException('A date/time change request has already been sent for this event');
         }
 
+        // Validate every explicit delivery selection before creating any schedule request.
+        const deliveryPrechecks = new Map<string, any>();
+        for (const booking of vendorOrders.filter(b => b.delivery)) {
+            const selected = dto.deliveryTimes?.[String(booking._id)];
+            if (!selected) throw new BadRequestException('Choose a delivery time for each delivery package.');
+            const result = await this.availabilityService.checkVendorAvailability(String(booking.vendorId), newEventStart, newEventEnd, booking.packageId, undefined, String(booking._id), false, rescheduleTimeZone, {startDateTime:selected,configuration:booking.delivery});
+            if (!result.available) throw new ConflictException(result.reason || 'Choose another delivery time.');
+            deliveryPrechecks.set(String(booking._id),result);
+        }
         const expiresAt = new Date(Date.now() + DEFAULT_HOLD_HOURS * 60 * 60 * 1000);
         const created: any[] = [];
         const requestGroupId = new Types.ObjectId();
@@ -2670,13 +2724,14 @@ async completeVendorOrder(vendorOrderId: string) {
         // cannot close an assignment while its schedule request is created.
         vendorOrders.sort((a, b) => Number(b.laterTimeRequest?.status === 'PENDING') - Number(a.laterTimeRequest?.status === 'PENDING'));
         for (const vendorOrder of vendorOrders) {
-            const availability = await this.availabilityService.checkVendorAvailability(
+            const availability = deliveryPrechecks.get(String(vendorOrder._id)) || await this.availabilityService.checkVendorAvailability(
                 String(vendorOrder.vendorId),
                 newEventStart,
                 newEventEnd,
                 vendorOrder.packageId || undefined,
                 undefined,
-                String(vendorOrder._id),
+                String(vendorOrder._id), false, rescheduleTimeZone,
+                vendorOrder.delivery ? { startDateTime: dto.deliveryTimes![String(vendorOrder._id)], configuration: vendorOrder.delivery } : undefined,
             );
 
             const vendor: any = await this.userModel
@@ -2701,7 +2756,7 @@ async completeVendorOrder(vendorOrderId: string) {
                 vendorOrderId: vendorOrder._id,
                 vendorId: vendorOrder.vendorId,
                 requestedBy: new Types.ObjectId(requesterId),
-                bookingType: pkg?.bookingType || null,
+                bookingType: vendorOrder.bookingType || pkg?.bookingType || null,
                 oldEventDate: order.eventDate,
                 oldStartTime: order.eventTime,
                 oldEndTime: oldEventEnd,
@@ -2767,7 +2822,7 @@ async completeVendorOrder(vendorOrderId: string) {
             try {
                 await this.sendPushNotification(
                     'Schedule update request',
-                    'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
+                    vendorOrder.delivery ? `Your client would like to update the event schedule. ${deliveryDescription({delivery:vendorOrder.delivery,startDateTime:availability.requiredServiceWindow?.startDateTime})} Please review the request.` : 'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
                     String(vendorOrder.vendorId),
                     'RESCHEDULE_REQUESTED',
                 );
@@ -2867,7 +2922,8 @@ async completeVendorOrder(vendorOrderId: string) {
                 new Date(request.newEndTime),
                 vendorOrder.packageId || undefined,
                 undefined,
-                String(vendorOrder._id),
+                String(vendorOrder._id), false, requestTimeZone,
+                vendorOrder.delivery ? { startDateTime: request.newServiceStartDateTime, configuration: vendorOrder.delivery } : undefined,
             );
 
             if (!availability.available) {
@@ -2993,7 +3049,8 @@ async completeVendorOrder(vendorOrderId: string) {
                         new Date(req.newEndTime),
                         vo.packageId || undefined,
                         session,
-                        String(vo._id),
+                        String(vo._id), false, rescheduleTimeZone,
+                        vo.delivery ? { startDateTime: req.newServiceStartDateTime, configuration: vo.delivery } : undefined,
                     );
 
                     if (!availability.available) {

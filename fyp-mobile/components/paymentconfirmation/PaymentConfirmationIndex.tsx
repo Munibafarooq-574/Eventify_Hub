@@ -1,3 +1,4 @@
+import { deliveryDateTime } from '@/utils/deliveryBooking';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
@@ -140,6 +141,12 @@ const PaymentConfirmationScreen = () => {
     { label: 'Vendor Name', value: paymentData?.vendor?.name || 'N/A' },
     { label: 'Brand Name', value: paymentData?.vendor?.brandName || 'N/A' },
     { label: 'Vendor Email', value: paymentData?.vendor?.email || 'N/A' },
+    ...(paymentData?.delivery ? [
+      {label:'Delivery date & time',value:deliveryDateTime(paymentData.deliveryStartDateTime,paymentData.delivery.timeZone || 'UTC')},
+      {label:'Package amount',value:formatCurrency(Number(paymentData.delivery.packageAmount))},
+      {label:'Delivery',value:paymentData.delivery.deliveryFeeType === 'FREE' ? 'Free' : formatCurrency(Number(paymentData.delivery.baseFee))},
+      ...(paymentData.delivery.deliveryExtraWeightEnabled ? [{label:'Extra weight fee',value:formatCurrency(Number(paymentData.delivery.extraFee))}] : []),
+    ] : []),
     { label: 'Payment Type', value: paymentTypeLabel },
     { label: 'Amount Paid', value: formatCurrency(amountPaid) },
     { label: 'Payment Method', value: paymentMethodLabel },

@@ -32,6 +32,17 @@ const service: GuideSection = {
     'Booking activity shows action dates and times with its displayed timezone. Use that timezone when comparing deadlines. Older history may say Time not recorded when the original timestamp was not saved.',
   ],
 };
+const delivery: GuideSection = {
+  id: 'delivery', title: 'Delivery bookings', summary: 'Choose and check the exact delivery time and fee.',
+  steps: [
+    'Choose an available delivery date and time within the package’s earliest and latest times. Quick choices may include one hour before, thirty minutes before or at event start. No service duration is needed for delivery.',
+    'Delivery time is separate from event time. Read the date, time and displayed timezone. Working hours, existing bookings, booking notice and time to pay can make a delivery time unavailable.',
+    'Free Delivery has no delivery fee. Otherwise, review the base delivery fee and any extra weight fee before submitting. Each started extra kilogram is charged when the package uses weight charges. Delivery fees are charged once for that package booking, not once per guest.',
+    'Catering package prices are calculated per guest. Other package prices are not multiplied by the event guest count. The delivery fee is shown separately.',
+    'Payment deadlines and request expiry follow the agreed delivery time. The vendor can mark delivery complete only once that time arrives and the required payment is secured. The remaining payment follows completion.',
+    'When changing the event schedule, choose a new available delivery time for each delivery booking. The original schedule stays until the required approvals finish. Replacement packages have their own delivery times and charges.',
+  ],
+};
 const laterClient: GuideSection = {
   id: 'later-time', title: 'Vendor asks for a later time', summary: 'Choose whether to reschedule, replace or continue without.',
   steps: [
@@ -53,7 +64,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Open My Events and expand the event. Check its date, time, city, address, guests and desired services.',
         'Expand each vendor card to review its package, service timing, price, booking activity and payment status. Different vendors can be at different stages.',
         'Pull down to refresh after a payment, vendor response or schedule decision. Check notifications for updates, then open the booking to see its latest state.',
-      ] }, status, service,
+      ] }, status, service, delivery,
       { id: 'pay', title: 'Pay the down payment and remaining balance', summary: 'Use only the payment action shown on that booking.', steps: [
         'While a vendor is Pending, wait for their response. Once accepted, use Pay Down Payment if an advance is required. Check the amount and exact due date before proceeding.',
         'Choose the available payment method, enter the requested details, review and submit once. Awaiting confirmation means the payment is still pending; do not submit another payment.',
@@ -104,7 +115,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'A remaining 30-minute segment on the calendar does not mean a one-hour package can fit there. The package’s complete required window must fit inside working hours.',
         'Availability is checked again when booking. Existing reservations, blocked dates, working hours, notice and simultaneous-booking limits can affect whether a service is available.',
       ], note: 'Changing availability does not cancel an existing customer booking. Accepted bookings keep their saved payment deadline; changing notice is not a way to extend it.' },
-      service, status, timing,
+      service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
         'Open My Orders / Order Summary to accept, review schedule changes, request a later time, cancel or mark a service completed when those actions are available.',
         'Check the client, package and booked service window before responding. If acceptance is blocked for insufficient time, use Request later service time rather than treating the booking as accepted.',
@@ -126,7 +137,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Use All or a status card to filter your orders. Expand the booking and check the event, client, package, service timing, address and booking ID.',
         'Read Paid and Remaining to understand the actual payment position. A package total or earnings label is not proof that payment has been received.',
         'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
-      ] }, status, service,
+      ] }, status, service, delivery,
       { id: 'accept', title: 'Accept a new request', summary: 'Mark Processing is your acceptance action.', steps: [
         'On a Pending booking, check whether you can provide the booked service, then use Mark Processing. The app checks that there is enough time for payment and preparation.',
         'If successful, your booking becomes Processing / Accepted. The client sees the required advance and its exact deadline. Acceptance alone does not mean money has been paid.',

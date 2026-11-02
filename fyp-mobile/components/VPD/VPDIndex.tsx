@@ -1,3 +1,5 @@
+import { formatServiceOffset } from '@/utils/serviceWindowInput';
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 //vendor side detail section
 import getVendorReviews from '@/services/getAllReviewsForVendor';
 import getVendorReviewSummary from '@/services/getVendorReviewSummary';
@@ -1408,6 +1410,7 @@ const category =
 {/* DELIVERY BASED */}
 {pkg.bookingType === "DELIVERY_BASED" && (
   <View style={styles.packageInfoSection}>
+    <DeliveryDetails pkg={pkg} />
     <View style={styles.sectionTitleWithIcon}>
       <Ionicons
         name="car-outline"
@@ -1423,30 +1426,12 @@ const category =
 
     <Text style={styles.packageDetailItem}>
       Earliest Delivery:{" "}
-      {typeof pkg.serviceWindowStartOffsetMinutes ===
-      "number"
-        ? pkg.serviceWindowStartOffsetMinutes === 0
-          ? "At event time"
-          : pkg.serviceWindowStartOffsetMinutes < 0
-          ? `${Math.abs(
-              pkg.serviceWindowStartOffsetMinutes
-            )} minutes before event`
-          : `${pkg.serviceWindowStartOffsetMinutes} minutes after event`
-        : "N/A"}
+      {formatServiceOffset(pkg.serviceWindowStartOffsetMinutes)}
     </Text>
 
     <Text style={styles.packageDetailItem}>
       Latest Delivery:{" "}
-      {typeof pkg.serviceWindowEndOffsetMinutes ===
-      "number"
-        ? pkg.serviceWindowEndOffsetMinutes === 0
-          ? "At event time"
-          : pkg.serviceWindowEndOffsetMinutes < 0
-          ? `${Math.abs(
-              pkg.serviceWindowEndOffsetMinutes
-            )} minutes before event`
-          : `${pkg.serviceWindowEndOffsetMinutes} minutes after event`
-        : "N/A"}
+      {formatServiceOffset(pkg.serviceWindowEndOffsetMinutes)}
     </Text>
   </View>
 )}

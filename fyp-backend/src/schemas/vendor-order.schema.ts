@@ -44,8 +44,32 @@ export class LaterTimeRequest {
 }
 const LaterTimeRequestSchema = SchemaFactory.createForClass(LaterTimeRequest);
 
+@Schema({ _id: false })
+export class DeliverySnapshot {
+  @Prop() timeZone: string;
+  @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
+  @Prop({ min: 0 }) deliveryFee?: number;
+  @Prop() deliveryExtraWeightEnabled?: boolean;
+  @Prop({ min: 0 }) deliveryIncludedWeightKg?: number;
+  @Prop({ min: 0 }) deliveryExtraFeePerKg?: number;
+  @Prop({ min: 0 }) deliveryWeightKg?: number;
+  @Prop({ enum: ['PACKAGE', 'PER_GUEST'] }) deliveryWeightBasis?: 'PACKAGE' | 'PER_GUEST';
+  @Prop({ min: 1, max: 1440 }) deliveryReserveMinutes?: number;
+  @Prop() baseFee: number;
+  @Prop() extraFee: number;
+  @Prop() weightKg: number;
+  @Prop() totalFee: number;
+  @Prop() packageAmount: number;
+  @Prop() serviceWindowStartOffsetMinutes: number;
+  @Prop() serviceWindowEndOffsetMinutes: number;
+}
+const DeliverySnapshotSchema = SchemaFactory.createForClass(DeliverySnapshot);
+
 @Schema({ timestamps: true })
 export class VendorOrder extends Document {
+    @Prop({ type: DeliverySnapshotSchema }) delivery?: DeliverySnapshot;
+    @Prop() bookingType?: string;
+
     @Prop({ type: LaterTimeRequestSchema })
     laterTimeRequest?: LaterTimeRequest;
 

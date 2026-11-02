@@ -1,3 +1,4 @@
+import { DeliveryPackageDto } from './delivery-package.dto';
 //fyp-backend/src/vendor/dto/create-package.dto.ts
 
 import {
@@ -26,7 +27,7 @@ export class PackageDurationOptionDto {
   price: number;
 }
 
-export class PackageDto {
+export class PackageDto extends DeliveryPackageDto {
   @IsString()
   packageName: string;
 

@@ -297,6 +297,8 @@ if (
 
     return {
         verified: true,
+        delivery: vendorOrder.delivery,
+        deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
         packageName: bookedPackage?.packageName || vendorOrder.serviceName || 'N/A',
         eventTimeZone: (order?.eventCityId as any)?.timeZone || 'UTC',
 
@@ -465,6 +467,8 @@ const vendor = vendorOrder.vendorId
 return {
     vendorOrderId,
     organizerId,
+    delivery: vendorOrder.delivery,
+    deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
     vendor: {
         name: vendor?.name || null,
         brandName: vendor?.contactDetails?.brandName || null,
@@ -728,6 +732,7 @@ private buildPaymentReceiptEmail(
         vendorAddress?: string | null;
 
         categoryName?: string | null;
+        delivery?: any;
         bookingType?: string | null;
         eventTimeZone?: string | null;
         packageName?: string | null;
@@ -1045,6 +1050,7 @@ private buildPaymentReceiptEmail(
           )}
         </div>
 
+        ${data.delivery ? `<div style="margin-top:8px;">Delivery: ${data.delivery.deliveryFeeType === 'FREE' ? 'Free' : `Rs. ${money(data.delivery.baseFee)} + extra weight Rs. ${money(data.delivery.extraFee)}`}</div>` : ''}
         ${serviceTimes.map(row => `<div style="margin-top:8px;">
           <strong>${row.label}:</strong> ${this.escapeHtml(formatDateTime(row.value))}
         </div>`).join('')}
@@ -1437,6 +1443,7 @@ try {
                     null,
 
                 categoryName: (vendor.buisnessCategory as any)?.name || null,
+                delivery: (vendorOrder as any).delivery,
                 bookingType: (vendorOrder as any).bookingType || packageData?.bookingType || null,
                 eventTimeZone: (order.eventCityId as any)?.timeZone || null,
 

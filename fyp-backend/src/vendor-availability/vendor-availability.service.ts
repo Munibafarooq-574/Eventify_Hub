@@ -1,3 +1,4 @@
+import { buildDeliveryCandidates, deliveryWindow } from '../common/utils/delivery-booking';
 import { getVendorDownPaymentConfig, snapshotDownPaymentWindow } from '../common/utils/booking-payment-window';
 // fyp-backend/src/vendor-availability/vendor-availability.service.ts
 
@@ -303,6 +304,7 @@ if (!hasAccess) {
     excludeVendorOrderId?: string,
     replacementMode = false,
     eventTimeZone = 'UTC',
+    deliverySelection?: { startDateTime: string | Date; configuration?: any },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -387,7 +389,7 @@ if (!hasAccess) {
         };
       }
 
-            const bookingType = selectedPackage.bookingType;
+            const bookingType = deliverySelection?.configuration ? 'DELIVERY_BASED' : selectedPackage.bookingType;
 
       // Preserve the original event/requested start because some package
       // booking types calculate their service window relative to event start.
@@ -519,7 +521,43 @@ if (!hasAccess) {
           break;
         }
 
-        case 'DELIVERY_BASED':
+        case 'DELIVERY_BASED': {
+          const configuration = deliverySelection?.configuration || selectedPackage;
+          if (!configuration.deliveryFeeType) {
+            startDateTime = new Date(eventStartDateTime.getTime() + Number(configuration.serviceWindowStartOffsetMinutes) * 60000);
+            endDateTime = new Date(eventStartDateTime.getTime() + Number(configuration.serviceWindowEndOffsetMinutes) * 60000);
+            break;
+          }
+          if (!deliverySelection) {
+            // Discovery checks all delivery dates, but never chooses a time for checkout.
+            const earliest = new Date(eventStartDateTime.getTime() + Number(configuration.serviceWindowStartOffsetMinutes) * 60000);
+            const latest = new Date(eventStartDateTime.getTime() + Number(configuration.serviceWindowEndOffsetMinutes) * 60000);
+            const zone = await this.cityService.requireCityTimeZone(String((vendor as any).businessCityId));
+            const localKey = (date: Date) => { const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(date).map(p => [p.type,p.value])); return `${parts.year}-${parts.month}-${parts.day}`; };
+            if (!Number.isFinite(earliest.getTime()) || !Number.isFinite(latest.getTime()) || latest < earliest || latest.getTime() - earliest.getTime() > 31 * 86400000)
+              return { vendorId, available: false, reason: 'Delivery window must cover no more than 31 days.' };
+            const dates = new Set<string>();
+            for (let t = Math.max(earliest.getTime(), Date.now()); t <= latest.getTime(); t += 86400000) dates.add(localKey(new Date(t)));
+            dates.add(localKey(latest));
+            for (const date of dates) {
+              for (const slot of buildDeliveryCandidates(configuration, eventStartDateTime, date, zone).slots) {
+                if (slot.startDateTime.getTime() <= Date.now()) continue;
+                const result = await this.checkVendorAvailability(vendorId, eventStartDateTime, requestedEnd, packageId, session, excludeVendorOrderId, true, zone, { startDateTime: slot.startDateTime, configuration });
+                if (result.available) return result;
+              }
+            }
+            return { vendorId, available: false, reason: 'No delivery times are available. Please choose a later event time.' };
+          }
+          try {
+            const window = deliveryWindow(configuration, eventStartDateTime, new Date(deliverySelection.startDateTime));
+            startDateTime = window.startDateTime;
+            endDateTime = window.endDateTime;
+          } catch (error) { return { vendorId, available: false, reason: error.message }; }
+          if (startDateTime.getTime() <= Date.now()) return { vendorId, available: false, reason: 'Delivery time has passed.' };
+          // Delivery payments always need enough time, including normal checkout.
+          replacementMode = true;
+          break;
+        }
         case 'SETUP_BASED':
         case 'CUSTOM': {
           const startOffset =
@@ -852,6 +890,20 @@ return {
       };
     }));
     return { vendorId, packageId, durationMinutes: duration, slots: results };
+  }
+
+  async getDeliveryCandidates(vendorId: string, packageId: string, eventStart: Date, eventEnd: Date, timeZone: string, date?: string, excludeVendorOrderId?: string, configuration?: any) {
+    if (!Types.ObjectId.isValid(vendorId) || !Types.ObjectId.isValid(packageId)) throw new BadRequestException('Invalid vendor or package.');
+    const vendor = await this.userModel.findById(vendorId).select('role packages businessCityId').lean();
+    const pkg: any = (vendor?.packages || []).find((p: any) => String(p._id) === packageId);
+    if (!vendor || vendor.role !== 'Vendor' || !pkg || (!configuration && (pkg.isActive === false || pkg.bookingType !== 'DELIVERY_BASED'))) throw new BadRequestException('Delivery package unavailable.');
+    const config = configuration || pkg;
+    const candidates = buildDeliveryCandidates(config, eventStart, date, timeZone);
+    const slots = await Promise.all(candidates.slots.map(async slot => {
+      const result = await this.checkVendorAvailability(vendorId, eventStart, eventEnd, packageId, undefined, excludeVendorOrderId, true, timeZone, { startDateTime: slot.startDateTime, configuration: config });
+      return { ...slot, available: result.available, reason: result.reason };
+    }));
+    return { vendorId, packageId, timeZone, eventStartDateTime: eventStart, earliest: candidates.earliest, latest: candidates.latest, date: candidates.date, slots };
   }
 
     async checkMany(

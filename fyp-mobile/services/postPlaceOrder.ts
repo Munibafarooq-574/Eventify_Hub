@@ -15,6 +15,8 @@ export interface ServiceItem {
   price: number;
   packageId: string;
   durationMinutes?: number;
+  deliveryStartDateTime?: string;
+        expectedDeliveryFee?: number;
   quantity?: number;
   requiredServiceWindow?: {
     startDateTime: string;
@@ -200,6 +202,8 @@ if (!orderData.eventAddress?.trim()) {
         packageId: service.packageId,
         durationMinutes: service.durationMinutes,
         quantity: service.quantity,
+        deliveryStartDateTime: service.deliveryStartDateTime,
+        expectedDeliveryFee: service.expectedDeliveryFee,
         requiredServiceWindow:
           service.requiredServiceWindow,
         promotion: service.promotion,

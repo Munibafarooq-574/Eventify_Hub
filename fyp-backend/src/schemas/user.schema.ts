@@ -766,6 +766,15 @@ export const PackageDurationOptionSchema =
 
 @Schema()
 export class Package {
+  @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
+  @Prop({ min: 0 }) deliveryFee?: number;
+  @Prop() deliveryExtraWeightEnabled?: boolean;
+  @Prop({ min: 0 }) deliveryIncludedWeightKg?: number;
+  @Prop({ min: 0 }) deliveryExtraFeePerKg?: number;
+  @Prop({ min: 0 }) deliveryWeightKg?: number;
+  @Prop({ enum: ['PACKAGE', 'PER_GUEST'] }) deliveryWeightBasis?: 'PACKAGE' | 'PER_GUEST';
+  @Prop({ min: 1, max: 1440 }) deliveryReserveMinutes?: number;
+
   @Prop({ required: true })
   packageName: string;
 

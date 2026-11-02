@@ -1,5 +1,7 @@
 // fyp-backend/src/payment/payment.types.ts
 export interface PaymentBreakdown {
+  delivery?: any;
+  deliveryStartDateTime?: Date;
     vendorOrderId: string;
     organizerId: string;
     vendor: { name: string | null; brandName: string | null; email: string | null };

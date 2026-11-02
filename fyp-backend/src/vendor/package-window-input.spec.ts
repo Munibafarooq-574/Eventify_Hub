@@ -48,3 +48,18 @@ describe('minute offsets through booking availability', () => {
     expect(result.requiredServiceWindow.endDateTime.toISOString()).toBe('2026-10-26T18:55:00.000Z');
   });
 });
+
+describe('Delivery package settings save through existing package actions',()=>{
+ const config:any={bookingType:'DELIVERY_BASED',packageName:'Cake',services:'Cake',price:8000,deliveryFeeType:'PAID',deliveryFee:300,deliveryReserveMinutes:30,deliveryExtraWeightEnabled:true,deliveryIncludedWeightKg:1,deliveryExtraFeePerKg:100,deliveryWeightKg:1.5,deliveryWeightBasis:'PACKAGE',serviceWindowStartOffsetMinutes:-60,serviceWindowEndOffsetMinutes:0};
+ function fixture(category='Cake'){
+  const old:any={_id:'old',packageName:'Existing',price:2000,bookingType:'CUSTOM',serviceWindowStartOffsetMinutes:0,serviceWindowEndOffsetMinutes:60};
+  const user:any={buisnessCategory:'category',packages:[old],markModified:jest.fn(),save:jest.fn(async()=>user)};
+  const service:any=Object.create(VendorService.prototype);
+  const update=jest.fn(async(_filter:any,_payload:any)=>({matchedCount:1}));
+  Object.assign(service,{userModel:{findById:async()=>user,findOne:async()=>user,updateOne:update},featureAccessService:{getFeatureLimit:async()=>10},categoryModel:{findById:()=>({select:()=>({lean:async()=>({name:category})})})}});
+  return {service,user,old,update};
+ }
+ it('adds delivery settings without replacing an existing package',async()=>{const f=fixture();await f.service.addPackages('vendor',{packages:[config]});expect(f.user.packages).toHaveLength(2);expect(f.user.packages[0]).toBe(f.old);expect(f.user.packages[1]).toMatchObject(config);expect(f.user.save).toHaveBeenCalledTimes(1)});
+ it('updates only requested delivery fields and keeps existing package data',async()=>{const f=fixture();f.user.packages=[{...config,_id:'delivery'}];await f.service.updatePackage('delivery',{deliveryFee:500});expect(f.update.mock.calls[0][1]).toEqual({$set:{'packages.$.deliveryFee':500}})});
+ it('requires per-guest weight for Catering before saving',async()=>{const f=fixture('Catering');await expect(f.service.addPackages('vendor',{packages:[config]})).rejects.toThrow('per guest');expect(f.user.save).not.toHaveBeenCalled();await f.service.addPackages('vendor',{packages:[{...config,deliveryWeightBasis:'PER_GUEST',deliveryWeightKg:0.25}]});expect(f.user.packages[1].deliveryWeightBasis).toBe('PER_GUEST')});
+});

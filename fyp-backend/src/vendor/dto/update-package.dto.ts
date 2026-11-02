@@ -1,3 +1,4 @@
+import { DeliveryPackageDto } from './delivery-package.dto';
 // src/vendor/dto/update-package.dto.ts
 
 import {
@@ -26,7 +27,7 @@ export class UpdatePackageDurationOptionDto {
   price: number;
 }
 
-export class UpdatePackageDto {
+export class UpdatePackageDto extends DeliveryPackageDto {
   @IsOptional()
   @IsString()
   packageName?: string;

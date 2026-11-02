@@ -1,3 +1,5 @@
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
+import { deliveryFee } from '@/utils/deliveryBooking';
 import { clearExpiredReplacementCart } from '@/services/clearExpiredReplacementCart';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/orderreview/OrderReviewIndex.tsx
@@ -182,6 +184,7 @@ try {
         Number(pkg?.quantity || 1),
       );
 
+      totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
       totalAmount += isCatering
         ? Number(pkg?.price || 0) *
           Number(guests || 0) *
@@ -501,7 +504,7 @@ const getResolvedServiceWindow = (
 
   // TIME_SLOT_BASED must use the exact appointment selected by the client.
   // Never silently replace it with the event start time.
-  if (bookingType === 'TIME_SLOT_BASED') {
+  if (bookingType === 'TIME_SLOT_BASED' || (bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType)) {
     const chosen = pkg?.requiredServiceWindow;
     if (!chosen?.startDateTime || !chosen?.endDateTime) return null;
     const start = new Date(chosen.startDateTime);
@@ -593,12 +596,12 @@ const getPackageAmount = (
     Number(pkg?.quantity || 1),
   );
 
-  return isCatering
+  return deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee + (isCatering
     ? Number(pkg?.price || 0) *
         Number(guests || 0) *
         quantity
     : Number(pkg?.price || 0) *
-        quantity;
+        quantity);
 };
 
 
@@ -1060,6 +1063,8 @@ const isInvalidCode =
         vendorId: vendor.vendor._id,
         serviceName: pkg.packageName,
         price: Number(pkg.price),
+        deliveryStartDateTime: pkg.deliveryStartDateTime,
+        expectedDeliveryFee: pkg.deliveryFeeType ? deliveryFee(pkg,Number(pkg.quantity || 1),Number(guests || 0),!!(cateringCategory?._id && vendor?.vendor?.buisnessCategory === cateringCategory._id)).totalFee : undefined,
         packageId:
           pkg.packageId ||
           pkg._id,
@@ -1599,7 +1604,7 @@ const packages =
         start.toLocaleDateString(
           'en-GB',
           {
-            timeZone: 'Asia/Karachi',
+            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -1610,7 +1615,7 @@ const packages =
         start.toLocaleTimeString(
           'en-US',
           {
-            timeZone: 'Asia/Karachi',
+            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
@@ -1623,7 +1628,7 @@ const packages =
           ? end.toLocaleTimeString(
               'en-US',
               {
-                timeZone: 'Asia/Karachi',
+                timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
@@ -1872,7 +1877,7 @@ const packages =
                       vendor?.vendor?.buisnessCategory === cateringCategory._id;
 
                     const packagePrice = Number(pkg?.price || 0);
-                    const finalPrice = isCatering ? packagePrice * Number(guests || 0) : packagePrice;
+                    const finalPrice = (isCatering ? packagePrice * Number(guests || 0) : packagePrice) + deliveryFee(pkg,Number(pkg.quantity || 1),Number(guests || 0),!!isCatering).totalFee;
 
                     const vendorId = String(
                     vendor?.vendor?._id || '',
@@ -1917,6 +1922,7 @@ const packages =
                           )}
 
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
+                          <DeliveryDetails pkg={pkg} quantity={Number(pkg.quantity || 1)} guests={Number(guests || 0)} isCatering={!!isCatering} />
                           {String(
   pkg?.bookingType || 'DURATION_BASED',
 ).toUpperCase() !== 'DELIVERY_BASED' && (

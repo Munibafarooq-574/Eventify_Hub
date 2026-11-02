@@ -66,6 +66,8 @@ async placeOrder(
     price: number;
     packageId: string;
     durationMinutes?: number;
+    deliveryStartDateTime?: string;
+        expectedDeliveryFee?: number;
     quantity?: number;
     requiredServiceWindow?: {
         startDateTime: string;
@@ -249,6 +251,18 @@ async getOrderStats(
 
 
     // Phase 13B — Client requests a date/time change.
+    @Get(':id/delivery-context')
+    @UseGuards(JwtAuthGuard)
+    deliveryContext(@Param('id') id: string, @Request() req: any) {
+        return this.orderService.getDeliveryRescheduleContext(id, req.user.id).then(({ bookings }) => bookings.map(b => ({ _id:b._id, serviceName:b.serviceName })));
+    }
+
+    @Post(':id/delivery-candidates')
+    @UseGuards(JwtAuthGuard)
+    rescheduleDeliveryCandidates(@Param('id') id: string, @Request() req: any, @Body() dto: any) {
+        return this.orderService.getRescheduleDeliveryCandidates(id,req.user.id,dto);
+    }
+
     @Post(':id/reschedule')
     @UseGuards(JwtAuthGuard)
     async requestReschedule(

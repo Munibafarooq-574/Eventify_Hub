@@ -1,3 +1,4 @@
+import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -660,7 +661,7 @@ user.vendorApprovalStatus =
 
   return user.save();
 }
-private validatePackageBookingConfiguration(pkg: {
+private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
   bookingType?: PackageBookingType;
   requiredServiceDurationMinutes?: number;
   serviceWindowStartOffsetMinutes?: number;
@@ -713,6 +714,8 @@ private validatePackageBookingConfiguration(pkg: {
       return;
 
     case PackageBookingType.DELIVERY_BASED:
+      validateDeliveryConfiguration(pkg);
+      if (pkg.deliveryFeeType && pkg.serviceWindowEndOffsetMinutes! - pkg.serviceWindowStartOffsetMinutes! > 31 * 1440) throw new BadRequestException("Choose a delivery window of up to 31 days.");
       if (!hasValidWindow) {
         throw new BadRequestException(
           'DELIVERY_BASED packages require a valid service window where start offset is less than or equal to end offset.',
@@ -746,6 +749,12 @@ private validatePackageBookingConfiguration(pkg: {
       throw new BadRequestException('Invalid package booking type.');
   }
 }
+private async validateDeliveryWeightBasis(pkg: DeliveryConfiguration & { bookingType?: PackageBookingType }, user: User) {
+  if (pkg.bookingType !== PackageBookingType.DELIVERY_BASED || pkg.deliveryFeeType !== 'PAID' || !pkg.deliveryExtraWeightEnabled) return;
+  const category = await this.categoryModel.findById(user.buisnessCategory).select('name normalizedName').lean();
+  const isCatering = String((category as any)?.normalizedName || category?.name || '').toLowerCase().includes('catering');
+  quoteDelivery(pkg, 1, 1, isCatering);
+}
 async addPackages(
     userId: string,
     createPackagesDto: CreatePackagesDto,
@@ -776,10 +785,12 @@ async addPackages(
 
         for (const pkg of createPackagesDto.packages) {
       this.validatePackageBookingConfiguration(pkg);
+      await this.validateDeliveryWeightBasis(pkg, user);
     }
 
     // Normalize new packages so they always match the Package schema
     const newPackages = createPackagesDto.packages.map((pkg) => ({
+        ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, pkg[field]])),
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
@@ -1298,6 +1309,7 @@ async updatePackage(
     }
 
         const mergedBookingConfiguration = {
+      ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, updateDto[field] ?? existingPackage[field]])),
       bookingType:
         updateDto.bookingType ??
         existingPackage.bookingType,
@@ -1318,6 +1330,7 @@ async updatePackage(
     this.validatePackageBookingConfiguration(
       mergedBookingConfiguration,
     );
+    await this.validateDeliveryWeightBasis(mergedBookingConfiguration, user);
     
     // Prevent image-upload bypass through PATCH.
     // Existing/smaller image lists are allowed.
@@ -1375,6 +1388,9 @@ async updatePackage(
             updateDto.serviceWindowStartOffsetMinutes;
     }
 
+    for (const field of DELIVERY_FIELDS) {
+      if (updateDto[field] !== undefined) updatePayload[`packages.$.${field}`] = updateDto[field];
+    }
     if (updateDto.serviceWindowEndOffsetMinutes !== undefined) {
         updatePayload['packages.$.serviceWindowEndOffsetMinutes'] =
             updateDto.serviceWindowEndOffsetMinutes;

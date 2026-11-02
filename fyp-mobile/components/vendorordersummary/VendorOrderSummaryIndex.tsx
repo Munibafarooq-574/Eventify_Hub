@@ -1,3 +1,5 @@
+import { deliveryDateTime } from '@/utils/deliveryBooking';
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { formatBookingActivityTime } from '@/utils/bookingActivity';
 import BookingUserGuide from '../guides/BookingUserGuide';
 import BookingActivity from '../booking/BookingActivity';
@@ -790,6 +792,7 @@ const OrderSummary = () => {
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New start time: {formatScheduleTime(request.newStartTime)}
                                                                 </Text>
+                                                                {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleLine}>New delivery date &amp; time: {deliveryDateTime(request.newServiceStartDateTime,item.eventCityId?.timeZone || 'UTC')}</Text>}
                                                                 <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
                                                                 <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, item.eventCityId?.timeZone)}</Text>
                                                                 <Text style={styles.rescheduleReason}>Times shown in {item.eventCityId?.timeZone || 'your device timezone'}</Text>
@@ -882,8 +885,8 @@ const OrderSummary = () => {
                                                               <View key={service?._id || idx} style={styles.serviceDetailCard}>
                                                                 <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text>
+                                                                {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text></>}
                                                                 <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
                                                                 <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
                                                                 <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>

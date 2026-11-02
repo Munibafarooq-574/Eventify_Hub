@@ -1,3 +1,4 @@
+import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import BookingUserGuide from '../guides/BookingUserGuide';
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
@@ -875,8 +876,8 @@ renderItem={({ item }) => {
                     <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.vendorDetailCard}>
                       <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
                       <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
-                      <Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
-                      <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text>
+                      {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
+                      <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text></>}
                       <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>
                       <Text style={styles.expandedText}>Paid: Rs. {paid}</Text>
                       <Text style={styles.expandedText}>Remaining: Rs. {remaining}</Text>

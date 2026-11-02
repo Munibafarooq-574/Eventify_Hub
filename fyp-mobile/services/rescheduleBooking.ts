@@ -32,6 +32,7 @@ export async function requestEventReschedule(
     eventTime: string;
     durationMinutes: number;
     reason?: string;
+    deliveryTimes?: Record<string,string>;
   },
 ) {
   try {

@@ -61,6 +61,14 @@ setAvailability(
     );
   }
 
+  @Post('delivery-candidates')
+  async deliveryCandidates(@Body() dto: { vendorId: string; packageId: string; eventCityId: string; eventDate: string; eventStartTime: string; eventDurationMinutes: number; deliveryDate?: string }) {
+    if (!dto || !/^\d{4}-\d{2}-\d{2}$/.test(dto.eventDate || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(dto.eventStartTime || '') || !Number.isSafeInteger(dto.eventDurationMinutes) || dto.eventDurationMinutes < 1 || dto.eventDurationMinutes > 1440 || (dto.deliveryDate && !/^\d{4}-\d{2}-\d{2}$/.test(dto.deliveryDate))) throw new BadRequestException('Select a valid event and delivery date.');
+    const zone = await this.cityService.requireCityTimeZone(dto.eventCityId);
+    const start = eventLocalToUtc(dto.eventDate, dto.eventStartTime, zone);
+    return this.service.getDeliveryCandidates(dto.vendorId, dto.packageId, start, new Date(start.getTime() + dto.eventDurationMinutes * 60000), zone, dto.deliveryDate);
+  }
+
   @Post('appointment-candidates')
   async appointmentCandidates(
     @Body() dto: {

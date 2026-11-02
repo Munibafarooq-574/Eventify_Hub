@@ -4,6 +4,7 @@ export interface CreateRescheduleRequestDto {
   eventTime: string;
   durationMinutes: number;
   reason: string;
+  deliveryTimes?: Record<string, string>;
 }
 
 export interface RespondRescheduleRequestDto {

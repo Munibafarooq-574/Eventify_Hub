@@ -1,7 +1,9 @@
+import DeliveryTimePicker from '@/components/booking/DeliveryTimePicker';
+import { growthApi } from '@/services/growthApiClient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -59,7 +61,21 @@ export default function ClientRescheduleScreen() {
   const [showTime, setShowTime] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [deliveryBookings,setDeliveryBookings] = useState<any[]>([]);
+  const [deliveryTimes,setDeliveryTimes] = useState<Record<string,string>>({});
+  const [deliveryLoading,setDeliveryLoading] = useState(true);
+  const [deliveryError,setDeliveryError] = useState('');
+  useEffect(() => {
+    let active = true;
+    growthApi.get<any[]>(`/orders/${params.orderId}/delivery-context`).then(result => {if(active)setDeliveryBookings(result);}).catch(() => {if(active)setDeliveryError('Delivery details could not be checked. Please return to your event and try again.');}).finally(() => {if(active)setDeliveryLoading(false);});
+    return () => {active=false;};
+  },[params.orderId]);
+  const newDateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  const newTimeKey = `${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
+
   const submit = async () => {
+    if (deliveryLoading || deliveryError) return Alert.alert('Please wait',deliveryError || 'Checking delivery details.');
+    if (deliveryBookings.some(b => !deliveryTimes[String(b._id)])) return Alert.alert('Choose delivery times','Select an available delivery time for each delivery package.');
     const durationMinutes = Number(duration);
     if (!params.orderId) return Alert.alert('Error', 'Booking ID is missing.');
     if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
@@ -88,6 +104,7 @@ export default function ClientRescheduleScreen() {
         eventTime,
         durationMinutes,
         reason: reason.trim(),
+        deliveryTimes,
       });
 
       Alert.alert(
@@ -223,6 +240,12 @@ export default function ClientRescheduleScreen() {
             </View>
           </View>
 
+          {deliveryLoading && <ActivityIndicator color={PRIMARY} />}
+          {!!deliveryError && <Text style={styles.warningText}>{deliveryError}</Text>}
+          {deliveryBookings.map(booking => <View key={booking._id} style={styles.card}>
+            <Text style={styles.cardTitle}>{booking.serviceName} · New delivery time</Text>
+            <DeliveryTimePicker orderId={params.orderId} vendorOrderId={String(booking._id)} eventDate={newDateKey} eventStartTime={newTimeKey} eventDurationMinutes={Number(duration)} onChange={slot => setDeliveryTimes(current => ({...current,[String(booking._id)]:slot?.startDateTime || ''}))} />
+          </View>)}
           {/* Reason card */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
