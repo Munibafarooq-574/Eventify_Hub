@@ -688,19 +688,25 @@ useEffect(() => {
   if (!isEventMode || !vendorData?._id || pkg?.bookingType !== 'TIME_SLOT_BASED') return;
   const date = String(Array.isArray(eventDate) ? eventDate[0] : eventDate || '');
   const time = String(Array.isArray(startTime) ? startTime[0] : startTime || '');
-  const city = String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || '');
-  if (!date || !time || !city || !Number(durationMinutes)) return;
+  const routeCity = String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || '');
+  if (!date || !time || !Number(durationMinutes)) return;
   setAppointmentLoading(true);
-  getTimeSlotAppointments({
-    vendorId: String(vendorData._id),
-    packageId: String(pkg._id),
-    eventCityId: city,
-    eventDate: date,
-    eventStartTime: time,
-    eventDurationMinutes: Number(durationMinutes),
-  }).then(result => {
+  (async () => {
+    const context = routeCity ? null : await getMarketplaceEventContext();
+    const city = routeCity || context?.eventCityId || '';
+    if (!city) throw new Error('Event city is required for appointment availability');
+    return getTimeSlotAppointments({
+      vendorId: String(vendorData._id),
+      packageId: String(pkg._id),
+      eventCityId: city,
+      eventDate: date,
+      eventStartTime: time,
+      eventDurationMinutes: Number(durationMinutes),
+    });
+  })().then(result => {
     if (active) setAppointmentSlots(result.slots || []);
-  }).catch(() => {
+  }).catch(error => {
+    reportMarketplaceLoadError('Appointment availability unavailable:', error);
     if (active) setAppointmentSlots([]);
   }).finally(() => {
     if (active) setAppointmentLoading(false);
@@ -4727,8 +4733,10 @@ const serviceCityNamesFromIds =
           {selectedPackage.bookingType === 'TIME_SLOT_BASED' && (
             <View style={styles.packageInfoSection}>
               <Text style={{ color: PRIMARY, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Select Appointment Slot</Text>
-              {appointmentLoading ? <ActivityIndicator color={PRIMARY} /> : appointmentSlots.length === 0 ? (
-                <Text style={{ color: '#777' }}>No appointment options available for this event.</Text>
+              {!isEventMode ? (
+                <Text style={{ color: '#777' }}>Plan an event to select an appointment time for this package.</Text>
+              ) : appointmentLoading ? <ActivityIndicator color={PRIMARY} /> : appointmentSlots.length === 0 ? (
+                <Text style={{ color: '#777' }}>No appointment options available for the selected event time.</Text>
               ) : (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {appointmentSlots.map(slot => {
