@@ -19,13 +19,11 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
         ['Weight unit',DELIVERY_WEIGHT_UNITS.find(u => u.value === unit)?.label || unit],
         ['Weight covered',`${weight(Number(d.deliveryIncludedWeightKg || 0))} ${unit}`],
         ['Extra fee',`Rs. ${rate} per additional ${unit}`],
-        ['Weight measured',d.deliveryWeightBasis === 'PER_GUEST' ? 'Per guest (Catering)' : 'Per package'],
-        ['Delivery weight',`${weight(Number(d.deliveryWeightKg || 0))} ${unit}`],
       ] : []),
       ['Time reserved',`${formatDeliveryReserve(d.deliveryReserveMinutes)} per delivery`],
     ];
     return <View style={s.card}>
-      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><View style={s.titleGroup}><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /></View><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
+      <View style={s.header}><View style={s.titleGroup}><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /></View><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
       {rows.map(([label,value]) => <View key={label} style={s.row}><Text style={s.label}>{label}</Text><Text style={s.value}>{value}</Text></View>)}
     </View>;
   }
