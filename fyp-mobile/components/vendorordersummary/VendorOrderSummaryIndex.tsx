@@ -733,6 +733,17 @@ const OrderSummary = () => {
                                                 )}
                                                 {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatTimeOnly(item.eventStartDateTime)}</Text></View>}
                                                 {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatTimeOnly(item.eventEndDateTime)}</Text></View>}
+                                                {(item.vendorOrders || []).filter((service: any) => {
+                                                    const packages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
+                                                    const pkg = packages.find((p: any) => String(p?._id || p?.id) === String(service?.packageId || ''));
+                                                    return String(pkg?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED'
+                                                        && service?.eventStartDateTime && service?.eventEndDateTime;
+                                                }).map((service: any, index: number) => (
+                                                    <View key={String(service?._id || index)} style={styles.detailRow}>
+                                                        <Ionicons name="time-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Appointment Time: {formatTimeOnly(service.eventStartDateTime)} - {formatTimeOnly(service.eventEndDateTime)}</Text>
+                                                    </View>
+                                                ))}
                                                 {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
 
                                                 {getVendorStatus(item) === "no_longer_assigned" && (() => {
@@ -871,8 +882,8 @@ const OrderSummary = () => {
                                                               <View key={service?._id || idx} style={styles.serviceDetailCard}>
                                                                 <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>Start Time: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>End Time: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
                                                                 <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
                                                                 <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>
