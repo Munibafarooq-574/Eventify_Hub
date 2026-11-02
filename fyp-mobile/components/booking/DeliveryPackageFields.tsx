@@ -40,9 +40,7 @@ export default function DeliveryPackageFields({ value, onChange }: { value: Deli
         <View style={s.row}>{DELIVERY_WEIGHT_UNITS.map(option => <TouchableOpacity key={option.value} accessibilityRole="radio" accessibilityState={{checked:unit === option.value}} style={[s.option,unit === option.value && s.active]} onPress={() => set({deliveryWeightUnit:option.value})}><Text style={s.label}>{option.label}</Text></TouchableOpacity>)}</View>
         {number(`Weight covered by delivery fee (${unit})`,'deliveryIncludedWeightKg','This is the weight included in the base delivery fee. Extra weight charges start only above this amount.')}
         {number(`Extra fee per additional ${unit} (Rs.)`,'deliveryExtraFeePerKg',`Each started additional ${unit} is charged. For example, 1.5 ${unit} counts as 1 extra ${unit} above a 1 ${unit} allowance.`)}
-        <View style={s.heading}><Text style={s.label}>Delivery weight is measured</Text><InfoHelp title="Delivery weight is measured" message="Per package uses the weight of one package. Per guest is for Catering and uses the weight for each guest. The base delivery fee is still charged once." /></View>
-        <View style={s.row}>{(['PACKAGE','PER_GUEST'] as const).map(basis => <TouchableOpacity key={basis} style={[s.option,value.deliveryWeightBasis === basis && s.active]} onPress={() => set({deliveryWeightBasis:basis})}><Text style={s.label}>{basis === 'PACKAGE' ? 'Per package' : 'Per guest (Catering)'}</Text></TouchableOpacity>)}</View>
-        {number(value.deliveryWeightBasis === 'PER_GUEST' ? `Delivery weight per guest (${unit})` : `Delivery weight per package (${unit})`,'deliveryWeightKg','Enter the weight to be delivered, using the selected unit and per-package or per-guest option.')}
+
       </>}
     </>}
     {number('Time reserved for each delivery','deliveryReserveMinutes','Choose how long you need for a delivery. This time must fit within your working hours. Customers only choose the delivery time. Choose Minutes or Hours; for example, 1 hour reserves the same time as 60 minutes.')}
