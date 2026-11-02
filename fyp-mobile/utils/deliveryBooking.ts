@@ -29,7 +29,7 @@ export function deliverySettingsError(d: DeliverySettings) {
   if (!Number.isSafeInteger(Number(d.deliveryReserveMinutes)) || Number(d.deliveryReserveMinutes) < 1 || Number(d.deliveryReserveMinutes) > 1440) return 'Enter a reserve time from 1 minute to 24 hours, in whole minutes.';
   if (d.deliveryFeeType === 'FREE') return '';
   if (!(Number(d.deliveryFee) > 0)) return 'Enter the delivery fee.';
-  if (d.deliveryExtraWeightEnabled && ![d.deliveryIncludedWeightKg,d.deliveryExtraFeePerKg,d.deliveryWeightKg].every(n => Number(n) > 0)) return 'Enter covered weight, extra fee and delivery weight.';
+  if (d.deliveryExtraWeightEnabled && ![d.deliveryIncludedWeightKg,d.deliveryExtraFeePerKg].every(n => Number(n) > 0)) return 'Enter covered weight and extra fee.';
   return '';
 }
 export function deliveryFee(pkg: DeliverySettings, quantity = 1, guests = 1, isCatering = false) {
