@@ -30,10 +30,10 @@ export default function DeliveryPackageFields({ value, onChange }: { value: Deli
     </View>;
   };
   return <View style={s.card}>
-    <View style={[s.heading,{marginBottom:8}]}><Text style={s.title}>Delivery charges</Text><InfoHelp title="Delivery charges" message="Choose Free Delivery for no extra delivery fee. Customers will see a Free Delivery badge. Otherwise, enter a delivery fee. It is charged once for this booking, not once per guest." /></View>
+    <View style={[s.heading,{marginBottom:8}]}><Text style={s.title}>Delivery charges</Text><InfoHelp title="Delivery charges" message="Choose Free Delivery for no extra delivery fee. Customers will see a Free Delivery badge. Otherwise, enter a delivery fee. It is charged once for this booking." /></View>
     <View style={s.row}>{(['FREE','PAID'] as const).map(type => <TouchableOpacity key={type} accessibilityRole="radio" accessibilityState={{ checked:value.deliveryFeeType === type }} style={[s.option,value.deliveryFeeType === type && s.active]} onPress={() => set({ deliveryFeeType:type, ...(type === 'FREE' ? { deliveryFee:0, deliveryExtraWeightEnabled:false } : {}) })}><Text style={s.label}>{type === 'FREE' ? 'Free Delivery' : 'Delivery Charges'}</Text></TouchableOpacity>)}</View>
     {value.deliveryFeeType === 'PAID' && <>
-      {number('Base delivery fee (Rs.)','deliveryFee','Charged once for this booking, not once per guest.')}
+      {number('Base delivery fee (Rs.)','deliveryFee','Charged once for this booking.')}
       <View style={s.row}><View style={[s.heading,{flex:1,minWidth:0}]}><Text style={[s.label,{flexShrink:1}]}>Extra charges for additional weight</Text><InfoHelp title="Extra charges for additional weight" message="Turn this on to charge extra when the delivery weight exceeds the weight covered by the base fee. Each started additional unit is charged at your selected rate." /></View><Switch value={!!value.deliveryExtraWeightEnabled} onValueChange={v => set({deliveryExtraWeightEnabled:v})} trackColor={{true:'#7B2869'}} /></View>
       {value.deliveryExtraWeightEnabled && <>
         <View style={s.heading}><Text style={s.label}>Weight unit</Text><InfoHelp title="Weight unit" message="Choose kg, g, lb or oz. Changing units converts the weights and rate. Review the values before saving." /></View>
