@@ -4734,7 +4734,7 @@ const serviceCityNamesFromIds =
             <View style={styles.packageInfoSection}>
               <Text style={{ color: PRIMARY, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Select Appointment Slot</Text>
               {!isEventMode ? (
-                <Text style={{ color: '#777' }}>Plan an event to select an appointment time for this package.</Text>
+                <Text style={{ color: '#777' }}>{isOwnerView ? 'Clients select their appointment time based on their event schedule.' : 'Plan an event to select an appointment time for this package.'}</Text>
               ) : appointmentLoading ? <ActivityIndicator color={PRIMARY} /> : appointmentSlots.length === 0 ? (
                 <Text style={{ color: '#777' }}>No appointment options available for the selected event time.</Text>
               ) : (
