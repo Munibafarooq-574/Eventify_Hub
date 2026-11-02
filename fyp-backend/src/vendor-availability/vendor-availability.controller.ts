@@ -74,8 +74,8 @@ setAvailability(
   ) {
     if (
       !dto || !dto.vendorId || !dto.packageId || !dto.eventCityId ||
-      !/^\\d{4}-\\d{2}-\\d{2}$/.test(dto.eventDate ?? '') ||
-      !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(dto.eventStartTime ?? '') ||
+      !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dto.eventDate ?? '') ||
+      !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(dto.eventStartTime ?? '') ||
       !Number.isSafeInteger(dto.eventDurationMinutes) ||
       dto.eventDurationMinutes < 1 || dto.eventDurationMinutes > 1440
     ) {
