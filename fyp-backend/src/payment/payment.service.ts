@@ -1,3 +1,4 @@
+import { displayDeliveryWeight } from '../common/utils/delivery-booking';
 import { effectiveDownPaymentDeadline, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue, servicePaymentCutoff } from '../common/utils/booking-payment-window';
 import { ClientSession } from 'mongoose';
 import {
@@ -1051,6 +1052,7 @@ private buildPaymentReceiptEmail(
         </div>
 
         ${data.delivery ? `<div style="margin-top:8px;">Delivery: ${data.delivery.deliveryFeeType === 'FREE' ? 'Free' : `Rs. ${money(data.delivery.baseFee)} + extra weight Rs. ${money(data.delivery.extraFee)}`}</div>` : ''}
+        ${data.delivery?.deliveryFeeType === 'PAID' && data.delivery.deliveryExtraWeightEnabled ? `<div style="margin-top:8px;">Delivery weight: ${displayDeliveryWeight(data.delivery.weightKg, data.delivery.deliveryWeightUnit)} ${data.delivery.deliveryWeightUnit || 'kg'}</div>` : ''}
         ${serviceTimes.map(row => `<div style="margin-top:8px;">
           <strong>${row.label}:</strong> ${this.escapeHtml(formatDateTime(row.value))}
         </div>`).join('')}

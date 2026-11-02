@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
 export interface DeliveryConfiguration {
+  deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   deliveryFeeType?: 'FREE' | 'PAID';
   deliveryFee?: number;
   deliveryExtraWeightEnabled?: boolean;
@@ -10,11 +11,21 @@ export interface DeliveryConfiguration {
   deliveryWeightBasis?: 'PACKAGE' | 'PER_GUEST';
   deliveryReserveMinutes?: number;
 }
-export const DELIVERY_FIELDS = ['deliveryFeeType', 'deliveryFee', 'deliveryExtraWeightEnabled',
+export const DELIVERY_FIELDS = ['deliveryWeightUnit', 'deliveryFeeType', 'deliveryFee', 'deliveryExtraWeightEnabled',
   'deliveryIncludedWeightKg', 'deliveryExtraFeePerKg', 'deliveryWeightKg',
   'deliveryWeightBasis', 'deliveryReserveMinutes'] as const;
 
+export function deliveryUnitKg(unit = 'kg'): number {
+  const factor = { kg:1, g:0.001, lb:0.45359237, oz:0.028349523125 }[unit];
+  if (!factor) throw new BadRequestException('Choose kg, g, lb or oz for delivery weight.');
+  return factor;
+}
+export function displayDeliveryWeight(kg: number, unit = 'kg'): number {
+  return Number((kg / deliveryUnitKg(unit)).toFixed(6));
+}
+
 export function validateDeliveryConfiguration(pkg: DeliveryConfiguration) {
+  deliveryUnitKg(pkg.deliveryWeightUnit);
   if (!pkg.deliveryFeeType) return; // Legacy packages retain their agreed price/window.
   if (!['FREE', 'PAID'].includes(pkg.deliveryFeeType)) throw new BadRequestException('Choose Free Delivery or Delivery Charges.');
   if (!Number.isSafeInteger(pkg.deliveryReserveMinutes) || pkg.deliveryReserveMinutes! < 1 || pkg.deliveryReserveMinutes! > 1440)
@@ -38,9 +49,10 @@ export function quoteDelivery(pkg: DeliveryConfiguration, quantity = 1, guests =
     throw new BadRequestException(isCatering ? 'Set delivery weight per guest for this catering package.' : 'Set delivery weight per package.');
   const weightKg = weighted ? Number(pkg.deliveryWeightKg) * quantity * (isCatering ? guests : 1) : 0;
   const baseFee = paid ? Number(pkg.deliveryFee) : 0;
-  // Round weight difference before ceil to avoid floating point charging a spurious kg.
-  const extraKg = weighted ? Math.ceil(Math.max(0, Number((weightKg - Number(pkg.deliveryIncludedWeightKg)).toFixed(6)))) : 0;
-  const extraFee = Math.round(extraKg * Number(pkg.deliveryExtraFeePerKg || 0) * 100) / 100;
+  const unitKg = deliveryUnitKg(pkg.deliveryWeightUnit);
+  // Round before ceil so conversion noise never adds another billing unit.
+  const extraUnits = weighted ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
+  const extraFee = Math.round(extraUnits * Number(pkg.deliveryExtraFeePerKg || 0) * unitKg * 100) / 100;
   return { baseFee, extraFee, weightKg, totalFee: baseFee + extraFee };
 }
 

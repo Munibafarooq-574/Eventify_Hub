@@ -46,6 +46,7 @@ const LaterTimeRequestSchema = SchemaFactory.createForClass(LaterTimeRequest);
 
 @Schema({ _id: false })
 export class DeliverySnapshot {
+  @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop() timeZone: string;
   @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
   @Prop({ min: 0 }) deliveryFee?: number;

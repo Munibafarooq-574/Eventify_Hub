@@ -1,3 +1,4 @@
+import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import DeliveryPackageFields from '@/components/booking/DeliveryPackageFields';
 import { deliveryWindowExample, defaultDelivery, deliverySettings, deliverySettingsError, DeliverySettings } from '@/utils/deliveryBooking';
@@ -2425,7 +2426,7 @@ if (!userId) {
           allowCustomDuration) && (
           <View style={styles.previewCard}>
             <Text style={styles.previewTag}>
-              PREVIEW
+              PACKAGE PREVIEW
             </Text>
 
             <View
@@ -2433,7 +2434,7 @@ if (!userId) {
             >
               <Text
                 style={styles.previewName}
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {packageName ||
                   "Package Name"}
@@ -3306,89 +3307,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  previewCard: {
-    backgroundColor: "#FDF3FA",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#F0DCEB",
-    padding: 16,
-    marginBottom: 20,
-  },
-
-  previewTag: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#B589A6",
-    letterSpacing: 1,
-    marginBottom: 7,
-  },
-
-  previewRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  previewName: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#221A20",
-    flex: 1,
-    marginRight: 8,
-  },
-
-  previewPrice: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#7B2869",
-  },
-
-  previewDescription: {
-    fontSize: 12.5,
-    color: "#71616C",
-    marginTop: 8,
-    lineHeight: 18,
-  },
-
-  previewServices: {
-    fontSize: 12.5,
-    color: "#8A7A85",
-    marginTop: 7,
-    lineHeight: 18,
-  },
-
-  previewDurationSection: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F0DCEB",
-  },
-
-  previewSectionTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#7B2869",
-    marginBottom: 7,
-  },
-
-  previewDurationRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 5,
-  },
-
-  previewDurationText: {
-    fontSize: 12.5,
-    color: "#4F3D49",
-    fontWeight: "600",
-  },
-
-  previewDurationPrice: {
-    fontSize: 12.5,
-    color: "#7B2869",
-    fontWeight: "800",
-  },
+  ...packagePreviewStyles,
 
   previewCustomBox: {
     marginTop: 10,

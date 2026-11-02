@@ -22,3 +22,29 @@ describe('Delivery fields persist and validate on create and edit',()=>{
  it.each([PackageDto,UpdatePackageDto])('rejects invalid inherited delivery fields',async (Dto:any)=>{const value=plainToInstance(Dto,{packageName:'Cake',services:'Cake',deliveryFeeType:'OTHER',deliveryReserveMinutes:0,deliveryFee:-1});const errors=await validate(value as object);expect(errors.map(e=>e.property)).toEqual(expect.arrayContaining(['deliveryFeeType','deliveryReserveMinutes','deliveryFee']))});
  it('retains the agreed delivery settings, amount and timezone in the booking schema',()=>{const Order=model<VendorOrder>('DeliverySnapshotTest',VendorOrderSchema);const doc=new Order({bookingType:'DELIVERY_BASED',delivery:{...pkg,baseFee:300,extraFee:100,weightKg:1.5,totalFee:400,packageAmount:8000,timeZone:'Asia/Karachi'}});const saved=doc.toObject();expect(saved.delivery).toMatchObject({deliveryFeeType:'PAID',deliveryReserveMinutes:30,baseFee:300,extraFee:100,packageAmount:8000,timeZone:'Asia/Karachi',serviceWindowStartOffsetMinutes:-60});expect(saved.bookingType).toBe('DELIVERY_BASED')});
 });
+
+import { deliveryUnitKg, displayDeliveryWeight } from './delivery-booking';
+describe('Selected delivery weight unit',()=>{
+ it.each(['kg','g','lb','oz'])('charges started additional %s units while storing kg weights',unit=>{
+  const factor=deliveryUnitKg(unit);
+  const selected:any={...pkg,deliveryWeightUnit:unit,deliveryIncludedWeightKg:2*factor,deliveryWeightKg:3*factor,deliveryExtraFeePerKg:100/factor};
+  expect(quoteDelivery(selected)).toMatchObject({baseFee:300,extraFee:100,totalFee:400});
+  expect(quoteDelivery({...selected,deliveryWeightKg:3.5*factor}).extraFee).toBe(200);
+  expect(quoteDelivery({...selected,deliveryWeightKg:2*factor+factor*1e-10}).extraFee).toBe(0);
+  expect(quoteDelivery({...selected,deliveryFeeType:'FREE'}).totalFee).toBe(0);
+  expect(displayDeliveryWeight(3*factor,unit)).toBe(3);
+ });
+ it('preserves legacy kg pricing and rejects unknown units',()=>{
+  expect(quoteDelivery(pkg).totalFee).toBe(300);
+  expect(()=>quoteDelivery({...pkg,deliveryWeightUnit:'stone'} as any)).toThrow('kg, g, lb or oz');
+ });
+ it('uses per-guest weight for Catering without multiplying the base delivery fee',()=>{
+  const factor=deliveryUnitKg('lb');
+  const result=quoteDelivery({...pkg,deliveryWeightUnit:'lb',deliveryWeightBasis:'PER_GUEST',deliveryWeightKg:0.5*factor,deliveryIncludedWeightKg:2*factor,deliveryExtraFeePerKg:100/factor},1,6,true);
+  expect(result).toMatchObject({baseFee:300,extraFee:100,totalFee:400});
+ });
+ it('keeps selected unit with the booking snapshot',()=>{
+  const Order=model<VendorOrder>('DeliveryUnitSnapshotTest',VendorOrderSchema);
+  expect(new Order({delivery:{deliveryWeightUnit:'lb'}}).toObject().delivery?.deliveryWeightUnit).toBe('lb');
+ });
+});

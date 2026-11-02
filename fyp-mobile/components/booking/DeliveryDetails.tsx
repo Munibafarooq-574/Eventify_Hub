@@ -1,25 +1,51 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import { deliveryFee, deliveryDateTime } from '@/utils/deliveryBooking';
+import { View, Text, StyleSheet } from 'react-native';
+import { deliveryFee, deliveryDateTime, displayDeliveryWeight, displayDeliveryRate, DELIVERY_WEIGHT_UNITS } from '@/utils/deliveryBooking';
 export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCatering = false, timeZone = 'UTC', showConfiguration = false }: { pkg:any; quantity?:number; guests?:number; isCatering?:boolean; timeZone?:string; showConfiguration?:boolean }) {
   const d = pkg.delivery || pkg;
   if (!d.deliveryFeeType || (pkg.bookingType && pkg.bookingType !== 'DELIVERY_BASED')) return null;
+  const unit = d.deliveryWeightUnit || 'kg';
+  const weight = (kg:number) => displayDeliveryWeight(kg,unit).toLocaleString();
+  const rate = displayDeliveryRate(Number(d.deliveryExtraFeePerKg || 0),unit).toLocaleString();
   const fees = pkg.delivery || deliveryFee(d,quantity,guests,isCatering);
   const booked = !!pkg.delivery || !!pkg.deliveryStartDateTime;
   const selected = pkg.deliveryStartDateTime || pkg.requiredServiceWindow?.startDateTime || pkg.eventStartDateTime;
+  if (showConfiguration) {
+    const paid = d.deliveryFeeType === 'PAID';
+    const rows = [
+      ...(paid ? [['Base delivery fee',`Rs. ${Number(fees.baseFee).toLocaleString()}`],['Extra weight charges',d.deliveryExtraWeightEnabled ? 'On' : 'Off']] : []),
+      ...(paid && d.deliveryExtraWeightEnabled ? [
+        ['Weight unit',DELIVERY_WEIGHT_UNITS.find(u => u.value === unit)?.label || unit],
+        ['Weight covered',`${weight(Number(d.deliveryIncludedWeightKg || 0))} ${unit}`],
+        ['Extra fee',`Rs. ${rate} per additional ${unit}`],
+        ['Weight measured',d.deliveryWeightBasis === 'PER_GUEST' ? 'Per guest (Catering)' : 'Per package'],
+        ['Delivery weight',`${weight(Number(d.deliveryWeightKg || 0))} ${unit}`],
+      ] : []),
+      ['Time reserved',`${d.deliveryReserveMinutes || 0} minutes per delivery`],
+    ];
+    return <View style={s.card}>
+      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><Text style={s.title}>Delivery details</Text><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
+      {rows.map(([label,value]) => <View key={label} style={s.row}><Text style={s.label}>{label}</Text><Text style={s.value}>{value}</Text></View>)}
+      {paid && d.deliveryExtraWeightEnabled && <Text style={s.note}>Each started additional {unit} is charged at the shown rate.</Text>}
+    </View>;
+  }
   return <View style={{marginVertical:8,gap:4}}>
-    {showConfiguration && <Text style={{color:"#68225D",fontWeight:"700"}}>Delivery charges</Text>}
-    {pkg.delivery && <Text style={{color:"#68225D"}}>Package amount: Rs. {Number(d.packageAmount).toLocaleString()}</Text>}
+    {pkg.delivery && <Text style={{color:'#68225D'}}>Package amount: Rs. {Number(d.packageAmount).toLocaleString()}</Text>}
     {d.deliveryFeeType === 'FREE' ? <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',alignSelf:'flex-start',borderRadius:8,paddingHorizontal:10,paddingVertical:5,fontWeight:'700'}}>Free Delivery</Text> : <>
       <Text style={{color:'#68225D'}}>Delivery: Rs. {Number(fees.baseFee).toLocaleString()}</Text>
-      {!!d.deliveryExtraWeightEnabled && booked && <Text style={{color:'#68225D'}}>Extra weight fee: Rs. {Number(fees.extraFee).toLocaleString()} · {Number(fees.weightKg).toLocaleString()} kg</Text>}
-      {d.deliveryExtraWeightEnabled && <Text style={{color:'#766572'}}>Covers {d.deliveryIncludedWeightKg} kg; Rs. {d.deliveryExtraFeePerKg} for each started additional kg.</Text>}
-    </>}
-    {showConfiguration && <>
-      {d.deliveryFeeType === 'PAID' && <Text style={{color:'#766572'}}>Extra weight charges: {d.deliveryExtraWeightEnabled ? 'On' : 'Off'}</Text>}
-      {d.deliveryFeeType === 'PAID' && d.deliveryExtraWeightEnabled && <Text style={{color:'#766572'}}>Delivery weight: {d.deliveryWeightKg} kg {d.deliveryWeightBasis === 'PER_GUEST' ? 'per guest (Catering)' : 'per package'}</Text>}
-      <Text style={{color:'#766572'}}>Time reserved for each delivery: {d.deliveryReserveMinutes} minutes</Text>
+      {!!d.deliveryExtraWeightEnabled && booked && <Text style={{color:'#68225D'}}>Extra weight fee: Rs. {Number(fees.extraFee).toLocaleString()} · {weight(Number(fees.weightKg))} {unit}</Text>}
+      {d.deliveryExtraWeightEnabled && <Text style={{color:'#766572'}}>Covers {weight(Number(d.deliveryIncludedWeightKg))} {unit}; Rs. {rate} for each started additional {unit}.</Text>}
     </>}
     {!!selected && <Text style={{color:'#68225D'}}>Delivery date &amp; time: {deliveryDateTime(selected, d.timeZone || pkg.deliveryTimeZone || timeZone)}</Text>}
   </View>;
 }
+const s = StyleSheet.create({
+  card:{backgroundColor:'#FFFFFF',borderRadius:16,borderWidth:1,borderColor:'#E8D4E2',padding:14,marginVertical:12},
+  header:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:8},
+  icon:{width:30,height:30,borderRadius:10,backgroundColor:'#F2E3EF',alignItems:'center',justifyContent:'center'},
+  iconText:{fontSize:21,color:'#7B2869',fontWeight:'700'},title:{flexGrow:1,fontSize:14,fontWeight:'800',color:'#572047'},
+  badge:{fontSize:11,fontWeight:'700',color:'#7B2869',backgroundColor:'#F4E7F1',paddingHorizontal:9,paddingVertical:5,borderRadius:8},free:{color:'#246C44',backgroundColor:'#E4F6EB'},
+  row:{flexDirection:'row',alignItems:'flex-start',gap:12,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#F4EAF1'},
+  label:{flex:1,minWidth:0,fontSize:12,color:'#88717F',lineHeight:18},value:{flex:1.2,minWidth:0,fontSize:12,fontWeight:'700',color:'#542046',textAlign:'right',lineHeight:18,flexShrink:1},
+  note:{fontSize:11,color:'#88717F',lineHeight:17,marginTop:10},
+});

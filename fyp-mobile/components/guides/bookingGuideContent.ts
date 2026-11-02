@@ -37,7 +37,7 @@ const delivery: GuideSection = {
   steps: [
     'Choose an available delivery date and time within the package’s earliest and latest times. Quick choices may include one hour before, thirty minutes before or at event start. No service duration is needed for delivery.',
     'Delivery time is separate from event time. Read the date, time and displayed timezone. Working hours, existing bookings, booking notice and time to pay can make a delivery time unavailable.',
-    'Free Delivery has no delivery fee. Otherwise, review the base delivery fee and any extra weight fee before submitting. Each started extra kilogram is charged when the package uses weight charges. Delivery fees are charged once for that package booking, not once per guest.',
+    'Free Delivery has no delivery fee. Otherwise, review the base delivery fee and any extra weight fee before submitting. When extra weight charges apply, check the vendor’s selected unit: kg, g, lb or oz. Each started extra unit is charged at the shown rate. Delivery fees are charged once for that package booking, not once per guest.',
     'Catering package prices are calculated per guest. Other package prices are not multiplied by the event guest count. The delivery fee is shown separately.',
     'Payment deadlines and request expiry follow the agreed delivery time. The vendor can mark delivery complete only once that time arrives and the required payment is secured. The remaining payment follows completion.',
     'When changing the event schedule, choose a new available delivery time for each delivery booking. The original schedule stays until the required approvals finish. Replacement packages have their own delivery times and charges.',

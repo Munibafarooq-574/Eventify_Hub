@@ -766,6 +766,7 @@ export const PackageDurationOptionSchema =
 
 @Schema()
 export class Package {
+  @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
   @Prop({ min: 0 }) deliveryFee?: number;
   @Prop() deliveryExtraWeightEnabled?: boolean;

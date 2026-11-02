@@ -1,5 +1,6 @@
 import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, Min, Max } from 'class-validator';
 export class DeliveryPackageDto {
+  @IsOptional() @IsEnum(['kg', 'g', 'lb', 'oz']) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @IsOptional() @IsEnum(['FREE', 'PAID']) deliveryFeeType?: 'FREE' | 'PAID';
   @IsOptional() @IsNumber() @Min(0) deliveryFee?: number;
   @IsOptional() @IsBoolean() deliveryExtraWeightEnabled?: boolean;

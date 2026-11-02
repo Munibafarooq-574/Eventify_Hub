@@ -1,4 +1,4 @@
-import { deliveryDateTime } from '@/utils/deliveryBooking';
+import { deliveryDateTime, displayDeliveryWeight } from '@/utils/deliveryBooking';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
@@ -145,7 +145,7 @@ const PaymentConfirmationScreen = () => {
       {label:'Delivery date & time',value:deliveryDateTime(paymentData.deliveryStartDateTime,paymentData.delivery.timeZone || 'UTC')},
       {label:'Package amount',value:formatCurrency(Number(paymentData.delivery.packageAmount))},
       {label:'Delivery',value:paymentData.delivery.deliveryFeeType === 'FREE' ? 'Free' : formatCurrency(Number(paymentData.delivery.baseFee))},
-      ...(paymentData.delivery.deliveryExtraWeightEnabled ? [{label:'Extra weight fee',value:formatCurrency(Number(paymentData.delivery.extraFee))}] : []),
+      ...(paymentData.delivery.deliveryFeeType === 'PAID' && paymentData.delivery.deliveryExtraWeightEnabled ? [{label:'Extra weight fee',value:formatCurrency(Number(paymentData.delivery.extraFee))}, {label:'Delivery weight',value:`${displayDeliveryWeight(Number(paymentData.delivery.weightKg),paymentData.delivery.deliveryWeightUnit)} ${paymentData.delivery.deliveryWeightUnit || 'kg'}`}] : []),
     ] : []),
     { label: 'Payment Type', value: paymentTypeLabel },
     { label: 'Amount Paid', value: formatCurrency(amountPaid) },

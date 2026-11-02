@@ -29,10 +29,45 @@ test('add and edit preview show selected delivery charges, weight rule and reser
  const C=load('components/booking/DeliveryDetails.tsx',{'react-native':native,'@/utils/deliveryBooking':utils}).default;
  const preview=pkg=>renderToStaticMarkup(React.createElement(C,{pkg,showConfiguration:true}));
  const weighted=preview({...paid,deliveryWeightKg:1,deliveryReserveMinutes:60});
- assert.match(weighted,/Delivery: Rs\. 300/);assert.match(weighted,/Covers 1 kg; Rs\. 100/);assert.match(weighted,/Extra weight charges: On/);assert.match(weighted,/Delivery weight: 1 kg per package/);assert.match(weighted,/Time reserved for each delivery: 60 minutes/);
- assert.match(preview({...paid,deliveryWeightBasis:'PER_GUEST'}),/per guest \(Catering\)/);
- const fixed=preview({...paid,deliveryExtraWeightEnabled:false});assert.match(fixed,/Extra weight charges: Off/);assert.doesNotMatch(fixed,/Covers|Delivery weight:/);
- const free=preview({...paid,deliveryFeeType:'FREE'});assert.match(free,/Free Delivery/);assert.doesNotMatch(free,/Extra weight charges|Covers|Delivery weight:|Delivery: Rs/);assert.match(free,/Time reserved for each delivery: 30 minutes/);
- const normal=renderToStaticMarkup(React.createElement(C,{pkg:paid}));assert.doesNotMatch(normal,/Time reserved for each delivery|Extra weight charges: On/);
+ assert.match(weighted,/Base delivery fee/);assert.match(weighted,/Rs\. 300/);assert.match(weighted,/Weight covered/);assert.match(weighted,/Rs\. 100 per additional kg/);assert.match(weighted,/Extra weight charges/);assert.match(weighted,/>On</);assert.match(weighted,/Delivery weight/);assert.match(weighted,/Per package/);assert.match(weighted,/60 minutes per delivery/);
+ assert.match(preview({...paid,deliveryWeightBasis:'PER_GUEST'}),/Per guest \(Catering\)/);
+ const fixed=preview({...paid,deliveryExtraWeightEnabled:false});assert.match(fixed,/>Off</);assert.doesNotMatch(fixed,/Weight covered|Delivery weight/);
+ const free=preview({...paid,deliveryFeeType:'FREE'});assert.match(free,/Free Delivery/);assert.doesNotMatch(free,/Extra weight charges|Weight covered|Delivery weight|Base delivery fee/);assert.match(free,/30 minutes per delivery/);
+ const normal=renderToStaticMarkup(React.createElement(C,{pkg:paid}));assert.doesNotMatch(normal,/Time reserved|Weight measured/);
  for(const path of ['components/VPDAddNewPackages/VPDAddNewPackages.tsx','components/editpackage/EditPackageIndex.tsx']){const source=fs.readFileSync(path,'utf8');assert.equal((source.match(/<DeliveryDetails pkg=\{delivery\} showConfiguration \/>/g)||[]).length,1);compile(path);}
+});
+
+test('all delivery weight units use one selected unit and preserve canonical weight and rate',()=>{
+ for(const option of utils.DELIVERY_WEIGHT_UNITS){
+  const d={...paid,deliveryWeightUnit:option.value,deliveryIncludedWeightKg:2*option.kg,deliveryWeightKg:3*option.kg,deliveryExtraFeePerKg:100/option.kg};
+  assert.equal(utils.displayDeliveryWeight(d.deliveryWeightKg,option.value),3);
+  assert.equal(utils.displayDeliveryRate(d.deliveryExtraFeePerKg,option.value),100);
+  assert.equal(utils.deliveryFee(d).totalFee,400);
+  assert.equal(utils.deliveryFee({...d,deliveryWeightKg:3.5*option.kg}).totalFee,500);
+  assert.equal(utils.deliveryFee({...d,deliveryFeeType:'FREE'}).totalFee,0);
+  assert.equal(utils.deliverySettings(d).deliveryWeightUnit,option.value);
+  const Fields=load('components/booking/DeliveryPackageFields.tsx',{'react-native':native,'@/utils/deliveryBooking':utils}).default;
+  const html=renderToStaticMarkup(React.createElement(Fields,{value:d,onChange(){}}));
+  assert.match(html,new RegExp(`Weight covered by delivery fee \\(${option.value}\\)`));
+  assert.match(html,new RegExp(`Extra fee per additional ${option.value}`));
+  assert.match(html,new RegExp(`Delivery weight per package \\(${option.value}\\)`));
+  for(const unit of utils.DELIVERY_WEIGHT_UNITS)assert.ok(html.includes(unit.label));
+  const Details=load('components/booking/DeliveryDetails.tsx',{'react-native':native,'@/utils/deliveryBooking':utils}).default;
+  const preview=renderToStaticMarkup(React.createElement(Details,{pkg:d,showConfiguration:true}));
+  assert.ok(preview.includes(`3 ${option.value}`));assert.ok(preview.includes(`Rs. 100 per additional ${option.value}`));
+  const booked=renderToStaticMarkup(React.createElement(Details,{pkg:{delivery:{...d,baseFee:300,extraFee:100,weightKg:3*option.kg,packageAmount:3000}}}));
+  assert.ok(booked.includes(`3 ${option.value}`));
+ }
+});
+
+test('weight inputs accept selected-unit fractions without changing other price fields',()=>{
+ let hook=0;const state=[],inputs=[],buttons=[];let value={...paid,deliveryWeightUnit:'lb',deliveryWeightKg:0.45359237,deliveryIncludedWeightKg:0.90718474,deliveryExtraFeePerKg:100/0.45359237};
+ const hooks={...React,useState:init=>{const i=hook++;if(!(i in state))state[i]=init;return[state[i],v=>{state[i]=typeof v==='function'?v(state[i]):v}];}};
+ const n={...native,TextInput:props=>{inputs.push(props);return React.createElement('input',{value:props.value,readOnly:true});},TouchableOpacity:props=>{buttons.push(props);return React.createElement('button',null,props.children);}};
+ const Fields=load('components/booking/DeliveryPackageFields.tsx',{'react':hooks,'react-native':n,'@/utils/deliveryBooking':utils}).default;
+ const render=()=>{hook=0;inputs.length=0;buttons.length=0;return renderToStaticMarkup(Fields({value,onChange:d=>{value=d;}}));};
+ render();let weight=()=>inputs.find(i=>i.accessibilityLabel==='Delivery weight per package (lb)');
+ assert.equal(weight().value,'1');weight().onChangeText('1.');render();assert.equal(weight().value,'1.');weight().onChangeText('1.5');render();assert.equal(weight().value,'1.5');assert.ok(Math.abs(value.deliveryWeightKg-1.5*0.45359237)<1e-9);
+ const fee=inputs.find(i=>i.accessibilityLabel==='Extra fee per additional lb (Rs.)');fee.onChangeText('100');render();assert.equal(utils.deliveryFee(value).totalFee,300);assert.equal(value.deliveryFee,300);
+ buttons.find(b=>renderToStaticMarkup(React.createElement(React.Fragment,null,b.children)).includes('Grams (g)')).onPress();render();assert.equal(value.deliveryWeightUnit,'g');assert.ok(inputs.find(i=>i.accessibilityLabel==='Delivery weight per package (g)'));assert.ok(Math.abs(value.deliveryWeightKg-1.5*0.45359237)<1e-9);
 });
