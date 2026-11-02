@@ -499,43 +499,16 @@ const getResolvedServiceWindow = (
     };
   }
 
-  // ---------------------------------
-  // TIME_SLOT_BASED
-  // event start + required duration
-  // ---------------------------------
-  if (
-    bookingType ===
-    'TIME_SLOT_BASED'
-  ) {
-    const requiredDuration =
-      Number(
-        pkg?.requiredServiceDurationMinutes,
-      );
-
-    if (
-      !Number.isFinite(
-        requiredDuration,
-      ) ||
-      requiredDuration <= 0
-    ) {
-      return null;
-    }
-
-    const end =
-      new Date(
-        eventStart.getTime() +
-          requiredDuration *
-            60 *
-            1000,
-      );
-
-    return {
-      startDateTime:
-        eventStart.toISOString(),
-
-      endDateTime:
-        end.toISOString(),
-    };
+  // TIME_SLOT_BASED must use the exact appointment selected by the client.
+  // Never silently replace it with the event start time.
+  if (bookingType === 'TIME_SLOT_BASED') {
+    const chosen = pkg?.requiredServiceWindow;
+    if (!chosen?.startDateTime || !chosen?.endDateTime) return null;
+    const start = new Date(chosen.startDateTime);
+    const end = new Date(chosen.endDateTime);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+        end.getTime() <= start.getTime()) return null;
+    return { startDateTime: start.toISOString(), endDateTime: end.toISOString() };
   }
 
   // ---------------------------------
@@ -1382,6 +1355,26 @@ const isInvalidCode =
         </Text>
       </View>
 
+      {cartData?.vendors?.flatMap((vendor: any) =>
+        (vendor?.packages || []).filter((pkg: any) =>
+          String(pkg?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' &&
+          pkg?.requiredServiceWindow?.startDateTime &&
+          pkg?.requiredServiceWindow?.endDateTime
+        ).map((pkg: any) => {
+          const start = new Date(pkg.requiredServiceWindow.startDateTime);
+          const end = new Date(pkg.requiredServiceWindow.endDateTime);
+          const format = (date: Date) => date.toLocaleTimeString('en-US', {
+            timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true,
+          });
+          return (
+            <View key={String(pkg.packageId || pkg._id || pkg.packageName)} style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Appointment Time</Text>
+              <Text style={styles.detailValue}>{`${format(start)} - ${format(end)}`}</Text>
+            </View>
+          );
+        })
+      )}
+
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>
           Duration
@@ -1606,6 +1599,7 @@ const packages =
         start.toLocaleDateString(
           'en-GB',
           {
+            timeZone: 'Asia/Karachi',
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -1616,6 +1610,7 @@ const packages =
         start.toLocaleTimeString(
           'en-US',
           {
+            timeZone: 'Asia/Karachi',
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
@@ -1628,6 +1623,7 @@ const packages =
           ? end.toLocaleTimeString(
               'en-US',
               {
+                timeZone: 'Asia/Karachi',
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
@@ -1848,7 +1844,7 @@ const packages =
                 styles.serviceWindowPackage
               }
             >
-              {item.packageName} {item.title}
+              {item.title}
             </Text>
 
             <Text
