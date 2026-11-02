@@ -25,7 +25,7 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
       ['Time reserved',`${formatDeliveryReserve(d.deliveryReserveMinutes)} per delivery`],
     ];
     return <View style={s.card}>
-      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
+      <View style={s.header}><View style={s.icon}><Text style={s.iconText}>↗</Text></View><View style={s.titleGroup}><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /></View><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
       {rows.map(([label,value]) => <View key={label} style={s.row}><Text style={s.label}>{label}</Text><Text style={s.value}>{value}</Text></View>)}
     </View>;
   }
@@ -43,7 +43,7 @@ const s = StyleSheet.create({
   card:{backgroundColor:'#FFFFFF',borderRadius:16,borderWidth:1,borderColor:'#E8D4E2',padding:14,marginVertical:12},
   header:{flexDirection:'row',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:8},
   icon:{width:30,height:30,borderRadius:10,backgroundColor:'#F2E3EF',alignItems:'center',justifyContent:'center'},
-  iconText:{fontSize:21,color:'#7B2869',fontWeight:'700'},title:{flexGrow:1,fontSize:14,fontWeight:'800',color:'#572047'},
+  iconText:{fontSize:21,color:'#7B2869',fontWeight:'700'},titleGroup:{flexDirection:'row',alignItems:'center',gap:3,flexGrow:1,flexShrink:1,minWidth:0},title:{flexShrink:1,fontSize:14,fontWeight:'800',color:'#572047'},
   badge:{fontSize:11,fontWeight:'700',color:'#7B2869',backgroundColor:'#F4E7F1',paddingHorizontal:9,paddingVertical:5,borderRadius:8},free:{color:'#246C44',backgroundColor:'#E4F6EB'},
   row:{flexDirection:'row',alignItems:'flex-start',gap:12,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#F4EAF1'},
   label:{flex:1,minWidth:0,fontSize:12,color:'#88717F',lineHeight:18},value:{flex:1.2,minWidth:0,fontSize:12,fontWeight:'700',color:'#542046',textAlign:'right',lineHeight:18,flexShrink:1},

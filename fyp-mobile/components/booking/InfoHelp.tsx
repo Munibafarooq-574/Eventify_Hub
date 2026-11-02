@@ -5,6 +5,7 @@ export default function InfoHelp({ title, message }: { title:string; message:str
   return <TouchableOpacity
     accessibilityRole="button" accessibilityLabel={`About ${title}`}
     onPress={() => Alert.alert(title,message)}
-    style={{minWidth:36,minHeight:36,alignItems:'center',justifyContent:'center'}}
-  ><Text style={{color:'#7B2869',fontSize:21,fontWeight:'600'}}>ⓘ</Text></TouchableOpacity>;
+    hitSlop={10}
+    style={{width:16,height:18,flexShrink:0,alignItems:'center',justifyContent:'center'}}
+  ><Text style={{color:'#7B2869',fontSize:13,lineHeight:16,fontWeight:'600'}}>ⓘ</Text></TouchableOpacity>;
 }

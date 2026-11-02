@@ -1326,7 +1326,7 @@ if (!userId) {
 {/* Booking Type */}
 
 <View style={styles.card}>
-  <View style={{flexDirection:'row',alignItems:'center',gap:6}}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:3}}>
     <Text style={styles.sectionTitle}>Booking Type</Text>
     {bookingType === "DELIVERY_BASED" && <InfoHelp title="Booking Type" message="Select how this package uses vendor availability. Delivery Based lets customers choose an available delivery time." />}
   </View>
@@ -1841,7 +1841,7 @@ if (!userId) {
 
 {bookingType !== "DURATION_BASED" && (
   <View style={styles.card}>
-    <View style={{flexDirection:"row",alignItems:"center",gap:6}}>
+    <View style={{flexDirection:"row",alignItems:"center",gap:3}}>
     <Text style={[styles.sectionTitle,{flexShrink:1}]}>
       {bookingType === "TIME_SLOT_BASED"
         ? "How long does this take?"
