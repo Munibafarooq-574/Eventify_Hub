@@ -1013,8 +1013,8 @@ const OrderSummary = () => {
                                                     const hint = time === null
                                                         ? 'Scheduled service time unavailable.'
                                                         : time > Date.now()
-                                                            ? `Available after ${formatBookingActivityTime(new Date(time).toISOString(), item.eventCityId?.timeZone || 'UTC')}.`
-                                                            : 'Available after the required payment is secured.';
+                                                            ? `Button unlocks at ${formatBookingActivityTime(new Date(time).toISOString(), item.eventCityId?.timeZone || 'UTC')}.`
+                                                            : 'Button unlocks once payment is secured.';
                                                     return (
                                                         <View key={booking._id} style={styles.completionAction}>
                                                             {(item.vendorOrders || []).length > 1 && <Text style={styles.detailText}>{booking.serviceName}</Text>}
