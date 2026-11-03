@@ -18,6 +18,7 @@ const status: GuideSection = {
     'Pending: the vendor has not accepted. Processing / Accepted: the vendor accepted, but any required advance payment still needs to be secured.',
     'Confirmed: the required advance is secured, or no advance is required. Check Paid and Remaining for the actual money received; a zero advance does not mean the whole package is paid.',
     'Completed: the vendor has marked the booked service as provided. Any outstanding balance is handled separately.',
+    'Fully Paid: the service is complete and the remaining balance is Rs. 0.',
     'Cancelled or Rejected: this vendor booking will not proceed. Read the reason, cancellation details and any refund status.',
     'Request Expired / Payment Expired: the request or unpaid payment window ended. Closed bookings stay in history and cannot be accepted or paid through their old buttons.',
     'No longer assigned: this vendor was removed from the active assignment, for example after a replacement. The history remains.',
