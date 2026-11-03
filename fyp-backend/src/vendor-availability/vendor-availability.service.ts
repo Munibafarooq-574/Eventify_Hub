@@ -193,10 +193,10 @@ if (!hasAccess) {
         for (const minutes of advanceOptions) {
           if (
             !Number.isInteger(minutes) ||
-            minutes < 0
+            minutes < 1440 || minutes % 1440 !== 0
           ) {
             throw new BadRequestException(
-              `${dayConfig.day}: advance notice must be zero or a positive whole number`,
+              `${dayConfig.day}: booking notice must be a whole number of days (minimum 1 day)`,
             );
           }
         }
@@ -208,10 +208,10 @@ if (!hasAccess) {
       for (const minutes of dto.advanceNoticeOptionsMinutes) {
         if (
           !Number.isInteger(minutes) ||
-          minutes < 0
+          minutes < 1440 || minutes % 1440 !== 0
         ) {
           throw new BadRequestException(
-            'Advance notice must be zero or a positive whole number',
+            'Booking notice must be a whole number of days (minimum 1 day)',
           );
         }
       }
@@ -221,11 +221,11 @@ if (!hasAccess) {
       dto.minimumAdvanceMinutes !== undefined &&
       (
         !Number.isInteger(dto.minimumAdvanceMinutes) ||
-        dto.minimumAdvanceMinutes < 0
+        dto.minimumAdvanceMinutes < 1440 || dto.minimumAdvanceMinutes % 1440 !== 0
       )
     ) {
       throw new BadRequestException(
-        'Minimum advance notice must be zero or a positive whole number',
+        'Minimum booking notice must be a whole number of days (minimum 1 day)',
       );
     }
 
@@ -374,8 +374,6 @@ if (!hasAccess) {
     // No packageId = keep existing vendor-level behavior.
     // ---------------------------------------------------------
 
-    let isSetupBasedBooking = false;
-    let setupEventStartForNotice: Date | undefined;
     if (packageId) {
       const packages: any[] = (vendor as any).packages ?? [];
 
@@ -394,8 +392,6 @@ if (!hasAccess) {
 
             const bookingType = deliverySelection?.configuration ? 'DELIVERY_BASED' : selectedPackage.bookingType;
 
-      isSetupBasedBooking = bookingType === 'SETUP_BASED';
-      setupEventStartForNotice = isSetupBasedBooking ? new Date(startDateTime) : undefined;
 
       // Preserve the original event/requested start because some package
       // booking types calculate their service window relative to event start.
@@ -800,40 +796,21 @@ if (!hasAccess) {
           ? [settings.minimumAdvanceMinutes]
           : [];
 
-    if (advanceNoticeOptionsMinutes.length > 0) {
-  const now = new Date();
-
-  // Setup bookings reserve a pre-event interval, but the vendor's
-  // booking notice is defined relative to the EVENT start. The setup
-  // interval itself must still start in the future (checked below).
-  const noticeReferenceStart =
-    isSetupBasedBooking && setupEventStartForNotice
-      ? setupEventStartForNotice
-      : startDateTime;
-  const minutesUntilEvent =
-    (noticeReferenceStart.getTime() - now.getTime()) /
-    60000;
-
-  const bookingAllowed = advanceNoticeOptionsMinutes.some(
-    (noticeMinutes) =>
-      minutesUntilEvent >= noticeMinutes,
-  );
-
-  if (!bookingAllowed) {
-    const sortedNoticeOptions = [
-      ...advanceNoticeOptionsMinutes,
-    ].sort((a, b) => a - b);
-
-    const minimumNotice =
-      sortedNoticeOptions[0];
-
-    return {
-      vendorId,
-      available: false,
-      reason: `Booking must be made at least ${minimumNotice} minutes before the event`,
-    };
-  }
-}
+    // Legacy notice values below one day still require a full 24-hour minimum.
+    const validNoticeOptions = advanceNoticeOptionsMinutes.filter(
+      (minutes) => Number.isFinite(minutes) && minutes >= 1440,
+    );
+    const minimumNotice = validNoticeOptions.length > 0
+      ? Math.min(...validNoticeOptions)
+      : 1440;
+    const minutesUntilService = (startDateTime.getTime() - Date.now()) / 60000;
+    if (minutesUntilService < minimumNotice) {
+      return {
+        vendorId,
+        available: false,
+        reason: `Booking must be made at least ${minimumNotice / 1440} day(s) before the service starts`,
+      };
+    }
 
     // ---------------------------------------------------------
     // 6. Existing bookings + capacity
