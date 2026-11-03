@@ -2402,39 +2402,45 @@ Alert.alert(
             </View>
           </View>
 
-          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
-            {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-            {((bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
-              (direction) => {
-                const active = windowStart.direction === direction;
-
-                return (
-                  <TouchableOpacity
-                    key={direction}
-                    style={[
-                      styles.friendlyDirectionButton,
-                      active && styles.friendlyDirectionButtonActive,
-                    ]}
-                    onPress={() =>
-                      setWindowStart((prev) => ({ ...prev, direction: bookingType === "SETUP_BASED" ? "BEFORE" : direction }))
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <Text
+          {bookingType === "SETUP_BASED" ? (
+            <Text style={{ marginTop: 8, color: "#77717A", fontSize: 13 }}>
+              Before event start
+            </Text>
+          ) : (
+            <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
+              {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
+              {((bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
+                (direction) => {
+                  const active = windowStart.direction === direction;
+  
+                  return (
+                    <TouchableOpacity
+                      key={direction}
                       style={[
-                        styles.friendlyToggleText,
-                        active && styles.friendlyToggleTextActive,
+                        styles.friendlyDirectionButton,
+                        active && styles.friendlyDirectionButtonActive,
                       ]}
+                      onPress={() =>
+                        setWindowStart((prev) => ({ ...prev, direction: bookingType === "SETUP_BASED" ? "BEFORE" : direction }))
+                      }
+                      activeOpacity={0.8}
                     >
-                      {direction === "BEFORE"
-                        ? "Before the event"
-                        : "After event starts"}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              },
-            )}
-          </View>
+                      <Text
+                        style={[
+                          styles.friendlyToggleText,
+                          active && styles.friendlyToggleTextActive,
+                        ]}
+                      >
+                        {direction === "BEFORE"
+                          ? "Before the event"
+                          : "After event starts"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                },
+              )}
+            </View>
+          )}
         </View>
 
         {/* --------------------------------------------------
