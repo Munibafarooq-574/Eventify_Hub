@@ -798,8 +798,15 @@ if (!hasAccess) {
     if (advanceNoticeOptionsMinutes.length > 0) {
   const now = new Date();
 
+  // Setup bookings reserve a pre-event interval, but the vendor's
+  // booking notice is defined relative to the EVENT start. The setup
+  // interval itself must still start in the future (checked below).
+  const noticeReferenceStart =
+    packageId && selectedPackage?.bookingType === 'SETUP_BASED'
+      ? eventStartDateTime
+      : startDateTime;
   const minutesUntilEvent =
-    (startDateTime.getTime() - now.getTime()) /
+    (noticeReferenceStart.getTime() - now.getTime()) /
     60000;
 
   const bookingAllowed = advanceNoticeOptionsMinutes.some(
