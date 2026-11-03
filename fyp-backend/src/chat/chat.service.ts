@@ -74,8 +74,13 @@ export class ChatService {
     async createBookingNotice(
         organizerId: string, vendorId: string, bookingId: string, stage: BookingChatStage, content: string,
     ): Promise<Message | null> {
-        // Use the same participant access and canonical pair as manually opened chats.
-        const chatId = await this.createOrGetConversation(organizerId, vendorId);
+        // A cancelled booking still permits its participants to read chat history.
+        if (stage === 'cancelled') {
+            await this.bookingAccess.assertHistoryBooking(bookingId, organizerId, vendorId);
+        } else {
+            await this.bookingAccess.assertPair(organizerId, vendorId);
+        }
+        const { chatId } = await this.findOrCreatePair(organizerId, vendorId);
         const [senderId, receiverId] = stage === 'requested'
             ? [organizerId, vendorId]
             : [vendorId, organizerId];

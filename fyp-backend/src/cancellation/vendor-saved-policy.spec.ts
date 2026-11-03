@@ -20,6 +20,25 @@ describe('Vendor cancellation uses saved booking policy',()=>{
   const f=fixture();const result=await f.cancel();expect(result.penalty.penaltyAmount).toBe(300);expect(result.penalty.penaltyPercentage).toBe(5);
   expect(result.refund).toMatchObject({amountPaid:3000,refundAmount:3000,withheldAmount:0,policyRevision:3,policyConfigId:'saved-config',refundPercentage:100});expect(f.s.getPolicyConfig).not.toHaveBeenCalled();
  });
+ it('posts the cancellation only after the financial transaction commits', async () => {
+  const f = fixture();
+  let committed = false;
+  const session = await f.s.connection.startSession();
+  f.s.connection.startSession = async () => ({
+   ...session,
+   withTransaction: async (callback: any) => {
+    await session.withTransaction(callback);
+    committed = true;
+   },
+  });
+  f.s.chatGateway = { sendBookingNotice: jest.fn(async () => expect(committed).toBe(true)) };
+  await f.cancel();
+  await expect(f.cancel()).rejects.toThrow('Only a pending or confirmed');
+  expect(f.s.chatGateway.sendBookingNotice).toHaveBeenCalledTimes(1);
+  expect(f.s.chatGateway.sendBookingNotice).toHaveBeenCalledWith(
+   expect.objectContaining({ organizerId: 'client' }), f.booking, 'cancelled',
+  );
+ });
  it.each([[23.99,100],[24,5],[239.99,5],[240,4],[480,3],[720,2],[960,0]])('selects saved threshold at %s hours as %s percent',async(hours,percentage)=>{
   const f=fixture(hours);const result=await f.cancel();expect(result.penalty.penaltyPercentage).toBe(percentage);expect(result.penalty.penaltyAmount).toBe(6000*percentage/100);
  });

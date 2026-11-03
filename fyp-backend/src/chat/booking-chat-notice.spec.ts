@@ -14,6 +14,7 @@ describe('Automatic booking chat', () => {
     const emit = jest.fn();
     const to = jest.fn((_room: string) => ({ emit }));
     const assertPair = jest.fn();
+    const assertHistoryBooking = jest.fn();
     const organizerId = new Types.ObjectId();
     const photographer = new Types.ObjectId();
     const baker = new Types.ObjectId();
@@ -48,7 +49,7 @@ describe('Automatic booking chat', () => {
         const messages = db.model(Message.name, MessageSchema);
         const conversations = db.model(Conversation.name, ConversationSchema);
         await Promise.all([messages.init(), conversations.init()]);
-        chat = new ChatService({ assertPair } as any, messages, conversations, {} as any, {} as any);
+        chat = new ChatService({ assertPair, assertHistoryBooking } as any, messages, conversations, {} as any, {} as any);
         gateway = new ChatGateway({} as any, {} as any, chat);
         gateway.server = { to } as any;
     }, 20000);
@@ -93,6 +94,28 @@ describe('Automatic booking chat', () => {
         expect(push).toHaveBeenCalledTimes(1);
         expect(push).toHaveBeenCalledWith('Booking confirmed', message?.message, String(organizerId), 'MESSAGE');
         push.mockRestore();
+    });
+
+    it.each(['completed', 'cancelled'] as const)('posts one %s notice in the affected vendor chat', async stage => {
+        const booking = { ...cake, _id: new Types.ObjectId() };
+        const chatId = await chat.createOrGetConversation(String(organizerId), String(baker));
+        if (stage === 'cancelled') assertPair.mockRejectedValue(new Error('Booking is closed'));
+        try {
+            await Promise.all([
+                gateway.sendBookingNotice(order, booking, stage),
+                gateway.sendBookingNotice(order, booking, stage),
+            ]);
+        } finally {
+            assertPair.mockReset();
+        }
+
+        const messages = await db.model(Message.name).find({ bookingNoticeKey: `${booking._id}:${stage}` });
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toMatchObject({ chatId, senderId: String(baker), receiverId: String(organizerId) });
+        expect(messages[0].message).toContain(`Booking ${stage} for Sara Wedding on 20 September.`);
+        if (stage === 'cancelled') {
+            expect(assertHistoryBooking).toHaveBeenCalledWith(String(booking._id), String(organizerId), String(baker));
+        }
     });
 
     it('includes the local day when delivery is scheduled before the event date', () => {

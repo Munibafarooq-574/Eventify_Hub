@@ -25,6 +25,7 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('OrderService - Unit Tests', () => {
     let service: OrderService;
+    let chatGateway: ChatGateway;
     let userModel: any;
     let orderModel: any;
     let vendorOrderModel: any;
@@ -140,6 +141,7 @@ describe('OrderService - Unit Tests', () => {
             ],
         }).compile();
 
+        chatGateway = module.get(ChatGateway);
         service = module.get<OrderService>(OrderService);
     });
 
@@ -249,6 +251,8 @@ describe('OrderService - Unit Tests', () => {
         vendorOrderModel.findById = jest.fn().mockResolvedValue(booking);
         userModel.findById = jest.fn(() => ({ select: jest.fn().mockResolvedValue({ packages: [{ _id: 'cake', bookingType: 'DELIVERY_BASED' }] }) }));
         vendorOrderModel.findOneAndUpdate = jest.fn(async (_filter, update) => ({ ...booking, ...update.$set }));
+        const order = { organizerId: validObjectId };
+        orderModel.findOne = jest.fn().mockResolvedValue(order);
         const before = Date.now();
         const result = await service.completeVendorOrder(validObjectId);
         expect(result.paymentDeadline).toBeNull();
@@ -259,6 +263,8 @@ describe('OrderService - Unit Tests', () => {
         vendorOrderModel.findById.mockResolvedValue(result);
         expect(await service.completeVendorOrder(validObjectId)).toBe(result);
         expect(vendorOrderModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
+        expect(chatGateway.sendBookingNotice).toHaveBeenCalledTimes(1);
+        expect(chatGateway.sendBookingNotice).toHaveBeenCalledWith(order, result, 'completed');
     });
     it('blocks premature duration service completion and unpaid completion', async () => {
         const booking: any = { status: 'accepted', paymentStatus: 'PARTIALLY_PAID', eventEndDateTime: new Date(Date.now()+3600000) };

@@ -3,7 +3,7 @@ import type { VendorOrder } from '../schemas/vendor-order.schema';
 
 export type BookingChatOrder = Pick<Order, 'organizerId' | 'eventName' | 'eventDate' | 'eventStartDateTime'>;
 export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService'>;
-export type BookingChatStage = 'requested' | 'confirmed';
+export type BookingChatStage = 'requested' | 'confirmed' | 'completed' | 'cancelled';
 
 export function formatBookingNotice(order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage) {
     const timeZone = booking.bookingChatTimeZone ?? 'UTC';
@@ -24,9 +24,7 @@ export function formatBookingNotice(order: BookingChatOrder, booking: BookingCha
         ? `Delivery: ${formatTime(start)}`
         : end && `Time: ${formatTime(start)} – ${formatTime(end)}`);
     return [
-        stage === 'confirmed'
-            ? `Booking confirmed for ${order.eventName} on ${eventDate}.`
-            : `Booking request sent for ${order.eventName} on ${eventDate}.`,
+        `Booking ${stage === 'requested' ? 'request sent' : stage} for ${order.eventName} on ${eventDate}.`,
         booking.bookingChatService && `Service: ${booking.bookingChatService}`,
         `Package: ${booking.serviceName}`,
         schedule,

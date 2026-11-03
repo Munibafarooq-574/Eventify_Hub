@@ -2497,6 +2497,15 @@ async completeVendorOrder(vendorOrderId: string) {
         );
     }
 
+    try {
+        if (this.chatGateway) {
+            const order = await this.orderModel.findOne({ vendorOrders: saved._id });
+            if (order) await this.chatGateway.sendBookingNotice(order, saved, 'completed');
+        }
+    } catch (error) {
+        console.warn('Could not publish booking completion notice:', error);
+    }
+
     return saved;
 }
 

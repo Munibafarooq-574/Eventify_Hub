@@ -6,6 +6,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
+import { ChatGateway } from '../chat/chat.gateway';
 import { NotificationService } from '../notifications/notifications.service';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
@@ -54,6 +55,7 @@ export class CancellationService {
         private readonly configService: ConfigService,
         @InjectConnection() private readonly connection: Connection,
         private readonly notifications?: NotificationService,
+        private readonly chatGateway?: ChatGateway,
     ) {}
 
     // Admin settings supply new booking snapshots; existing snapshots remain authoritative.
@@ -551,6 +553,7 @@ export class CancellationService {
             }, { readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
         } finally { await session.endSession(); }
         const { vendorOrder, refund, penalty, order, refundAmount, penaltyAmount, penaltyPercentage } = result;
+        if (order) await this.chatGateway?.sendBookingNotice(order, vendorOrder, 'cancelled');
         // Notify only after cancellation and financial records have been saved.
         // A failed push must not undo cancellation or block the other recipient.
         if (this.notifications) {
