@@ -2279,11 +2279,30 @@ const serviceCityNamesFromIds =
     const selectedPackage =
       getSelectedPackage();
 
+    const getEventDurationQuote = (pkg: any) =>
+      isEventMode && pkg?.bookingType === 'DURATION_BASED'
+        ? resolvePackagePrice(pkg, Number(durationMinutes))
+        : null;
+
+    const selectedDurationQuote = getEventDurationQuote(selectedPackage);
+    const durationPriceLabel = (quote: NonNullable<typeof selectedDurationQuote>) =>
+      quote.price === null ? 'Duration unavailable' : quote.basis === 'custom' ? 'Custom Duration Price' : 'Price for Selected Duration';
+
+
       const selectedBookingType =
   String(
     selectedPackage?.bookingType ||
       'DURATION_BASED',
   ).toUpperCase();
+    const cartDisabled = selectedDurationQuote?.price === null ||
+      (selectedPackage?.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType
+        ? !selectedDelivery?.available
+        : selectedPackage?.bookingType === 'TIME_SLOT_BASED'
+          ? !selectedAppointment?.available
+          : selectedPackage?.bookingType === 'SETUP_BASED'
+            ? setupSlotsLoading || !selectedSetup
+            : !availabilityCheck?.available);
+
 
     const relevantVendorSlots =
       getRelevantVendorSlots(
@@ -4335,6 +4354,7 @@ const serviceCityNamesFromIds =
   const isActive =
     String(activePackage) === String(pkg._id);
 
+  const durationQuote = getEventDurationQuote(pkg);
   const applicableCoupon = getApplicablePublicCoupon(
     String(pkg._id),
   );
@@ -4416,7 +4436,7 @@ const serviceCityNamesFromIds =
               isActive && styles.pkgFromLabelActive,
             ]}
           >
-            Base Price
+            {durationQuote ? durationPriceLabel(durationQuote) : 'Base Price'}
           </Text>
           <Text
             style={[
@@ -4424,9 +4444,9 @@ const serviceCityNamesFromIds =
               isActive && styles.packageCardPriceActive,
             ]}
           >
-            Rs. {Number(pkg.price || 0).toLocaleString()}
+            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}
           </Text>
-          {pkg.bookingType === 'DURATION_BASED' &&
+          {!durationQuote && pkg.bookingType === 'DURATION_BASED' &&
             Number(pkg.baseIncludedDurationMinutes) > 0 && (
               <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
                 Includes {Number(pkg.baseIncludedDurationMinutes) % 1440 === 0
@@ -4994,13 +5014,13 @@ const serviceCityNamesFromIds =
                           styles.packagePriceFooter
                         }
                       >
-                        <View>
+                        <View style={{ flex: 1, marginRight: 8 }}>
                           <Text
                             style={
                               styles.priceFooterLabel
                             }
                           >
-                            Base Price
+                            {selectedDurationQuote ? durationPriceLabel(selectedDurationQuote) : 'Base Price'}
                           </Text>
 
                           <Text
@@ -5009,14 +5029,14 @@ const serviceCityNamesFromIds =
                               styles.priceText
                             }
                           >
-                            Rs.{' '}
-                            {Number(
-                              selectedPackage.price ||
-                                0,
-                            ).toLocaleString()}
-                            /-
+                            {selectedDurationQuote?.price === null
+                              ? '—'
+                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}/-`}
                           </Text>
-                           {selectedPackage.bookingType === 'DURATION_BASED' &&
+                           {selectedDurationQuote?.reason && (
+                             <Text style={styles.priceFooterLabel}>{selectedDurationQuote.reason}</Text>
+                           )}
+                           {!selectedDurationQuote && selectedPackage.bookingType === 'DURATION_BASED' &&
                              Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
                                <Text style={styles.priceFooterLabel}>
                                  Includes {Number(selectedPackage.baseIncludedDurationMinutes) % 1440 === 0
@@ -5029,9 +5049,9 @@ const serviceCityNamesFromIds =
                         {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available}
-                              accessibilityState={{ disabled: selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available }}
-                              style={[styles.cartButton, (selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available) && { opacity: 0.45 }]}
+                              disabled={cartDisabled}
+                              accessibilityState={{ disabled: cartDisabled }}
+                              style={[styles.cartButton, cartDisabled && { opacity: 0.45 }]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,

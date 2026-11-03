@@ -28,3 +28,11 @@ test('the short quote requires valid vendor custom pricing and preserves price o
   assert.equal(resolve(pricing, 90).price, null);
   assert.equal(resolve({ ...pricing, customDurationRate: 18000 }, 60).price, 15000);
 });
+
+test('package cards and the Add to Cart footer show the same selected-duration quote', () => {
+  assert.match(source, /const durationQuote = getEventDurationQuote\(pkg\)/);
+  assert.match(source, /durationQuote\?\.price \?\? pkg\.price/);
+  assert.match(source, /const selectedDurationQuote = getEventDurationQuote\(selectedPackage\)/);
+  assert.match(source, /selectedDurationQuote\?\.price \?\? selectedPackage\.price/);
+  assert.match(source, /const cartDisabled = selectedDurationQuote\?\.price === null/);
+});
