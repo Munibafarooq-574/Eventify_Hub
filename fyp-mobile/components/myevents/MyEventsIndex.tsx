@@ -10,6 +10,8 @@ import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 import ClientCancellationReview from '../cancellation/ClientCancellationReview';
 import createConversation from '@/services/createConversation';
 import getVendorOrders from '@/services/getVendorOrders';
+import getVendorById from '@/services/getVendorById';
+import getAllCategories from '@/services/getAllCategories';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { getRescheduleRequests, resolvePartialReschedule } from '@/services/rescheduleBooking';
 import { getUserData, getSecureData, saveSecureData } from '@/store';
@@ -35,8 +37,47 @@ import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 
 const getVendorBookingCategory = (booking: any): string => {
   const category = booking?.vendorId?.buisnessCategory;
-  return category?.name || booking?.bookingChatService || category?.normalizedName || '';
+  return category?.name || category?.categoryName || booking?.bookingChatService ||
+    booking?.resolvedCategoryName || category?.normalizedName || '';
 };
+
+const getCategoryId = (vendor: any): string => {
+  const category = vendor?.buisnessCategory ?? vendor?.categoryId;
+  return String(category?._id ?? (typeof category === 'string' ? category : ''));
+};
+
+const getBookingVendorId = (booking: any): string =>
+  String(booking?.vendorId?._id ?? (typeof booking?.vendorId === 'string' ? booking.vendorId : ''));
+
+async function resolveBookingCategories(events: Awaited<ReturnType<typeof getVendorOrders>>) {
+  const bookings = events.flatMap(event => event.vendorOrders || []);
+  const missing = bookings.filter(booking => !getVendorBookingCategory(booking));
+  if (!missing.length) return new Map<string, string>();
+
+  const vendorIds = [...new Set(missing
+    .filter(booking => !getCategoryId(booking.vendorId))
+    .map(getBookingVendorId)
+    .filter(Boolean))];
+
+  const [catalog, profiles] = await Promise.all([
+    getAllCategories().catch(() => []),
+    Promise.all(vendorIds.map(async id => [id, await getVendorById(id).catch(() => null)] as const)),
+  ]);
+  const names = new Map<string, string>();
+  for (const category of Array.isArray(catalog) ? catalog : []) {
+    if (category?._id && category?.name) names.set(String(category._id), category.name);
+  }
+  const vendors = new Map(profiles);
+
+  const resolved = new Map<string, string>();
+  for (const booking of missing) {
+    const vendor = vendors.get(getBookingVendorId(booking));
+    const categoryId = getCategoryId(booking.vendorId) || getCategoryId(vendor);
+    const name = vendor?.buisnessCategory?.name || vendor?.categoryName || names.get(categoryId);
+    if (name) resolved.set(booking._id, name);
+  }
+  return resolved;
+}
 
 // Large system font sizes ko limit karo taake layout na tootay
 (Text as any).defaultProps = {
@@ -223,6 +264,16 @@ const MyEventsScreen = () => {
       const fetchedEvents = await getVendorOrders('Organizer', user._id);
 
       setEvents(fetchedEvents || []);
+      void resolveBookingCategories(fetchedEvents || []).then(categories => {
+        if (!categories.size) return;
+        setEvents(current => current.map(event => ({
+          ...event,
+          vendorOrders: event.vendorOrders?.map((booking: any) => {
+            const resolvedCategoryName = categories.get(booking._id);
+            return resolvedCategoryName ? { ...booking, resolvedCategoryName } : booking;
+          }),
+        })));
+      }).catch(error => reportMarketplaceLoadError('Could not load booking categories', error));
 
       try {
         const requests = await getRescheduleRequests();
