@@ -34,14 +34,7 @@ export default function DeliveryPackageFields({ value, onChange }: { value: Deli
     <View style={s.row}>{(['FREE','PAID'] as const).map(type => <TouchableOpacity key={type} accessibilityRole="radio" accessibilityState={{ checked:value.deliveryFeeType === type }} style={[s.option,value.deliveryFeeType === type && s.active]} onPress={() => set({ deliveryFeeType:type, ...(type === 'FREE' ? { deliveryFee:0, deliveryExtraWeightEnabled:false } : {}) })}><Text style={s.label}>{type === 'FREE' ? 'Free Delivery' : 'Delivery Charges'}</Text></TouchableOpacity>)}</View>
     {value.deliveryFeeType === 'PAID' && <>
       {number('Base delivery fee (Rs.)','deliveryFee','Charged once for this booking.')}
-      <View style={s.row}><View style={[s.heading,{flex:1,minWidth:0}]}><Text style={[s.label,{flexShrink:1}]}>Extra charges for additional weight</Text><InfoHelp title="Extra charges for additional weight" message="Turn this on to charge extra when the delivery weight exceeds the weight covered by the base fee. Each started additional unit is charged at your selected rate." /></View><Switch value={!!value.deliveryExtraWeightEnabled} onValueChange={v => set({deliveryExtraWeightEnabled:v})} trackColor={{true:'#7B2869'}} /></View>
-      {value.deliveryExtraWeightEnabled && <>
-        <View style={s.heading}><Text style={s.label}>Weight unit</Text><InfoHelp title="Weight unit" message="Choose kg, g, lb or oz. Changing units converts the weights and rate. Review the values before saving." /></View>
-        <View style={s.row}>{DELIVERY_WEIGHT_UNITS.map(option => <TouchableOpacity key={option.value} accessibilityRole="radio" accessibilityState={{checked:unit === option.value}} style={[s.option,unit === option.value && s.active]} onPress={() => set({deliveryWeightUnit:option.value})}><Text style={s.label}>{option.label}</Text></TouchableOpacity>)}</View>
-        {number(`Weight covered by delivery fee (${unit})`,'deliveryIncludedWeightKg','This is the weight included in the base delivery fee. Extra weight charges start only above this amount.')}
-        {number(`Extra fee per additional ${unit} (Rs.)`,'deliveryExtraFeePerKg',`Each started additional ${unit} is charged. For example, 1.5 ${unit} counts as 1 extra ${unit} above a 1 ${unit} allowance.`)}
-
-      </>}
+    </>}
     </>}
     {number('Time reserved for each delivery','deliveryReserveMinutes','Choose how long you need for a delivery. This time must fit within your working hours. Customers only choose the delivery time. Choose Minutes or Hours; for example, 1 hour reserves the same time as 60 minutes.')}
     {!!deliverySettingsError(value) && <Text style={s.error}>{deliverySettingsError(value)}</Text>}
