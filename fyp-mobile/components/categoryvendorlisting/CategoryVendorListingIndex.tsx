@@ -619,7 +619,7 @@ const renderEmptyState = () => {
       <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : !isBrowseMode && eventTiming ? "No vendors available for your event" : "No vendors match these filters"}</Text>
       <Text style={styles.emptySubtitle}>{isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? (unavailableReason || 'No vendors are available for this event. Try another date or time, or adjust your search filters.') : 'Try adjusting your search or filters.'}</Text>
       {!isBrowseMode && !isReplacementMode && eventTiming && (
-        <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/EventDetailsForm")} style={{ padding: 14 }}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/EventDetailsForm", params: { editDateTime: "true" } })} style={{ padding: 14 }}>
           <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Change Event Date & Time</Text>
         </TouchableOpacity>
       )}
