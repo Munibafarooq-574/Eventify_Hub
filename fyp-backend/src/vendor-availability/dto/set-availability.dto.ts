@@ -3,7 +3,7 @@
 
 import {
   IsArray,
-  IsIn,
+  IsIn, IsDivisibleBy,
   IsInt,
   IsOptional,
   IsString,
@@ -55,7 +55,8 @@ export class DaySlotConfigDto {
    */
     @IsArray()
 @IsInt({ each: true })
-@Min(0, { each: true })
+  @IsDivisibleBy(1440, { each: true })
+@Min(1440, { each: true })
 @IsOptional()
 advanceNoticeOptionsMinutes?: number[];
 }
@@ -105,7 +106,9 @@ export class SetAvailabilityDto {
    * 0, 30 minutes, 1 hour, 2 hours, 4 hours,
    * 8 hours, 24 hours, 48 hours.
    */
-  @IsIn([0, 30, 60, 120, 240, 480, 1440, 2880])
+  @IsInt()
+  @Min(1440)
+  @IsDivisibleBy(1440)
   @IsOptional()
   minimumAdvanceMinutes?: number;
 
@@ -119,7 +122,8 @@ export class SetAvailabilityDto {
    */
   @IsArray()
   @IsInt({ each: true })
-  @Min(0, { each: true })
+  @IsDivisibleBy(1440, { each: true })
+  @Min(1440, { each: true })
   @IsOptional()
   advanceNoticeOptionsMinutes?: number[];
 
