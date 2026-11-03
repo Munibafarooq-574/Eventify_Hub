@@ -796,9 +796,9 @@ const VendorAvailabilityEditor = ({
         <HourPromptModal
           visible={!!noticePromptDay}
           title="Add booking notice"
-          message="Enter how many hours before the event a booking must be made (e.g. 24 for 1 day)."
+          message="Enter the minimum number of days before the service (1 or more)."
           onCancel={() => setNoticePromptDay(null)}
-          onSubmit={(hours) => noticePromptDay && addNoticeOption(noticePromptDay, hours)}
+          onSubmit={(days) => noticePromptDay && addNoticeOption(noticePromptDay, days)}
         />
       </View>
     </Modal>
