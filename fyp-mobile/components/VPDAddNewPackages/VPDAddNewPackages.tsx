@@ -1149,8 +1149,13 @@ if (!userId) {
 
     Alert.alert(
       "Error",
-      err?.response?.data?.message ||
-        "Could not save package. Try again."
+      (typeof err?.response?.data?.message === "string"
+        ? err.response.data.message
+        : typeof err?.response?.data?.message?.message === "string"
+          ? err.response.data.message.message
+          : typeof err?.message === "string"
+            ? err.message
+            : "Could not save package. Try again.")
     );
   } finally {
     setLoading(false);
