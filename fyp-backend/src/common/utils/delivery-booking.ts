@@ -25,7 +25,6 @@ export function displayDeliveryWeight(kg: number, unit = 'kg'): number {
 }
 
 export function validateDeliveryConfiguration(pkg: DeliveryConfiguration) {
-  deliveryUnitKg(pkg.deliveryWeightUnit);
   if (!pkg.deliveryFeeType) return; // Legacy packages retain their agreed price/window.
   if (!['FREE', 'PAID'].includes(pkg.deliveryFeeType)) throw new BadRequestException('Choose Free Delivery or Delivery Charges.');
   if (!Number.isSafeInteger(pkg.deliveryReserveMinutes) || pkg.deliveryReserveMinutes! < 1 || pkg.deliveryReserveMinutes! > 1440)
@@ -33,26 +32,15 @@ export function validateDeliveryConfiguration(pkg: DeliveryConfiguration) {
   if (pkg.deliveryFeeType === 'FREE') return;
   if (!Number.isFinite(pkg.deliveryFee) || pkg.deliveryFee! <= 0)
     throw new BadRequestException('Enter a delivery fee greater than zero.');
-  if (pkg.deliveryExtraWeightEnabled && (
-    !Number.isFinite(pkg.deliveryIncludedWeightKg) || pkg.deliveryIncludedWeightKg! <= 0 ||
-    !Number.isFinite(pkg.deliveryExtraFeePerKg) || pkg.deliveryExtraFeePerKg! <= 0
-  )) throw new BadRequestException('Enter the covered weight and extra fee.');
 }
 
 export function quoteDelivery(pkg: DeliveryConfiguration, quantity = 1, guests = 1, isCatering = false) {
   validateDeliveryConfiguration(pkg);
   const paid = pkg.deliveryFeeType === 'PAID';
-  const weighted = paid && pkg.deliveryExtraWeightEnabled;
-  // Older packages may include a per-package/per-guest weight; new packages do not require it.
-  const weightKg = weighted && Number.isFinite(pkg.deliveryWeightKg) && Number(pkg.deliveryWeightKg) > 0
-    ? Number(pkg.deliveryWeightKg) * quantity * (isCatering && pkg.deliveryWeightBasis === 'PER_GUEST' ? guests : 1)
-    : 0;
+  // Flat delivery charge. Weight and quantity never add a surcharge.
+  // Legacy weight fields are ignored for old saved packages as well.
   const baseFee = paid ? Number(pkg.deliveryFee) : 0;
-  const unitKg = deliveryUnitKg(pkg.deliveryWeightUnit);
-  // Round before ceil so conversion noise never adds another billing unit.
-  const extraUnits = weighted && weightKg > 0 ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
-  const extraFee = Math.round(extraUnits * Number(pkg.deliveryExtraFeePerKg || 0) * unitKg * 100) / 100;
-  return { baseFee, extraFee, weightKg, totalFee: baseFee + extraFee };
+  return { baseFee, extraFee: 0, weightKg: 0, totalFee: baseFee };
 }
 
 export function deliveryWindow(pkg: any, eventStart: Date, selected: Date, reserveMinutes = pkg.deliveryReserveMinutes) {
