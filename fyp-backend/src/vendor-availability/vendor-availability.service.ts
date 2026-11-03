@@ -374,6 +374,8 @@ if (!hasAccess) {
     // No packageId = keep existing vendor-level behavior.
     // ---------------------------------------------------------
 
+    let isSetupBasedBooking = false;
+    let setupEventStartForNotice: Date | undefined;
     if (packageId) {
       const packages: any[] = (vendor as any).packages ?? [];
 
@@ -391,6 +393,9 @@ if (!hasAccess) {
       }
 
             const bookingType = deliverySelection?.configuration ? 'DELIVERY_BASED' : selectedPackage.bookingType;
+
+      isSetupBasedBooking = bookingType === 'SETUP_BASED';
+      setupEventStartForNotice = isSetupBasedBooking ? new Date(startDateTime) : undefined;
 
       // Preserve the original event/requested start because some package
       // booking types calculate their service window relative to event start.
@@ -798,8 +803,15 @@ if (!hasAccess) {
     if (advanceNoticeOptionsMinutes.length > 0) {
   const now = new Date();
 
+  // Setup bookings reserve a pre-event interval, but the vendor's
+  // booking notice is defined relative to the EVENT start. The setup
+  // interval itself must still start in the future (checked below).
+  const noticeReferenceStart =
+    isSetupBasedBooking && setupEventStartForNotice
+      ? setupEventStartForNotice
+      : startDateTime;
   const minutesUntilEvent =
-    (startDateTime.getTime() - now.getTime()) /
+    (noticeReferenceStart.getTime() - now.getTime()) /
     60000;
 
   const bookingAllowed = advanceNoticeOptionsMinutes.some(
