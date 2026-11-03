@@ -119,7 +119,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
         'Open My Orders / Order Summary to accept, review schedule changes, request a later time, cancel or mark a service completed when those actions are available.',
         'Check the client, package and booked service window before responding. If acceptance is blocked for insufficient time, use Request later service time rather than treating the booking as accepted.',
-        'Mark Completed only after providing the service and once the scheduled delivery/service completion time and payment requirements allow it.',
+        'For completion and payment status, see Complete service and contact the client below.',
       ] },
       { id: 'subscription', title: 'If your subscription expires', summary: 'Continue managing legitimate existing bookings.', steps: [
         'Subscription expiry affects access to subscription features and visibility to new clients. It does not automatically cancel existing customer bookings.',
@@ -171,8 +171,9 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'complete-chat', title: 'Complete service and contact the client', summary: 'Finish only your work, then check the remaining payment.', steps: [
         'Use Message on an available booking to open that client’s chat. Chat does not replace a formal booking, cancellation or schedule action.',
-        'After providing the service, use Mark Completed when available. Check the time shown under the button and wait until the required payment is secured. Fully Paid shows completed orders with no balance left.',
+        'Mark Completed stays grey until the scheduled delivery time or your booked service end time is reached and any required advance payment is secured. Check the hint under the button. Tap the green button and confirm after providing the service.',
         'Completion applies only to your vendor booking. If money remains, the client gets the remaining-payment action and its separate deadline; completion does not itself mark the balance paid.',
+        'Tap Fully Paid Orders on the Vendor Dashboard or Fully Paid in Order Summary to see completed orders with no balance left. These orders show a Paid in Full badge.',
         'If your subscription is inactive, manage valid existing bookings through My Orders and open Message from the booking. The general Messages list can be restricted. Expiry of your subscription does not itself cancel customer bookings.',
       ] },
     ],
