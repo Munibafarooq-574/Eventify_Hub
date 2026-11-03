@@ -1,3 +1,4 @@
+import { VendorAnalyticsService } from './vendor-analytics.service';
 
 // import { Test, TestingModule } from '@nestjs/testing';
 // import { INestApplication, ValidationPipe, HttpException, HttpStatus } from '@nestjs/common';
@@ -204,6 +205,7 @@ describe('VendorController - Unit Tests', () => {
       controllers: [VendorController],
       providers: [
         { provide: VendorService, useValue: vendorService },
+        { provide: VendorAnalyticsService, useValue: {} },
         { provide: FileUploadService, useValue: {} },
       ],
     }).compile();

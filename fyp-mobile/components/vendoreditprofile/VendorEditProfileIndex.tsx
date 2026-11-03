@@ -150,7 +150,7 @@ const EditProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.container} testID="screen-container">
-      <StatusBar backgroundColor={PRIMARY_LIGHT} barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Plain header, no colored bar */}
       <View style={styles.header}>

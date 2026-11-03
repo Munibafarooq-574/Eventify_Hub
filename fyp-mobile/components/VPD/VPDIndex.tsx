@@ -1240,7 +1240,7 @@ const category =
       : pkg.bookingType === "SETUP_BASED"
       ? "Setup Based"
       : pkg.bookingType === "CUSTOM"
-      ? "Custom"
+      ? "Retired booking type"
       : "Not configured"}
   </Text>
 </View>
@@ -1489,58 +1489,6 @@ const category =
   </View>
 )}
 
-{/* CUSTOM */}
-{pkg.bookingType === "CUSTOM" && (
-  <View style={styles.packageInfoSection}>
-    <View style={styles.sectionTitleWithIcon}>
-      <Ionicons
-        name="options-outline"
-        size={16}
-        color={PRIMARY}
-      />
-
-      <Text style={styles.servicesLabel}>
-        Custom Service Timing
-      </Text>
-    </View>
-    <Text style={styles.packageDetailItem}>Service must start and finish within this window. Duration is optional.</Text>
-
-    {pkg.requiredServiceDurationMinutes ? (
-      <Text style={styles.packageDetailItem}>
-        Time Needed:{" "}
-        {pkg.requiredServiceDurationMinutes} minutes
-      </Text>
-    ) : null}
-
-    <Text style={styles.packageDetailItem}>
-      Earliest Service Start:{" "}
-      {typeof pkg.serviceWindowStartOffsetMinutes ===
-      "number"
-        ? pkg.serviceWindowStartOffsetMinutes === 0
-          ? "At event time"
-          : pkg.serviceWindowStartOffsetMinutes < 0
-          ? `${Math.abs(
-              pkg.serviceWindowStartOffsetMinutes
-            )} minutes before event`
-          : `${pkg.serviceWindowStartOffsetMinutes} minutes after event`
-        : "N/A"}
-    </Text>
-
-    <Text style={styles.packageDetailItem}>
-      Service Completion Deadline:{" "}
-      {typeof pkg.serviceWindowEndOffsetMinutes ===
-      "number"
-        ? pkg.serviceWindowEndOffsetMinutes === 0
-          ? "At event time"
-          : pkg.serviceWindowEndOffsetMinutes < 0
-          ? `${Math.abs(
-              pkg.serviceWindowEndOffsetMinutes
-            )} minutes before event`
-          : `${pkg.serviceWindowEndOffsetMinutes} minutes after event`
-        : "N/A"}
-    </Text>
-  </View>
-)}
 
           {/* Base Price */}
           <View

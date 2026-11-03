@@ -27,8 +27,8 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
   });
 
   // ✅ Test 1: Ensure the screen renders correctly
-  test("renders correctly with all input fields and buttons", () => {
-    const { getByPlaceholderText, getByText } = render(
+  test("renders correctly with all input fields and buttons", async () => {
+    const { getByPlaceholderText, getByText } = await render(
       <ContactDetailsScreen />
     );
 
@@ -45,14 +45,14 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
   });
 
   // ✅ Test 2: Ensure state updates when text inputs change
-  test("updates state when text inputs change", () => {
-    const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+  test("updates state when text inputs change", async () => {
+    const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
     const brandNameInput = getByPlaceholderText("Brand Name*");
-    fireEvent.changeText(brandNameInput, "Eventify Hun");
+    await fireEvent.changeText(brandNameInput, "Eventify Hun");
 
     const cityInput = getByPlaceholderText("City*");
-    fireEvent.changeText(cityInput, "Lahore");
+    await fireEvent.changeText(cityInput, "Lahore");
 
     expect(brandNameInput.props.value).toBe("Eventify Hun");
     expect(cityInput.props.value).toBe("Lahore");
@@ -60,8 +60,8 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
 
   // ✅ Test 3: Ensure error alert appears when required fields are empty
   test("displays an error if required fields are empty when submitting", async () => {
-    const { getByText } = render(<ContactDetailsScreen />);
-    fireEvent.press(getByText("Save & Continue"));
+    const { getByText } = await render(<ContactDetailsScreen />);
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -72,9 +72,9 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
   });
 
   // ✅ Test 4: Ensure navigation works when back button is pressed
-  test('navigates back when the "Back" button is pressed', () => {
-    const { getByText } = render(<ContactDetailsScreen />);
-    fireEvent.press(getByText("Back"));
+  test('navigates back when the "Back" button is pressed', async () => {
+    const { getByText } = await render(<ContactDetailsScreen />);
+    await fireEvent.press(getByText("Back"));
 
     expect(router.back).toHaveBeenCalled();
   });
@@ -88,24 +88,24 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
       new Error("Failed")
     );
 
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByPlaceholderText } = await render(
       <ContactDetailsScreen />
     );
 
     // Fill in required fields
-    fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+    await fireEvent.changeText(
       getByPlaceholderText("Instagram Link*"),
       "https://instagram.com/eventify"
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Booking Email*"),
       "contact@eventify.com"
     );
-    fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
-    fireEvent.changeText(getByPlaceholderText("+92"), "03001234567"); // ✅ Fix: Filling in the contact number
+    await fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
+    await fireEvent.changeText(getByPlaceholderText("+92"), "03001234567"); // ✅ Fix: Filling in the contact number
 
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     // Ensure API request was attempted
     await waitFor(
@@ -124,8 +124,8 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
     });
   });
 
-  test("ensures placeholder texts are correctly displayed", () => {
-    const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+  test("ensures placeholder texts are correctly displayed", async () => {
+    const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
     expect(getByPlaceholderText("Brand Name*")).toBeTruthy();
     expect(getByPlaceholderText("Instagram Link*")).toBeTruthy();
@@ -137,36 +137,36 @@ describe("ContactDetailsScreen UI , Functional & Security Tests", () => {
     expect(getByPlaceholderText("Official Google Link")).toBeTruthy();
   });
 
-  test("ensures buttons are clickable", () => {
-    const { getByText } = render(<ContactDetailsScreen />);
+  test("ensures buttons are clickable", async () => {
+    const { getByText } = await render(<ContactDetailsScreen />);
 
     const backButton = getByText("Back");
     const saveButton = getByText("Save & Continue");
 
-    fireEvent.press(backButton);
-    fireEvent.press(saveButton);
+    await fireEvent.press(backButton);
+    await fireEvent.press(saveButton);
 
     expect(router.back).toHaveBeenCalled();
   });
 
-  test("ensures ScrollView allows scrolling", () => {
-    const { getByTestId } = render(<ContactDetailsScreen />);
+  test("ensures ScrollView allows scrolling", async () => {
+    const { getByTestId } = await render(<ContactDetailsScreen />);
 
     const scrollView = getByTestId("scrollView");
 
     expect(scrollView).toBeTruthy();
   });
 
-test("ensures contact number field uses correct keyboard type", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures contact number field uses correct keyboard type", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const contactInput = getByPlaceholderText("+92");
 
   expect(contactInput.props.keyboardType).toBe("phone-pad"); // ✅ Correct Check
 });
 
 
-test("ensures email input uses correct keyboard type", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures email input uses correct keyboard type", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const emailInput = getByPlaceholderText("Booking Email*");
 
   expect(emailInput.props.keyboardType).toBe("email-address"); // ✅ Correct Check
@@ -174,9 +174,9 @@ test("ensures email input uses correct keyboard type", () => {
 
 
 test("ensures form cannot be submitted with empty required fields", async () => {
-  const { getByText } = render(<ContactDetailsScreen />);
+  const { getByText } = await render(<ContactDetailsScreen />);
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -191,22 +191,22 @@ test("ensures success alert is shown on successful form submission", async () =>
   );
   (postContactDetails as jest.Mock).mockResolvedValue(true);
 
-  const { getByText, getByPlaceholderText } = render(<ContactDetailsScreen />);
+  const { getByText, getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
   // ✅ Fill in all required fields
-  fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-  fireEvent.changeText(
+  await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+  await fireEvent.changeText(
     getByPlaceholderText("Instagram Link*"),
     "https://instagram.com/eventify"
   );
-  fireEvent.changeText(
+  await fireEvent.changeText(
     getByPlaceholderText("Booking Email*"),
     "contact@eventify.com"
   );
-  fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
-  fireEvent.changeText(getByPlaceholderText("+92"), "03001234567"); // ✅ Ensure contact number is filled
+  await fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
+  await fireEvent.changeText(getByPlaceholderText("+92"), "03001234567"); // ✅ Ensure contact number is filled
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -216,11 +216,11 @@ test("ensures success alert is shown on successful form submission", async () =>
   });
 });
 
-  test("ensures brand name input accepts text", () => {
-    const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+  test("ensures brand name input accepts text", async () => {
+    const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
     const brandNameInput = getByPlaceholderText("Brand Name*");
 
-    fireEvent.changeText(brandNameInput, "<script>alert('Hacked');</script>");
+    await fireEvent.changeText(brandNameInput, "<script>alert('Hacked');</script>");
     expect(brandNameInput.props.value).toBe(
       "<script>alert('Hacked');</script>"
     ); // ✅ Accepts text
@@ -230,12 +230,12 @@ test("ensures success alert is shown on successful form submission", async () =>
   test("ensures API call is not made if user ID is missing", async () => {
     (getSecureData as jest.Mock).mockResolvedValue(null);
 
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByPlaceholderText } = await render(
       <ContactDetailsScreen />
     );
 
-    fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(postContactDetails).not.toHaveBeenCalled();
@@ -248,22 +248,22 @@ test("ensures user data is not exposed via console log", async () => {
     JSON.stringify({ _id: "12345" })
   );
 
-  render(<ContactDetailsScreen />);
+  await render(<ContactDetailsScreen />);
 
   expect(console.log).not.toHaveBeenCalledWith(
     expect.objectContaining({ _id: "12345" })
   );
 });
-test("ensures save button is clickable", () => {
-  const { getByText } = render(<ContactDetailsScreen />);
+test("ensures save button is clickable", async () => {
+  const { getByText } = await render(<ContactDetailsScreen />);
   const saveButton = getByText("Save & Continue");
 
-  fireEvent.press(saveButton);
+  await fireEvent.press(saveButton);
   expect(saveButton).toBeTruthy();
 });
 
-test("ensures required fields display an asterisk (*)", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures required fields display an asterisk (*)", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
   expect(getByPlaceholderText("Brand Name*")).toBeTruthy();
   expect(getByPlaceholderText("Instagram Link*")).toBeTruthy();
@@ -272,9 +272,9 @@ test("ensures required fields display an asterisk (*)", () => {
 });
 
 test("ensures required fields must be filled before submission", async () => {
-  const { getByText } = render(<ContactDetailsScreen />);
+  const { getByText } = await render(<ContactDetailsScreen />);
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -284,56 +284,56 @@ test("ensures required fields must be filled before submission", async () => {
   });
 });
 
-test("ensures back button navigates correctly", () => {
-  const { getByText } = render(<ContactDetailsScreen />);
+test("ensures back button navigates correctly", async () => {
+  const { getByText } = await render(<ContactDetailsScreen />);
 
-  fireEvent.press(getByText("Back"));
+  await fireEvent.press(getByText("Back"));
 
   expect(router.back).toHaveBeenCalled();
 });
-test("ensures brand name input accepts special characters", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures brand name input accepts special characters", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const brandNameInput = getByPlaceholderText("Brand Name*");
 
-  fireEvent.changeText(brandNameInput, "Eventify & Co.");
+  await fireEvent.changeText(brandNameInput, "Eventify & Co.");
   expect(brandNameInput.props.value).toBe("Eventify & Co.");
 });
 
-test("ensures form does not allow JavaScript injection", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures form does not allow JavaScript injection", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const brandNameInput = getByPlaceholderText("Brand Name*");
 
-  fireEvent.changeText(brandNameInput, "<script>alert('XSS')</script>");
+  await fireEvent.changeText(brandNameInput, "<script>alert('XSS')</script>");
   expect(brandNameInput.props.value).toBe("<script>alert('XSS')</script>");
 });
 
 test("ensures API call is not made if user data is missing", async () => {
   (getSecureData as jest.Mock).mockResolvedValue(null);
 
-  const { getByText, getByPlaceholderText } = render(<ContactDetailsScreen />);
+  const { getByText, getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
-  fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(postContactDetails).not.toHaveBeenCalled();
   });
 });
 
-test("ensures contact number field only allows numbers", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures contact number field only allows numbers", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const contactInput = getByPlaceholderText("+92");
 
-  fireEvent.changeText(contactInput, "123");
+  await fireEvent.changeText(contactInput, "123");
   expect(contactInput.props.value).toBe("123"); // Ensures only numbers remain
 });
 
 test("ensures email field rejects invalid email formats", async () => {
-  const { getByPlaceholderText, getByText } = render(<ContactDetailsScreen />);
+  const { getByPlaceholderText, getByText } = await render(<ContactDetailsScreen />);
   const emailInput = getByPlaceholderText("Booking Email*");
 
-  fireEvent.changeText(emailInput, "invalid-email");
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.changeText(emailInput, "invalid-email");
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -349,22 +349,22 @@ test("ensures input fields reset after successful submission", async () => {
   );
   (postContactDetails as jest.Mock).mockResolvedValue(true);
 
-  const { getByText, getByPlaceholderText } = render(<ContactDetailsScreen />);
+  const { getByText, getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
   // ✅ Fill in all required fields before submission
-  fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-  fireEvent.changeText(
+  await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+  await fireEvent.changeText(
     getByPlaceholderText("Instagram Link*"),
     "https://instagram.com/eventify"
   );
-  fireEvent.changeText(
+  await fireEvent.changeText(
     getByPlaceholderText("Booking Email*"),
     "contact@eventify.com"
   );
-  fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
-  fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
+  await fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
+  await fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   // ✅ Expect success alert to be displayed
   await waitFor(() => {
@@ -381,22 +381,22 @@ test("ensures success alert appears after form submission", async () => {
   );
   (postContactDetails as jest.Mock).mockResolvedValue(true);
 
-  const { getByText, getByPlaceholderText } = render(<ContactDetailsScreen />);
+  const { getByText, getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
   // Fill required fields
-  fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-  fireEvent.changeText(
+  await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+  await fireEvent.changeText(
     getByPlaceholderText("Instagram Link*"),
     "https://instagram.com/eventify"
   );
-  fireEvent.changeText(
+  await fireEvent.changeText(
     getByPlaceholderText("Booking Email*"),
     "contact@eventify.com"
   );
-  fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
-  fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
+  await fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
+  await fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -405,32 +405,32 @@ test("ensures success alert appears after form submission", async () => {
     );
   });
 });
-test("ensures ScrollView allows scrolling", () => {
-  const { getByTestId } = render(<ContactDetailsScreen />);
+test("ensures ScrollView allows scrolling", async () => {
+  const { getByTestId } = await render(<ContactDetailsScreen />);
 
   const scrollView = getByTestId("scrollView");
   expect(scrollView).toBeTruthy();
 });
-test("ensures save button is clickable", () => {
-  const { getByText } = render(<ContactDetailsScreen />);
+test("ensures save button is clickable", async () => {
+  const { getByText } = await render(<ContactDetailsScreen />);
   const saveButton = getByText("Save & Continue");
 
-  fireEvent.press(saveButton);
+  await fireEvent.press(saveButton);
   expect(saveButton).toBeTruthy();
 });
 
-test("ensures numeric values are not accepted in brand name input", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures numeric values are not accepted in brand name input", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const brandNameInput = getByPlaceholderText("Brand Name*");
 
-  fireEvent.changeText(brandNameInput, "12345");
+  await fireEvent.changeText(brandNameInput, "12345");
   expect(brandNameInput.props.value).toBe("12345"); // Ensures no validation issue
 });
-test("ensures email input accepts valid email format", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures email input accepts valid email format", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const emailInput = getByPlaceholderText("Booking Email*");
 
-  fireEvent.changeText(emailInput, "valid@email.com");
+  await fireEvent.changeText(emailInput, "valid@email.com");
   expect(emailInput.props.value).toBe("valid@email.com");
 });
 
@@ -440,21 +440,21 @@ test("ensures submission fails if API returns an error", async () => {
   );
   (postContactDetails as jest.Mock).mockRejectedValueOnce(new Error("Failed"));
 
-  const { getByText, getByPlaceholderText } = render(<ContactDetailsScreen />);
+  const { getByText, getByPlaceholderText } = await render(<ContactDetailsScreen />);
 
-  fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
-  fireEvent.changeText(
+  await fireEvent.changeText(getByPlaceholderText("Brand Name*"), "Eventify Hun");
+  await fireEvent.changeText(
     getByPlaceholderText("Instagram Link*"),
     "https://instagram.com/eventify"
   );
-  fireEvent.changeText(
+  await fireEvent.changeText(
     getByPlaceholderText("Booking Email*"),
     "contact@eventify.com"
   );
-  fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
-  fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
+  await fireEvent.changeText(getByPlaceholderText("City*"), "Lahore");
+  await fireEvent.changeText(getByPlaceholderText("+92"), "03001234567");
 
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -465,27 +465,27 @@ test("ensures submission fails if API returns an error", async () => {
 });
 
 
-test("ensures city input accepts alphabetical characters only", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures city input accepts alphabetical characters only", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const cityInput = getByPlaceholderText("City*");
 
-  fireEvent.changeText(cityInput, "Lahore123");
+  await fireEvent.changeText(cityInput, "Lahore123");
   expect(cityInput.props.value).toBe("Lahore123"); // No validation restricting numbers
 });
 
-test("ensures Facebook link input accepts valid URL format", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures Facebook link input accepts valid URL format", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const facebookInput = getByPlaceholderText("Facebook Link");
 
-  fireEvent.changeText(facebookInput, "https://facebook.com/eventify");
+  await fireEvent.changeText(facebookInput, "https://facebook.com/eventify");
   expect(facebookInput.props.value).toBe("https://facebook.com/eventify");
 });
 
-test("ensures Google link input accepts a valid URL format", () => {
-  const { getByPlaceholderText } = render(<ContactDetailsScreen />);
+test("ensures Google link input accepts a valid URL format", async () => {
+  const { getByPlaceholderText } = await render(<ContactDetailsScreen />);
   const googleLinkInput = getByPlaceholderText("Official Google Link");
 
-  fireEvent.changeText(googleLinkInput, "https://google.com/maps");
+  await fireEvent.changeText(googleLinkInput, "https://google.com/maps");
   expect(googleLinkInput.props.value).toBe("https://google.com/maps");
 });
 

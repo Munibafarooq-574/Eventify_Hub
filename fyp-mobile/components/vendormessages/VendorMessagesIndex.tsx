@@ -1086,7 +1086,7 @@ const MessagesScreen: React.FC = () => {
                                 message you
                             </Text>
                         </View>
-                    ) : null
+                    ) : undefined
                 }
             />
 

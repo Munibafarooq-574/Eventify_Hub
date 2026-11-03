@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react';
 // fyp-mobile/components/VendorSubscription/SubscriptionScreen.tsx
 
 import React, {
@@ -252,7 +253,7 @@ export default function SubscriptionScreen() {
 
   // ---- NEW: refs for auto-scroll-to-payment-card ----
   const scrollViewRef =
-    useRef<ScrollView>(null);
+    useRef<ComponentRef<typeof ScrollView>>(null);
 
   const paymentCardOffsetY =
     useRef(0);

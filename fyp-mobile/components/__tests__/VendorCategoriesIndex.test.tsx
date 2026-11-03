@@ -1,3 +1,4 @@
+import { getRenderedComponent, getRenderedComponents } from '../../test-utils/renderedComponents';
 /* eslint-disable no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-require-imports */
 import React from "react";
@@ -47,8 +48,8 @@ describe("VendorCategoriesIndex Component", () => {
   });
 
   describe("VendorCategoriesIndex Snapshot Testing", () => {
-    test("renders correctly with default layout", () => {
-      const tree = render(<VendorCategoriesIndex />).toJSON();
+    test("renders correctly with default layout", async () => {
+      const tree = (await render(<VendorCategoriesIndex />)).toJSON();
       expect(tree).toMatchSnapshot();
     });
 
@@ -73,7 +74,7 @@ describe("VendorCategoriesIndex Component", () => {
         mockCategories
       );
 
-      const { findByText, toJSON } = render(<VendorCategoriesIndex />);
+      const { findByText, toJSON } = await render(<VendorCategoriesIndex />);
       await findByText("Food");
       await findByText("Clothing");
 
@@ -83,7 +84,7 @@ describe("VendorCategoriesIndex Component", () => {
     test("renders correctly when no categories are available", async () => {
       require("@/services/getAllCategories").mockResolvedValueOnce([]);
 
-      const { findByText, toJSON } = render(<VendorCategoriesIndex />);
+      const { findByText, toJSON } = await render(<VendorCategoriesIndex />);
       await findByText("Vendor Categories");
 
       expect(toJSON()).toMatchSnapshot();
@@ -103,22 +104,22 @@ describe("VendorCategoriesIndex Component", () => {
         mockCategories
       );
 
-      const { findByText, toJSON } = render(<VendorCategoriesIndex />);
+      const { findByText, toJSON } = await render(<VendorCategoriesIndex />);
       await findByText("Super Long Category Name That Overflows");
 
       expect(toJSON()).toMatchSnapshot();
     });
 
-    test("renders correctly with search input", () => {
-      const { getByPlaceholderText, toJSON } = render(
+    test("renders correctly with search input", async () => {
+      const { getByPlaceholderText, toJSON } = await render(
         <VendorCategoriesIndex />
       );
       expect(getByPlaceholderText("Search vendor categories")).toBeTruthy();
       expect(toJSON()).toMatchSnapshot();
     });
 
-    test("renders correctly with back button", () => {
-      const { getByText, toJSON } = render(<VendorCategoriesIndex />);
+    test("renders correctly with back button", async () => {
+      const { getByText, toJSON } = await render(<VendorCategoriesIndex />);
       expect(getByText("Back")).toBeTruthy();
       expect(toJSON()).toMatchSnapshot();
     });
@@ -136,7 +137,7 @@ describe("VendorCategoriesIndex Component", () => {
       require("@/services/getAllCategories").mockResolvedValueOnce(
         mockCategories
       );
-      const { findByText, toJSON } = render(<VendorCategoriesIndex />);
+      const { findByText, toJSON } = await render(<VendorCategoriesIndex />);
 
       const foodCategory = await findByText("Food");
       expect(foodCategory).toBeTruthy();
@@ -147,7 +148,7 @@ describe("VendorCategoriesIndex Component", () => {
   // UI TESTING
   describe("UI Testing", () => {
     test("renders all UI elements correctly", async () => {
-      const { getByText, getByPlaceholderText } = render(
+      const { getByText, getByPlaceholderText } = await render(
         <VendorCategoriesIndex />
       );
 
@@ -170,7 +171,7 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("renders all UI elements correctly", async () => {
-      const { getByText, getByPlaceholderText, queryByText } = render(
+      const { getByText, getByPlaceholderText, queryByText } = await render(
         <VendorCategoriesIndex />
       );
 
@@ -191,11 +192,11 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("renders FlatList with expected structure", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       // Wait for FlatList to be rendered
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         expect(flatList).toBeTruthy();
         expect(flatList.props.data).toBeTruthy();
         expect(flatList.props.renderItem).toBeTruthy();
@@ -203,38 +204,38 @@ describe("VendorCategoriesIndex Component", () => {
       });
     });
 
-    test("applies correct background color to container", () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+    test("applies correct background color to container", async () => {
+      const { container } = await render(<VendorCategoriesIndex />);
 
-      const viewComponent = UNSAFE_getByType(require("react-native").View);
+      const viewComponent = getRenderedComponent(container, require("react-native").View);
       expect(viewComponent.props.style).toMatchObject({
         backgroundColor: "#F8E9F0",
       });
     });
 
-    test("renders correct padding on list container", () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+    test("renders correct padding on list container", async () => {
+      const { container } = await render(<VendorCategoriesIndex />);
 
-      const flatList = UNSAFE_getByType(require("react-native").FlatList);
+      const flatList = getRenderedComponent(container, require("react-native").FlatList);
       expect(flatList.props.contentContainerStyle).toMatchObject({
         paddingBottom: 16,
       });
     });
 
-    test("renders search input with correct placeholder color", () => {
-      const { getByPlaceholderText } = render(<VendorCategoriesIndex />);
+    test("renders search input with correct placeholder color", async () => {
+      const { getByPlaceholderText } = await render(<VendorCategoriesIndex />);
 
       const searchInput = getByPlaceholderText("Search vendor categories");
       expect(searchInput.props.placeholderTextColor).toBe("#aaa");
     });
 
-    test("should display correct header text", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("should display correct header text", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
       expect(getByText("Vendor Categories")).toBeTruthy();
     });
 
-     test("should render back button with correct styling", () => {
-       const { getByText } = render(<VendorCategoriesIndex />);
+     test("should render back button with correct styling", async () => {
+       const { getByText } = await render(<VendorCategoriesIndex />);
        const backButton = getByText("Back").parent;
 
        // Update expected styles to match what's actually in the component
@@ -246,16 +247,16 @@ describe("VendorCategoriesIndex Component", () => {
        });
      });
 
-    test("should have search input with specific placeholder", () => {
-      const { getByPlaceholderText } = render(<VendorCategoriesIndex />);
+    test("should have search input with specific placeholder", async () => {
+      const { getByPlaceholderText } = await render(<VendorCategoriesIndex />);
       const searchInput = getByPlaceholderText("Search vendor categories");
       expect(searchInput).toBeTruthy();
       expect(searchInput.props.placeholderTextColor).toBe("#aaa");
     });
 
-    test("should apply correct container padding", () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
-      const containerView = UNSAFE_getByType(require("react-native").View);
+    test("should apply correct container padding", async () => {
+      const { container } = await render(<VendorCategoriesIndex />);
+      const containerView = getRenderedComponent(container, require("react-native").View);
       expect(containerView.props.style).toMatchObject({
         paddingHorizontal: 16,
         paddingTop: 70,
@@ -285,7 +286,7 @@ describe("VendorCategoriesIndex Component", () => {
   // FUNCTIONAL TESTING
   describe("Functional Testing", () => {
     test("fetches categories on mount", async () => {
-      render(<VendorCategoriesIndex />);
+      await render(<VendorCategoriesIndex />);
 
       expect(getAllCategories).toHaveBeenCalledTimes(1);
 
@@ -295,7 +296,7 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("displays fetched categories correctly", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
         expect(getByText("Food")).toBeTruthy();
@@ -305,22 +306,22 @@ describe("VendorCategoriesIndex Component", () => {
       });
     });
 
-    test("back button navigates back when pressed", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("back button navigates back when pressed", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       const backButton = getByText("Back");
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(mockRouter.back).toHaveBeenCalledTimes(1);
     });
 
     test("pressing a category saves ID and navigates to vendor listing", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         if (foodCategory?.parent?.parent) {
-          fireEvent.press(foodCategory.parent.parent);
+          await fireEvent.press(foodCategory.parent.parent);
         }
 
         expect(saveSecureData).toHaveBeenCalledWith("categoryId", "1");
@@ -329,14 +330,14 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("search input should be editable", async () => {
-      const { getByPlaceholderText, queryByText } = render(
+      const { getByPlaceholderText, queryByText } = await render(
         <VendorCategoriesIndex />
       );
 
       const searchInput = getByPlaceholderText("Search vendor categories");
 
       // Simulate typing "Food" into the search bar
-      fireEvent.changeText(searchInput, "Food");
+      await fireEvent.changeText(searchInput, "Food");
 
       // Wait for the filtered item to appear
       await waitFor(() => {
@@ -345,13 +346,13 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("multiple category clicks should navigate correctly", async () => {
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // First category click
       const foodCategory = await findByText("Food");
 
       if (foodCategory?.parent?.parent) {
-        fireEvent.press(foodCategory.parent.parent);
+        await fireEvent.press(foodCategory.parent.parent);
       } else {
         throw new Error("Food category container not found");
       }
@@ -365,7 +366,7 @@ describe("VendorCategoriesIndex Component", () => {
       const clothingCategory = await findByText("Clothing");
 
       if (clothingCategory?.parent?.parent) {
-        fireEvent.press(clothingCategory.parent.parent);
+        await fireEvent.press(clothingCategory.parent.parent);
       } else {
         throw new Error("Clothing category container not found");
       }
@@ -381,10 +382,10 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("keyExtractor function returns correct ID", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         const keyExtractor = flatList.props.keyExtractor;
 
         expect(keyExtractor(mockCategories[0])).toBe("1");
@@ -393,10 +394,10 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("TouchableOpacity in renderItem has correct onPress handler", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         const renderItem = flatList.props.renderItem;
 
         const renderedItem = renderItem({ item: mockCategories[0] });
@@ -405,10 +406,10 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("image source in renderItem has correct URI", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         const renderItem = flatList.props.renderItem;
 
         const renderedItem = renderItem({ item: mockCategories[0] });
@@ -421,13 +422,13 @@ describe("VendorCategoriesIndex Component", () => {
       });
     });
 
-    test("should call getAllCategories on component mount", () => {
-      render(<VendorCategoriesIndex />);
+    test("should call getAllCategories on component mount", async () => {
+      await render(<VendorCategoriesIndex />);
       expect(getAllCategories).toHaveBeenCalledTimes(1);
     });
 
     test("should update categories state after API call", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Wait for the categories that are actually rendered
       await waitFor(() => {
@@ -439,10 +440,10 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("should correctly extract item ID for FlatList keyExtractor", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         const keyExtractor = flatList.props.keyExtractor;
 
         expect(keyExtractor({ _id: "test-id" })).toBe("test-id");
@@ -453,7 +454,7 @@ describe("VendorCategoriesIndex Component", () => {
   // INTEGRATION TESTING
   describe("Integration Testing", () => {
     test("integrates with getAllCategories service correctly", async () => {
-      render(<VendorCategoriesIndex />);
+      await render(<VendorCategoriesIndex />);
 
       expect(getAllCategories).toHaveBeenCalled();
 
@@ -463,29 +464,29 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("integrates with saveSecureData correctly", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         if (foodCategory?.parent) {
-          fireEvent.press(foodCategory.parent);
+          await fireEvent.press(foodCategory.parent);
         }
         expect(saveSecureData).toHaveBeenCalledWith("categoryId", "1");
       });
     });
 
     test("integrates with expo-router navigation correctly", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Test back navigation
-      fireEvent.press(getByText("Back"));
+      await fireEvent.press(getByText("Back"));
       expect(mockRouter.back).toHaveBeenCalled();
 
       // Test forward navigation
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         if (foodCategory?.parent?.parent) {
-          fireEvent.press(foodCategory.parent.parent);
+          await fireEvent.press(foodCategory.parent.parent);
         }
         expect(mockRouter.push).toHaveBeenCalledWith("/categoryvendorlisting");
       });
@@ -507,7 +508,7 @@ describe("VendorCategoriesIndex Component", () => {
          },
        ]);
 
-       const { findByText } = render(<VendorCategoriesIndex />);
+       const { findByText } = await render(<VendorCategoriesIndex />);
 
        // Wait for the component to render and categories to load
        const cateringsCategory = await findByText("Caterings");
@@ -517,7 +518,7 @@ describe("VendorCategoriesIndex Component", () => {
 
        if (touchableParent) {
          // Fire press event on the touchable component
-         fireEvent.press(touchableParent);
+         await fireEvent.press(touchableParent);
 
          // Check if secure storage was called with correct ID
          expect(saveSecureData).toHaveBeenCalledWith("categoryId", "2");
@@ -530,10 +531,10 @@ describe("VendorCategoriesIndex Component", () => {
      });
   
     test("component correctly integrates FlatList with category data", async () => {
-      const { UNSAFE_getByType } = render(<VendorCategoriesIndex />);
+      const { container } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
-        const flatList = UNSAFE_getByType(require("react-native").FlatList);
+        const flatList = getRenderedComponent(container, require("react-native").FlatList);
         expect(flatList.props.data).toEqual([
           {
             _id: "1",
@@ -552,13 +553,13 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("correctly integrates image loading for each category", async () => {
-      const { findByText, UNSAFE_getAllByType } = render(
+      const { findByText, container } = await render(
         <VendorCategoriesIndex />
       );
 
       await findByText("Food");
 
-      const images = UNSAFE_getAllByType(require("react-native").Image);
+      const images = getRenderedComponents(container, require("react-native").Image);
       expect(images.length).toBe(2);
       expect(images[0].props.source).toEqual({
         uri: "https://example.com/food.jpg",
@@ -569,14 +570,14 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
       test("should correctly pass image URLs to Image component", async () => {
-        const { UNSAFE_getAllByType, getByText } = render(
+        const { container, getByText } = await render(
           <VendorCategoriesIndex />
         );
 
         // Wait for the categories that are actually rendered
         await waitFor(() => getByText("Food"));
 
-        const images = UNSAFE_getAllByType(require("react-native").Image);
+        const images = getRenderedComponents(container, require("react-native").Image);
         // Update expected image URLs to match actual data
         expect(images[0].props.source).toEqual({
           uri: "https://example.com/food.jpg",
@@ -586,17 +587,17 @@ describe("VendorCategoriesIndex Component", () => {
         });
       });
 
-     test("should properly call router.back when back button is pressed", () => {
-       const { getByText } = render(<VendorCategoriesIndex />);
+     test("should properly call router.back when back button is pressed", async () => {
+       const { getByText } = await render(<VendorCategoriesIndex />);
 
        const backButton = getByText("Back");
-       fireEvent.press(backButton);
+       await fireEvent.press(backButton);
 
        expect(mockRouter.back).toHaveBeenCalledTimes(1);
      });
 
        test("should combine FlatList with item renderer correctly", async () => {
-         const { UNSAFE_getByType, getByText } = render(
+         const { container, getByText } = await render(
            <VendorCategoriesIndex />
          );
 
@@ -604,7 +605,7 @@ describe("VendorCategoriesIndex Component", () => {
          await waitFor(() => getByText("Food"));
 
          // Use RCTScrollView instead of FlatList directly
-         const scrollView = UNSAFE_getByType(
+         const scrollView = getRenderedComponent(container,
            require("react-native").ScrollView
          );
          expect(scrollView).toBeTruthy();
@@ -627,7 +628,7 @@ describe("VendorCategoriesIndex Component", () => {
         maliciousCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       const maliciousText = await findByText("Malicious");
@@ -650,7 +651,7 @@ describe("VendorCategoriesIndex Component", () => {
         nullImageCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       const nullImageText = await findByText("Null Image");
@@ -671,7 +672,7 @@ describe("VendorCategoriesIndex Component", () => {
         undefinedImageCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       const undefinedImageText = await findByText("Undefined Image");
@@ -690,7 +691,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(htmlCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render the text content safely
       await findByText('<script>alert("XSS")</script>HTML Injection');
@@ -708,7 +709,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(htmlDescCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render the text content safely
       await findByText('<img src="x" onerror="alert(\'XSS\')">');
@@ -726,7 +727,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(longNameCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       await findByText("A".repeat(1000));
@@ -746,12 +747,12 @@ describe("VendorCategoriesIndex Component", () => {
             maliciousCategories
           );
 
-          const { findByText, UNSAFE_getAllByType } = render(
+          const { findByText, container } = await render(
             <VendorCategoriesIndex />
           );
 
           await findByText("Test Category");
-          const images = UNSAFE_getAllByType(require("react-native").Image);
+          const images = getRenderedComponents(container, require("react-native").Image);
 
           // Component should still render without executing the malicious URL
           expect(images[0].props.source).toEqual({
@@ -774,15 +775,15 @@ describe("VendorCategoriesIndex Component", () => {
             brokenImageCategories
           );
 
-          const { findByText, UNSAFE_getAllByType } = render(
+          const { findByText, container } = await render(
             <VendorCategoriesIndex />
           );
 
           await findByText("Broken Image");
-          const images = UNSAFE_getAllByType(require("react-native").Image);
+          const images = getRenderedComponents(container, require("react-native").Image);
 
           // Test onError handler
-          act(() => {
+          await act(() => {
             images[0].props.onError && images[0].props.onError();
           });
 
@@ -801,7 +802,7 @@ describe("VendorCategoriesIndex Component", () => {
 
           (getAllCategories as jest.Mock).mockResolvedValueOnce(htmlCategories);
 
-          const { findByText } = render(<VendorCategoriesIndex />);
+          const { findByText } = await render(<VendorCategoriesIndex />);
 
           // Should render text content without executing scripts
           await findByText("<script>alert('test')</script>Description");
@@ -821,7 +822,7 @@ describe("VendorCategoriesIndex Component", () => {
             longTextCategories
           );
 
-          const { findByText } = render(<VendorCategoriesIndex />);
+          const { findByText } = await render(<VendorCategoriesIndex />);
 
           // Component should handle long text gracefully
           await findByText("A".repeat(500));
@@ -841,10 +842,10 @@ describe("VendorCategoriesIndex Component", () => {
             emptyFieldCategories
           );
 
-          const { UNSAFE_getAllByType } = render(<VendorCategoriesIndex />);
+          const { container } = await render(<VendorCategoriesIndex />);
 
           await waitFor(() => {
-            const images = UNSAFE_getAllByType(require("react-native").Image);
+            const images = getRenderedComponents(container, require("react-native").Image);
             expect(images[0]).toBeTruthy();
           });
         });
@@ -868,7 +869,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       const startTime = performance.now();
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       await findByText("Category 0");
 
@@ -893,7 +894,7 @@ describe("VendorCategoriesIndex Component", () => {
        (getAllCategories as jest.Mock).mockResolvedValueOnce(datasetMedium);
 
        const startTime = performance.now();
-       const { findByText } = render(<VendorCategoriesIndex />);
+       const { findByText } = await render(<VendorCategoriesIndex />);
 
        // Wait for the first category to render (indicates data has loaded)
        await findByText("Category 0");
@@ -909,8 +910,8 @@ describe("VendorCategoriesIndex Component", () => {
        expect(endTime - startTime).toBeLessThan(1000);
      });
 
-    test("search input responds to user input without delay", () => {
-      const { getByPlaceholderText } = render(<VendorCategoriesIndex />);
+    test("search input responds to user input without delay", async () => {
+      const { getByPlaceholderText } = await render(<VendorCategoriesIndex />);
 
       const searchInput = getByPlaceholderText("Search vendor categories");
 
@@ -918,7 +919,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       // Type 10 characters in the search input
       for (let i = 0; i < 10; i++) {
-        fireEvent.changeText(searchInput, "C".repeat(i + 1));
+        await fireEvent.changeText(searchInput, "C".repeat(i + 1));
       }
 
       const endTime = performance.now();
@@ -947,7 +948,7 @@ describe("VendorCategoriesIndex Component", () => {
        // Mock the API to return our test data
        (getAllCategories as jest.Mock).mockResolvedValueOnce(testCategories);
 
-       const { findByText } = render(<VendorCategoriesIndex />);
+       const { findByText } = await render(<VendorCategoriesIndex />);
 
        // Use a category name that's actually in our mock data
        const foodCategory = await findByText("Food");
@@ -958,7 +959,7 @@ describe("VendorCategoriesIndex Component", () => {
 
        const startTime = performance.now();
 
-       fireEvent.press(foodCategory.parent.parent);
+       await fireEvent.press(foodCategory.parent.parent);
 
        const endTime = performance.now();
 
@@ -966,14 +967,14 @@ describe("VendorCategoriesIndex Component", () => {
        expect(endTime - startTime).toBeLessThan(100);
      });
 
-    test("back button responds to touch without delay", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("back button responds to touch without delay", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       const backButton = getByText("Back");
 
       const startTime = performance.now();
 
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       const endTime = performance.now();
 
@@ -996,7 +997,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       const startTime = performance.now();
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       await findByText("Image 0");
 
@@ -1019,7 +1020,7 @@ describe("VendorCategoriesIndex Component", () => {
       (getAllCategories as jest.Mock).mockResolvedValueOnce(moderateDataset);
 
       const startTime = performance.now();
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       await findByText("Category 0");
       const endTime = performance.now();
@@ -1027,15 +1028,15 @@ describe("VendorCategoriesIndex Component", () => {
       expect(endTime - startTime).toBeLessThan(2000);
     });
 
-    test("should handle rapid text input changes efficiently", () => {
-      const { getByPlaceholderText } = render(<VendorCategoriesIndex />);
+    test("should handle rapid text input changes efficiently", async () => {
+      const { getByPlaceholderText } = await render(<VendorCategoriesIndex />);
       const searchInput = getByPlaceholderText("Search vendor categories");
 
       const startTime = performance.now();
 
       // Simulate fast typing
       for (let i = 0; i < 20; i++) {
-        fireEvent.changeText(searchInput, `Search text ${i}`);
+        await fireEvent.changeText(searchInput, `Search text ${i}`);
       }
 
       const endTime = performance.now();
@@ -1043,18 +1044,18 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("should optimize FlatList rendering with proper configuration", async () => {
-      const { UNSAFE_getByType, getByText } = render(<VendorCategoriesIndex />);
+      const { container, getByText } = await render(<VendorCategoriesIndex />);
 
       // Wait for the category that is actually rendered
       await waitFor(() => getByText("Food"));
 
       // Use RCTScrollView instead of testing FlatList props
-      const scrollView = UNSAFE_getByType(require("react-native").ScrollView);
+      const scrollView = getRenderedComponent(container, require("react-native").ScrollView);
       expect(scrollView).toBeTruthy();
     });
    
     test("should handle multiple rapid button presses efficiently", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Wait for the category that is actually rendered
       await waitFor(() => getByText("Food"));
@@ -1066,7 +1067,7 @@ describe("VendorCategoriesIndex Component", () => {
         const startTime = performance.now();
         // Simulate multiple rapid presses
         for (let i = 0; i < 5; i++) {
-          fireEvent.press(touchableParent);
+          await fireEvent.press(touchableParent);
         }
 
         const endTime = performance.now();
@@ -1077,7 +1078,7 @@ describe("VendorCategoriesIndex Component", () => {
     });
      
      test("should handle component unmount cleanly", async () => {
-       const { getByText, unmount } = render(<VendorCategoriesIndex />);
+       const { getByText, unmount } = await render(<VendorCategoriesIndex />);
 
        // Wait for the category that is actually rendered
        await waitFor(() => getByText("Food"));
@@ -1090,7 +1091,7 @@ describe("VendorCategoriesIndex Component", () => {
   // ACCURACY TESTING
   describe("Accuracy Testing", () => {
     test("correctly displays all category information", async () => {
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Verify each piece of information is displayed correctly
       const foodTitle = await findByText("Food");
@@ -1108,7 +1109,7 @@ describe("VendorCategoriesIndex Component", () => {
 
     // New Test Cases
      test("renders exact number of items as in the data source", async () => {
-       const { findByText, UNSAFE_getAllByType } = render(
+       const { findByText, container } = await render(
          <VendorCategoriesIndex />
        );
 
@@ -1116,7 +1117,7 @@ describe("VendorCategoriesIndex Component", () => {
        await findByText("Food");
 
        // Find all TouchableOpacity components that represent category items
-       const touchables = UNSAFE_getAllByType(TouchableOpacity).filter(
+       const touchables = getRenderedComponents(container, TouchableOpacity).filter(
          (touchable) =>
            touchable.props.style &&
            typeof touchable.props.style === "object" &&
@@ -1141,7 +1142,7 @@ describe("VendorCategoriesIndex Component", () => {
         mixedCaseCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Should preserve the exact case
       const categoryName = await findByText("MiXeD CaSe");
@@ -1162,7 +1163,7 @@ describe("VendorCategoriesIndex Component", () => {
         whitespaceCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Should preserve whitespace
       const description = await findByText("  Leading and trailing spaces  ");
@@ -1185,7 +1186,7 @@ describe("VendorCategoriesIndex Component", () => {
         specialCharCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Should render special characters correctly
       await findByText("Special Chars ©®™");
@@ -1204,7 +1205,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(unicodeCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Should render unicode characters correctly
       await findByText("🍕 Food Emojis 🍔");
@@ -1212,7 +1213,7 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
      test("should display exact category descriptions", async () => {
-       const { getByText } = render(<VendorCategoriesIndex />);
+       const { getByText } = await render(<VendorCategoriesIndex />);
 
        // Wait for the descriptions that are actually rendered
        await waitFor(() => {
@@ -1241,7 +1242,7 @@ describe("VendorCategoriesIndex Component", () => {
         formattedCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Should preserve exact spacing
       const spacedName = await findByText("  Spaced  Name  ");
@@ -1260,14 +1261,14 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(nonAsciiCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       await findByText("Café Français");
       await findByText("中文 日本語 한국어");
     });
 
    test("should match exact font sizes specified in styles", async () => {
-     const { findByText } = render(<VendorCategoriesIndex />);
+     const { findByText } = await render(<VendorCategoriesIndex />);
 
      const header = await findByText("Vendor Categories");
      expect(header.props.style).toMatchObject({ fontSize: 24 });
@@ -1291,13 +1292,13 @@ describe("VendorCategoriesIndex Component", () => {
         precisionCategories
       );
 
-      const { findByText, UNSAFE_getByType } = render(
+      const { findByText, container } = await render(
         <VendorCategoriesIndex />
       );
 
       await findByText("Precision Test");
 
-      const flatList = UNSAFE_getByType(require("react-native").FlatList);
+      const flatList = getRenderedComponent(container, require("react-native").FlatList);
       expect(flatList.props.keyExtractor(precisionCategories[0])).toBe(
         "12345678901234567890"
       );
@@ -1307,45 +1308,45 @@ describe("VendorCategoriesIndex Component", () => {
 
   // NAVIGATION TESTING
   describe("Navigation Testing", () => {
-    test("navigates back correctly", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("navigates back correctly", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
-      fireEvent.press(getByText("Back"));
+      await fireEvent.press(getByText("Back"));
       expect(mockRouter.back).toHaveBeenCalledTimes(1);
     });
 
     test("navigates to category vendor listing correctly", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         if (foodCategory?.parent?.parent) {
-          fireEvent.press(foodCategory.parent.parent);
+          await fireEvent.press(foodCategory.parent.parent);
         }
         expect(mockRouter.push).toHaveBeenCalledWith("/categoryvendorlisting");
       });
     });
 
-    test("navigates correctly after multiple back button presses", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("navigates correctly after multiple back button presses", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Press back multiple times
       const backButton = getByText("Back");
-      fireEvent.press(backButton);
-      fireEvent.press(backButton);
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
+      await fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       expect(mockRouter.back).toHaveBeenCalledTimes(3);
     });
 
     test("maintains navigation state between renders", async () => {
-      const { getByText, rerender } = render(<VendorCategoriesIndex />);
+      const { getByText, rerender } = await render(<VendorCategoriesIndex />);
 
       // Navigate once using an existing category
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food"); // Using existing category
         if (foodCategory?.parent?.parent) {
-          fireEvent.press(foodCategory.parent.parent);
+          await fireEvent.press(foodCategory.parent.parent);
         } else {
           throw new Error("Food category container not found");
         }
@@ -1354,13 +1355,13 @@ describe("VendorCategoriesIndex Component", () => {
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
 
       // Re-render component
-      rerender(<VendorCategoriesIndex />);
+      await rerender(<VendorCategoriesIndex />);
 
       // Navigate again using another existing category
-      await waitFor(() => {
+      await waitFor(async () => {
         const clothingCategory = getByText("Clothing"); // Using existing category
         if (clothingCategory?.parent?.parent) {
-          fireEvent.press(clothingCategory.parent.parent);
+          await fireEvent.press(clothingCategory.parent.parent);
         } else {
           throw new Error("Clothing category container not found");
         }
@@ -1370,16 +1371,16 @@ describe("VendorCategoriesIndex Component", () => {
     });
 
     test("properly handles rapid navigation events", async () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       const backButton = getByText("Back");
-      fireEvent.press(backButton);
+      await fireEvent.press(backButton);
 
       // Since findByText is failing, let's use waitFor with getByText instead
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         if (foodCategory?.parent?.parent) {
-          fireEvent.press(foodCategory.parent.parent);
+          await fireEvent.press(foodCategory.parent.parent);
         } else {
           throw new Error("Food category container not found");
         }
@@ -1391,8 +1392,8 @@ describe("VendorCategoriesIndex Component", () => {
   });
   // ACCESSIBILITY TESTING
   describe("Accessibility Testing", () => {
-    test("elements have appropriate accessibility props", () => {
-      const { getByText, getByPlaceholderText } = render(
+    test("elements have appropriate accessibility props", async () => {
+      const { getByText, getByPlaceholderText } = await render(
         <VendorCategoriesIndex />
       );
 
@@ -1407,8 +1408,8 @@ describe("VendorCategoriesIndex Component", () => {
       expect(searchInput.props.accessible).not.toBe(false);
     });
 
-    test("should have accessible touchable elements", () => {
-      const { getByText } = render(<VendorCategoriesIndex />);
+    test("should have accessible touchable elements", async () => {
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       const backButton = getByText("Back").parent;
       // Check for accessibility either from props or parent
@@ -1417,8 +1418,8 @@ describe("VendorCategoriesIndex Component", () => {
       ).toBeTruthy();
     });
      
-    test("should have accessible search input", () => {
-      const { getByPlaceholderText } = render(<VendorCategoriesIndex />);
+    test("should have accessible search input", async () => {
+      const { getByPlaceholderText } = await render(<VendorCategoriesIndex />);
       
       const searchInput = getByPlaceholderText("Search vendor categories");
       expect(searchInput.props.accessible || true).toBeTruthy();
@@ -1430,7 +1431,7 @@ describe("VendorCategoriesIndex Component", () => {
     test("handles empty categories array correctly", async () => {
       (getAllCategories as jest.Mock).mockResolvedValueOnce([]);
 
-      const { queryByText } = render(<VendorCategoriesIndex />);
+      const { queryByText } = await render(<VendorCategoriesIndex />);
 
       await waitFor(() => {
         expect(queryByText("Food")).toBeNull();
@@ -1460,7 +1461,7 @@ describe("VendorCategoriesIndex Component", () => {
         incompleteCategories
       );
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       await findByText("Incomplete");
@@ -1470,7 +1471,7 @@ describe("VendorCategoriesIndex Component", () => {
     test("should handle API returning null gracefully", async () => {
       (getAllCategories as jest.Mock).mockResolvedValueOnce(null);
 
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       expect(getByText("Vendor Categories")).toBeTruthy();
@@ -1479,7 +1480,7 @@ describe("VendorCategoriesIndex Component", () => {
     test("should handle API returning empty array", async () => {
       (getAllCategories as jest.Mock).mockResolvedValueOnce([]);
 
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       expect(getByText("Vendor Categories")).toBeTruthy();
@@ -1490,7 +1491,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(invalidCategories);
 
-      const { getByText } = render(<VendorCategoriesIndex />);
+      const { getByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       expect(getByText("Vendor Categories")).toBeTruthy();
@@ -1508,7 +1509,7 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(partialCategories);
 
-      const { findByText } = render(<VendorCategoriesIndex />);
+      const { findByText } = await render(<VendorCategoriesIndex />);
 
       // Component should render without crashing
       await findByText("Partial Data");
@@ -1530,16 +1531,16 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(manyCategories);
 
-      const { UNSAFE_getByType, findByText } = render(
+      const { container, findByText } = await render(
         <VendorCategoriesIndex />
       );
 
       await findByText("Category 0");
-      const flatList = UNSAFE_getByType(require("react-native").ScrollView);
+      const flatList = getRenderedComponent(container, require("react-native").ScrollView);
       expect(flatList).toBeTruthy();
 
       // Test scrolling functionality
-      fireEvent.scroll(flatList, {
+      await fireEvent.scroll(flatList.host, {
         nativeEvent: {
           contentOffset: { y: 500 },
           contentSize: { height: 1000, width: 400 },
@@ -1564,16 +1565,16 @@ describe("VendorCategoriesIndex Component", () => {
 
       (getAllCategories as jest.Mock).mockResolvedValueOnce(scrollCategories);
 
-      const { findByText, UNSAFE_getByType, rerender } = render(
+      const { findByText, container, rerender } = await render(
         <VendorCategoriesIndex />
       );
 
       await findByText("Scroll 0");
 
-      const flatList = UNSAFE_getByType(require("react-native").FlatList);
+      const flatList = getRenderedComponent(container, require("react-native").FlatList);
 
       // Simulate scrolling
-      fireEvent.scroll(flatList, {
+      await fireEvent.scroll(flatList.host, {
         nativeEvent: {
           contentOffset: { y: 200, x: 0 },
           contentSize: { height: 1000, width: 400 },
@@ -1582,7 +1583,7 @@ describe("VendorCategoriesIndex Component", () => {
       });
 
       // Rerender and check if scroll position is maintained
-      rerender(<VendorCategoriesIndex />);
+      await rerender(<VendorCategoriesIndex />);
 
       expect(flatList).toBeTruthy();
     });
@@ -1601,13 +1602,13 @@ describe("VendorCategoriesIndex Component", () => {
         scrollTestCategories
       );
 
-      const { UNSAFE_getByType, findByText } = render(
+      const { container, findByText } = await render(
         <VendorCategoriesIndex />
       );
 
       await findByText("Name 0");
 
-      const flatList = UNSAFE_getByType(require("react-native").FlatList);
+      const flatList = getRenderedComponent(container, require("react-native").FlatList);
       const keyExtractor = flatList.props.keyExtractor;
 
       // Check various items from the list
@@ -1620,18 +1621,18 @@ describe("VendorCategoriesIndex Component", () => {
   // ERROR HANDLING TESTING
   describe("Error Handling Testing", () => {
     test("handles image loading errors gracefully", async () => {
-      const { getByText, UNSAFE_getAllByType } = render(
+      const { getByText, container } = await render(
         <VendorCategoriesIndex />
       );
 
-      await waitFor(() => {
+      await waitFor(async () => {
         const foodCategory = getByText("Food");
         expect(foodCategory).toBeTruthy();
 
         // ✅ FIX: Use require("react-native").Image
-        const images = UNSAFE_getAllByType(require("react-native").Image);
+        const images = getRenderedComponents(container, require("react-native").Image);
 
-        act(() => {
+        await act(() => {
           images[0].props.onError && images[0].props.onError();
         });
 
@@ -1651,7 +1652,7 @@ describe("VendorCategoriesIndex Component", () => {
 
     (getAllCategories as jest.Mock).mockResolvedValueOnce(invalidIdCategories);
 
-    const { findByText } = render(<VendorCategoriesIndex />);
+    const { findByText } = await render(<VendorCategoriesIndex />);
 
     // Component should render without crashing
     await findByText("Invalid ID");

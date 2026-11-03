@@ -179,11 +179,6 @@ const getServiceWindowLabel = (
         ? `Time Slot: ${start}`
         : `Time Slot: ${start} - ${end}`;
 
-    case "CUSTOM":
-      return start === end
-        ? `Service at ${start}`
-        : `Service Window: ${start} - ${end}`;
-
     case "DURATION_BASED":
     default:
       return start === end
@@ -630,7 +625,7 @@ const renderEmptyState = () => {
 
 return (
   <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-    <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+    <StatusBar barStyle="dark-content" />
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()} style={styles.backButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} activeOpacity={0.7}>

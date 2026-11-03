@@ -1,3 +1,6 @@
+import { FeatureAccessService } from './growth/feature-access.service';
+import { CampaignService } from './growth/campaign/campaign.service';
+import { CityService } from '../city/city.service';
 import { VendorService } from './vendor.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
@@ -14,7 +17,7 @@ describe('VendorService - Unit Tests', () => {
         userModel = {
             findById: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: 'u1', save: jest.fn() }) }),
             updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
-            findOne: jest.fn().mockResolvedValue({ packages: [{ _id: 'p1', packageName: 'Gold' }] }),
+            findOne: jest.fn().mockResolvedValue({ _id: 'u1', packages: [{ _id: 'p1', packageName: 'Gold' }] }),
             aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
         };
         categoryModel = {
@@ -24,6 +27,9 @@ describe('VendorService - Unit Tests', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 VendorService,
+                { provide: FeatureAccessService, useValue: { getFeatureLimit: jest.fn().mockResolvedValue(10) } },
+                { provide: CampaignService, useValue: { cancelCampaignsForDeletedPackage: jest.fn() } },
+                { provide: CityService, useValue: {} },
                 { provide: getModelToken(User.name), useValue: userModel },
                 { provide: getModelToken(Category.name), useValue: categoryModel },
                 { provide: FileUploadService, useValue: { uploadFile: jest.fn().mockResolvedValue({ Location: 'logo.png' }), uploadMultipleFiles: jest.fn() } },
@@ -42,7 +48,7 @@ describe('VendorService - Unit Tests', () => {
     });
 
     it('addPackages - should save packages', async () => {
-        const userMock = { packages: [], save: jest.fn(), _id: 'u1' };
+        const userMock = { packages: [], markModified: jest.fn(), save: jest.fn(), _id: 'u1' };
         userModel.findById.mockResolvedValue(userMock);
         await service.addPackages('u1', { packages: [{ packageName: 'Silver', price: 5000, services: 'test' }] });
         expect(userMock.save).toHaveBeenCalled();

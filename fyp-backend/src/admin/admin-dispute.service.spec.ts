@@ -7,7 +7,7 @@ describe('AdminDisputeService transaction rollback', () => {
 
   beforeAll(async () => {
     mongo = await MongoMemoryReplSet.create({
-      replSet: { count: 1 },
+      replSet: { count: 1, args: ['--nounixsocket'] },
     });
 
     await mongoose.connect(mongo.getUri());

@@ -1,8 +1,15 @@
+import { validateSync } from 'class-validator';
+import { PackageDto } from './dto/create-package.dto';
+import { UpdatePackageDto } from './dto/update-package.dto';
 import { VendorService } from './vendor.service';
 
 describe('package minute window validation', () => {
+  it.each([PackageDto, UpdatePackageDto])('rejects the retired type in %p', Dto => {
+    const dto = Object.assign(new Dto(), { bookingType: 'CUSTOM' });
+    expect(validateSync(dto).find(error => error.property === 'bookingType')?.constraints).toHaveProperty('isEnum');
+  });
   const validate = (pkg: any) => (VendorService.prototype as any).validatePackageBookingConfiguration(pkg);
-  it.each(['DELIVERY_BASED', 'SETUP_BASED', 'CUSTOM'])('%s accepts minute offsets and rejects reversed or insufficient windows', bookingType => {
+  it.each(['DELIVERY_BASED', 'SETUP_BASED'])('%s accepts minute offsets and rejects reversed or insufficient windows', bookingType => {
     const pkg = { bookingType, requiredServiceDurationMinutes: 30, serviceWindowStartOffsetMinutes: -45, serviceWindowEndOffsetMinutes: -15 };
     expect(() => validate(pkg)).not.toThrow();
     if (bookingType === 'DELIVERY_BASED') {
@@ -21,8 +28,8 @@ describe('package minute window validation', () => {
     expect(() => validate({ ...pkg, serviceWindowStartOffsetMinutes: 1 })).toThrow('Setup must start');
     expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 1 })).toThrow('Setup must finish');
   });
-  it('preserves optional custom duration and other booking types', () => {
-    expect(() => validate({ bookingType: 'CUSTOM', serviceWindowStartOffsetMinutes: -45, serviceWindowEndOffsetMinutes: -15 })).not.toThrow();
+  it('rejects retired package configuration and keeps other booking types', () => {
+    expect(() => validate({ bookingType: 'CUSTOM', serviceWindowStartOffsetMinutes: -45, serviceWindowEndOffsetMinutes: -15 })).toThrow('Choose a supported booking type');
     expect(() => validate({ bookingType: 'DURATION_BASED' })).not.toThrow();
     expect(() => validate({ bookingType: 'TIME_SLOT_BASED', requiredServiceDurationMinutes: 15 })).not.toThrow();
     expect(() => validate({})).not.toThrow();
@@ -48,8 +55,13 @@ describe('minute offsets through booking availability', () => {
       cityService: { requireCityTimeZone: async () => 'Asia/Karachi' },
       featureAccessService: { hasActiveSubscription: async () => true } });
     // Event is 12:10 AM local: the start falls on the previous local day.
+    if (bookingType === 'CUSTOM') {
+      const newBooking = await service.checkVendorAvailability(id, new Date('2026-10-26T19:10:00Z'),
+        new Date('2026-10-26T20:10:00Z'), 'minute-package');
+      expect(newBooking).toMatchObject({ available: false, reason: 'Package booking type is no longer available.' });
+    }
     const result = await service.checkVendorAvailability(id, new Date('2026-10-26T19:10:00Z'),
-      new Date('2026-10-26T20:10:00Z'), 'minute-package');
+      new Date('2026-10-26T20:10:00Z'), 'minute-package', undefined, bookingType === 'CUSTOM' ? id : undefined);
     expect(result.available).toBe(true);
     expect(result.requiredServiceWindow.startDateTime.toISOString()).toBe('2026-10-26T18:25:00.000Z');
     expect(result.requiredServiceWindow.endDateTime.toISOString()).toBe('2026-10-26T18:55:00.000Z');

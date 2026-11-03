@@ -34,7 +34,7 @@ describe("AccountScreen", () => {
   });
 
   it("renders the profile section with correct user name and a valid email", async () => {
-    const { getByText } = render(<AccountScreen />);
+    const { getByText } = await render(<AccountScreen />);
 
     await waitFor(() => {
       expect(getByText("Midhat Rizvi")).toBeTruthy();
@@ -44,19 +44,19 @@ describe("AccountScreen", () => {
 
 
   it("navigates to Edit Profile when Edit Profile is clicked", async () => {
-    const { getByText } = render(<AccountScreen />);
+    const { getByText } = await render(<AccountScreen />);
 
     await waitFor(() => expect(getByText("Edit Profile")).toBeTruthy());
 
-    fireEvent.press(getByText("Edit Profile"));
+    await fireEvent.press(getByText("Edit Profile"));
 
     expect(mockPush).toHaveBeenCalledWith("/editprofile");
   });
 
   it("shows the confirmation modal when Sign Out is clicked", async () => {
-    const { getByText, queryByTestId } = render(<AccountScreen />);
+    const { getByText, queryByTestId } = await render(<AccountScreen />);
 
-    fireEvent.press(getByText("Sign Out"));
+    await fireEvent.press(getByText("Sign Out"));
 
     await waitFor(() => {
       expect(queryByTestId("logout-modal")).not.toBeNull(); // ✅ Ensure modal appears
@@ -64,23 +64,23 @@ describe("AccountScreen", () => {
   });
 
   it("closes the confirmation modal when cancel is clicked", async () => {
-    const { getByText, queryByTestId } = render(<AccountScreen />);
+    const { getByText, queryByTestId } = await render(<AccountScreen />);
 
-    fireEvent.press(getByText("Sign Out"));
+    await fireEvent.press(getByText("Sign Out"));
 
     await waitFor(() => {
       expect(queryByTestId("logout-modal")).not.toBeNull(); // ✅ Ensure modal appears
     });
 
-    fireEvent.press(getByText("Cancel"));
+    await fireEvent.press(getByText("Cancel"));
 
     await waitFor(() => {
       expect(queryByTestId("logout-modal")).toBeNull(); // ✅ Ensure modal disappears
     });
   });
 
-  it("renders all menu options correctly", () => {
-    const { getAllByText } = render(<AccountScreen />);
+  it("renders all menu options correctly", async () => {
+    const { getAllByText } = await render(<AccountScreen />);
 
     const menuOptions = [
       "Edit Profile",
@@ -96,22 +96,22 @@ describe("AccountScreen", () => {
     });
   });
 
-  it("navigates to Terms of Service when the link is clicked", () => {
-    const { getByText } = render(<AccountScreen />);
+  it("navigates to Terms of Service when the link is clicked", async () => {
+    const { getByText } = await render(<AccountScreen />);
 
-    fireEvent.press(getByText("Terms of Service"));
+    await fireEvent.press(getByText("Terms of Service"));
 
     expect(mockPush).toHaveBeenCalledWith("/termsofservices");
   });
 
-  it("does not show logout confirmation modal initially", () => {
-    const { queryByTestId } = render(<AccountScreen />);
+  it("does not show logout confirmation modal initially", async () => {
+    const { queryByTestId } = await render(<AccountScreen />);
 
     expect(queryByTestId("logout-modal")).toBeNull(); // ✅ Modal should be hidden at start
   });
 
-  it("renders all bottom navigation items correctly", () => {
-    const { getAllByText } = render(<AccountScreen />);
+  it("renders all bottom navigation items correctly", async () => {
+    const { getAllByText } = await render(<AccountScreen />);
 
     const bottomNavItems = ["Home", "Messages", "Notifications", "Account"];
 
@@ -123,26 +123,26 @@ describe("AccountScreen", () => {
   });
 
   it("renders and allows clicking 'Edit Profile' button", async () => {
-    const { getByText } = render(<AccountScreen />);
+    const { getByText } = await render(<AccountScreen />);
 
     await waitFor(() => expect(getByText("Edit Profile")).toBeTruthy());
-    fireEvent.press(getByText("Edit Profile"));
+    await fireEvent.press(getByText("Edit Profile"));
 
     expect(mockPush).toHaveBeenCalledWith("/editprofile");
   });
 
-  it("renders 'Sign Out' button before interaction", () => {
-    const { getByText } = render(<AccountScreen />);
+  it("renders 'Sign Out' button before interaction", async () => {
+    const { getByText } = await render(<AccountScreen />);
     expect(getByText("Sign Out")).toBeTruthy(); // ✅ Check before clicking
   });
 
   it("closes logout modal when back is pressed", async () => {
-    const { getByText, queryByTestId } = render(<AccountScreen />);
+    const { getByText, queryByTestId } = await render(<AccountScreen />);
 
-    fireEvent.press(getByText("Sign Out"));
+    await fireEvent.press(getByText("Sign Out"));
     await waitFor(() => expect(queryByTestId("logout-modal")).toBeTruthy()); // ✅ Modal appears
 
-    fireEvent.press(getByText("Cancel")); // Simulate pressing back
+    await fireEvent.press(getByText("Cancel")); // Simulate pressing back
     await waitFor(() => expect(queryByTestId("logout-modal")).toBeNull()); // ✅ Modal disappears
   });
 

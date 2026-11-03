@@ -7,8 +7,8 @@ jest.mock("expo-router", () => ({
   router: { push: jest.fn() }, // Mock router.push function
 }));
 
-test("renders all UI elements correctly", () => {
-  const { getByText } = render(<Sandwich2Index />);
+test("renders all UI elements correctly", async () => {
+  const { getByText } = await render(<Sandwich2Index />);
 
   // Title and nested text via regex
   expect(getByText(/YOUR/)).toBeTruthy();
@@ -25,16 +25,16 @@ test("renders all UI elements correctly", () => {
   expect(getByText("NEXT")).toBeTruthy();
 });
 
-test("navigates to /intro when SKIP is pressed", () => {
-  const { getByText } = render(<Sandwich2Index />);
+test("navigates to /intro when SKIP is pressed", async () => {
+  const { getByText } = await render(<Sandwich2Index />);
   const skipButton = getByText("SKIP");
-  fireEvent.press(skipButton);
+  await fireEvent.press(skipButton);
   expect(router.push).toHaveBeenCalledWith("/intro");
 });
 
-test("navigates to /sandwich3 when NEXT is pressed", () => {
-  const { getByText } = render(<Sandwich2Index />);
+test("navigates to /sandwich3 when NEXT is pressed", async () => {
+  const { getByText } = await render(<Sandwich2Index />);
   const nextButton = getByText("NEXT");
-  fireEvent.press(nextButton);
+  await fireEvent.press(nextButton);
   expect(router.push).toHaveBeenCalledWith("/sandwich3");
 });

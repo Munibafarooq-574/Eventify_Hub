@@ -515,15 +515,10 @@ const getResolvedServiceWindow = (
   }
 
   // ---------------------------------
-  // DELIVERY / CUSTOM
+  // DELIVERY
   // event start + configured offsets
   // ---------------------------------
-  if (
-    bookingType ===
-      'DELIVERY_BASED' ||
-    bookingType ===
-      'CUSTOM'
-  ) {
+  if (bookingType === 'DELIVERY_BASED') {
     const startOffset =
       Number(
         pkg?.serviceWindowStartOffsetMinutes,
@@ -1031,6 +1026,10 @@ const isInvalidCode =
 
       if (!user?._id) throw new Error('Your session is unavailable. Please sign in again.');
       if (!cartData?.vendors?.length) throw new Error('Your cart is empty. Please add a package before booking.');
+      if (cartData.vendors.some((vendor: any) =>
+        vendor.packages?.some((pkg: any) => pkg.bookingType === 'CUSTOM')
+      )) throw new Error('Remove the package with a retired booking type from your cart before booking.');
+
 
       const eventDetailsRaw = await getSecureData('eventDetails');
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;

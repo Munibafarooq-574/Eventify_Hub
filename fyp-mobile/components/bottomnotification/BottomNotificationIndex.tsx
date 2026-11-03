@@ -82,7 +82,7 @@ const NotificationsScreen: React.FC = () => {
             <FlatList
                 refreshing={refreshing}
                 onRefresh={loadNotifications}
-                ListEmptyComponent={!refreshing && !error ? <Text style={{ padding: 20 }}>No notifications yet.</Text> : null}
+                ListEmptyComponent={!refreshing && !error ? <Text style={{ padding: 20 }}>No notifications yet.</Text> : undefined}
                 data={notifications}
                 renderItem={renderNotification}
                 keyExtractor={(item) => item._id}

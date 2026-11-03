@@ -14,7 +14,9 @@ describe('MessagesModule', () => {
   let mongod: MongoMemoryServer;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
+    mongod = await MongoMemoryServer.create({
+      instance: { args: ['--nounixsocket'] },
+    });
     const uri = mongod.getUri();
 
     await mongoose.connect(uri); // real connection for mongoose internals
@@ -30,8 +32,9 @@ describe('MessagesModule', () => {
   }, 20000); // ⏱ extend timeout for slow init
 
   afterAll(async () => {
+    await module?.close();
     await mongoose.disconnect();
-    await mongod.stop();
+    await mongod?.stop();
   });
 
   describe('Compilation Tests', () => {

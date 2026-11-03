@@ -77,7 +77,6 @@ const AIPackageScreen = () => {
             <SafeAreaView style={styles.loadingContainer}>
                 <StatusBar
                     barStyle="dark-content"
-                    backgroundColor="#F8E9F0"
                 />
 
                 <View style={styles.loadingCircle}>
@@ -146,7 +145,6 @@ const AIPackageScreen = () => {
         <SafeAreaView style={styles.safeArea}>
             <StatusBar
                 barStyle="dark-content"
-                backgroundColor="#F8E9F0"
             />
 
             <View style={styles.container}>

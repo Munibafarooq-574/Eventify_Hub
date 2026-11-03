@@ -1739,7 +1739,7 @@ Toast.show({
           return;
         }
       } else {
-        // TIME_SLOT_BASED, DELIVERY_BASED, SETUP_BASED and CUSTOM
+        // TIME_SLOT_BASED, DELIVERY_BASED, and SETUP_BASED
         // use the package base price.
         resolvedPrice = Number(pkg.price || 0);
         basis = 'base';
@@ -1977,9 +1977,7 @@ Toast.show({
             loadedCategoryName = savedCategory?.name || '';
           }
           setProfileCategoryName(String(loadedCategoryName).trim());
-          setVendorData(
-            vendor,
-          );
+          let isOwner = false;
 
           // The same profile screen is reused for clients and for the
           // signed-in vendor. Owner-only edit actions are enabled only
@@ -1990,14 +1988,16 @@ Toast.show({
               ['organizer', 'client'].includes(String(currentUser?.role || '').toLowerCase()) &&
               String(currentUser?._id || '') !== String(vendor?._id || ''),
             );
-            setIsOwnerView(
-              String(currentUser?._id || '') ===
-                String(vendor?._id || ''),
-            );
+            isOwner = Boolean(currentUser?._id) && String(currentUser._id) === String(vendor?._id);
+            setIsOwnerView(isOwner);
           } catch {
             setIsClientView(false);
             setIsOwnerView(false);
           }
+          setVendorData(isOwner || !Array.isArray(vendor?.packages) ? vendor : {
+            ...vendor,
+            packages: vendor.packages.filter((pkg: any) => pkg.bookingType !== 'CUSTOM'),
+          });
 
                     // Record one profile view after the vendor loads successfully.
           // Do not count refreshes or package changes as new profile visits.
@@ -4696,8 +4696,6 @@ const serviceCityNamesFromIds =
           ? 'Delivery Based'
           : selectedPackage.bookingType === 'SETUP_BASED'
             ? 'Setup Based'
-            : selectedPackage.bookingType === 'CUSTOM'
-              ? 'Custom'
               : 'N/A'}
   </Text>
 </View>
@@ -4981,34 +4979,6 @@ const serviceCityNamesFromIds =
             </View>
           )}
 
-          {selectedPackage.bookingType === 'CUSTOM' && (
-            <View style={styles.packageInfoSection}>
-              <View style={styles.sectionTitleWithIcon}>
-                <Ionicons
-                  name="options-outline"
-                  size={16}
-                  color={PRIMARY}
-                />
-
-                <Text style={styles.servicesLabel}>
-                  Custom Service Timing
-                </Text>
-              </View>
-              <Text style={styles.packageDetailItem}>Service must start and finish within this window. Duration is optional.</Text>
-
-              {!!selectedPackage.requiredServiceDurationMinutes && (
-                <Text style={styles.packageDetailItem}>
-                  Service Duration: {selectedPackage.requiredServiceDurationMinutes} minutes
-                </Text>
-              )}
-              <Text style={styles.packageDetailItem}>
-                Earliest Service Start: {formatServiceOffset(selectedPackage.serviceWindowStartOffsetMinutes)}
-              </Text>
-              <Text style={styles.packageDetailItem}>
-                Service Completion Deadline: {formatServiceOffset(selectedPackage.serviceWindowEndOffsetMinutes)}
-              </Text>
-            </View>
-          )}
 
                       {/* Price + Cart */}
 

@@ -45,11 +45,11 @@ jest.mock("expo-router", () => ({
 }));
 
 describe("BusinessDetailsScreen Tests", () => {
-  let component: ReturnType<typeof render>;
+  let component: Awaited<ReturnType<typeof render>>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
-    component = render(<BusinessDetailsScreen />);
+    component = await render(<BusinessDetailsScreen />);
     jest.spyOn(Alert, "alert"); // Mock Alert.alert
   });
 
@@ -66,19 +66,19 @@ describe("BusinessDetailsScreen Tests", () => {
     expect(getByText("Back")).toBeTruthy();
   });
 
-  it("updates text inputs when typed", () => {
+  it("updates text inputs when typed", async () => {
     const { getByPlaceholderText } = component;
     const cityInput = getByPlaceholderText("Select Cities");
 
-    fireEvent.changeText(cityInput, "Islamabad");
+    await fireEvent.changeText(cityInput, "Islamabad");
     expect(cityInput.props.value).toBe("Islamabad");
   });
 
-  it("selects staff type correctly", () => {
+  it("selects staff type correctly", async () => {
     const { getByText } = component;
     const maleButton = getByText("MALE");
 
-    fireEvent.press(maleButton);
+    await fireEvent.press(maleButton);
 
     // Get the parent TouchableOpacity element which contains the styles
     const buttonContainer = maleButton.parent;
@@ -94,7 +94,7 @@ describe("BusinessDetailsScreen Tests", () => {
 
   it("does not submit if required fields are empty", async () => {
     const { getByText } = component;
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() =>
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -112,27 +112,27 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill all required fields
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000"); // Added
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000"); // Added
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
       "Valid description"
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "Valid info"
     );
 
     // Select all required options
-    fireEvent.press(getByText("MALE")); // Added staff type
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE")); // Added staff type
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     // Add small delay to ensure state updates
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
@@ -154,26 +154,26 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill required fields first
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000");
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
       "Valid description"
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "Valid info"
     );
 
     // Select required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
@@ -190,9 +190,9 @@ describe("BusinessDetailsScreen Tests", () => {
     );
   });
 
-  it("navigates back when back button is pressed", () => {
+  it("navigates back when back button is pressed", async () => {
     const { getByText } = component;
-    fireEvent.press(getByText("Back"));
+    await fireEvent.press(getByText("Back"));
     expect(router.back).toHaveBeenCalled();
   });
 
@@ -206,11 +206,11 @@ describe("BusinessDetailsScreen Tests", () => {
     expect(getByPlaceholderText("Enter Down Payment")).toBeTruthy();
   });
 
-  it("disables Save & Continue button when required fields are empty", () => {
+  it("disables Save & Continue button when required fields are empty", async () => {
     const { getByText } = component;
     const saveButton = getByText("Save & Continue");
 
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
 
     expect(Alert.alert).toHaveBeenCalledWith(
       "Error",
@@ -218,19 +218,19 @@ describe("BusinessDetailsScreen Tests", () => {
     );
   });
 
-  it("prevents non-numeric input in the Down Payment field", () => {
+  it("prevents non-numeric input in the Down Payment field", async () => {
     const { getByPlaceholderText } = component;
     const downPaymentInput = getByPlaceholderText("Enter Down Payment");
 
-    fireEvent.changeText(downPaymentInput, "5000"); // Use numeric input only
+    await fireEvent.changeText(downPaymentInput, "5000"); // Use numeric input only
     expect(downPaymentInput.props.value).toMatch(/^\d*$/);
   });
 
-  it("allows selecting a refund policy", () => {
+  it("allows selecting a refund policy", async () => {
     const { getByText } = component;
     const refundableButton = getByText("REFUNDABLE");
 
-    fireEvent.press(refundableButton);
+    await fireEvent.press(refundableButton);
     expect(refundableButton.parent?.props.style).toBeDefined();
   });
 
@@ -242,22 +242,22 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill required fields
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "test"
     );
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     // Select required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     });
 
     expect(getSecureData).toHaveBeenCalledWith("user");
@@ -271,25 +271,25 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill all required fields
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
       "test description"
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "test info"
     );
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     // Select all required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     });
 
     // Add a small delay to ensure state updates
@@ -315,13 +315,13 @@ describe("BusinessDetailsScreen Tests", () => {
 
     const { getByText, getByPlaceholderText } = component;
 
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     const startTime = Date.now();
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     });
 
     const endTime = Date.now();
@@ -331,7 +331,7 @@ describe("BusinessDetailsScreen Tests", () => {
   it("closes alert after displaying an error message", async () => {
     const { getByText } = component;
 
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() =>
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -350,19 +350,19 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill required fields
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
-    fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "test"
     );
 
     // Select required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     // Mock successful API call
     (postPhotographyBusinessDetails as jest.Mock).mockResolvedValueOnce({});
@@ -371,15 +371,15 @@ describe("BusinessDetailsScreen Tests", () => {
     );
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
     // Manually clear input fields before checking reset state
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "");
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "");
-    fireEvent.changeText(getByPlaceholderText("Enter Description"), "");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "");
+    await fireEvent.changeText(getByPlaceholderText("Enter Description"), "");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       ""
     );
@@ -395,23 +395,23 @@ describe("BusinessDetailsScreen Tests", () => {
     });
   });
 
-  it("ensures 'Save & Continue' button is initially disabled", () => {
+  it("ensures 'Save & Continue' button is initially disabled", async () => {
     const { getByText } = component;
     const saveButton = getByText("Save & Continue");
 
     // Button should not proceed if required fields are empty
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
     expect(Alert.alert).toHaveBeenCalledWith(
       "Error",
       "Please fill in all the required fields marked with *."
     );
   });
 
-  it("ensures correct font styles and colors for selected elements", () => {
+  it("ensures correct font styles and colors for selected elements", async () => {
     const { getByText } = component;
     const maleButton = getByText("MALE");
 
-    fireEvent.press(maleButton);
+    await fireEvent.press(maleButton);
 
     expect(maleButton.props.style).toBeDefined();
   });
@@ -422,25 +422,25 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill all required fields with whitespace
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Select Cities"),
       "  Islamabad   "
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
       "  test description  "
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "  test info  "
     );
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     // Select all required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     // Mock the secure data
     (getSecureData as jest.Mock).mockResolvedValueOnce(
@@ -448,7 +448,7 @@ describe("BusinessDetailsScreen Tests", () => {
     );
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
       await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
@@ -473,7 +473,7 @@ describe("BusinessDetailsScreen Tests", () => {
     // Get the initial value to verify the prop
 
     // Fire change text event
-    fireEvent.changeText(downPaymentInput, "5000@!");
+    await fireEvent.changeText(downPaymentInput, "5000@!");
 
     // Verify the input accepts the value (since validation happens on submission)
     expect(downPaymentInput.props.value).toBeDefined();
@@ -487,19 +487,19 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText, getByPlaceholderText } = component;
 
     // Fill required fields
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
-    fireEvent.changeText(
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
+    await fireEvent.changeText(
       getByPlaceholderText("Enter Additional Information"),
       "test"
     );
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     // Select required options
-    fireEvent.press(getByText("MALE"));
-    fireEvent.press(getByText("PERCENTAGE"));
-    fireEvent.press(getByText("YES"));
-    fireEvent.press(getByText("REFUNDABLE"));
+    await fireEvent.press(getByText("MALE"));
+    await fireEvent.press(getByText("PERCENTAGE"));
+    await fireEvent.press(getByText("YES"));
+    await fireEvent.press(getByText("REFUNDABLE"));
 
     // Mock getSecureData to return test user data
     (getSecureData as jest.Mock).mockResolvedValueOnce(
@@ -507,7 +507,7 @@ describe("BusinessDetailsScreen Tests", () => {
     );
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     });
 
     // Verify getSecureData was called with "user"
@@ -522,13 +522,13 @@ describe("BusinessDetailsScreen Tests", () => {
 
     const { getByText, getByPlaceholderText } = component;
 
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
 
     const startTime = Date.now();
 
     await act(async () => {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     });
 
     const endTime = Date.now();
@@ -539,7 +539,7 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByText } = component;
     const backButton = getByText("Back");
 
-    fireEvent.press(backButton);
+    await fireEvent.press(backButton);
 
     await waitFor(() => {
       expect(router.back).toHaveBeenCalledTimes(1);
@@ -550,7 +550,7 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByPlaceholderText } = component;
     const downPaymentInput = getByPlaceholderText("Enter Down Payment");
 
-    fireEvent.changeText(downPaymentInput, "12345");
+    await fireEvent.changeText(downPaymentInput, "12345");
 
     await waitFor(() => {
       expect(downPaymentInput.props.value).toBe("12345"); // Ensure valid numeric input
@@ -560,10 +560,10 @@ describe("BusinessDetailsScreen Tests", () => {
   it("ensures form does not submit if only some fields are filled", async () => {
     const { getByText, getByPlaceholderText } = component;
 
-    fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
+    await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+    await fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
 
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -575,10 +575,10 @@ describe("BusinessDetailsScreen Tests", () => {
  it("ensures all selection options update correctly", async () => {
    const { getByText } = component;
 
-   fireEvent.press(getByText("FEMALE"));
-   fireEvent.press(getByText("FIXED"));
-   fireEvent.press(getByText("NO"));
-   fireEvent.press(getByText("NON-REFUNDABLE"));
+   await fireEvent.press(getByText("FEMALE"));
+   await fireEvent.press(getByText("FIXED"));
+   await fireEvent.press(getByText("NO"));
+   await fireEvent.press(getByText("NON-REFUNDABLE"));
 
    await waitFor(() => {
      expect(getByText("FEMALE").parent?.props.style).toBeDefined();
@@ -590,7 +590,7 @@ describe("BusinessDetailsScreen Tests", () => {
  it("ensures postPhotographyBusinessDetails does not get called with invalid input", async () => {
    const { getByText } = component;
 
-   fireEvent.press(getByText("Save & Continue"));
+   await fireEvent.press(getByText("Save & Continue"));
 
    await waitFor(() => {
      expect(postPhotographyBusinessDetails).not.toHaveBeenCalled();
@@ -601,9 +601,9 @@ describe("BusinessDetailsScreen Tests", () => {
    const { getByText, getByPlaceholderText } = component;
 
    // Fill only one required field
-   fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+   await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
 
-   fireEvent.press(getByText("Save & Continue"));
+   await fireEvent.press(getByText("Save & Continue"));
 
    await waitFor(() => {
      expect(Alert.alert).toHaveBeenCalledWith(
@@ -618,7 +618,7 @@ describe("BusinessDetailsScreen Tests", () => {
    const saveButton = getByText("Save & Continue");
 
    // Initially, the button should not trigger submission
-   fireEvent.press(saveButton);
+   await fireEvent.press(saveButton);
    await waitFor(() => {
      expect(Alert.alert).toHaveBeenCalledWith(
        "Error",
@@ -627,26 +627,26 @@ describe("BusinessDetailsScreen Tests", () => {
    });
 
    // Fill only some fields
-   fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-   fireEvent.press(saveButton);
+   await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
+   await fireEvent.press(saveButton);
    await waitFor(() => {
      expect(Alert.alert).toHaveBeenCalledTimes(2);
    });
 
    // Fully complete form
-   fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
-   fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
-   fireEvent.changeText(
+   await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
+   await fireEvent.changeText(getByPlaceholderText("Enter Description"), "test");
+   await fireEvent.changeText(
      getByPlaceholderText("Enter Additional Information"),
      "info"
    );
-   fireEvent.press(getByText("MALE"));
-   fireEvent.press(getByText("PERCENTAGE"));
-   fireEvent.press(getByText("YES"));
-   fireEvent.press(getByText("REFUNDABLE"));
+   await fireEvent.press(getByText("MALE"));
+   await fireEvent.press(getByText("PERCENTAGE"));
+   await fireEvent.press(getByText("YES"));
+   await fireEvent.press(getByText("REFUNDABLE"));
 
    // Now the button should be active
-   fireEvent.press(saveButton);
+   await fireEvent.press(saveButton);
    await waitFor(() => {
      expect(postPhotographyBusinessDetails).toHaveBeenCalled();
    });
@@ -656,10 +656,10 @@ describe("BusinessDetailsScreen Tests", () => {
    const { getByText } = component;
 
    // Select some options
-   fireEvent.press(getByText("FEMALE"));
-   fireEvent.press(getByText("FIXED"));
-   fireEvent.press(getByText("NO"));
-   fireEvent.press(getByText("NON-REFUNDABLE"));
+   await fireEvent.press(getByText("FEMALE"));
+   await fireEvent.press(getByText("FIXED"));
+   await fireEvent.press(getByText("NO"));
+   await fireEvent.press(getByText("NON-REFUNDABLE"));
 
    // Simulate API error
    (postPhotographyBusinessDetails as jest.Mock).mockRejectedValueOnce(
@@ -667,7 +667,7 @@ describe("BusinessDetailsScreen Tests", () => {
    );
 
    await act(async () => {
-     fireEvent.press(getByText("Save & Continue"));
+     await fireEvent.press(getByText("Save & Continue"));
      await new Promise((resolve) => setTimeout(resolve, 100));
    });
 
@@ -684,21 +684,21 @@ describe("BusinessDetailsScreen Tests", () => {
    const { getByText, getByPlaceholderText, rerender } = component;
 
    // Fill required fields
-   fireEvent.changeText(getByPlaceholderText("Select Cities"), "Lahore");
-   fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "3000");
-   fireEvent.changeText(
+   await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Lahore");
+   await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "3000");
+   await fireEvent.changeText(
      getByPlaceholderText("Enter Description"),
      "Business setup"
    );
-   fireEvent.changeText(
+   await fireEvent.changeText(
      getByPlaceholderText("Enter Additional Information"),
      "Important details"
    );
 
-   fireEvent.press(getByText("MALE"));
-   fireEvent.press(getByText("FIXED"));
-   fireEvent.press(getByText("NO"));
-   fireEvent.press(getByText("NON-REFUNDABLE"));
+   await fireEvent.press(getByText("MALE"));
+   await fireEvent.press(getByText("FIXED"));
+   await fireEvent.press(getByText("NO"));
+   await fireEvent.press(getByText("NON-REFUNDABLE"));
 
    // Mock successful API response
    (postPhotographyBusinessDetails as jest.Mock).mockResolvedValueOnce({});
@@ -707,21 +707,21 @@ describe("BusinessDetailsScreen Tests", () => {
    );
 
    await act(async () => {
-     fireEvent.press(getByText("Save & Continue"));
+     await fireEvent.press(getByText("Save & Continue"));
      await new Promise((resolve) => setTimeout(resolve, 100));
    });
 
    // 🔹 Manually clear the fields (to simulate real behavior)
-   fireEvent.changeText(getByPlaceholderText("Select Cities"), "");
-   fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "");
-   fireEvent.changeText(getByPlaceholderText("Enter Description"), "");
-   fireEvent.changeText(
+   await fireEvent.changeText(getByPlaceholderText("Select Cities"), "");
+   await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "");
+   await fireEvent.changeText(getByPlaceholderText("Enter Description"), "");
+   await fireEvent.changeText(
      getByPlaceholderText("Enter Additional Information"),
      ""
    );
 
    // 🔹 Re-render component
-   rerender(<BusinessDetailsScreen />);
+   await rerender(<BusinessDetailsScreen />);
 
    // ✅ Ensure fields are cleared
    await waitFor(() => {

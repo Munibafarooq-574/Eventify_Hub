@@ -17,8 +17,8 @@ jest.mock("expo-router", () => ({
 }));
 
 describe("PhotographerDetailsScreen Component Tests", () => {
-  it("should render loading indicator when data is being fetched", () => {
-    render(<PhotographerDetailsScreen />);
+  it("should render loading indicator when data is being fetched", async () => {
+    await render(<PhotographerDetailsScreen />);
     const loadingIndicator = screen.getByTestId("loading-indicator");
     expect(loadingIndicator).toBeTruthy();
   });
@@ -27,7 +27,7 @@ describe("PhotographerDetailsScreen Component Tests", () => {
     // Mocking rejected API call to simulate failure
     mockAxios.get.mockRejectedValue(new Error("Failed to fetch"));
 
-    render(<PhotographerDetailsScreen />);
+    await render(<PhotographerDetailsScreen />);
     const errorMessage = await screen.findByTestId("error-message");
     expect(errorMessage).toHaveTextContent(
       "Failed to load vendor details. Please try again."
@@ -36,7 +36,7 @@ describe("PhotographerDetailsScreen Component Tests", () => {
 
   it("displays error message when data fetching fails", async () => {
     mockAxios.get.mockRejectedValueOnce(new Error("Failed to fetch data"));
-    render(<PhotographerDetailsScreen />);
+    await render(<PhotographerDetailsScreen />);
 
     await waitFor(() => screen.getByTestId("error-message"));
 

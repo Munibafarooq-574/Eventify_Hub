@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { getCardOwnerId, assertCardOwner, listDemoCards, rememberDemoCard, removeDemoCard, type SavedDemoCard } from '@/services/demoSavedCards';
 import { DEMO_CARD_OPTIONS, formatCardNumber, formatExpiry, validateCardForm, cardPaymentAmount, isExpiryValid } from '@/utils/cardPaymentValidation';
@@ -90,7 +91,7 @@ type FieldProps = TextInputProps & {
 };
 
 /** Labelled input with focus highlight and a green tick when valid. */
-const Field = React.forwardRef<TextInput, FieldProps>(
+const Field = React.forwardRef<ComponentRef<typeof TextInput>, FieldProps>(
   (
     {
       label,
@@ -239,10 +240,10 @@ const CreditCardPaymentScreen = () => {
   }
 
 
-  const nameRef = useRef<TextInput>(null);
-  const numberRef = useRef<TextInput>(null);
-  const expiryRef = useRef<TextInput>(null);
-  const cvvRef = useRef<TextInput>(null);
+  const nameRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const numberRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const expiryRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const cvvRef = useRef<ComponentRef<typeof TextInput>>(null);
 
   // Card flip (CVV focus shows the back of the card)
   const [flip] = useState(() => new Animated.Value(0));

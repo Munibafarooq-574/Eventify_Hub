@@ -13,7 +13,7 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 
-import { User } from '../schemas/user.schema';
+import { Package, RETIRED_PACKAGE_BOOKING_TYPE, User } from '../schemas/user.schema';
 import { Category } from '../schemas/category.schema';
 import { Review, ReviewModerationStatus } from '../schemas/review.schema';
 
@@ -1218,6 +1218,9 @@ private async filterVendorsWithActiveSubscription(
   ): any {
     return {
       ...user,
+      ...(Array.isArray(user.packages) && {
+        packages: user.packages.filter((pkg: Package) => pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE),
+      }),
 
       BusinessDetails:
         user?.photographerBusinessDetails ??

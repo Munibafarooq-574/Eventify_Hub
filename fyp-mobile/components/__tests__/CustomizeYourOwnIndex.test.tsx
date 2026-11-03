@@ -50,15 +50,15 @@ beforeAll(() => {
   });
 });
 describe("Unit Testing", () => {
-  it("renders header correctly", () => {
+  it("renders header correctly", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy();
   });
 
-  it("renders search input with correct placeholder", () => {
+  it("renders search input with correct placeholder", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByPlaceholderText } = render(<CustomizeYourOwnIndex />);
+    const { getByPlaceholderText } = await render(<CustomizeYourOwnIndex />);
     expect(getByPlaceholderText("Search vendor categories")).toBeTruthy();
   });
 
@@ -66,13 +66,13 @@ describe("Unit Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
- it("renders back button with correct label", () => {
+ it("renders back button with correct label", async () => {
    (getAllCategories as jest.Mock).mockResolvedValue([]);
-   const { getByText } = render(<CustomizeYourOwnIndex />);
+   const { getByText } = await render(<CustomizeYourOwnIndex />);
    expect(getByText("Back")).toBeTruthy();
  });
 
@@ -83,7 +83,7 @@ describe("Unit Testing", () => {
    (useLocalSearchParams as jest.Mock).mockReturnValue({
      selectedServices: JSON.stringify(["Venue"]),
    });
-   const { queryByText } = render(<CustomizeYourOwnIndex />);
+   const { queryByText } = await render(<CustomizeYourOwnIndex />);
    expect(queryByText("Photography")).toBeNull();
  });
 
@@ -92,7 +92,7 @@ describe("Unit Testing", () => {
      { _id: "123", name: "Venue", image: "img", description: "desc" },
    ];
    (getAllCategories as jest.Mock).mockResolvedValue(data);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Venue")).toBeTruthy();
  });
 
@@ -105,7 +105,7 @@ describe("Unit Testing", () => {
      { _id: "1", name: "Venue", image: "img", description: "desc" },
      { _id: "2", name: "Photography", image: "img", description: "desc" },
    ]);
-   const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Venue")).toBeTruthy();
    expect(queryByText("Photography")).toBeNull();
  });
@@ -114,14 +114,14 @@ describe("Unit Testing", () => {
    (getAllCategories as jest.Mock).mockResolvedValue([
      { _id: "1", name: "Venue", image: "img", description: "desc" },
    ]);
-   const { findByTestId } = render(<CustomizeYourOwnIndex />);
+   const { findByTestId } = await render(<CustomizeYourOwnIndex />);
    const item = await findByTestId("category-item-1");
    expect(item).toBeTruthy();
  });
 
- it("renders styled TextInput for searching categories", () => {
+ it("renders styled TextInput for searching categories", async () => {
    (getAllCategories as jest.Mock).mockResolvedValue([]);
-   const { getByPlaceholderText } = render(<CustomizeYourOwnIndex />);
+   const { getByPlaceholderText } = await render(<CustomizeYourOwnIndex />);
    const input = getByPlaceholderText("Search vendor categories");
    expect(input.props.placeholderTextColor).toBe("#aaa");
    expect(input.props.style).toBeTruthy();
@@ -135,7 +135,7 @@ describe("Functional Testing", () => {
       { _id: "1", name: "Catering", image: "img", description: "Food" },
       { _id: "2", name: "Photography", image: "img", description: "Photo" },
     ]);
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Catering")).toBeTruthy();
     expect(queryByText("Photography")).toBeNull();
   });
@@ -144,7 +144,7 @@ describe("Functional Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "4", name: "Venue", image: "img", description: "Beautiful Venue" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Beautiful Venue")).toBeTruthy();
   });
 
@@ -152,15 +152,15 @@ describe("Functional Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "7", name: "Catering", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(await findByText("Catering"));
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(await findByText("Catering"));
     expect(saveSecureData).toHaveBeenCalledWith("categoryId", "7");
   });
 
- it("calls router.back when back button is pressed", () => {
+ it("calls router.back when back button is pressed", async () => {
    (getAllCategories as jest.Mock).mockResolvedValue([]);
-   const { getByText } = render(<CustomizeYourOwnIndex />);
-   fireEvent.press(getByText("Back"));
+   const { getByText } = await render(<CustomizeYourOwnIndex />);
+   await fireEvent.press(getByText("Back"));
    expect(mockRouter.back).toHaveBeenCalled();
  });
 
@@ -169,8 +169,8 @@ describe("Functional Testing", () => {
      { _id: "v1", name: "Venue", image: "img", description: "desc" },
      { _id: "c2", name: "Catering", image: "img", description: "desc" },
    ]);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
-   fireEvent.press(await findByText("Catering"));
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
+   await fireEvent.press(await findByText("Catering"));
    expect(saveSecureData).toHaveBeenCalledWith("categoryId", "c2");
  });
 
@@ -183,7 +183,7 @@ describe("Functional Testing", () => {
    (useLocalSearchParams as jest.Mock).mockReturnValue({
      selectedServices: JSON.stringify(["Venue", "Catering"]),
    });
-   const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Venue")).toBeTruthy();
    expect(await findByText("Catering")).toBeTruthy();
    expect(queryByText("Photography")).toBeNull();
@@ -193,7 +193,7 @@ describe("Functional Testing", () => {
    (getAllCategories as jest.Mock).mockResolvedValue([
      { _id: "1", name: "DJ", image: "img", description: "desc" },
    ]);
-   const { queryByText } = render(<CustomizeYourOwnIndex />);
+   const { queryByText } = await render(<CustomizeYourOwnIndex />);
    expect(queryByText("DJ")).toBeNull();
  });
 
@@ -206,7 +206,7 @@ describe("Functional Testing", () => {
        description: "A beautiful space",
      },
    ]);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Venue")).toBeTruthy();
    expect(await findByText("A beautiful space")).toBeTruthy();
  });
@@ -215,9 +215,9 @@ describe("Functional Testing", () => {
    (getAllCategories as jest.Mock).mockResolvedValue([
      { _id: "xyz", name: "Venue", image: "img", description: "desc" },
    ]);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    const item = await findByText("Venue");
-   expect(() => fireEvent.press(item)).not.toThrow();
+   expect(async () => await fireEvent.press(item)).not.toThrow();
  });
 
 });
@@ -228,15 +228,15 @@ describe("Integration Testing", () => {
       { _id: "5", name: "Venue", image: "img", description: "V" },
       { _id: "6", name: "Catering", image: "img", description: "C" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(await findByText("Catering")).toBeTruthy();
   });
 
-  it("goes back when back button is pressed", () => {
+  it("goes back when back button is pressed", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(getByText("Back"));
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(getByText("Back"));
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
@@ -245,15 +245,15 @@ describe("Integration Testing", () => {
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ];
     (getAllCategories as jest.Mock).mockResolvedValue(mock);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(await findByText("Venue"));
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(await findByText("Venue"));
     expect(saveSecureData).toHaveBeenCalledWith("categoryId", "1");
   });
 
-  it("integrates back button with navigation stack", () => {
+  it("integrates back button with navigation stack", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(getByText("Back"));
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(getByText("Back"));
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
@@ -265,7 +265,7 @@ describe("Integration Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Catering"]),
     });
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Catering")).toBeTruthy();
     expect(queryByText("Photography")).toBeNull();
   });
@@ -275,7 +275,7 @@ describe("Integration Testing", () => {
       { _id: "1", name: "Venue", image: "img", description: "Spacious" },
       { _id: "2", name: "Catering", image: "img", description: "Food" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(await findByText("Catering")).toBeTruthy();
   });
@@ -286,9 +286,9 @@ describe("Integration Testing", () => {
       { _id: "2", name: "Catering", image: "img", description: "desc" },
     ];
     (getAllCategories as jest.Mock).mockResolvedValue(mock);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(await findByText("Venue"));
-    fireEvent.press(await findByText("Catering"));
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(await findByText("Venue"));
+    await fireEvent.press(await findByText("Catering"));
     expect(saveSecureData).toHaveBeenCalledTimes(2);
   });
 
@@ -298,9 +298,9 @@ describe("Integration Testing", () => {
       { _id: "b", name: "Venue", image: "img", description: "desc" },
     ];
     (getAllCategories as jest.Mock).mockResolvedValue(mock);
-    const { findAllByText } = render(<CustomizeYourOwnIndex />);
+    const { findAllByText } = await render(<CustomizeYourOwnIndex />);
     const [first] = await findAllByText("Venue");
-    fireEvent.press(first);
+    await fireEvent.press(first);
     expect(saveSecureData).toHaveBeenCalledWith("categoryId", "a");
   });
 
@@ -311,16 +311,16 @@ describe("Integration Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Venue"]),
     });
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Photo")).toBeNull();
   });
 
 });
 
 describe("Performance Testing", () => {
-  it("renders safely with empty data", () => {
+  it("renders safely with empty data", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy();
   });
 
@@ -333,7 +333,7 @@ describe("Performance Testing", () => {
      // ... more mock services
    ];
    (getAllCategories as jest.Mock).mockResolvedValue(mock);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Service 0")).toBeTruthy();
  });
 
@@ -348,7 +348,7 @@ describe("Performance Testing", () => {
      description: `desc ${i}`,
    }));
    (getAllCategories as jest.Mock).mockResolvedValue(mock);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Category 0")).toBeTruthy();
  });
 
@@ -363,7 +363,7 @@ describe("Performance Testing", () => {
      description: "desc",
    }));
    (getAllCategories as jest.Mock).mockResolvedValue(data);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Category 0")).toBeTruthy();
  });
 
@@ -371,7 +371,7 @@ describe("Performance Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "x1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
@@ -381,7 +381,7 @@ describe("Performance Testing", () => {
       { _id: "2", name: "Catering", image: "", description: "desc" },
     ];
     (getAllCategories as jest.Mock).mockResolvedValue(mock);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
@@ -394,7 +394,7 @@ describe("Performance Testing", () => {
         description: "Very long description ".repeat(10),
       },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
@@ -404,7 +404,7 @@ describe("Performance Testing", () => {
       { _id: "2", name: "Unmatched", image: "img", description: "desc" },
     ];
     (getAllCategories as jest.Mock).mockResolvedValue(data);
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(queryByText("Unmatched")).toBeNull();
   });
@@ -417,7 +417,7 @@ describe("Performance Testing", () => {
       description: `desc ${i}`,
     }));
     (getAllCategories as jest.Mock).mockResolvedValue(mock);
-    const { findAllByText } = render(<CustomizeYourOwnIndex />);
+    const { findAllByText } = await render(<CustomizeYourOwnIndex />);
     const results = await findAllByText("Venue");
     expect(results.length).toBeGreaterThan(1);
   });
@@ -430,7 +430,7 @@ describe("Accuracy Testing", () => {
       { _id: "10", name: "Venue", image: "img", description: "desc" },
       { _id: "11", name: "Unrelated", image: "img", description: "desc" },
     ]);
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(queryByText("Unrelated")).toBeNull();
   });
@@ -439,7 +439,7 @@ describe("Accuracy Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "12", name: "Photography", image: "img", description: "desc" },
     ]);
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Photography")).toBeNull();
   });
 
@@ -452,7 +452,7 @@ describe("Accuracy Testing", () => {
         description: "Food & Service",
       },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Catering")).toBeTruthy();
     expect(await findByText("Food & Service")).toBeTruthy();
   });
@@ -465,7 +465,7 @@ describe("Accuracy Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Venue"]),
     });
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(queryByText("Venue Decor")).toBeNull();
   });
@@ -477,7 +477,7 @@ describe("Accuracy Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Venue"]),
     });
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("VENUE")).toBeNull();
   });
 
@@ -489,7 +489,7 @@ describe("Accuracy Testing", () => {
       description: "Perfect for events",
     };
     (getAllCategories as jest.Mock).mockResolvedValue([category]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(await findByText("Perfect for events")).toBeTruthy();
   });
@@ -501,7 +501,7 @@ describe("Accuracy Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Venue")).toBeNull();
   });
 
@@ -517,7 +517,7 @@ describe("Accuracy Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Catering"]),
     });
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Catering Services")).toBeNull();
   });
 
@@ -530,7 +530,7 @@ describe("Accuracy Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["Venue"]),
     });
-    const { findByText, queryByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText, queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(queryByText("Venue 2")).toBeNull();
   });
@@ -543,7 +543,7 @@ describe("Accuracy Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify([" Venue "]),
     });
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Venue")).toBeNull(); // Strict matching, no trim
   });
 
@@ -553,20 +553,20 @@ describe("Navigation Testing", () => {
  
   it("does not throw error if push not called", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy(); // Safe render with no navigation
   });
 
-  it("back button does not crash when called", () => {
+  it("back button does not crash when called", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
-    fireEvent.press(getByText("Back"));
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
+    await fireEvent.press(getByText("Back"));
     expect(mockRouter.back).toHaveBeenCalledTimes(1);
   });
 
-  it("back button is visible and tappable", () => {
+  it("back button is visible and tappable", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     const backBtn = getByText("Back");
     expect(backBtn).toBeTruthy();
   });
@@ -575,13 +575,13 @@ describe("Navigation Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    render(<CustomizeYourOwnIndex />);
+    await render(<CustomizeYourOwnIndex />);
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   it("navigation stays idle if no data matches", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    render(<CustomizeYourOwnIndex />);
+    await render(<CustomizeYourOwnIndex />);
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
@@ -589,7 +589,7 @@ describe("Navigation Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "3", name: "Photography", image: "img", description: "desc" },
     ]);
-    render(<CustomizeYourOwnIndex />);
+    await render(<CustomizeYourOwnIndex />);
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
@@ -605,7 +605,7 @@ describe("Error Handling Testing", () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       selectedServices: JSON.stringify(["NonMatchingService"]),
     });
-    const { queryByText } = render(<CustomizeYourOwnIndex />);
+    const { queryByText } = await render(<CustomizeYourOwnIndex />);
     expect(queryByText("Photography")).toBeNull();
   });
 
@@ -616,7 +616,7 @@ describe("Error Handling Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy();
   });
 
@@ -624,7 +624,7 @@ describe("Error Handling Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "x", name: "Venue", image: "img" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
@@ -638,22 +638,22 @@ describe("Error Handling Testing", () => {
         foo: "bar",
       },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
 });
 
 describe("Accessibility Testing", () => {
-  it("search input is accessible by placeholder", () => {
+  it("search input is accessible by placeholder", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByPlaceholderText } = render(<CustomizeYourOwnIndex />);
+    const { getByPlaceholderText } = await render(<CustomizeYourOwnIndex />);
     expect(getByPlaceholderText("Search vendor categories")).toBeTruthy();
   });
 
-  it("header is accessible by text", () => {
+  it("header is accessible by text", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy();
   });
 
@@ -661,13 +661,13 @@ describe("Accessibility Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "a11y", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
-  it("back button is accessible by text", () => {
+  it("back button is accessible by text", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Back")).toBeTruthy();
   });
 
@@ -675,13 +675,13 @@ describe("Accessibility Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
-  it("text input supports accessibility props", () => {
+  it("text input supports accessibility props", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByPlaceholderText } = render(<CustomizeYourOwnIndex />);
+    const { getByPlaceholderText } = await render(<CustomizeYourOwnIndex />);
     const input = getByPlaceholderText("Search vendor categories");
     expect(input.props.accessible).not.toBe(false);
   });
@@ -690,7 +690,7 @@ describe("Accessibility Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "2", name: "Venue", image: "img", description: "Nice Hall" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Nice Hall")).toBeTruthy();
   });
 
@@ -699,23 +699,23 @@ describe("Accessibility Testing", () => {
       { _id: "1", name: "Venue", image: "img", description: "Nice" },
       { _id: "2", name: "Catering", image: "img", description: "Delicious" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(await findByText("Catering")).toBeTruthy();
   });
 
-  it("search input has accessible placeholder", () => {
+  it("search input has accessible placeholder", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByPlaceholderText } = render(<CustomizeYourOwnIndex />);
+    const { getByPlaceholderText } = await render(<CustomizeYourOwnIndex />);
     expect(getByPlaceholderText("Search vendor categories")).toBeTruthy();
   });
 
 });
 
 describe("Boundary Testing", () => {
-  it("renders correctly with no categories", () => {
+  it("renders correctly with no categories", async () => {
     (getAllCategories as jest.Mock).mockResolvedValue([]);
-    const { getByText } = render(<CustomizeYourOwnIndex />);
+    const { getByText } = await render(<CustomizeYourOwnIndex />);
     expect(getByText("Vendor Categories")).toBeTruthy();
   });
 
@@ -723,7 +723,7 @@ describe("Boundary Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "1", name: "Venue", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
   });
 
@@ -731,7 +731,7 @@ describe("Boundary Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue([
       { _id: "null-desc", name: "Venue", image: "img", description: undefined },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy(); // name still renders
   });
 
@@ -740,7 +740,7 @@ describe("Boundary Testing", () => {
       { _id: "1", name: "Venue", image: "img", description: "desc1" },
       { _id: "2", name: "Venue", image: "img", description: "desc2" },
     ]);
-    const { findAllByText } = render(<CustomizeYourOwnIndex />);
+    const { findAllByText } = await render(<CustomizeYourOwnIndex />);
     const items = await findAllByText("Venue");
     expect(items.length).toBe(2);
   });
@@ -753,7 +753,7 @@ describe("Scrolling Testing", () => {
       { _id: "1", name: "Venue", image: "img", description: "desc" },
       { _id: "2", name: "Catering", image: "img", description: "desc" },
     ]);
-    const { findByText } = render(<CustomizeYourOwnIndex />);
+    const { findByText } = await render(<CustomizeYourOwnIndex />);
     expect(await findByText("Venue")).toBeTruthy();
     expect(await findByText("Catering")).toBeTruthy();
   });
@@ -763,7 +763,7 @@ describe("Scrolling Testing", () => {
      { _id: "1", name: "Venue", image: "img", description: "desc" },
      { _id: "2", name: "Catering", image: "img", description: "desc" },
    ]);
-   const { findByText } = render(<CustomizeYourOwnIndex />);
+   const { findByText } = await render(<CustomizeYourOwnIndex />);
    expect(await findByText("Venue")).toBeTruthy();
    expect(await findByText("Catering")).toBeTruthy();
  });
@@ -773,7 +773,7 @@ it("renders duplicate category names in scrollable list correctly", async () => 
     { _id: "1", name: "Venue", image: "img", description: "desc" },
     { _id: "2", name: "Venue", image: "img", description: "desc2" },
   ]);
-  const { findAllByText } = render(<CustomizeYourOwnIndex />);
+  const { findAllByText } = await render(<CustomizeYourOwnIndex />);
   const venues = await findAllByText("Venue");
   expect(venues.length).toBe(2);
 });
@@ -783,7 +783,7 @@ it("renders scrollable list even with missing image URLs", async () => {
     { _id: "1", name: "Venue", image: "", description: "desc" },
     { _id: "2", name: "Catering", image: "", description: "desc" },
   ]);
-  const { findByText } = render(<CustomizeYourOwnIndex />);
+  const { findByText } = await render(<CustomizeYourOwnIndex />);
   expect(await findByText("Venue")).toBeTruthy();
   expect(await findByText("Catering")).toBeTruthy();
 });

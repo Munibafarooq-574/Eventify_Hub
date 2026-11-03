@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { OrderService } from './order.service';
 const id=()=>new Types.ObjectId();
 const q=(value:any):any=>{const query:any={session:()=>query,select:()=>query,lean:async()=>value,then:(resolve:any,reject:any)=>Promise.resolve(value).then(resolve,reject)};return query};
-function fixture(){
+function fixture(bookingType = 'DURATION_BASED'){
  const organizer=id(),category=id(),oldVendor=id(),newVendor=id(),city=id(),pkg=id();
  const old:any={_id:id(),vendorId:oldVendor,status:'cancelled_by_vendor',cancelledBy:'vendor',price:6000,save:jest.fn(async()=>{})};
  const sibling:any={_id:id(),vendorId:id(),status:'accepted',price:3000,originalAmount:3000,finalAmount:3000};
@@ -12,7 +12,7 @@ function fixture(){
  s.cancellationService={assertClientBookingOwner:jest.fn(async(_id:any,actor:any)=>{if(actor.id!==String(organizer))throw Error('You do not own this booking');return{vendorOrder:old,order}}),getPolicyConfig:async()=>({}),buildBookingPolicySnapshot:()=>({policyRevision:3})};
  s.rescheduleRequestModel={exists:()=>q(false)};
  s.vendorOrderModel={find:()=>q([sibling]),exists:()=>q(false),create:jest.fn(async([data]:any[])=>[{_id:id(),...data}])};
- s.userModel={findById:()=>q({buisnessCategory:category}),updateOne:async()=>({matchedCount:1}),find:()=>q([{_id:newVendor,buisnessCategory:category,packages:[{_id:pkg,bookingType:'CUSTOM',price:6000,isActive:true}]}])};
+ s.userModel={findById:()=>q({buisnessCategory:category}),updateOne:async()=>({matchedCount:1}),find:()=>q([{_id:newVendor,buisnessCategory:category,packages:[{_id:pkg,bookingType,price:6000,isActive:true}]}])};
  s.orderModel={findOne:()=>q({_id:order._id}),create:jest.fn()};
  s.categoryModel={findById:()=>q({name:'Photography'}),find:()=>q([{_id:category,name:'Photography',normalizedName:'photography'}])};
  s.cityService={requireActiveCity:async()=>({}),requireCityTimeZone:async()=>'Asia/Karachi'};
@@ -44,6 +44,11 @@ describe('Cancelled-vendor replacement restrictions and checkout',()=>{
   const f=fixture();const result=await f.create();expect(result._id).toEqual(f.order._id);expect(f.s.orderModel.create).not.toHaveBeenCalled();
   const record=f.s.vendorOrderModel.create.mock.calls[0][0][0];expect(record).toMatchObject({status:'pending',orderId:f.order._id,replacesVendorOrderId:String(f.old._id),finalAmount:6000,eventStartDateTime:f.order.eventStartDateTime});
   expect(f.order.vendorOrders).toHaveLength(3);expect(f.order.vendorOrders.slice(0,2)).toEqual([f.old._id,f.sibling._id]);expect(f.sibling.status).toBe('accepted');expect(f.old.status).toBe('cancelled_by_vendor');expect(f.order.finalAmount).toBe(9000);expect(f.order.eventName).toBe('Wedding');
+ });
+ it('rejects a retired package before creating a replacement booking', async () => {
+  const f = fixture('CUSTOM');
+  await expect(f.create()).rejects.toThrow('Package booking type is invalid');
+  expect(f.s.vendorOrderModel.create).not.toHaveBeenCalled();
  });
  it('blocks another category or an already active vendor',async()=>{
   const f=fixture();f.s.userModel.find=()=>q([{_id:f.newVendor,buisnessCategory:id(),packages:[]}]);await expect(f.create()).rejects.toThrow('category');expect(f.s.vendorOrderModel.create).not.toHaveBeenCalled();

@@ -8,7 +8,21 @@ exports[`MessagesModule Snapshot Testing should ensure schema fields are stable 
   "senderId",
   "receiverId",
   "message",
+  "imageUrl",
+  "videoUrl",
+  "thumbnailUrl",
+  "videoDurationMs",
+  "audioUrl",
+  "audioDurationMs",
+  "isRead",
   "timestamp",
+  "deletedFor",
+  "isDeletedForEveryone",
+  "pinnedAt",
+  "pinExpiresAt",
+  "deliveredAt",
+  "seenAt",
+  "repliedToMessageId",
   "_id",
   "__v",
 ]
@@ -30,24 +44,84 @@ MessagesService {
 
 exports[`MessagesModule Snapshot Testing should match snapshot for Mongoose schema 1`] = `
 {
+  "audioDurationMs": {
+    "default": 0,
+    "type": [Function],
+  },
+  "audioUrl": {
+    "default": "",
+    "type": [Function],
+  },
   "chatId": {
     "required": true,
     "type": [Function],
   },
+  "deletedFor": {
+    "default": [],
+    "type": [
+      [Function],
+    ],
+  },
+  "deliveredAt": {
+    "default": null,
+    "type": [Function],
+  },
+  "imageUrl": {
+    "default": "",
+    "type": [Function],
+  },
+  "isDeletedForEveryone": {
+    "default": false,
+    "type": [Function],
+  },
+  "isRead": {
+    "default": false,
+    "type": [Function],
+  },
   "message": {
-    "required": true,
+    "default": "",
+    "required": [Function],
+    "type": [Function],
+  },
+  "pinExpiresAt": {
+    "default": null,
+    "type": [Function],
+  },
+  "pinnedAt": {
+    "default": null,
     "type": [Function],
   },
   "receiverId": {
     "required": true,
     "type": [Function],
   },
+  "repliedToMessageId": {
+    "default": null,
+    "ref": "Message",
+    "type": {},
+  },
+  "seenAt": {
+    "default": null,
+    "type": [Function],
+  },
   "senderId": {
     "required": true,
     "type": [Function],
   },
+  "thumbnailUrl": {
+    "default": "",
+    "type": [Function],
+  },
   "timestamp": {
     "default": [Function],
+    "type": [Function],
+  },
+  "videoDurationMs": {
+    "default": 0,
+    "type": [Function],
+  },
+  "videoUrl": {
+    "default": "",
     "type": [Function],
   },
 }
@@ -59,6 +133,20 @@ exports[`MessagesModule Snapshot Testing should snapshot schema structure keys 1
   "senderId",
   "receiverId",
   "message",
+  "imageUrl",
+  "videoUrl",
+  "thumbnailUrl",
+  "videoDurationMs",
+  "audioUrl",
+  "audioDurationMs",
+  "isRead",
   "timestamp",
+  "deletedFor",
+  "isDeletedForEveryone",
+  "pinnedAt",
+  "pinExpiresAt",
+  "deliveredAt",
+  "seenAt",
+  "repliedToMessageId",
 ]
 `;

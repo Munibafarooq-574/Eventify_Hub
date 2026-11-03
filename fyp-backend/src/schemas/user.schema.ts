@@ -752,12 +752,14 @@ export const PackageDurationOptionSchema =
   SchemaFactory.createForClass(PackageDurationOption);
 
 
-  export enum PackageBookingType {
+// Stored packages can retain this value until the vendor chooses a supported type.
+export const RETIRED_PACKAGE_BOOKING_TYPE = 'CUSTOM';
+
+export enum PackageBookingType {
   DURATION_BASED = 'DURATION_BASED',
   TIME_SLOT_BASED = 'TIME_SLOT_BASED',
   DELIVERY_BASED = 'DELIVERY_BASED',
   SETUP_BASED = 'SETUP_BASED',
-  CUSTOM = 'CUSTOM',
 }
 
 // ==========================================
@@ -797,10 +799,11 @@ export class Package {
   // Defines how this package consumes vendor availability.
   // Optional for backward compatibility with existing packages.
   @Prop({
-    enum: PackageBookingType,
+    type: String,
+    enum: [...Object.values(PackageBookingType), RETIRED_PACKAGE_BOOKING_TYPE],
     required: false,
   })
-  bookingType?: PackageBookingType;
+  bookingType?: PackageBookingType | typeof RETIRED_PACKAGE_BOOKING_TYPE;
 
   // Fixed amount of vendor time required where applicable.
   // Existing DURATION_BASED packages continue using durations[].

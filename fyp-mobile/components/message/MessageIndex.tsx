@@ -1634,7 +1634,7 @@ const handleMessageOption = (
               </TouchableOpacity>
             )}
             ListEmptyComponent={
-              searchQuery.trim().length === 0 ? null : (
+              searchQuery.trim().length === 0 ? undefined : (
                 <Text style={styles.searchEmptyText}>
                   {searching ? "Searching..." : "No messages found"}
                 </Text>

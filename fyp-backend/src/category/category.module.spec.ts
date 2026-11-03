@@ -98,10 +98,10 @@ describe('CategoryModule', () => {
     expect(categoryController).toBeDefined();
   });
 
-  it('CategoryController should define createCategory and getAllCategories methods', () => {
+  it('CategoryController should expose category requests and listing', () => {
     const methodNames = Object.getOwnPropertyNames(Object.getPrototypeOf(categoryController));
     // expect(methodNames).toEqual(expect.arrayContaining(['createCategory', 'getAllCategories']));
-    expect(methodNames).toEqual(expect.arrayContaining(['register', 'getAll']));
+    expect(methodNames).toEqual(expect.arrayContaining(['createCategoryRequest', 'getAll']));
 
   });
 });

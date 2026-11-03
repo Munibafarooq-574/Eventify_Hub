@@ -337,6 +337,7 @@ const selectedCity = useMemo(
   } = useVendorsAvailability({
     vendorIds,
     eventDate: availabilityDate,
+    eventCityId,
     startTime: eventDate ? timeToHHMM(startTime) : null,
     durationMinutes,
   });

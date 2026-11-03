@@ -1,3 +1,4 @@
+import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
@@ -16,6 +17,7 @@ describe('ReviewsController', () => {
             controllers: [ReviewsController],
             providers: [
                 { provide: ReviewsService, useValue: mockReviewsService },
+                { provide: FileUploadService, useValue: {} },
             ],
         }).compile();
 

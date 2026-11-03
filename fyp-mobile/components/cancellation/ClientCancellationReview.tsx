@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react';
 import { formatNoticeHours } from '@/utils/bookingCancellation';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
@@ -29,7 +30,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 360 || fontScale >= 1.4;
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const reasonTop = useRef(0);
   const reasonFocused = useRef(false);
   const frame = useRef<number | null>(null);

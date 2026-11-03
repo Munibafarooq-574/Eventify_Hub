@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { formatBookingActivityTime } from '@/utils/bookingActivity';
@@ -153,7 +154,7 @@ const OrderSummary = () => {
     const [previewLoading, setPreviewLoading] = useState(false);
     const previewGeneration = useRef(0);
     const cancellationLock = useRef(false);
-    const summaryScrollRef = useRef<ScrollView>(null);
+    const summaryScrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
     const [lateAcceptanceId, setLateAcceptanceId] = useState<string | null>(null);
     const refreshScreenData = useCallback(async () => {
@@ -467,7 +468,7 @@ const OrderSummary = () => {
                 {isRefreshingScreen && (
                     <View
                         style={{
-                            ...StyleSheet.absoluteFillObject,
+                            ...StyleSheet.absoluteFill,
                             zIndex: 1000,
                             elevation: 1000,
                             backgroundColor: "rgba(255,255,255,0.78)",

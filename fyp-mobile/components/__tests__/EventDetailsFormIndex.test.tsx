@@ -30,10 +30,10 @@ describe("Unit Testing", () => {
   });
 
 
-  it("updates event name input", () => {
-    const { getByPlaceholderText } = render(<PersonalizedExperienceScreen />);
+  it("updates event name input", async () => {
+    const { getByPlaceholderText } = await render(<PersonalizedExperienceScreen />);
     const input = getByPlaceholderText("Enter event name");
-    fireEvent.changeText(input, "My Birthday");
+    await fireEvent.changeText(input, "My Birthday");
     expect(input.props.value).toBe("My Birthday");
   });
 
@@ -45,22 +45,22 @@ describe("Functional Testing", () => {
   });
 
   // Test Case 1: Event name input field should update state correctly
-  it("updates event name input field correctly", () => {
-    const { getByPlaceholderText } = render(<PersonalizedExperienceScreen />);
+  it("updates event name input field correctly", async () => {
+    const { getByPlaceholderText } = await render(<PersonalizedExperienceScreen />);
     const input = getByPlaceholderText("Enter event name");
-    fireEvent.changeText(input, "My Birthday");
+    await fireEvent.changeText(input, "My Birthday");
     expect(input.props.value).toBe("My Birthday");
   });
 
   it("displays the selected event date correctly", async () => {
-    const { getByText, getByTestId } = render(<PersonalizedExperienceScreen />);
+    const { getByText, getByTestId } = await render(<PersonalizedExperienceScreen />);
 
     // Open the date picker
-    fireEvent.press(getByTestId("select-event-date-button"));
+    await fireEvent.press(getByTestId("select-event-date-button"));
 
     // Get the current date and simulate the date selection
     const currentDate = new Date();
-    fireEvent(getByTestId("datetime-picker"), "onChange", {
+    await fireEvent(getByTestId("datetime-picker"), "onChange", {
       nativeEvent: { timestamp: currentDate.getTime() },
     });
 
@@ -71,16 +71,16 @@ describe("Functional Testing", () => {
   });
 
   it("displays the selected event date correctly", async () => {
-    const { getByText, getByTestId } = render(<PersonalizedExperienceScreen />);
+    const { getByText, getByTestId } = await render(<PersonalizedExperienceScreen />);
 
     // Open the date picker
-    fireEvent.press(getByTestId("select-event-date-button"));
+    await fireEvent.press(getByTestId("select-event-date-button"));
 
     // Get the current date
     const currentDate = new Date();
 
     // Simulate selecting the date
-    fireEvent(getByTestId("datetime-picker"), "onChange", {
+    await fireEvent(getByTestId("datetime-picker"), "onChange", {
       nativeEvent: { timestamp: currentDate.getTime() },
     });
 
@@ -92,10 +92,10 @@ describe("Functional Testing", () => {
 
   it("opens the date picker when 'Select event date' is clicked", async () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { getByText, getByTestId } = render(<PersonalizedExperienceScreen />);
+    const { getByText, getByTestId } = await render(<PersonalizedExperienceScreen />);
 
     // Simulate clicking the 'Select event date' button
-    fireEvent.press(getByTestId("select-event-date-button"));
+    await fireEvent.press(getByTestId("select-event-date-button"));
 
     // Verify that the date picker opens
     await waitFor(() => {
@@ -104,13 +104,13 @@ describe("Functional Testing", () => {
   });
 
   it("shows an error when event name is left empty", async () => {
-    const { getByText, getByPlaceholderText } = render(
+    const { getByText, getByPlaceholderText } = await render(
       <PersonalizedExperienceScreen />
     );
 
     // Leave the event name empty and simulate form submission
-    fireEvent.changeText(getByPlaceholderText("Enter event name"), "");
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.changeText(getByPlaceholderText("Enter event name"), "");
+    await fireEvent.press(getByText("AI Suggested Plan"));
 
     // Verify that the error message is shown
     await waitFor(() => {
@@ -125,16 +125,16 @@ describe("Integration Testing", () => {
   });
 
   it("can select an event date correctly", async () => {
-    const { getByText, getByTestId } = render(<PersonalizedExperienceScreen />);
+    const { getByText, getByTestId } = await render(<PersonalizedExperienceScreen />);
 
     // Open the date picker
-    fireEvent.press(getByTestId("select-event-date-button"));
+    await fireEvent.press(getByTestId("select-event-date-button"));
 
     // Get the current date
     const currentDate = new Date();
 
     // Simulate a date selection
-    fireEvent(getByTestId("datetime-picker"), "onChange", {
+    await fireEvent(getByTestId("datetime-picker"), "onChange", {
       nativeEvent: { timestamp: currentDate.getTime() },
     });
 
@@ -151,17 +151,17 @@ describe("Security Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue(mockCategories);
   });
 
-  it("does not save or navigate when form is invalid", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
-    fireEvent.press(getByText("AI Suggested Plan"));
+  it("does not save or navigate when form is invalid", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
+    await fireEvent.press(getByText("AI Suggested Plan"));
     expect(saveSecureData).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("prevents injection in eventName input", () => {
-    const { getByPlaceholderText } = render(<PersonalizedExperienceScreen />);
+  it("prevents injection in eventName input", async () => {
+    const { getByPlaceholderText } = await render(<PersonalizedExperienceScreen />);
     const maliciousInput = "<script>alert('xss')</script>";
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter event name"),
       maliciousInput
     );
@@ -170,10 +170,10 @@ describe("Security Testing", () => {
     );
   });
 
-  it("prevents injection in eventType input", () => {
-    const { getByPlaceholderText } = render(<PersonalizedExperienceScreen />);
+  it("prevents injection in eventType input", async () => {
+    const { getByPlaceholderText } = await render(<PersonalizedExperienceScreen />);
     const maliciousInput = "<img src=x onerror=alert('xss') />";
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter event type"),
       maliciousInput
     );
@@ -184,14 +184,14 @@ describe("Security Testing", () => {
 
 
 
-  it("rejects excessively long eventName input", () => {
-    const { getByPlaceholderText, getByText, queryByText } = render(
+  it("rejects excessively long eventName input", async () => {
+    const { getByPlaceholderText, getByText, queryByText } = await render(
       <PersonalizedExperienceScreen />
     );
     const longString = "a".repeat(1001); // 1001 chars
 
-    fireEvent.changeText(getByPlaceholderText("Enter event name"), longString);
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.changeText(getByPlaceholderText("Enter event name"), longString);
+    await fireEvent.press(getByText("AI Suggested Plan"));
 
     // Expect some error message related to input length or validation failure
     // (Assuming you add max length validation; else just checking form does not submit)
@@ -199,17 +199,17 @@ describe("Security Testing", () => {
     // You might want to add a max length validation error message here in your component for this to work
   });
 
-  it("sanitizes eventName input against script injection", () => {
-    const { getByPlaceholderText, getByText, queryByText } = render(
+  it("sanitizes eventName input against script injection", async () => {
+    const { getByPlaceholderText, getByText, queryByText } = await render(
       <PersonalizedExperienceScreen />
     );
     const maliciousInput = `<script>alert('hack')</script>`;
 
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter event name"),
       maliciousInput
     );
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.press(getByText("AI Suggested Plan"));
 
     // Your component doesn't sanitize but you should check form does not submit
     expect(queryByText("Event name is required")).toBeNull();
@@ -225,27 +225,27 @@ describe("Accuracy Testing ", () => {
     (getAllCategories as jest.Mock).mockResolvedValue(mockCategories);
   });
 
-  it("validates form accurately with missing inputs", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
-    fireEvent.press(getByText("AI Suggested Plan"));
+  it("validates form accurately with missing inputs", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
+    await fireEvent.press(getByText("AI Suggested Plan"));
     expect(getByText("Event name is required")).toBeTruthy();
   });
 
   // Test: Errors clear when fields are correctly filled
   it("clears error messages after valid inputs", async () => {
-    const { getByText, getByPlaceholderText, queryByText } = render(
+    const { getByText, getByPlaceholderText, queryByText } = await render(
       <PersonalizedExperienceScreen />
     );
 
     // Submit empty form, expect errors
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.press(getByText("AI Suggested Plan"));
     await waitFor(() => {
       expect(getByText("Event name is required")).toBeTruthy();
     });
 
     // Fill valid event name, error should clear
-    fireEvent.changeText(getByPlaceholderText("Enter event name"), "My Event");
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.changeText(getByPlaceholderText("Enter event name"), "My Event");
+    await fireEvent.press(getByText("AI Suggested Plan"));
 
     await waitFor(() => {
       expect(queryByText("Event name is required")).toBeNull();
@@ -257,22 +257,22 @@ describe("Accuracy Testing ", () => {
 
   // Test: Event type input updates and validation
   it("updates event type input and validates correctly", async () => {
-    const { getByPlaceholderText, getByText, queryByText } = render(
+    const { getByPlaceholderText, getByText, queryByText } = await render(
       <PersonalizedExperienceScreen />
     );
 
     // Submit empty form, expect event type error
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.press(getByText("AI Suggested Plan"));
     await waitFor(() => {
       expect(getByText("Event type is required")).toBeTruthy();
     });
 
     // Enter valid event type
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter event type"),
       "Conference"
     );
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.press(getByText("AI Suggested Plan"));
 
     await waitFor(() => {
       expect(queryByText("Event type is required")).toBeNull();
@@ -280,8 +280,8 @@ describe("Accuracy Testing ", () => {
   });
 
   // Test: Error messages only appear after attempting to submit invalid form
-  it("does not show error messages before form submission", () => {
-    const { queryByText } = render(<PersonalizedExperienceScreen />);
+  it("does not show error messages before form submission", async () => {
+    const { queryByText } = await render(<PersonalizedExperienceScreen />);
     expect(queryByText("Event name is required")).toBeNull();
     expect(queryByText("Event type is required")).toBeNull();
     expect(queryByText("Event date is required")).toBeNull();
@@ -300,16 +300,16 @@ describe("Navigation Testing", () => {
     jest.clearAllMocks();
   });
 
-  it("does not call router.push if form is invalid", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
-    fireEvent.press(getByText("AI Suggested Plan"));
+  it("does not call router.push if form is invalid", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
+    await fireEvent.press(getByText("AI Suggested Plan"));
     expect(router.push).not.toHaveBeenCalled();
   });
 
   it("does not navigate on Customize Your Own button press if form invalid", async () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
     // Immediately press without filling anything
-    fireEvent.press(getByText("Customize Your Own"));
+    await fireEvent.press(getByText("Customize Your Own"));
     await waitFor(() => {
       expect(router.push).not.toHaveBeenCalled();
     });
@@ -322,15 +322,15 @@ describe("Accessibility Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue(mockCategories);
   });
 
-  it("buttons are accessible", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
+  it("buttons are accessible", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
     expect(getByText("AI Suggested Plan")).toBeTruthy();
     expect(getByText("Customize Your Own")).toBeTruthy();
   });
 
   it("error messages are readable by screen readers", async () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
-    fireEvent.press(getByText("AI Suggested Plan"));
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
+    await fireEvent.press(getByText("AI Suggested Plan"));
     await waitFor(() => {
       expect(
         getByText("Event name is required").props.accessible !== false
@@ -344,17 +344,17 @@ describe("Boundary Testing", () => {
     (getAllCategories as jest.Mock).mockResolvedValue(mockCategories);
   });
 
-  it("accepts empty string and shows error for eventName", () => {
-    const { getByText, getByPlaceholderText } = render(
+  it("accepts empty string and shows error for eventName", async () => {
+    const { getByText, getByPlaceholderText } = await render(
       <PersonalizedExperienceScreen />
     );
-    fireEvent.changeText(getByPlaceholderText("Enter event name"), "");
-    fireEvent.press(getByText("AI Suggested Plan"));
+    await fireEvent.changeText(getByPlaceholderText("Enter event name"), "");
+    await fireEvent.press(getByText("AI Suggested Plan"));
     expect(getByText("Event name is required")).toBeTruthy();
   });
 
-  it("handles null eventDate gracefully", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
+  it("handles null eventDate gracefully", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
     expect(getByText("Select event date")).toBeTruthy();
   });
 });
@@ -365,15 +365,15 @@ describe("Scrolling Testing - PersonalizedExperienceScreen", () => {
   });
 
 
-  it("keeps input fields visible on scroll", () => {
+  it("keeps input fields visible on scroll", async () => {
     // This is more manual; we check if ScrollView is present wrapping inputs
-    const { getByText } = render(<PersonalizedExperienceScreen />);
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
     expect(getByText("Event Name")).toBeTruthy();
   });
 
   // Test: User can scroll down to the bottom (simulate scroll event)
-  it("allows scrolling through the content", () => {
-    const { getByText } = render(<PersonalizedExperienceScreen />);
+  it("allows scrolling through the content", async () => {
+    const { getByText } = await render(<PersonalizedExperienceScreen />);
     const heading = getByText("Enter your details for personalized experience");
 
     // Simulate scroll event — react-native testing library doesn't support scroll event natively,
@@ -382,10 +382,10 @@ describe("Scrolling Testing - PersonalizedExperienceScreen", () => {
   });
 
   // Test: After filling inputs, fields remain visible (simulate)
-  it("keeps input fields accessible after scrolling (conceptual)", () => {
-    const { getByPlaceholderText } = render(<PersonalizedExperienceScreen />);
+  it("keeps input fields accessible after scrolling (conceptual)", async () => {
+    const { getByPlaceholderText } = await render(<PersonalizedExperienceScreen />);
     const input = getByPlaceholderText("Enter event name");
-    fireEvent.changeText(input, "Test event");
+    await fireEvent.changeText(input, "Test event");
 
     // Cannot simulate real scrolling in RN Testing Library,
     // but can confirm input exists and is focusable

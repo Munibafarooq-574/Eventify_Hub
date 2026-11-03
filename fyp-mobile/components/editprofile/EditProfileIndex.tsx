@@ -121,7 +121,7 @@ const OrganizerEditProfileScreen: React.FC = () => {
 
   return (
     <View style={styles.container} testID="screen-container">
-      <StatusBar backgroundColor={PRIMARY_LIGHT} barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.back()}>

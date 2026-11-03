@@ -45,19 +45,19 @@ describe("PhotographerDetailsScreen", () => {
     (axios.get as jest.Mock).mockResolvedValue({ data: mockVendorData });
   });
 
-  it("renders loading state initially", () => {
-    const { getByTestId } = render(<PhotographerDetailsScreen />);
+  it("renders loading state initially", async () => {
+    const { getByTestId } = await render(<PhotographerDetailsScreen />);
     expect(getByTestId("loading-indicator")).toBeTruthy();
   });
 
   it("renders error message when vendorData is null", async () => {
     (axios.get as jest.Mock).mockResolvedValue({ data: null });
-    const { findByTestId } = render(<PhotographerDetailsScreen />);
+    const { findByTestId } = await render(<PhotographerDetailsScreen />);
     expect(await findByTestId("error-message")).toBeTruthy();
   });
 
-  it("shows loading indicator on initial render", () => {
-    const { getByTestId } = render(<PhotographerDetailsScreen />);
+  it("shows loading indicator on initial render", async () => {
+    const { getByTestId } = await render(<PhotographerDetailsScreen />);
     expect(getByTestId("loading-indicator")).toBeTruthy();
   });
 

@@ -28,8 +28,7 @@ type BookingType =
   | "DURATION_BASED"
   | "TIME_SLOT_BASED"
   | "DELIVERY_BASED"
-  | "SETUP_BASED"
-  | "CUSTOM";
+  | "SETUP_BASED";
 
 interface PackageDuration {
   value: number;
@@ -72,7 +71,6 @@ const bookingTypeOptions: {
   { label: "Time Slot Based", value: "TIME_SLOT_BASED" },
   { label: "Delivery Based", value: "DELIVERY_BASED" },
   { label: "Setup Based", value: "SETUP_BASED" },
-  { label: "Custom", value: "CUSTOM" },
 ];
 
 // ===========================================================
@@ -198,7 +196,7 @@ export default function VendorPackagesScreen() {
 
   const [delivery, setDelivery] = useState<DeliverySettings>({...defaultDelivery});
   const [bookingType, setBookingType] =
-  useState<BookingType>("DURATION_BASED");
+  useState<BookingType | "">("DURATION_BASED");
 
 // Friendly (vendor-facing) state — never raw signed minutes.
 // "How long does the task take" (delivery drop-off, setup, a time slot)
@@ -487,7 +485,7 @@ const existingPackage =
 
     setDelivery(deliverySettings(existingPackage));
          setBookingType(
-          existingPackage.bookingType || "DURATION_BASED",
+          String(existingPackage.bookingType) === "CUSTOM" ? "" : existingPackage.bookingType || "DURATION_BASED",
         );
 
         setServiceDuration(
@@ -778,7 +776,7 @@ const removeImageAsset = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!hasName || !hasPrice) {
+  if (!bookingType || !hasName || !hasPrice) {
     return false;
   }
 
@@ -813,7 +811,7 @@ const removeImageAsset = (index: number) => {
   const validWindow = !serviceWindowError(startOffset, endOffset, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) && (bookingType !== "SETUP_BASED" || (startOffset !== undefined && startOffset <= 0 && endOffset !== undefined && endOffset <= 0));
 
   if (bookingType === "DELIVERY_BASED" && deliverySettingsError(delivery)) return false;
-  if (bookingType === "CUSTOM" || bookingType === "DELIVERY_BASED") {
+  if (bookingType === "DELIVERY_BASED") {
     return validWindow;
   }
 
@@ -867,7 +865,7 @@ const removeImageAsset = (index: number) => {
   // ---------------------------------------------------------
 
  const handleSave = async () => {
-  if (!isFormValid) {
+  if (!bookingType || !isFormValid) {
     Alert.alert(
       "Incomplete Form",
    "Please complete the required package and booking configuration."    );
@@ -965,15 +963,13 @@ if (!userId) {
 
   serviceWindowStartOffsetMinutes:
     bookingType === "DELIVERY_BASED" ||
-    bookingType === "SETUP_BASED" ||
-    bookingType === "CUSTOM"
+    bookingType === "SETUP_BASED"
       ? serviceWindowStartOffsetMinutesValue
       : undefined,
 
   serviceWindowEndOffsetMinutes:
     bookingType === "DELIVERY_BASED" ||
-    bookingType === "SETUP_BASED" ||
-    bookingType === "CUSTOM"
+    bookingType === "SETUP_BASED"
       ? serviceWindowEndOffsetMinutesValue
       : undefined,
 
@@ -1841,7 +1837,7 @@ if (!userId) {
     Non-Duration Booking Configuration
 ------------------------------------------------- */}
 
-{bookingType !== "DURATION_BASED" && (
+{bookingType !== "" && bookingType !== "DURATION_BASED" && (
   <View style={styles.card}>
     <View style={{flexDirection:"row",alignItems:"center",gap:3}}>
     <Text style={[styles.sectionTitle,{flexShrink:1}]}>
@@ -1849,9 +1845,7 @@ if (!userId) {
         ? "How long does this take?"
         : bookingType === "DELIVERY_BASED"
         ? "Delivery Window"
-        : bookingType === "SETUP_BASED"
-        ? "Setup Duration & Allowed Window"
-        : "Custom Service Timing"}
+        : "Setup Duration & Allowed Window"}
     </Text>
     {bookingType === "DELIVERY_BASED" && <InfoHelp title="Delivery Window" message={deliveryWindowHelp(serviceWindowStartOffsetMinutesValue,serviceWindowEndOffsetMinutesValue)} />}
     </View>
@@ -1859,9 +1853,7 @@ if (!userId) {
     {bookingType !== "DELIVERY_BASED" && <Text style={styles.sectionSubtitle}>
       {bookingType === "TIME_SLOT_BASED"
         ? "This is how much of your time a single booking takes — e.g. a makeup session or a transport trip."
-        : bookingType === "SETUP_BASED"
-        ? "Enter how long setup takes, the earliest it may start, and when it must be finished. The setup duration must fit inside this window."
-        : "Choose when the service may start and when it must finish, relative to the event start. Duration is optional; if entered, it must fit inside this window."}
+        : "Enter how long setup takes, the earliest it may start, and when it must be finished. The setup duration must fit inside this window."}
     </Text>}
 
     {/* --------------------------------------------------
@@ -1869,15 +1861,12 @@ if (!userId) {
     -------------------------------------------------- */}
 
     {(bookingType === "TIME_SLOT_BASED" ||
-      bookingType === "SETUP_BASED" ||
-      bookingType === "CUSTOM") && (
+      bookingType === "SETUP_BASED") && (
       <View style={{ marginTop: 18 }}>
         <Text style={styles.smallLabel}>
           {bookingType === "TIME_SLOT_BASED"
             ? "Time needed per booking"
-            : bookingType === "SETUP_BASED"
-            ? "Time needed to set up"
-            : "Time needed (optional)"}
+            : "Time needed to set up"}
         </Text>
 
         <View style={styles.friendlyRow}>
@@ -1946,9 +1935,7 @@ if (!userId) {
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
               ? "Earliest delivery time"
-              : bookingType === "SETUP_BASED"
-              ? "Earliest setup start"
-              : "Earliest service start"}
+              : "Earliest setup start"}
           </Text>
 
           <View style={styles.friendlyRow}>
@@ -2003,7 +1990,7 @@ if (!userId) {
           ) : (
             <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
               {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-              {((bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
+              {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
                 (direction) => {
                   const active = windowStart.direction === direction;
   
@@ -2015,7 +2002,7 @@ if (!userId) {
                         active && styles.friendlyDirectionButtonActive,
                       ]}
                       onPress={() =>
-                        setWindowStart((prev) => ({ ...prev, direction: bookingType === "SETUP_BASED" ? "BEFORE" : direction }))
+                        setWindowStart((prev) => ({ ...prev, direction }))
                       }
                       activeOpacity={0.8}
                     >
@@ -2575,51 +2562,6 @@ if (!userId) {
     </>
   )}
 
-  {bookingType === "CUSTOM" && (
-    <>
-      {requiredServiceDurationMinutesValue !== undefined && (
-        <View style={styles.previewDurationRow}>
-          <Text style={styles.previewDurationText}>
-            Time needed
-          </Text>
-
-          <Text style={styles.previewDurationPrice}>
-            {formatDurationDisplay(
-              requiredServiceDurationMinutesValue,
-            )}
-          </Text>
-        </View>
-      )}
-
-      {serviceWindowStartOffsetMinutesValue !== undefined && (
-        <View style={styles.previewDurationRow}>
-          <Text style={styles.previewDurationText}>
-            Earliest service start
-          </Text>
-
-          <Text style={styles.previewDurationPrice}>
-            {formatOffsetDisplay(
-              serviceWindowStartOffsetMinutesValue,
-            )}
-          </Text>
-        </View>
-      )}
-
-      {serviceWindowEndOffsetMinutesValue !== undefined && (
-        <View style={styles.previewDurationRow}>
-          <Text style={styles.previewDurationText}>
-            Service completion deadline
-          </Text>
-
-          <Text style={styles.previewDurationPrice}>
-            {formatOffsetDisplay(
-              serviceWindowEndOffsetMinutesValue,
-            )}
-          </Text>
-        </View>
-      )}
-    </>
-  )}
 </View>
 
             {bookingType === "DURATION_BASED" &&

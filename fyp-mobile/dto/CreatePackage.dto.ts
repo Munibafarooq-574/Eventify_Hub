@@ -20,8 +20,7 @@ export interface PackageDto {
     | "DURATION_BASED"
     | "TIME_SLOT_BASED"
     | "DELIVERY_BASED"
-    | "SETUP_BASED"
-    | "CUSTOM";
+    | "SETUP_BASED";
 
   // Required vendor service time where applicable
   requiredServiceDurationMinutes?: number;

@@ -430,44 +430,6 @@ if (eventDetailsRaw) {
         };
     }
 
-    // -----------------------------------------
-    // CUSTOM
-    // Configured start/end offsets
-    // -----------------------------------------
-    if (
-        bookingType === 'CUSTOM'
-    ) {
-        const startOffset =
-            Number(
-                pkg?.serviceWindowStartOffsetMinutes,
-            );
-
-        const endOffset =
-            Number(
-                pkg?.serviceWindowEndOffsetMinutes,
-            );
-
-        if (
-            !Number.isFinite(startOffset) ||
-            !Number.isFinite(endOffset) ||
-            startOffset > endOffset
-        ) {
-            return null;
-        }
-
-        return {
-            bookingType,
-            start: new Date(
-                eventStart.getTime() +
-                startOffset * 60000,
-            ),
-            end: new Date(
-                eventStart.getTime() +
-                endOffset * 60000,
-            ),
-        };
-    }
-
     return null;
 };
 
@@ -907,13 +869,6 @@ if (eventDetailsRaw) {
                                                                         serviceEndText
                                                                             ? `Appointment: ${serviceStartText} - ${serviceEndText}`
                                                                             : 'Appointment time unavailable'
-
-                                                                        : resolvedTiming?.bookingType ===
-                                                                        'CUSTOM'
-                                                                        ? serviceStartText &&
-                                                                        serviceEndText
-                                                                            ? `Service Window: ${serviceStartText} - ${serviceEndText}`
-                                                                            : 'Service window unavailable'
 
                                                                         : serviceStartText &&
                                                                         serviceEndText

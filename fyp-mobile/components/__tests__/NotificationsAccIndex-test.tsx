@@ -1,3 +1,4 @@
+import { getRenderedComponent } from '../../test-utils/renderedComponents';
 // __tests__/NotificationsAccIndex.test.tsx
 
 import React from 'react';
@@ -32,98 +33,98 @@ jest.mock('@/store', () => ({
 }));
 
 describe('NotificationsAccIndex', () => {
-  it('shows the header title', () => {
-    const { getAllByText } = render(<NotificationsAccIndex />);
+  it('shows the header title', async () => {
+    const { getAllByText } = await render(<NotificationsAccIndex />);
     expect(getAllByText('Notifications').length).toBeGreaterThan(0);
   });
 
-  it('renders RSVP switch with default ON', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('renders RSVP switch with default ON', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     expect(getByTestId('rsvp-switch').props.value).toBe(true);
   });
 
-  it('renders Activity switch with default OFF', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('renders Activity switch with default OFF', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     expect(getByTestId('activity-switch').props.value).toBe(false);
   });
 
-  it('renders Deadline switch with default ON', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('renders Deadline switch with default ON', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     expect(getByTestId('deadline-switch').props.value).toBe(true);
   });
 
-  it('toggles RSVP switch from ON to OFF', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('toggles RSVP switch from ON to OFF', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     const toggle = getByTestId('rsvp-switch');
-    fireEvent(toggle, 'valueChange', false);
+    await fireEvent(toggle, 'valueChange', false);
     expect(toggle.props.value).toBe(false);
   });
 
-  it('toggles Activity switch from OFF to ON', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('toggles Activity switch from OFF to ON', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     const toggle = getByTestId('activity-switch');
-    fireEvent(toggle, 'valueChange', true);
+    await fireEvent(toggle, 'valueChange', true);
     expect(toggle.props.value).toBe(true);
   });
 
-  it('toggles Deadline switch from ON to OFF', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('toggles Deadline switch from ON to OFF', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     const toggle = getByTestId('deadline-switch');
-    fireEvent(toggle, 'valueChange', false);
+    await fireEvent(toggle, 'valueChange', false);
     expect(toggle.props.value).toBe(false);
   });
 
-  it('shows RSVP label text', () => {
-    const { getByText } = render(<NotificationsAccIndex />);
+  it('shows RSVP label text', async () => {
+    const { getByText } = await render(<NotificationsAccIndex />);
     expect(
       getByText('Receive notification when guests RSVP to the event')
     ).toBeTruthy();
   });
 
-  it('shows Activity label text', () => {
-    const { getByText } = render(<NotificationsAccIndex />);
+  it('shows Activity label text', async () => {
+    const { getByText } = await render(<NotificationsAccIndex />);
     expect(
       getByText('Receive notification for activity that involves me')
     ).toBeTruthy();
   });
 
-  it('shows Activity description text', () => {
-    const { getByText } = render(<NotificationsAccIndex />);
+  it('shows Activity description text', async () => {
+    const { getByText } = await render(<NotificationsAccIndex />);
     expect(
       getByText('When a guest replies to me, mentions, or tags me')
     ).toBeTruthy();
   });
 
-  it('shows Deadline label text', () => {
-    const { getByText } = render(<NotificationsAccIndex />);
+  it('shows Deadline label text', async () => {
+    const { getByText } = await render(<NotificationsAccIndex />);
     expect(
       getByText('Receive notification about approaching deadlines for tasks')
     ).toBeTruthy();
   });
 
-  it('renders back button and it works', () => {
-    const { getByText } = render(<NotificationsAccIndex />);
+  it('renders back button and it works', async () => {
+    const { getByText } = await render(<NotificationsAccIndex />);
     const back = getByText('< Back');
-    fireEvent.press(back);
+    await fireEvent.press(back);
     expect(back).toBeTruthy();
   });
 
-  it('renders all switches correctly', () => {
-    const { getByTestId } = render(<NotificationsAccIndex />);
+  it('renders all switches correctly', async () => {
+    const { getByTestId } = await render(<NotificationsAccIndex />);
     expect(getByTestId('rsvp-switch')).toBeTruthy();
     expect(getByTestId('activity-switch')).toBeTruthy();
     expect(getByTestId('deadline-switch')).toBeTruthy();
   });
 
-  it('renders SafeAreaView container', () => {
-    const { UNSAFE_getByType } = render(<NotificationsAccIndex />);
+  it('renders SafeAreaView container', async () => {
+    const { container } = await render(<NotificationsAccIndex />);
     expect(
-      UNSAFE_getByType(require('react-native').SafeAreaView)
+      getRenderedComponent(container, require('react-native').SafeAreaView)
     ).toBeTruthy();
   });
 
-  it('matches snapshot', () => {
-    const tree = render(<NotificationsAccIndex />).toJSON();
+  it('matches snapshot', async () => {
+    const tree = (await render(<NotificationsAccIndex />)).toJSON();
     expect(tree).toMatchSnapshot();
   });
 });

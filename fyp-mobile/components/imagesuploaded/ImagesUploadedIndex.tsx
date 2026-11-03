@@ -67,7 +67,7 @@ const ZoomableImage: React.FC<{ uri: string }> = ({ uri }) => {
   const lastDistance = useRef<number | null>(null);
   const lastTap = useRef<number>(0);
 
-  const getDistance = (touches: any[]) => {
+  const getDistance = (touches: readonly { pageX: number; pageY: number }[]) => {
     const [a, b] = touches;
     const dx = a.pageX - b.pageX;
     const dy = a.pageY - b.pageY;

@@ -13,7 +13,9 @@ import {
   SoundBusinessDetails,
   GenericBusinessDetails,
   VendorApprovalStatus,
+  Package,
   PackageBookingType,
+  RETIRED_PACKAGE_BOOKING_TYPE,
 } from '../schemas/user.schema';
 import { CampaignService } from './growth/campaign/campaign.service';
 import { CreateContactDetailsDto } from './dto/create-contact-details.dto';
@@ -171,7 +173,10 @@ const vendorAccessResults = await Promise.all(
 
 return vendorAccessResults
     .filter(({ hasAccess }) => hasAccess)
-    .map(({ vendor }) => vendor) as User[];
+    .map(({ vendor }) => ({
+        ...vendor,
+        packages: vendor.packages?.filter((pkg: Package) => pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE),
+    })) as User[];
     }
 
     async findVendorById(id: string) {
@@ -662,7 +667,7 @@ user.vendorApprovalStatus =
   return user.save();
 }
 private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
-  bookingType?: PackageBookingType;
+  bookingType?: PackageBookingType | typeof RETIRED_PACKAGE_BOOKING_TYPE;
   requiredServiceDurationMinutes?: number;
   serviceWindowStartOffsetMinutes?: number;
   serviceWindowEndOffsetMinutes?: number;
@@ -693,7 +698,7 @@ private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
       pkg.serviceWindowEndOffsetMinutes!;
 
   if (
-    [PackageBookingType.SETUP_BASED, PackageBookingType.CUSTOM].includes(pkg.bookingType) &&
+    pkg.bookingType === PackageBookingType.SETUP_BASED &&
     hasValidWindow && hasValidRequiredDuration &&
     pkg.requiredServiceDurationMinutes! > pkg.serviceWindowEndOffsetMinutes! - pkg.serviceWindowStartOffsetMinutes!
   ) {
@@ -739,19 +744,14 @@ private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
       }
       return;
 
-    case PackageBookingType.CUSTOM:
-      if (!hasValidWindow) {
-        throw new BadRequestException(
-          'CUSTOM packages require a valid service window where start offset is less than or equal to end offset.',
-        );
-      }
-      return;
+    case RETIRED_PACKAGE_BOOKING_TYPE:
+      throw new BadRequestException('Choose a supported booking type for this package.');
 
     default:
       throw new BadRequestException('Invalid package booking type.');
   }
 }
-private async validateDeliveryWeightBasis(pkg: DeliveryConfiguration & { bookingType?: PackageBookingType }, user: User) {
+private async validateDeliveryWeightBasis(pkg: DeliveryConfiguration & { bookingType?: PackageBookingType | typeof RETIRED_PACKAGE_BOOKING_TYPE }, user: User) {
   if (pkg.bookingType !== PackageBookingType.DELIVERY_BASED || pkg.deliveryFeeType !== 'PAID' || !pkg.deliveryExtraWeightEnabled) return;
   const category = await this.categoryModel.findById(user.buisnessCategory).select('name normalizedName').lean();
   const isCatering = String((category as any)?.normalizedName || category?.name || '').toLowerCase().includes('catering');
@@ -1201,7 +1201,7 @@ const visibleVendors = vendorAccessResults
 
 // Flatten all packages with vendor info
 const packages = visibleVendors.flatMap(vendor =>
-    vendor.packages.map((pkg: any) => ({
+    vendor.packages.filter((pkg: Package) => pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE).map((pkg: any) => ({
         packageId: pkg._id.toString(),
         vendorId: vendor._id.toString(),
         vendorName: vendor.name,

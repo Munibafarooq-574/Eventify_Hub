@@ -18,7 +18,7 @@ import { BookingPolicySnapshot } from '../schemas/vendor-order.schema';
 import { Order } from 'src/schemas/order.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { User } from 'src/schemas/user.schema';
+import { PackageBookingType, User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 import { PayoutService } from 'src/payout/payout.service';
@@ -621,19 +621,8 @@ export class OrderService {
                             );
                         }
 
-                        const validBookingTypes =
-                            new Set([
-                                'DURATION_BASED',
-                                'TIME_SLOT_BASED',
-                                'DELIVERY_BASED',
-                                'SETUP_BASED',
-                                'CUSTOM',
-                            ]);
-
                         if (
-                            !validBookingTypes.has(
-                                packageDoc.bookingType,
-                            )
+                            !Object.values(PackageBookingType).includes(packageDoc.bookingType as PackageBookingType)
                         ) {
                             throw new BadRequestException(
                                 'Package booking type is invalid',

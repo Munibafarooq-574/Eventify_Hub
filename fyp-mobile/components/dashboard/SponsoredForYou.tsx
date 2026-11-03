@@ -1,3 +1,4 @@
+import type { ComponentRef } from 'react';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/dashboard/SponsoredForYou.tsx
 
@@ -125,7 +126,7 @@ const [allLoading, setAllLoading] = useState(false);
    * on the device screen.
    */
   const campaignCardRefs = useRef<
-    Record<string, View | null>
+    Record<string, ComponentRef<typeof View> | null>
   >({});
 
   /*

@@ -532,7 +532,6 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={PRIMARY_DARK}
       />
 
       <KeyboardAvoidingView

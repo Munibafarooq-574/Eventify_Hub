@@ -93,11 +93,12 @@ describe('FileUploadService', () => {
                 promise: () => Promise.reject(new Error('S3 Upload Failed')),
             } as any);
 
-            const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+            const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-            await service.s3_upload(Buffer.from('file'), 'bucket', 'file.jpg', 'image/jpeg');
+            await expect(service.s3_upload(Buffer.from('file'), 'bucket', 'file.jpg', 'image/jpeg')).rejects.toThrow('S3 Upload Failed');
 
-            expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error));
+            expect(consoleSpy).toHaveBeenCalledWith('S3 upload failed:', expect.any(Error));
+            consoleSpy.mockRestore();
 
             s3UploadSpy.mockRestore();
         });

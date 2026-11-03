@@ -29,8 +29,7 @@ export interface VendorPackageListItem extends DeliverySettings {
     | 'DURATION_BASED'
     | 'TIME_SLOT_BASED'
     | 'DELIVERY_BASED'
-    | 'SETUP_BASED'
-    | 'CUSTOM';
+    | 'SETUP_BASED';
 
   requiredServiceDurationMinutes?: number;
 

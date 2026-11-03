@@ -12,7 +12,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 
-import { User } from 'src/schemas/user.schema';
+import { RETIRED_PACKAGE_BOOKING_TYPE, User } from 'src/schemas/user.schema';
 import { VendorOrder } from 'src/schemas/vendor-order.schema';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 
@@ -609,7 +609,12 @@ if (!hasAccess) {
           }
           return { vendorId, available: false, reason: 'No available setup interval fits the allowed window.' };
         }
-        case 'CUSTOM': {
+        case RETIRED_PACKAGE_BOOKING_TYPE: {
+          // Existing bookings can still be rescheduled using their original window.
+          if (!excludeVendorOrderId) {
+            return { vendorId, available: false, reason: 'Package booking type is no longer available.' };
+          }
+
           const startOffset =
             selectedPackage.serviceWindowStartOffsetMinutes;
 

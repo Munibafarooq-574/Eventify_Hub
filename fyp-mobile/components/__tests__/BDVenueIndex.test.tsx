@@ -31,14 +31,14 @@ jest.mock("@/store", () => ({
 }));
 
 describe("BusinessDetailsForm", () => {
-  it("renders correctly", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("renders correctly", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     expect(getByText("Business Details")).toBeTruthy();
   });
 
   it("validates required fields on submit", async () => {
-    const { getByText } = render(<BusinessDetailsForm />);
-    fireEvent.press(getByText("Save & Continue"));
+    const { getByText } = await render(<BusinessDetailsForm />);
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -48,32 +48,32 @@ describe("BusinessDetailsForm", () => {
     });
   });
 
-  it("allows user input in text fields", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("allows user input in text fields", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const expertiseInput = getByPlaceholderText("Enter expertise");
-    fireEvent.changeText(expertiseInput, "Catering Services");
+    await fireEvent.changeText(expertiseInput, "Catering Services");
     expect(expertiseInput.props.value).toBe("Catering Services");
   });
 
-  it("selects venue type correctly", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("selects venue type correctly", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const hallButton = getByText("HALL");
-    fireEvent.press(hallButton);
+    await fireEvent.press(hallButton);
     expect(hallButton).toBeTruthy();
   });
 
-  it("navigates back when back button is pressed", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
-    fireEvent.press(getByText("Back"));
+  it("navigates back when back button is pressed", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
+    await fireEvent.press(getByText("Back"));
     expect(router.back).toHaveBeenCalled();
   });
 
   it("prevents submission with malicious input", async () => {
-  const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+  const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
   
-  fireEvent.changeText(getByPlaceholderText("Enter expertise"), "<script>alert('hacked')</script>");
-  fireEvent.changeText(getByPlaceholderText("Enter amenities"), "' OR 1=1 --");
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.changeText(getByPlaceholderText("Enter expertise"), "<script>alert('hacked')</script>");
+  await fireEvent.changeText(getByPlaceholderText("Enter amenities"), "' OR 1=1 --");
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -85,8 +85,8 @@ describe("BusinessDetailsForm", () => {
   expect(postVenueBusinessDetails).not.toHaveBeenCalled(); // Ensure API is not called
 });
 
-it("renders all required input fields", () => {
-  const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+it("renders all required input fields", async () => {
+  const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
   expect(getByPlaceholderText("Enter expertise")).toBeTruthy();
   expect(getByPlaceholderText("Enter amenities")).toBeTruthy();
@@ -95,8 +95,8 @@ it("renders all required input fields", () => {
   expect(getByPlaceholderText("Enter description")).toBeTruthy();
   expect(getByPlaceholderText("Enter Down Payment")).toBeTruthy();
 });
- it("ensures buttons are enabled", () => {
-   const { getByText } = render(<BusinessDetailsForm />);
+ it("ensures buttons are enabled", async () => {
+   const { getByText } = await render(<BusinessDetailsForm />);
 
    const saveButton = getByText("Save & Continue");
    const backButton = getByText("Back");
@@ -104,21 +104,21 @@ it("renders all required input fields", () => {
    expect(saveButton).toBeTruthy();
    expect(backButton).toBeTruthy();
 
-   fireEvent.press(saveButton);
-   fireEvent.press(backButton);
+   await fireEvent.press(saveButton);
+   await fireEvent.press(backButton);
  });
-it("updates UI when selecting venue type", () => {
-  const { getByText } = render(<BusinessDetailsForm />);
+it("updates UI when selecting venue type", async () => {
+  const { getByText } = await render(<BusinessDetailsForm />);
 
-  fireEvent.press(getByText("HALL"));
+  await fireEvent.press(getByText("HALL"));
   expect(getByText("HALL")).toBeTruthy();
 
-  fireEvent.press(getByText("OUTDOOR"));
+  await fireEvent.press(getByText("OUTDOOR"));
   expect(getByText("OUTDOOR")).toBeTruthy();
 });
 it("prevents form submission when fields are empty", async () => {
-  const { getByText } = render(<BusinessDetailsForm />);
-  fireEvent.press(getByText("Save & Continue"));
+  const { getByText } = await render(<BusinessDetailsForm />);
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -129,40 +129,40 @@ it("prevents form submission when fields are empty", async () => {
 });
 
 it("handles large text input without crashing", async () => {
-  const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
   const largeText = "A".repeat(5000);
-  fireEvent.changeText(getByPlaceholderText("Enter description"), largeText);
+  await fireEvent.changeText(getByPlaceholderText("Enter description"), largeText);
 
   expect(getByPlaceholderText("Enter description").props.value).toBe(largeText);
 });
-it("ensures smooth scrolling through the form", () => {
-  const { getByText } = render(<BusinessDetailsForm />);
+it("ensures smooth scrolling through the form", async () => {
+  const { getByText } = await render(<BusinessDetailsForm />);
 
-  fireEvent.scroll(getByText("Business Details"), {
+  await fireEvent.scroll(getByText("Business Details"), {
     nativeEvent: { contentOffset: { y: 500 } },
   });
 
   expect(getByText("Down Payment *")).toBeTruthy();
 });
 it("ensures buttons respond quickly on tap", async () => {
-  const { getByText } = render(<BusinessDetailsForm />);
+  const { getByText } = await render(<BusinessDetailsForm />);
 
   const saveButton = getByText("Save & Continue");
-  fireEvent.press(saveButton);
+  await fireEvent.press(saveButton);
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalled();
   });
 });
 it("prevents submission with script injection", async () => {
-  const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+  const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
-  fireEvent.changeText(
+  await fireEvent.changeText(
     getByPlaceholderText("Enter expertise"),
     "<script>alert('hacked')</script>"
   );
-  fireEvent.press(getByText("Save & Continue"));
+  await fireEvent.press(getByText("Save & Continue"));
 
   await waitFor(() => {
     expect(Alert.alert).toHaveBeenCalledWith(
@@ -172,8 +172,8 @@ it("prevents submission with script injection", async () => {
   });
 });
 
-it("ensures text fields exist for accessibility", () => {
-  const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+it("ensures text fields exist for accessibility", async () => {
+  const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
   expect(getByPlaceholderText("Enter expertise")).toBeTruthy();
 });
 
@@ -188,25 +188,25 @@ it("fetches user ID from secure storage", async () => {
 
 describe("BusinessDetailsForm - Extended Test Suite", () => {
   // UI Testing
-  it("applies correct styles to selected venue type buttons", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("applies correct styles to selected venue type buttons", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const hallButton = getByText("HALL");
 
     // Get the initial style
     const initialStyle = { ...hallButton.props.style };
 
     // Press the button to select it
-    fireEvent.press(hallButton);
+    await fireEvent.press(hallButton);
 
     // Check that something about the style changed (without being too specific)
     expect(hallButton.props.style).not.toEqual(initialStyle);
   });
 
   it("displays error styling on required fields after failed submission", async () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const saveButton = getByText("Save & Continue");
 
-    fireEvent.press(saveButton);
+    await fireEvent.press(saveButton);
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalled();
     });
@@ -216,80 +216,80 @@ describe("BusinessDetailsForm - Extended Test Suite", () => {
     expect(getByPlaceholderText("Enter expertise")).toBeTruthy();
   });
 
-  it("ensures the form layout follows proper alignment", () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("ensures the form layout follows proper alignment", async () => {
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
     expect(getByText("Business Details")).toBeTruthy();
     expect(getByPlaceholderText("Enter expertise")).toBeTruthy();
     expect(getByPlaceholderText("Enter amenities")).toBeTruthy();
   });
-it("ensures text size is readable", () => {
-  const { getByText } = render(<BusinessDetailsForm />);
+it("ensures text size is readable", async () => {
+  const { getByText } = await render(<BusinessDetailsForm />);
   const header = getByText("Business Details");
 
   expect(header.props.style.fontSize).toBeGreaterThanOrEqual(20); // Checking if font size is >= 20
 });
 
-it("ensures input fields have consistent padding", () => {
-  const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+it("ensures input fields have consistent padding", async () => {
+  const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
   const expertiseInput = getByPlaceholderText("Enter expertise");
 
   expect(expertiseInput.props.style.padding).toBeTruthy();
 });
 
   // Functional Testing
-  it("allows selection of different payment types", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("allows selection of different payment types", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const fixedOption = getByText("FIXED");
 
     // Store initial styles for comparison
     const initialStyle = { ...fixedOption.props.style };
 
     // Select the option
-    fireEvent.press(fixedOption);
+    await fireEvent.press(fixedOption);
 
     // Verify something has changed in the style
     expect(fixedOption.props.style).not.toEqual(initialStyle);
   });
 
   // Another functional test fix
-  it("handles staff selection options", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("handles staff selection options", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const maleOption = getByText("MALE");
 
     // Store initial state
     const initialStyle = { ...maleOption.props.style };
 
     // Select the option
-    fireEvent.press(maleOption);
+    await fireEvent.press(maleOption);
 
     // Verify selection changed something
     expect(maleOption.props.style).not.toEqual(initialStyle);
   });
 
-  it("ensures venue type selection updates UI correctly", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("ensures venue type selection updates UI correctly", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
 
-    fireEvent.press(getByText("HALL"));
+    await fireEvent.press(getByText("HALL"));
     expect(getByText("HALL")).toBeTruthy();
 
-    fireEvent.press(getByText("OUTDOOR"));
+    await fireEvent.press(getByText("OUTDOOR"));
     expect(getByText("OUTDOOR")).toBeTruthy();
   });
 
- it("ensures additional info is optional", () => {
-   const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+ it("ensures additional info is optional", async () => {
+   const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
    const additionalInfoInput = getByPlaceholderText(
      "Enter additional information"
    );
 
-   fireEvent.changeText(additionalInfoInput, "");
+   await fireEvent.changeText(additionalInfoInput, "");
    expect(additionalInfoInput.props.value).toBe("");
  });
 
   // Integration Testing
   it("integrates with secure storage when retrieving user data", async () => {
-    render(<BusinessDetailsForm />);
+    await render(<BusinessDetailsForm />);
 
     await waitFor(() => {
       expect(getSecureData).toHaveBeenCalledWith("user");
@@ -304,36 +304,36 @@ it("ensures input fields have consistent padding", () => {
   
 
   // Security Testing
-  it("sanitizes input by trimming whitespace", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("sanitizes input by trimming whitespace", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const expertiseInput = getByPlaceholderText("Enter expertise");
 
-    fireEvent.changeText(expertiseInput, "  Catering Services  ");
+    await fireEvent.changeText(expertiseInput, "  Catering Services  ");
     expect(expertiseInput.props.value).toBe("  Catering Services  ");
 
     // Assuming the component handles trimming internally or during submission
     // We can't test actual sanitization without modifying the component
   });
 
-  it("handles potentially dangerous numeric inputs safely", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("handles potentially dangerous numeric inputs safely", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const capacityInput = getByPlaceholderText("Enter maximum people capacity");
 
     // Test with non-numeric input
-    fireEvent.changeText(capacityInput, "abc");
+    await fireEvent.changeText(capacityInput, "abc");
 
     // Just verify the component didn't crash
     expect(capacityInput).toBeTruthy();
   });
 
   it("prevents submission of XSS attack attempts", async () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter expertise"),
       "<script>alert('XSS')</script>"
     );
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -344,13 +344,13 @@ it("ensures input fields have consistent padding", () => {
   });
   
   it("prevents submission of SQL injection attempts", async () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter expertise"),
       "' OR 1=1 --"
     );
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(
@@ -361,15 +361,15 @@ it("ensures input fields have consistent padding", () => {
   });
 
   // Performance Testing
-  it("handles rapid button clicks without performance issues", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("handles rapid button clicks without performance issues", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const hallButton = getByText("HALL");
     const outdoorButton = getByText("OUTDOOR");
 
     // Rapidly toggle between options multiple times
     for (let i = 0; i < 10; i++) {
-      fireEvent.press(hallButton);
-      fireEvent.press(outdoorButton);
+      await fireEvent.press(hallButton);
+      await fireEvent.press(outdoorButton);
     }
 
     // If the component survives this without crashing, the test passes
@@ -377,9 +377,9 @@ it("ensures input fields have consistent padding", () => {
     expect(outdoorButton).toBeTruthy();
   });
 
-  it("renders efficiently with all form elements", () => {
+  it("renders efficiently with all form elements", async () => {
     const startTime = performance.now();
-    const { getByText } = render(<BusinessDetailsForm />);
+    const { getByText } = await render(<BusinessDetailsForm />);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const renderTime = performance.now() - startTime;
 
@@ -390,84 +390,84 @@ it("ensures input fields have consistent padding", () => {
     // but we can verify the render completed
   });
 
-  it("ensures form renders within an acceptable time", () => {
+  it("ensures form renders within an acceptable time", async () => {
     const startTime = performance.now();
-    const { getByText } = render(<BusinessDetailsForm />);
+    const { getByText } = await render(<BusinessDetailsForm />);
     const renderTime = performance.now() - startTime;
 
     expect(getByText("Business Details")).toBeTruthy();
     expect(renderTime).toBeLessThan(500); // Ensuring render takes less than 500ms
   });
 
-  it("handles rapid button clicks without crashing", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("handles rapid button clicks without crashing", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
 
     for (let i = 0; i < 10; i++) {
-      fireEvent.press(getByText("Save & Continue"));
+      await fireEvent.press(getByText("Save & Continue"));
     }
 
     expect(getByText("Save & Continue")).toBeTruthy();
   });
 
   // Accuracy Testing
-  it("correctly preserves numeric input precision", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("correctly preserves numeric input precision", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const priceInput = getByPlaceholderText("Enter minimum price");
 
-    fireEvent.changeText(priceInput, "1000");
+    await fireEvent.changeText(priceInput, "1000");
     expect(priceInput.props.value).toBe("1000");
   });
 
-  it("accurately preserves text content length and format", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("accurately preserves text content length and format", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const descriptionInput = getByPlaceholderText("Enter description");
 
     const testText = "This is a test description with specific formatting.";
-    fireEvent.changeText(descriptionInput, testText);
+    await fireEvent.changeText(descriptionInput, testText);
 
     expect(descriptionInput.props.value).toBe(testText);
     expect(descriptionInput.props.value.length).toBe(testText.length);
   });
 
-  it("ensures description input allows long text", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("ensures description input allows long text", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const descriptionInput = getByPlaceholderText("Enter description");
 
     const longText = "A".repeat(200);
-    fireEvent.changeText(descriptionInput, longText);
+    await fireEvent.changeText(descriptionInput, longText);
     expect(descriptionInput.props.value).toBe(longText);
   });
 
   // Navigation Testing
-  it("handles navigation through form fields using tab order", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("handles navigation through form fields using tab order", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const expertiseInput = getByPlaceholderText("Enter expertise");
     const amenitiesInput = getByPlaceholderText("Enter amenities");
 
     // Focus first field
-    fireEvent(expertiseInput, "focus");
+    await fireEvent(expertiseInput, "focus");
 
     // Check if focus works (without actually testing tab order which would need a keyboard event)
     expect(expertiseInput).toBeTruthy();
 
     // Move focus to next field
-    fireEvent(amenitiesInput, "focus");
+    await fireEvent(amenitiesInput, "focus");
     expect(amenitiesInput).toBeTruthy();
   });
 
-  it("ensures back button navigates to the previous screen", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
-    fireEvent.press(getByText("Back"));
+  it("ensures back button navigates to the previous screen", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
+    await fireEvent.press(getByText("Back"));
 
     expect(router.back).toHaveBeenCalled();
   });
 
-  it("ensures form remains intact after navigating back and forth", () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("ensures form remains intact after navigating back and forth", async () => {
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
-    fireEvent.changeText(getByPlaceholderText("Enter expertise"), "Catering");
-    fireEvent.press(getByText("Back"));
-    fireEvent.press(getByText("Save & Continue"));
+    await fireEvent.changeText(getByPlaceholderText("Enter expertise"), "Catering");
+    await fireEvent.press(getByText("Back"));
+    await fireEvent.press(getByText("Save & Continue"));
 
     expect(getByPlaceholderText("Enter expertise").props.value).toBe(
       "Catering"
@@ -475,16 +475,16 @@ it("ensures input fields have consistent padding", () => {
   });
 
   // Accessibility Testing
-  it("ensures important elements have proper roles for accessibility", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("ensures important elements have proper roles for accessibility", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const header = getByText("Business Details");
 
     // Check if important elements exist and are accessible
     expect(header).toBeTruthy();
   });
 
-  it("provides sufficient color contrast for visually impaired users", () => {
-    const { getByText } = render(<BusinessDetailsForm />);
+  it("provides sufficient color contrast for visually impaired users", async () => {
+    const { getByText } = await render(<BusinessDetailsForm />);
     const saveButton = getByText("Save & Continue");
 
     // Verify button exists with appropriate styling
@@ -495,48 +495,48 @@ it("ensures input fields have consistent padding", () => {
   });
 
   // Additional Test Categories
-  it("handles validation of minimum price constraints", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("handles validation of minimum price constraints", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const priceInput = getByPlaceholderText("Enter minimum price");
 
     // Test with negative price (should be handled gracefully)
-    fireEvent.changeText(priceInput, "-100");
+    await fireEvent.changeText(priceInput, "-100");
 
     // Component should handle this without crashing
     expect(priceInput).toBeTruthy();
   });
 
-  it("handles validation of maximum capacity constraints", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("handles validation of maximum capacity constraints", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const capacityInput = getByPlaceholderText("Enter maximum people capacity");
 
     // Test with extremely large capacity
-    fireEvent.changeText(capacityInput, "9999999");
+    await fireEvent.changeText(capacityInput, "9999999");
 
     // Component should handle this without crashing
     expect(capacityInput).toBeTruthy();
   });
 
-  it("ensures form can be reset to initial state", () => {
-    const { getByText, getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("ensures form can be reset to initial state", async () => {
+    const { getByText, getByPlaceholderText } = await render(<BusinessDetailsForm />);
 
     // First make some changes
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter expertise"),
       "Test Expertise"
     );
-    fireEvent.press(getByText("HALL"));
+    await fireEvent.press(getByText("HALL"));
 
     // We can't actually test reset functionality without modifying the component
     // But we can verify the component is still in a working state
     expect(getByText("Save & Continue")).toBeTruthy();
   });
 
-  it("ensures input fields trim unnecessary whitespace", () => {
-    const { getByPlaceholderText } = render(<BusinessDetailsForm />);
+  it("ensures input fields trim unnecessary whitespace", async () => {
+    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const expertiseInput = getByPlaceholderText("Enter expertise");
 
-    fireEvent.changeText(expertiseInput, "  Catering  ");
+    await fireEvent.changeText(expertiseInput, "  Catering  ");
     expect(expertiseInput.props.value).toBe("  Catering  ");
   });
 
@@ -549,9 +549,9 @@ describe("BusinessDetailsForm - Snapshot Tests", () => {
  });
 
   it("matches snapshot after venue type selection", async () => {
-    const { getByText, toJSON } = render(<BusinessDetailsForm />);
+    const { getByText, toJSON } = await render(<BusinessDetailsForm />);
 
-    fireEvent.press(getByText("HALL"));
+    await fireEvent.press(getByText("HALL"));
 
     await waitFor(() => {
       expect(toJSON()).toMatchSnapshot();
@@ -559,13 +559,13 @@ describe("BusinessDetailsForm - Snapshot Tests", () => {
   });
 
   it("matches snapshot when entering input values", async () => {
-    const { getByPlaceholderText, toJSON } = render(<BusinessDetailsForm />);
+    const { getByPlaceholderText, toJSON } = await render(<BusinessDetailsForm />);
 
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter expertise"),
       "Catering Services"
     );
-    fireEvent.changeText(
+    await fireEvent.changeText(
       getByPlaceholderText("Enter amenities"),
       "WiFi, Parking"
     );
@@ -576,10 +576,10 @@ describe("BusinessDetailsForm - Snapshot Tests", () => {
   });
 
   it("matches snapshot after toggling Covid Compliant option", async () => {
-    const { getAllByText, toJSON } = render(<BusinessDetailsForm />);
+    const { getAllByText, toJSON } = await render(<BusinessDetailsForm />);
 
     const covidYesButtons = getAllByText("YES"); // Assuming multiple "YES" buttons exist
-    fireEvent.press(covidYesButtons[1]); // Pressing the second one
+    await fireEvent.press(covidYesButtons[1]); // Pressing the second one
 
     await waitFor(() => {
       expect(toJSON()).toMatchSnapshot();

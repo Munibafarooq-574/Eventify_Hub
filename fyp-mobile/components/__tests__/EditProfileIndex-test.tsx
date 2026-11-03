@@ -43,39 +43,39 @@ describe("EditProfileScreen - Simple Unit Tests", () => {
     });
   });
 
-  it("renders Edit Profile screen", () => {
-    const { getByText } = render(<EditProfileScreen />);
+  it("renders Edit Profile screen", async () => {
+    const { getByText } = await render(<EditProfileScreen />);
     expect(getByText("Edit Profile")).toBeTruthy();
   });
 
-  it("renders Save button", () => {
-    const { getByText } = render(<EditProfileScreen />);
+  it("renders Save button", async () => {
+    const { getByText } = await render(<EditProfileScreen />);
     expect(getByText("SAVE")).toBeTruthy();
   });
 
   it("displays correct avatar letter from name", async () => {
-    const { findByText } = render(<EditProfileScreen />);
+    const { findByText } = await render(<EditProfileScreen />);
     expect(await findByText("A")).toBeTruthy(); // A from Ali
   });
 
-  it("updates name field", () => {
-    const { getByPlaceholderText } = render(<EditProfileScreen />);
+  it("updates name field", async () => {
+    const { getByPlaceholderText } = await render(<EditProfileScreen />);
     const nameInput = getByPlaceholderText("Enter your name");
-    fireEvent.changeText(nameInput, "Zara");
+    await fireEvent.changeText(nameInput, "Zara");
     expect(nameInput.props.value).toBe("Zara");
   });
 
-  it("updates email field", () => {
-    const { getByPlaceholderText } = render(<EditProfileScreen />);
+  it("updates email field", async () => {
+    const { getByPlaceholderText } = await render(<EditProfileScreen />);
     const emailInput = getByPlaceholderText("Enter your email");
-    fireEvent.changeText(emailInput, "zara@example.com");
+    await fireEvent.changeText(emailInput, "zara@example.com");
     expect(emailInput.props.value).toBe("zara@example.com");
   });
 
-  it("updates phone number", () => {
-    const { getByPlaceholderText } = render(<EditProfileScreen />);
+  it("updates phone number", async () => {
+    const { getByPlaceholderText } = await render(<EditProfileScreen />);
     const phoneInput = getByPlaceholderText("Enter phone number");
-    fireEvent.changeText(phoneInput, "3123456789");
+    await fireEvent.changeText(phoneInput, "3123456789");
     expect(phoneInput.props.value).toBe("3123456789");
   });
 

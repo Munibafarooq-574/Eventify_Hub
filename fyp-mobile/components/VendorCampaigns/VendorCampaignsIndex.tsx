@@ -539,7 +539,6 @@ export default function VendorCampaignsIndex() {
       <View style={styles.loadingScreen}>
         <StatusBar
           barStyle="light-content"
-          backgroundColor={PRIMARY_DARK}
         />
 
         <LinearGradient
@@ -581,7 +580,6 @@ export default function VendorCampaignsIndex() {
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={PRIMARY_DARK}
       />
 
       <ScrollView

@@ -266,7 +266,7 @@ return {
             <ActivityIndicator
               style={styles.footerLoader}
             />
-          ) : null
+          ) : undefined
         }
         renderItem={({ item }) => {
           const price = Number(

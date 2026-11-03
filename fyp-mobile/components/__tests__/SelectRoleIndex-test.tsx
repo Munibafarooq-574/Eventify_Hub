@@ -26,47 +26,47 @@ describe("SelectRoleScreen", () => {
     jest.clearAllMocks(); // Reset all mock data
   });
 
-  it("renders correctly", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("renders correctly", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     expect(getByText("Select Your Role")).toBeTruthy();
     expect(getByText("Join As")).toBeTruthy();
     expect(getByText("Select")).toBeTruthy();
   });
 
-  it("has the correct default state", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("has the correct default state", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     expect(getByText("Select")).toBeTruthy(); // Default role is 'Select'
   });
 
-  it("updates the state when a role is selected", () => {
-    const { getByText, getByTestId } = render(<SelectRoleScreen />);
-    fireEvent.press(getByText("Select")); // Open modal
-    fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
+  it("updates the state when a role is selected", async () => {
+    const { getByText, getByTestId } = await render(<SelectRoleScreen />);
+    await fireEvent.press(getByText("Select")); // Open modal
+    await fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
     expect(getByText("Vendor")).toBeTruthy(); // Confirm state update
   });
 
   it("navigates to the correct route for Vendor", async () => {
-    const { getByText, getByTestId } = render(<SelectRoleScreen />);
-    fireEvent.press(getByText("Select")); // Open modal
-    fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
-    fireEvent.press(getByText("Confirm")); // Confirm selection
+    const { getByText, getByTestId } = await render(<SelectRoleScreen />);
+    await fireEvent.press(getByText("Select")); // Open modal
+    await fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
+    await fireEvent.press(getByText("Confirm")); // Confirm selection
     await waitFor(() => {
       expect(router.push).toHaveBeenCalledWith("/bussinessselection");
     });
   });
 
   it("navigates to the correct route for Organizer", async () => {
-    const { getByText, getByTestId } = render(<SelectRoleScreen />);
-    fireEvent.press(getByText("Select")); // Open modal
-    fireEvent(getByTestId("picker"), "onValueChange", "Organizer"); // Select "Organizer"
-    fireEvent.press(getByText("Confirm")); // Confirm selection
+    const { getByText, getByTestId } = await render(<SelectRoleScreen />);
+    await fireEvent.press(getByText("Select")); // Open modal
+    await fireEvent(getByTestId("picker"), "onValueChange", "Organizer"); // Select "Organizer"
+    await fireEvent.press(getByText("Confirm")); // Confirm selection
     await waitFor(() => {
       expect(router.push).toHaveBeenCalledWith("/signup");
     });
   });
 
   it("does not allow confirmation if no role is selected", async () => {
-    const { getByTestId } = render(<SelectRoleScreen />);
+    const { getByTestId } = await render(<SelectRoleScreen />);
 
     // Get the Confirm button
     const confirmButton = getByTestId("confirm-button");
@@ -75,7 +75,7 @@ describe("SelectRoleScreen", () => {
     expect(confirmButton.props.accessibilityState.disabled).toBe(true);
 
     // Try pressing the Confirm button (should not trigger alert)
-    fireEvent.press(confirmButton);
+    await fireEvent.press(confirmButton);
 
     // Ensure alert is NOT called because the button is disabled
     await waitFor(() => {
@@ -83,12 +83,12 @@ describe("SelectRoleScreen", () => {
     });
   });
 
-  it("enables the Confirm button when a role is selected", () => {
-    const { getByTestId, getByText } = render(<SelectRoleScreen />);
+  it("enables the Confirm button when a role is selected", async () => {
+    const { getByTestId, getByText } = await render(<SelectRoleScreen />);
 
     // Simulate selecting a role
-    fireEvent.press(getByText("Select")); // Open the picker modal
-    fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
+    await fireEvent.press(getByText("Select")); // Open the picker modal
+    await fireEvent(getByTestId("picker"), "onValueChange", "Vendor"); // Select "Vendor"
 
     // Find the Confirm button using the testID
     const confirmButton = getByTestId("confirm-button");
@@ -97,30 +97,30 @@ describe("SelectRoleScreen", () => {
     expect(confirmButton.props.accessibilityState.disabled).toBe(false);
   });
 
-  it("opens the picker modal when selecting a role", () => {
-    const { getByText, getByTestId } = render(<SelectRoleScreen />);
+  it("opens the picker modal when selecting a role", async () => {
+    const { getByText, getByTestId } = await render(<SelectRoleScreen />);
 
-    fireEvent.press(getByText("Select")); // Open modal
+    await fireEvent.press(getByText("Select")); // Open modal
     expect(getByTestId("picker")).toBeTruthy(); // Picker should be visible
   });
 
-  it("displays the correct title text", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("displays the correct title text", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     expect(getByText("Select Your Role")).toBeTruthy();
   });
 
-  it("displays the correct label text", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("displays the correct label text", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     expect(getByText("Join As")).toBeTruthy();
   });
 
-  it("has the correct button text for confirmation", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("has the correct button text for confirmation", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     expect(getByText("Confirm")).toBeTruthy();
   });
 
-  it("shows the proper styling for the title", () => {
-    const { getByText } = render(<SelectRoleScreen />);
+  it("shows the proper styling for the title", async () => {
+    const { getByText } = await render(<SelectRoleScreen />);
     const titleElement = getByText("Select Your Role");
     expect(titleElement.props.style).toMatchObject({
       fontSize: 24,
@@ -128,9 +128,9 @@ describe("SelectRoleScreen", () => {
     });
   });
   describe("Functional Tests", () => {
-    it("shows an alert when trying to confirm without selecting a role", () => {
+    it("shows an alert when trying to confirm without selecting a role", async () => {
       // Simply verify that the component renders without errors
-      const { getByText } = render(<SelectRoleScreen />);
+      const { getByText } = await render(<SelectRoleScreen />);
       expect(getByText("Confirm")).toBeTruthy();
 
       // Mock implementation to simulate the alert behavior
@@ -148,14 +148,14 @@ describe("SelectRoleScreen", () => {
       global.alert = originalAlert;
     });
 
-    it("toggles modal visibility when select button is pressed", () => {
-      const { getByText } = render(<SelectRoleScreen />);
+    it("toggles modal visibility when select button is pressed", async () => {
+      const { getByText } = await render(<SelectRoleScreen />);
       const selectButton = getByText("Select");
 
       // We can't directly test state changes, so instead we'll test that
       // the button is at least pressable without errors
-      expect(() => {
-        fireEvent.press(selectButton);
+      expect(async () => {
+        await fireEvent.press(selectButton);
       }).not.toThrow();
     });
   });
@@ -168,7 +168,7 @@ describe("SelectRoleScreen", () => {
 
       try {
         // Render the component
-        const { getByText } = render(<SelectRoleScreen />);
+        const { getByText } = await render(<SelectRoleScreen />);
 
         // We'll just test that the component renders without errors
         // since we can't directly trigger handleConfirm without setting state
@@ -186,16 +186,16 @@ describe("SelectRoleScreen", () => {
 
       // We can't easily simulate the full flow, so we'll just verify
       // that our mocks are correctly set up
-      const { getByText } = render(<SelectRoleScreen />);
+      const { getByText } = await render(<SelectRoleScreen />);
       expect(getByText("Select Your Role")).toBeTruthy();
     });
   });
 
   // Fixed Regression Tests - one is already passing
   describe("Regression Tests", () => {
-    it("handles empty selection gracefully", () => {
+    it("handles empty selection gracefully", async () => {
       // Create a snapshot of the component in its initial state
-      const component = render(<SelectRoleScreen />);
+      const component = await render(<SelectRoleScreen />);
       const initialButtonText = component.getByText("Select");
 
       // Verify initial state shows "Select"
@@ -210,12 +210,12 @@ describe("SelectRoleScreen", () => {
       expect(component).toBeTruthy();
     });
 
-    it("does not allow navigation without selection", () => {
-      const { getByText } = render(<SelectRoleScreen />);
+    it("does not allow navigation without selection", async () => {
+      const { getByText } = await render(<SelectRoleScreen />);
 
       // Press confirm without selection
       const confirmButton = getByText("Confirm");
-      fireEvent.press(confirmButton);
+      await fireEvent.press(confirmButton);
 
       // Verify router.push was not called
       expect(router.push).not.toHaveBeenCalled();
@@ -224,9 +224,9 @@ describe("SelectRoleScreen", () => {
 
   // Fixed Edge Case Tests
   describe("Edge Case Tests", () => {
-    it("handles rapid button presses correctly", () => {
+    it("handles rapid button presses correctly", async () => {
       // Render the component
-      const { getByText } = render(<SelectRoleScreen />);
+      const { getByText } = await render(<SelectRoleScreen />);
 
       // Mock implementation to simulate what happens with rapid presses
       const mockFunction = jest.fn();
@@ -248,21 +248,21 @@ describe("SelectRoleScreen", () => {
     // Accessibility Tests
     describe("Accessibility Tests", () => {
      
-      it("has sufficient color contrast for visibility", () => {
-        const { getByText } = render(<SelectRoleScreen />);
+      it("has sufficient color contrast for visibility", async () => {
+        const { getByText } = await render(<SelectRoleScreen />);
         const confirmButton = getByText("Confirm").parent;
 
         expect(confirmButton).toBeTruthy(); // Ensure the button exists
 
         // Optional: Check if button is pressable
-        fireEvent.press(getByText("Confirm"));
+        await fireEvent.press(getByText("Confirm"));
 
         // This test now ensures the button exists instead of checking styles directly
       });
 
 
-      it("has appropriate text size for readability", () => {
-        const { getByText } = render(<SelectRoleScreen />);
+      it("has appropriate text size for readability", async () => {
+        const { getByText } = await render(<SelectRoleScreen />);
         const title = getByText("Select Your Role");
 
         // Check that title has sufficient font size for readability
@@ -272,8 +272,8 @@ describe("SelectRoleScreen", () => {
 
     // Styling Tests
     describe("Styling Tests", () => {
-      it("applies appropriate spacing between elements", () => {
-        const component = render(<SelectRoleScreen />);
+      it("applies appropriate spacing between elements", async () => {
+        const component = await render(<SelectRoleScreen />);
         const { getByText } = component;
         const title = getByText("Select Your Role");
 
@@ -281,8 +281,8 @@ describe("SelectRoleScreen", () => {
         expect(title.props.style.marginBottom).toBeDefined();
       });
 
-    it("uses consistent color scheme", () => {
-      const { getByText } = render(<SelectRoleScreen />);
+    it("uses consistent color scheme", async () => {
+      const { getByText } = await render(<SelectRoleScreen />);
 
       expect(getByText("Select Your Role")).toBeTruthy(); // Ensures the screen is rendered
     });
@@ -290,8 +290,8 @@ describe("SelectRoleScreen", () => {
 
     // Component Structure Tests
     describe("Component Structure Tests", () => {
-      it("includes all required UI elements", () => {
-        const { getByText } = render(<SelectRoleScreen />);
+      it("includes all required UI elements", async () => {
+        const { getByText } = await render(<SelectRoleScreen />);
 
         // Check for presence of all important elements
         expect(getByText("Select Your Role")).toBeTruthy();
@@ -300,8 +300,8 @@ describe("SelectRoleScreen", () => {
         expect(getByText("Select")).toBeTruthy();
       });
 
-      it("organizes elements in logical visual hierarchy", () => {
-        const { getByText } = render(<SelectRoleScreen />);
+      it("organizes elements in logical visual hierarchy", async () => {
+        const { getByText } = await render(<SelectRoleScreen />);
 
         // Ensure all key elements are present
         expect(getByText("Select Your Role")).toBeTruthy();
@@ -320,19 +320,19 @@ describe("SelectRoleScreen", () => {
         expect(typeof saveSecureData).toBe("function");
       });
 
-      it("uses appropriate router navigation based on role", () => {
-  const { getByText, getByTestId } = render(<SelectRoleScreen />);
+      it("uses appropriate router navigation based on role", async () => {
+  const { getByText, getByTestId } = await render(<SelectRoleScreen />);
 
-  fireEvent.press(getByText("Select")); // Open modal
-  fireEvent(getByTestId("picker"), "onValueChange", "Vendor");
-  fireEvent.press(getByText("Confirm"));
+  await fireEvent.press(getByText("Select")); // Open modal
+  await fireEvent(getByTestId("picker"), "onValueChange", "Vendor");
+  await fireEvent.press(getByText("Confirm"));
 
   expect(router.push).toHaveBeenCalledWith("/bussinessselection");
 });
     });
     // Performance Tests
     describe("Performance Tests", () => {
-      it("renders without performance warnings", () => {
+      it("renders without performance warnings", async () => {
         // Mock console.warn to catch any React performance warnings
         const originalWarn = console.warn;
         const mockWarn = jest.fn();
@@ -340,8 +340,8 @@ describe("SelectRoleScreen", () => {
 
         try {
           // Render the component multiple times to check for performance issues
-          render(<SelectRoleScreen />);
-          render(<SelectRoleScreen />);
+          await render(<SelectRoleScreen />);
+          await render(<SelectRoleScreen />);
 
           // In a real performance test, you might analyze render times, but
           // for a simple passing test, we'll just check no warnings were logged
@@ -355,7 +355,7 @@ describe("SelectRoleScreen", () => {
 
     // Security Tests
     describe("Security Tests", () => {
-      it("stores user role data securely", () => {
+      it("stores user role data securely", async () => {
         // Verify secure storage is being used for sensitive data
         const { saveSecureData } = require("@/store");
 
@@ -366,7 +366,7 @@ describe("SelectRoleScreen", () => {
 
         try {
           // Render the component
-          render(<SelectRoleScreen />);
+          await render(<SelectRoleScreen />);
 
           // Verify secure storage function exists
           expect(mockSaveSecureData).toBeDefined();
@@ -384,34 +384,34 @@ describe("SelectRoleScreen", () => {
       expect(tree).toMatchSnapshot();
     });
 
-    it("matches snapshot after selecting a role", () => {
-      const { getByText, getByTestId } = render(<SelectRoleScreen />);
+    it("matches snapshot after selecting a role", async () => {
+      const { getByText, getByTestId } = await render(<SelectRoleScreen />);
 
       // Select a role
-      fireEvent.press(getByText("Select"));
-      fireEvent(getByTestId("picker"), "onValueChange", "Vendor");
+      await fireEvent.press(getByText("Select"));
+      await fireEvent(getByTestId("picker"), "onValueChange", "Vendor");
 
       const tree = renderer.create(<SelectRoleScreen />).toJSON();
       expect(tree).toMatchSnapshot();
     });
 
-    it("matches snapshot when modal is open", () => {
-      const { getByText } = render(<SelectRoleScreen />);
+    it("matches snapshot when modal is open", async () => {
+      const { getByText } = await render(<SelectRoleScreen />);
 
       // Open the modal
-      fireEvent.press(getByText("Select"));
+      await fireEvent.press(getByText("Select"));
 
       const tree = renderer.create(<SelectRoleScreen />).toJSON();
       expect(tree).toMatchSnapshot();
     });
 
     it("matches snapshot after confirming a selection", async () => {
-      const { getByText, getByTestId } = render(<SelectRoleScreen />);
+      const { getByText, getByTestId } = await render(<SelectRoleScreen />);
 
       // Select a role and confirm
-      fireEvent.press(getByText("Select"));
-      fireEvent(getByTestId("picker"), "onValueChange", "Organizer");
-      fireEvent.press(getByText("Confirm"));
+      await fireEvent.press(getByText("Select"));
+      await fireEvent(getByTestId("picker"), "onValueChange", "Organizer");
+      await fireEvent.press(getByText("Confirm"));
 
       await waitFor(() => {
         expect(router.push).toHaveBeenCalledWith("/signup");

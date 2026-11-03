@@ -19,8 +19,8 @@ jest.mock("expo-router", () => ({
 }));
 
 describe("Sandwich1Index Screen", () => {
-  test("renders all UI elements correctly", () => {
-    const { getByText } = render(<Sandwich1Index />); // ✅ Use regex for partial text match to prevent text issues
+  test("renders all UI elements correctly", async () => {
+    const { getByText } = await render(<Sandwich1Index />); // ✅ Use regex for partial text match to prevent text issues
 
     expect(getByText(/VENDORS AT YOUR/)).toBeTruthy();
     expect(getByText(/FINGERTIPS!/)).toBeTruthy(); // ✅ Check description text
@@ -28,22 +28,22 @@ describe("Sandwich1Index Screen", () => {
     expect(getByText(/Easily search, sort by price and reviews/)).toBeTruthy();
   });
 
-  test("navigates to /intro when SKIP is pressed", () => {
-    const { getByText } = render(<Sandwich1Index />);
+  test("navigates to /intro when SKIP is pressed", async () => {
+    const { getByText } = await render(<Sandwich1Index />);
 
     const skipButton = getByText("SKIP");
-    fireEvent.press(skipButton); // ✅ Check navigation call
+    await fireEvent.press(skipButton); // ✅ Check navigation call
 
     expect(router.push).toHaveBeenCalledWith("/intro");
   });
 
-  test("navigates to /sandwich2 when NEXT is pressed and logs to console", () => {
+  test("navigates to /sandwich2 when NEXT is pressed and logs to console", async () => {
     const consoleLogSpy = jest.spyOn(console, "log").mockImplementation(); // ✅ Mock console.log
 
-    const { getByText } = render(<Sandwich1Index />);
+    const { getByText } = await render(<Sandwich1Index />);
 
     const nextButton = getByText("NEXT");
-    fireEvent.press(nextButton); // ✅ Check navigation
+    await fireEvent.press(nextButton); // ✅ Check navigation
 
     expect(router.push).toHaveBeenCalledWith("/sandwich2"); // ✅ Check console.log output
 

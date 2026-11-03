@@ -18,27 +18,27 @@ jest.mock("expo-router", () => ({
 }));
 
 describe("IntroIndex Component", () => {
-  it("renders correctly", () => {
-    const { getByText } = render(<IntroIndex />);
+  it("renders correctly", async () => {
+    const { getByText } = await render(<IntroIndex />);
     expect(getByText("Welcome to Eventify Hub")).toBeTruthy();
     expect(getByText("Create Account")).toBeTruthy();
     expect(getByText("Login")).toBeTruthy();
   });
 
-  it("navigates to select role screen when Create Account button is pressed", () => {
-    const { getByText } = render(<IntroIndex />);
-    fireEvent.press(getByText("Create Account"));
+  it("navigates to select role screen when Create Account button is pressed", async () => {
+    const { getByText } = await render(<IntroIndex />);
+    await fireEvent.press(getByText("Create Account"));
     expect(router.push).toHaveBeenCalledWith("/selectrole");
   });
 
-  it("navigates to login screen when Login button is pressed", () => {
-    const { getByText } = render(<IntroIndex />);
-    fireEvent.press(getByText("Login"));
+  it("navigates to login screen when Login button is pressed", async () => {
+    const { getByText } = await render(<IntroIndex />);
+    await fireEvent.press(getByText("Login"));
     expect(router.push).toHaveBeenCalledWith("/login");
   });
 
-  it("loads the image correctly", () => {
-    render(<IntroIndex />);
+  it("loads the image correctly", async () => {
+    await render(<IntroIndex />);
     expect(Asset.fromModule).toHaveBeenCalledWith(expect.anything());
   });
 });

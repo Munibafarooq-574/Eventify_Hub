@@ -240,7 +240,7 @@ const PackageScreen = () => {
         return "Setup Based";
 
       case "CUSTOM":
-        return "Custom";
+        return "Retired booking type";
 
       default:
         return "Duration Based";
@@ -1184,103 +1184,6 @@ const PackageScreen = () => {
                 </View>
               )}
 
-              {/* =============================================
-                  CUSTOM
-              ============================================= */}
-
-              {packageDetails.bookingType === "CUSTOM" && (
-                <View style={styles.durationSection}>
-                  <View style={styles.sectionTitleRow}>
-                    <View style={styles.infoIconCircle}>
-                      <Ionicons
-                        name="options-outline"
-                        size={17}
-                        color="#780C60"
-                      />
-                    </View>
-
-                    <Text style={styles.sectionTitle}>
-                      Custom Service Timing
-                    </Text>
-                  </View>
-                  <Text style={styles.durationLabel}>Service must start and finish within this window. Duration is optional.</Text>
-
-                  <View style={styles.durationList}>
-                    {packageDetails.requiredServiceDurationMinutes !==
-                      undefined && (
-                      <View style={styles.durationCard}>
-                        <View style={styles.durationIcon}>
-                          <Ionicons
-                            name="time-outline"
-                            size={18}
-                            color="#780C60"
-                          />
-                        </View>
-
-                        <View style={styles.durationInfo}>
-                          <Text
-                            style={styles.durationLabel}
-                          >
-                            Time Needed
-                          </Text>
-
-                          <Text
-                            style={styles.durationValue}
-                          >
-                            {formatServiceDuration(
-                              packageDetails.requiredServiceDurationMinutes
-                            )}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-
-                    <View style={styles.durationCard}>
-                      <View style={styles.durationIcon}>
-                        <Ionicons
-                          name="play-outline"
-                          size={18}
-                          color="#780C60"
-                        />
-                      </View>
-
-                      <View style={styles.durationInfo}>
-                        <Text style={styles.durationLabel}>
-                          Earliest Service Start
-                        </Text>
-
-                        <Text style={styles.durationValue}>
-                          {formatServiceOffset(
-                            packageDetails.serviceWindowStartOffsetMinutes
-                          )}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.durationCard}>
-                      <View style={styles.durationIcon}>
-                        <Ionicons
-                          name="flag-outline"
-                          size={18}
-                          color="#780C60"
-                        />
-                      </View>
-
-                      <View style={styles.durationInfo}>
-                        <Text style={styles.durationLabel}>
-                          Service Completion Deadline
-                        </Text>
-
-                        <Text style={styles.durationValue}>
-                          {formatServiceOffset(
-                            packageDetails.serviceWindowEndOffsetMinutes
-                          )}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              )}
 
               <View style={styles.divider} />
             </View>
