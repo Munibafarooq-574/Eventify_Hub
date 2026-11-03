@@ -305,6 +305,7 @@ if (!hasAccess) {
     replacementMode = false,
     eventTimeZone = 'UTC',
     deliverySelection?: { startDateTime: string | Date; configuration?: any },
+    setupSelection?: { startDateTime: string | Date; endDateTime: string | Date },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
