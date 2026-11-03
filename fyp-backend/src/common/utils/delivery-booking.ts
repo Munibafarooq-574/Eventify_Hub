@@ -35,23 +35,22 @@ export function validateDeliveryConfiguration(pkg: DeliveryConfiguration) {
     throw new BadRequestException('Enter a delivery fee greater than zero.');
   if (pkg.deliveryExtraWeightEnabled && (
     !Number.isFinite(pkg.deliveryIncludedWeightKg) || pkg.deliveryIncludedWeightKg! <= 0 ||
-    !Number.isFinite(pkg.deliveryExtraFeePerKg) || pkg.deliveryExtraFeePerKg! <= 0 ||
-    !Number.isFinite(pkg.deliveryWeightKg) || pkg.deliveryWeightKg! <= 0 ||
-    !['PACKAGE', 'PER_GUEST'].includes(pkg.deliveryWeightBasis || '')
-  )) throw new BadRequestException('Enter the covered weight, extra fee and package or per-guest weight.');
+    !Number.isFinite(pkg.deliveryExtraFeePerKg) || pkg.deliveryExtraFeePerKg! <= 0
+  )) throw new BadRequestException('Enter the covered weight and extra fee.');
 }
 
 export function quoteDelivery(pkg: DeliveryConfiguration, quantity = 1, guests = 1, isCatering = false) {
   validateDeliveryConfiguration(pkg);
   const paid = pkg.deliveryFeeType === 'PAID';
   const weighted = paid && pkg.deliveryExtraWeightEnabled;
-  if (weighted && (isCatering ? pkg.deliveryWeightBasis !== 'PER_GUEST' : pkg.deliveryWeightBasis !== 'PACKAGE'))
-    throw new BadRequestException(isCatering ? 'Set delivery weight per guest for this catering package.' : 'Set delivery weight per package.');
-  const weightKg = weighted ? Number(pkg.deliveryWeightKg) * quantity * (isCatering ? guests : 1) : 0;
+  // Older packages may include a per-package/per-guest weight; new packages do not require it.
+  const weightKg = weighted && Number.isFinite(pkg.deliveryWeightKg) && Number(pkg.deliveryWeightKg) > 0
+    ? Number(pkg.deliveryWeightKg) * quantity * (isCatering && pkg.deliveryWeightBasis === 'PER_GUEST' ? guests : 1)
+    : 0;
   const baseFee = paid ? Number(pkg.deliveryFee) : 0;
   const unitKg = deliveryUnitKg(pkg.deliveryWeightUnit);
   // Round before ceil so conversion noise never adds another billing unit.
-  const extraUnits = weighted ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
+  const extraUnits = weighted && weightKg > 0 ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
   const extraFee = Math.round(extraUnits * Number(pkg.deliveryExtraFeePerKg || 0) * unitKg * 100) / 100;
   return { baseFee, extraFee, weightKg, totalFee: baseFee + extraFee };
 }
