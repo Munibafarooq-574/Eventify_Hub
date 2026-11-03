@@ -43,15 +43,9 @@ export class DaySlotConfigDto {
   slots?: TimeSlotDto[];
 
   /**
-   * Maximum event durations allowed for this specific day.
-   *
-   * Example:
-   * [120, 300, 480]
-   *
-   * = 2 hours, 5 hours, 8 hours
-   *
-   * If an empty array is provided, there is no
-   * per-day duration restriction.
+   * Booking notice options for this day, in whole-day minutes.
+   * Example: [1440, 2880, 4320] = 1, 2, or 3 days before service.
+   * Empty array falls back to vendor-wide notice options.
    */
     @IsArray()
 @IsInt({ each: true })
@@ -100,11 +94,8 @@ export class SetAvailabilityDto {
   blockedDates?: string[];
 
   /**
-   * Legacy/single minimum advance notice.
-   *
-   * Supported values:
-   * 0, 30 minutes, 1 hour, 2 hours, 4 hours,
-   * 8 hours, 24 hours, 48 hours.
+   * Minimum advance booking notice in whole-day minutes.
+   * Minimum: 1440 (1 day). Example: 2880 = 2 days.
    */
   @IsInt()
   @Min(1440)
@@ -113,12 +104,8 @@ export class SetAvailabilityDto {
   minimumAdvanceMinutes?: number;
 
   /**
-   * Multiple booking notice options selected by the vendor.
-   *
-   * Example:
-   * [180, 360, 720]
-   *
-   * = 3 hours, 6 hours, 12 hours before event.
+   * Vendor-wide booking notice options in whole-day minutes.
+   * Example: [1440, 2880, 10080] = 1, 2, or 7 days before service.
    */
   @IsArray()
   @IsInt({ each: true })
