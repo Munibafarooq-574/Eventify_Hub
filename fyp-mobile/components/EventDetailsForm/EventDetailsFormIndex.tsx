@@ -7,7 +7,7 @@ import getActiveCities, {
 } from "@/services/getActiveCities";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -70,6 +70,71 @@ const formatDuration = (minutes: number) => {
 
 
 const PersonalizedExperienceScreen: React.FC = () => {
+  const routeParams = useLocalSearchParams();
+  const editDateTimeOnly = (Array.isArray(routeParams.editDateTime) ? routeParams.editDateTime[0] : routeParams.editDateTime) === "true";
+  const [editLoading, setEditLoading] = useState(editDateTimeOnly);
+  const [editSaving, setEditSaving] = useState(false);
+  const [savedEditEvent, setSavedEditEvent] = useState<any>(null);
+  useEffect(() => {
+    if (!editDateTimeOnly) return;
+    let active = true;
+    (async () => {
+      try {
+        const raw = await getSecureData("eventDetails");
+        const saved = raw ? JSON.parse(raw) : null;
+        if (!active) return;
+        if (!saved?.eventDate || !saved?.startTime) {
+          Alert.alert("Event details unavailable", "Please create your event again.");
+          router.back();
+          return;
+        }
+        const dateText = String(saved.eventDate).slice(0, 10);
+        const parsedDate = new Date(dateText + "T12:00:00");
+        if (!Number.isNaN(parsedDate.getTime())) setEventDate(parsedDate);
+        const [hours, minutes] = String(saved.startTime).split(":").map(Number);
+        if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+          const parsedTime = new Date();
+          parsedTime.setHours(hours, minutes, 0, 0);
+          setStartTime(parsedTime);
+        }
+        setSavedEditEvent(saved);
+      } catch (error) {
+        console.error("Could not restore event details:", error);
+        Alert.alert("Error", "Unable to load your saved event details.");
+      } finally {
+        if (active) setEditLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [editDateTimeOnly]);
+
+  const saveEditedDateTime = async () => {
+    if (!savedEditEvent || !eventDate || editSaving) return;
+    setEditSaving(true);
+    try {
+      const duration = Number(savedEditEvent.durationMinutes) || 60;
+      const end = new Date(startTime);
+      end.setMinutes(end.getMinutes() + duration);
+      await saveSecureData("eventDetails", JSON.stringify({
+        ...savedEditEvent,
+        eventDate,
+        startTime: timeToHHMM(startTime),
+        endTime: timeToHHMM(end),
+      }));
+      const ids = Array.isArray(savedEditEvent.selectedCategoryIds) ? savedEditEvent.selectedCategoryIds : [];
+      const names = Array.isArray(savedEditEvent.selectedServices) ? savedEditEvent.selectedServices : [];
+      router.replace({
+        pathname: "/categoryvendorlisting",
+        params: { categoryIds: JSON.stringify(ids), categoryNames: JSON.stringify(names) },
+      });
+    } catch (error) {
+      console.error("Could not update event date and time:", error);
+      Alert.alert("Error", "Unable to save your new date and time. Please try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // -------------------------------------------------------
   // STEP 1 & 2 — EVENT NAME / TYPE
   // -------------------------------------------------------
@@ -528,6 +593,63 @@ const handleContinue = async () => {
   // RENDER
   // -------------------------------------------------------
 
+  if (editDateTimeOnly) {
+    return (
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 36 }]} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.heading, { color: PRIMARY, marginBottom: 8 }]}>Change Event Date & Time</Text>
+        <Text style={[styles.helperText, { marginBottom: 18 }]}>
+          Your event name, type, guests, location and selected services are saved. Only update the date and time.
+        </Text>
+        {editLoading ? <ActivityIndicator color={PRIMARY} /> : savedEditEvent ? (
+          <>
+            <Text style={styles.label}>Event Date</Text>
+            <View style={styles.calendarContainer}>
+              <Calendar
+                current={eventDate ? eventDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)}
+                minDate={new Date().toISOString().slice(0, 10)}
+                markedDates={calendarMarks}
+                onDayPress={(day) => setEventDate(new Date(day.dateString + "T12:00:00"))}
+                enableSwipeMonths
+                theme={{ arrowColor: PRIMARY, todayTextColor: PRIMARY, selectedDayBackgroundColor: PRIMARY }}
+              />
+            </View>
+            <Text style={[styles.label, { marginTop: 18 }]}>Event Start Time</Text>
+            <TouchableOpacity style={styles.timeSelector} onPress={() => setShowTimePicker(true)}>
+              <Ionicons name="time-outline" size={20} color={PRIMARY} />
+              <Text style={[styles.timeValue, { flex: 1, marginLeft: 12 }]}>{formatTime(startTime)}</Text>
+              <Ionicons name="chevron-forward" size={19} color={PRIMARY} />
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                value={startTime}
+                mode="time"
+                display="default"
+                onValueChange={(_, selected) => {
+                  if (selected) setStartTime(selected);
+                  setShowTimePicker(Platform.OS === "ios");
+                }}
+              />
+            )}
+            <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 10, marginTop: 10, backgroundColor: "#FFF2D9", borderRadius: 10 }}>
+              <Ionicons name="warning-outline" size={17} color="#995A00" />
+              <Text style={{ color: "#754600", fontSize: 12, lineHeight: 18, flex: 1 }}>
+                Book at least 1 day before service starts. Vendor availability will be checked for your new date and time.
+              </Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              disabled={editSaving || !eventDate}
+              onPress={saveEditedDateTime}
+              style={{ backgroundColor: PRIMARY, borderRadius: 12, padding: 17, alignItems: "center", marginTop: 24, opacity: editSaving ? 0.6 : 1 }}
+            >
+              <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>{editSaving ? "Saving..." : "Show Available Vendors"}</Text>
+            </TouchableOpacity>
+          </>
+        ) : <Text style={styles.helperText}>Saved event details could not be loaded.</Text>}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -782,10 +904,10 @@ const handleContinue = async () => {
   />
 )}
 
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 8, marginBottom: 12, gap: 8 }}>
-        <Ionicons name="information-circle-outline" size={16} color={PRIMARY} />
-        <Text style={[styles.helperText, { flex: 1 }]}>
-          Vendors require at least 1 day's advance notice. Availability depends on when the selected service starts.
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, marginBottom: 7, paddingVertical: 8, paddingHorizontal: 10, gap: 7, backgroundColor: '#FFF2D9', borderRadius: 9, borderLeftWidth: 3, borderLeftColor: '#C88716' }}>
+        <Ionicons name="warning-outline" size={16} color="#995A00" />
+        <Text style={{ flex: 1, color: '#754600', fontSize: 11.5, lineHeight: 16 }}>
+          Book at least 1 day before service starts. Actual availability depends on the vendor and package.
         </Text>
       </View>
 
