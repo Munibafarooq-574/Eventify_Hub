@@ -392,8 +392,8 @@ if (eventDetailsRaw) {
         };
     }
 
-    // TIME_SLOT_BASED: use the client's selected appointment, not event start.
-    if (bookingType === 'TIME_SLOT_BASED') {
+    // Selected appointment/setup interval is authoritative; never use the entire allowed setup window.
+    if (bookingType === 'TIME_SLOT_BASED' || bookingType === 'SETUP_BASED') {
         const selectedWindow = pkg?.requiredServiceWindow;
         if (!selectedWindow?.startDateTime || !selectedWindow?.endDateTime) return null;
         const start = new Date(selectedWindow.startDateTime);
@@ -431,11 +431,10 @@ if (eventDetailsRaw) {
     }
 
     // -----------------------------------------
-    // SETUP_BASED / CUSTOM
+    // CUSTOM
     // Configured start/end offsets
     // -----------------------------------------
     if (
-        bookingType === 'SETUP_BASED' ||
         bookingType === 'CUSTOM'
     ) {
         const startOffset =
@@ -899,7 +898,7 @@ if (eventDetailsRaw) {
                                                                         'SETUP_BASED'
                                                                         ? serviceStartText &&
                                                                         serviceEndText
-                                                                            ? `Setup Window: ${serviceStartText} - ${serviceEndText}`
+                                                                            ? `Setup Time: ${serviceStartText} - ${serviceEndText}`
                                                                             : 'Setup window unavailable'
 
                                                                         : resolvedTiming?.bookingType ===
@@ -936,9 +935,9 @@ if (eventDetailsRaw) {
 
                                                                     <Text style={styles.bookingDetailText}>
                                                                         {formatCartDuration(
-                                                                            resolvedTiming?.bookingType === 'TIME_SLOT_BASED'
-                                                                                ? pkg?.requiredServiceDurationMinutes
-                                                                                : pkg?.durationMinutes
+                                                                            (resolvedTiming?.bookingType === 'TIME_SLOT_BASED' || resolvedTiming?.bookingType === 'SETUP_BASED')
+                                                                                 ? pkg?.requiredServiceDurationMinutes
+                                                                                 : pkg?.durationMinutes
                                                                         )}
                                                                     </Text>
                                                                 </View>
