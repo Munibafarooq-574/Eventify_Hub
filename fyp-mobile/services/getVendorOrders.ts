@@ -1,5 +1,6 @@
 //fyp-mobile/services/getVendorOrders.ts
 import axios, { AxiosRequestConfig } from "axios";
+import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
 
 export interface GetOrdersResponse {
     _id: string;
@@ -67,7 +68,7 @@ export default async function getVendorOrders(type: string, userId: string, stat
         const response = await axios(config);
         return response.data;
     } catch (error) {
-        console.error("Error fetching orders:", error);
+        reportMarketplaceLoadError("Orders unavailable", error);
         throw error;
     }
 }
