@@ -940,9 +940,9 @@ if (eventDetailsRaw) {
                                                                     </Text>
 
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        {Number(pkg.baseIncludedDurationMinutes) > 0
+                                                                        {Number(pkg.baseIncludedDurationMinutes) > 0 && Number(pkg.durationMinutes) > Number(pkg.baseIncludedDurationMinutes)
                                                                             ? `Base Rs. ${formatCurrency(Number(pkg.basePrice))} includes ${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s). Extra time at the shown rate. Total Rs. ${formatCurrency(Number(pkg.price))}`
-                                                                            : `${pkg.customDurationUnit === 'DAYS' ? Number(pkg.durationMinutes) / 1440 : Number(pkg.durationMinutes) / 60} unit(s) × Rs. ${formatCurrency(Number(pkg.customDurationRate))} = Rs. ${formatCurrency(Number(pkg.price))}`}
+                                                                            : `${pkg.customDurationUnit === 'DAYS' ? Number(pkg.durationMinutes) / 1440 : Number(pkg.durationMinutes) / 60} unit(s) at the custom rate. Total Rs. ${formatCurrency(Number(pkg.price))}`}
                                                                     </Text>
                                                                 </View>
                                                             </View>

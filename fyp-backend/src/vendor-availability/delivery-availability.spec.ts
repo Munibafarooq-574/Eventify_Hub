@@ -18,3 +18,27 @@ describe('Delivery reuses working hours, notice, payment and capacity rules',()=
  it('uses frozen delivery terms after package edits',async()=>{const f=fixture();const saved={...f.pkg};f.pkg.serviceWindowStartOffsetMinutes=120;f.pkg.bookingType='CUSTOM';expect((await f.check(undefined,saved)).available).toBe(true);expect((await f.check('2026-11-09T07:00:00Z',saved)).available).toBe(false)});
  it('discovers a free alternative if the first delivery time is busy',async()=>{const f=fixture();f.overlap.mockImplementation((filter:any)=>q(+filter.eventEndDateTime.$gt===+new Date('2026-11-09T08:00:00Z')?1:0));const r=await f.service.checkVendorAvailability(id,new Date('2026-11-09T09:00:00Z'),new Date('2026-11-09T11:00:00Z'),packageId);expect(r.available).toBe(true);expect(+r.requiredServiceWindow.startDateTime).toBeGreaterThan(+new Date('2026-11-09T08:00:00Z'))});
 });
+
+describe('Duration Based availability uses the selected package duration', () => {
+ beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(new Date('2026-11-08T05:00:00Z')); });
+ afterEach(() => jest.useRealTimers());
+
+ it('allows a 1-hour custom booking and a 2-hour base booking with custom disabled', async () => {
+  const f = fixture();
+  Object.assign(f.pkg, {
+   bookingType: 'DURATION_BASED', baseIncludedDurationMinutes: 120,
+   durations: [{ value: 3, unit: 'HOURS', price: 20000 }],
+   allowCustomDuration: true, customDurationUnit: 'HOURS', customDurationRate: 6000,
+  });
+  const start = new Date('2026-11-09T09:00:00Z');
+  const check = (minutes: number) => f.service.checkVendorAvailability(
+   id, start, new Date(start.getTime() + minutes * 60000), packageId,
+  );
+  expect((await check(60)).requiredServiceWindow).toEqual({
+   startDateTime: start, endDateTime: new Date('2026-11-09T10:00:00Z'),
+  });
+  f.pkg.allowCustomDuration = false;
+  expect((await check(60)).available).toBe(false);
+  expect((await check(120)).available).toBe(true);
+ });
+});

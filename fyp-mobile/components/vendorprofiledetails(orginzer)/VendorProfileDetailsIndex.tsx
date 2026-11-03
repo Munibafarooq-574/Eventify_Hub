@@ -1623,8 +1623,8 @@ Toast.show({
         return { price: null, reason: 'This duration is not offered by the vendor.' };
       }
       const base = Number(pkg.price);
-      if (!Number.isFinite(base) || base < 0 || selectedDurationMinutes < included)
-        return { price: null, reason: 'Please select at least the included duration.' };
+      if (!Number.isFinite(base) || base < 0)
+        return { price: null, reason: 'Vendor pricing needs correction before booking.' };
       const tiers = [{ minutes: included, price: base }, ...durations.map((d: any) => ({
         minutes: Number(d.value) * (d.unit === 'DAYS' ? 1440 : 60), price: Number(d.price),
       }))].sort((a,b) => a.minutes - b.minutes);
@@ -1636,9 +1636,16 @@ Toast.show({
       const rate = Number(pkg.customDurationRate);
       if (!pkg.allowCustomDuration || !Number.isFinite(rate) || rate <= 0)
         return { price: null, reason: 'This duration is not offered by the vendor.' };
+      if (selectedDurationMinutes < included) {
+        const unitMinutes = pkg.customDurationUnit === 'DAYS' ? 1440 : pkg.customDurationUnit === 'HOURS' ? 60 : 0;
+        if (!unitMinutes || selectedDurationMinutes <= 0 || selectedDurationMinutes % unitMinutes !== 0) {
+          return { price: null, reason: 'Select a duration in whole units of the vendor’s custom rate.' };
+        }
+        return { price: Math.round(Math.min(base, rate * selectedDurationMinutes / unitMinutes)), basis: 'custom' };
+      }
       const lower = [...tiers].reverse().find(t => t.minutes < selectedDurationMinutes);
       const upper = tiers.find(t => t.minutes > selectedDurationMinutes);
-      if (!lower) return { price: null, reason: 'Duration is below the minimum.' };
+      if (!lower) return { price: null, reason: 'This duration is not offered by the vendor.' };
       // Custom time is charged beyond the base included duration, not
       // beyond a discounted fixed tier. Fixed tiers remain exact overrides.
       const calculated = base + rate * (selectedDurationMinutes - included) / (pkg.customDurationUnit === 'DAYS' ? 1440 : 60);

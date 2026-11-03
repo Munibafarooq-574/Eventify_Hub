@@ -792,9 +792,6 @@ export class OrderService {
                             const hasIncluded = Number.isFinite(included) && included > 0;
                             const exact = tiers.find((tier) => tier.minutes === selectedDurationMinutes);
 
-                            if (hasIncluded && selectedDurationMinutes < included) {
-                                throw new BadRequestException('Duration is below the package included time');
-                            }
                             if (hasIncluded && selectedDurationMinutes === included) {
                                 unitPrice = basePrice;
                             } else if (exact) {
@@ -806,7 +803,12 @@ export class OrderService {
                                 if (!unitMinutes || !Number.isFinite(rate) || rate <= 0) {
                                     throw new BadRequestException('Package custom duration pricing is invalid');
                                 }
-                                if (hasIncluded) {
+                                if (hasIncluded && selectedDurationMinutes < included) {
+                                    if (selectedDurationMinutes % unitMinutes !== 0) {
+                                        throw new BadRequestException('Select a duration in whole units of the vendor’s custom rate.');
+                                    }
+                                    unitPrice = Math.round(Math.min(basePrice, rate * selectedDurationMinutes / unitMinutes));
+                                } else if (hasIncluded) {
                                     const sortedTiers = [{ minutes: included, price: basePrice }, ...tiers]
                                         .sort((a, b) => a.minutes - b.minutes);
                                     const lower = [...sortedTiers].reverse()

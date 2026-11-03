@@ -75,10 +75,10 @@ function query(value: unknown) {
     const result: any = { select: () => result, session: () => result, lean: async () => value };
     return result;
 }
-function checkout(replacement = false) {
+function checkout(replacement = false, pricing: Record<string, unknown> = {}, durationMinutes = 60) {
     const organizerId = id(), categoryId = id(), cityId = id();
     const vendors = [0, 1].map(() => ({ _id: id(), buisnessCategory: categoryId,
-        packages: [{ _id: id(), packageName: 'Package', bookingType: 'DELIVERY_BASED', price: 1000 }],
+        packages: [{ _id: id(), packageName: 'Package', bookingType: 'DELIVERY_BASED', price: 1000, ...pricing }],
         cakeBusinessDetails: { cancellationPolicy: 'REFUNDABLE' } }));
     const source = config(); const policy = cancellation();
     jest.spyOn(policy, 'getPolicyConfig').mockResolvedValue(source as any);
@@ -106,7 +106,7 @@ function checkout(replacement = false) {
     const services = vendors.slice(0, replacement ? 1 : 2).map(vendor => ({ vendorId: vendor._id, packageId: vendor.packages[0]._id,
         serviceName: 'Client label', price: 1, policySnapshot: { selectedPolicy: 'NON-REFUNDABLE', policyRevision: 999 } }));
     const run = () => service.createOrder(organizerId, new Date('2099-01-01'), '12:00', services,
-        'Event', 10, 'Wedding', 60, cityId, 'Address', [categoryId], id(), replacement ? request._id : undefined);
+        'Event', 10, 'Wedding', durationMinutes, cityId, 'Address', [categoryId], id(), replacement ? request._id : undefined);
     return { run, policy, source, snapshots, vendorOrders, orders, session, service, request, sendBookingNotice };
 }
 
@@ -156,5 +156,28 @@ describe('Snapshot in existing checkout transaction', () => {
         await expect(fixture.run()).rejects.toThrow('invalid');
         expect(fixture.orders.create).not.toHaveBeenCalled(); expect(fixture.vendorOrders.create).not.toHaveBeenCalled();
         expect(fixture.session.endSession).toHaveBeenCalled();
+    });
+});
+
+describe('Duration Based checkout pricing', () => {
+    const pricing = {
+        bookingType: 'DURATION_BASED', price: 15000, baseIncludedDurationMinutes: 120,
+        durations: [{ value: 3, unit: 'HOURS', price: 20000 }],
+        allowCustomDuration: true, customDurationUnit: 'HOURS', customDurationRate: 6000,
+    };
+
+    it.each([[60, 6000], [120, 15000], [180, 20000], [240, 27000]])(
+        'prices %i minutes at Rs. %i from the vendor configuration', async (minutes, expected) => {
+            const fixture = checkout(false, pricing, minutes);
+            await fixture.run();
+            expect(fixture.snapshots).toHaveLength(2);
+            expect(fixture.snapshots.map(line => line.price)).toEqual([expected, expected]);
+        },
+    );
+
+    it('rejects a shorter duration when the vendor disables custom pricing', async () => {
+        const fixture = checkout(false, { ...pricing, allowCustomDuration: false });
+        await expect(fixture.run()).rejects.toThrow('This duration is not offered by the vendor');
+        expect(fixture.vendorOrders.create).not.toHaveBeenCalled();
     });
 });

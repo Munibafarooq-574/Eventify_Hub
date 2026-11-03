@@ -408,7 +408,8 @@ if (!hasAccess) {
               ? selectedPackage.durations
               : [];
 
-          const matchesFixedDuration = durations.some(
+          const included = Number(selectedPackage.baseIncludedDurationMinutes);
+          const matchesFixedDuration = (included > 0 && included === requestedDurationMinutes) || durations.some(
             (duration: any) => {
               const value = Number(duration.value);
 
@@ -428,7 +429,7 @@ if (!hasAccess) {
           );
 
           if (
-            durations.length > 0 &&
+            (durations.length > 0 || included > 0) &&
             !matchesFixedDuration &&
             !selectedPackage.allowCustomDuration
           ) {
@@ -463,7 +464,7 @@ if (!hasAccess) {
                 customUnit !== 'DAYS') ||
               typeof customRate !== 'number' ||
               !Number.isFinite(customRate) ||
-              customRate < 0
+              customRate <= 0
             ) {
               return {
                 vendorId,
