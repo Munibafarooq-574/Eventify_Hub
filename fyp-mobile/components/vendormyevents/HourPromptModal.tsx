@@ -37,12 +37,12 @@ const HourPromptModal = ({
   }, [visible]);
 
   const handleSubmit = () => {
-    const hours = parseFloat(value.trim());
-    if (!Number.isFinite(hours) || hours <= 0) {
-      setError('Please enter a valid number of hours.');
+    const days = Number(value.trim());
+    if (!Number.isInteger(days) || days < 1) {
+      setError('Please enter a whole number of days (minimum 1).');
       return;
     }
-    onSubmit(hours);
+    onSubmit(days);
   };
 
   return (
@@ -55,7 +55,7 @@ const HourPromptModal = ({
           <TextInput
             style={styles.input}
             keyboardType="numeric"
-            placeholder="e.g. 3 (for 3 hours)"
+            placeholder="e.g. 3 (for 3 days)"
             value={value}
             onChangeText={(t) => {
               setValue(t);
