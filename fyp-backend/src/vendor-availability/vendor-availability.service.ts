@@ -953,6 +953,54 @@ return {
     return { vendorId, packageId, durationMinutes: duration, slots: results };
   }
 
+  // Setup choices use the same authoritative check as checkout; never infer availability on the client.
+  async getSetupCandidates(vendorId: string, packageId: string, eventStart: Date, eventEnd: Date, timeZone: string) {
+    if (!Types.ObjectId.isValid(vendorId) || !Types.ObjectId.isValid(packageId)) {
+      throw new BadRequestException('Invalid vendor or package identifier');
+    }
+    const vendor = await this.userModel.findById(vendorId).select('role packages').lean();
+    const pkg: any = (vendor?.packages ?? []).find((item: any) => String(item._id) === packageId);
+    if (!vendor || vendor.role !== 'Vendor' || !pkg || pkg.isActive === false || pkg.bookingType !== 'SETUP_BASED') {
+      throw new BadRequestException('Setup package unavailable');
+    }
+    const startOffset = pkg.serviceWindowStartOffsetMinutes;
+    const endOffset = pkg.serviceWindowEndOffsetMinutes;
+    const duration = pkg.requiredServiceDurationMinutes;
+    if (![startOffset, endOffset, duration].every((n) => Number.isSafeInteger(n)) ||
+        startOffset > endOffset || startOffset > 0 || endOffset > 0 ||
+        duration <= 0 || duration > endOffset - startOffset || endOffset - startOffset > 31 * 1440) {
+      throw new BadRequestException('Invalid setup duration or allowed window');
+    }
+    const earliest = eventStart.getTime() + startOffset * 60000;
+    const latestEnd = eventStart.getTime() + endOffset * 60000;
+    const durationMs = duration * 60000;
+    const stepMs = 15 * 60000;
+    const slots: Array<{ startDateTime: Date; endDateTime: Date; available: boolean; reason?: string }> = [];
+    const addCandidate = async (start: number) => {
+      const end = start + durationMs;
+      if (start <= Date.now()) return;
+      const result = await this.checkVendorAvailability(
+        vendorId, eventStart, eventEnd, packageId, undefined, undefined, false, timeZone,
+        undefined, { startDateTime: new Date(start), endDateTime: new Date(end) },
+      );
+      slots.push({
+        startDateTime: new Date(start), endDateTime: new Date(end),
+        available: result.available, reason: result.reason,
+      });
+    };
+    // Bound the number of requests for very wide windows; keep the final deadline boundary.
+    const maxCandidates = 128;
+    for (let start = earliest; start + durationMs <= latestEnd && slots.length < maxCandidates; start += stepMs) {
+      await addCandidate(start);
+    }
+    const lastStart = latestEnd - durationMs;
+    if (lastStart >= earliest && (lastStart - earliest) % stepMs !== 0 &&
+        !slots.some((slot) => slot.startDateTime.getTime() === lastStart)) {
+      await addCandidate(lastStart);
+    }
+    return { vendorId, packageId, timeZone, durationMinutes: duration, slots };
+  }
+
   async getDeliveryCandidates(vendorId: string, packageId: string, eventStart: Date, eventEnd: Date, timeZone: string, date?: string, excludeVendorOrderId?: string, configuration?: any) {
     if (!Types.ObjectId.isValid(vendorId) || !Types.ObjectId.isValid(packageId)) throw new BadRequestException('Invalid vendor or package.');
     const vendor = await this.userModel.findById(vendorId).select('role packages businessCityId').lean();
