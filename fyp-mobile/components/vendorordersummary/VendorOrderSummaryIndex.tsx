@@ -155,6 +155,8 @@ const OrderSummary = () => {
     const [cancellationPreview, setCancellationPreview] = useState<VendorCancellationPreview | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
     const previewGeneration = useRef(0);
+    const completionLock = useRef(false);
+    const [completingBookingId, setCompletingBookingId] = useState<string | null>(null);
     const cancellationLock = useRef(false);
     const summaryScrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
@@ -446,6 +448,34 @@ const OrderSummary = () => {
         Alert.alert('Booking could not be updated', error?.message || 'Please refresh and try again.');
     }
 };
+    const confirmCompletion = (orderId: string, booking: any) => {
+        if (completionLock.current || !canCompleteVendorBooking(booking)) return;
+        completionLock.current = true;
+        const release = () => { completionLock.current = false; };
+        let submitted = false;
+        Alert.alert("Complete booking?", "Have you provided the booked service?", [
+            { text: "Keep Booking", style: "cancel", onPress: release },
+            {
+                text: "Mark Completed",
+                onPress: async () => {
+                    if (submitted) return;
+                    submitted = true;
+                    if (!completionLock.current || !canCompleteVendorBooking(booking)) {
+                        release();
+                        return;
+                    }
+                    setCompletingBookingId(booking._id);
+                    try {
+                        await mark(orderId, booking._id, "completed");
+                    } finally {
+                        setCompletingBookingId(null);
+                        release();
+                    }
+                },
+            },
+        ], { cancelable: true, onDismiss: release });
+    };
+
     // Handler for summary card clicks
     const handleSummaryCardClick = (filterType: FilterType) => {
         setSelectedFilter(filterType);
@@ -990,22 +1020,15 @@ const OrderSummary = () => {
                                                             {(item.vendorOrders || []).length > 1 && <Text style={styles.detailText}>{booking.serviceName}</Text>}
                                                             <TouchableOpacity
                                                                 accessibilityRole="button"
-                                                                disabled={!canComplete}
-                                                                accessibilityState={{ disabled: !canComplete }}
-                                                                style={[styles.completeButton, !canComplete && styles.disabledAction]}
-                                                                onPress={() => Alert.alert(
-                                                                    "Complete booking?",
-                                                                    "Have you provided the booked service?",
-                                                                    [
-                                                                        { text: "Keep Booking", style: "cancel" },
-                                                                        { text: "Mark Completed", onPress: () => {
-                                                                            if (canCompleteVendorBooking(booking)) void mark(item._id, booking._id, "completed");
-                                                                        } },
-                                                                    ],
-                                                                )}
+                                                                disabled={!canComplete || completingBookingId !== null}
+                                                                accessibilityState={{ disabled: !canComplete || completingBookingId !== null, busy: completingBookingId === booking._id }}
+                                                                style={[styles.completeButton, styles.finishButton, (!canComplete || completingBookingId !== null) && styles.disabledAction]}
+                                                                onPress={() => confirmCompletion(item._id, booking)}
                                                             >
-                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete ? "#fff" : "#695562"} />
-                                                                <Text style={[styles.buttonText, !canComplete && styles.disabledActionText]}>Mark Completed</Text>
+                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete && completingBookingId === null ? "#fff" : "#236947"} />
+                                                                <Text style={[styles.buttonText, (!canComplete || completingBookingId !== null) && styles.disabledActionText]}>
+                                                                    {completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}
+                                                                </Text>
                                                             </TouchableOpacity>
                                                             {!canComplete && <Text style={styles.completionHint}>{hint}</Text>}
                                                         </View>
@@ -1029,7 +1052,7 @@ const OrderSummary = () => {
                                                         style={styles.deleteButton}
                                                         onPress={() => handleDelete(item._id, item.vendorOrders?.[0]?._id)}
                                                     >
-                                                        <Ionicons name="close-circle-outline" size={16} color="#A9273B" />
+                                                        <Ionicons name="close-circle-outline" size={16} color="#fff" />
                                                         <Text style={styles.deleteButtonText}>Cancel Order</Text>
                                                     </TouchableOpacity>
                                                 )}
@@ -1043,7 +1066,7 @@ const OrderSummary = () => {
                     }}
                 />
             </View>
-            <Modal visible={!!cancellation} transparent animationType="slide" onRequestClose={() => { if (!cancelling) setCancellation(null); }}>
+            <Modal visible={!!cancellation} transparent animationType="slide" onRequestClose={() => { if (!cancellationLock.current) setCancellation(null); }}>
                 <KeyboardAvoidingView style={styles.cancellationOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <View style={styles.cancellationPanel}>
                         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: 14 }}>
@@ -1064,7 +1087,7 @@ const OrderSummary = () => {
                                 onPress={confirmVendorCancellation} style={[styles.cancellationConfirm, (cancelling || previewLoading || !cancellationPreview || !cancellationReason.trim()) && { opacity: 0.5 }]}>
                                 <Text style={styles.buttonText}>{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity accessibilityRole="button" disabled={cancelling} onPress={() => setCancellation(null)} style={styles.cancellationKeep}>
+                            <TouchableOpacity accessibilityRole="button" disabled={cancelling} onPress={() => { if (!cancellationLock.current) setCancellation(null); }} style={styles.cancellationKeep}>
                                 <Text style={{ color: PRIMARY, fontWeight: '700' }}>Keep Booking</Text>
                             </TouchableOpacity>
                         </ScrollView>
@@ -1377,8 +1400,9 @@ const styles = StyleSheet.create({
     bookingActions: { gap: 10 },
     completionAction: { gap: 6 },
     completionHint: { color: '#695562', fontSize: 12, lineHeight: 17, textAlign: 'center' },
-    disabledAction: { backgroundColor: '#EEE5EC' },
-    disabledActionText: { color: '#695562' },
+    finishButton: { backgroundColor: '#237247' },
+    disabledAction: { backgroundColor: '#E5F5EB' },
+    disabledActionText: { color: '#236947' },
     actionButtons: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -1393,11 +1417,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 6,
         borderWidth: 1,
-        borderColor: '#EBCAD1',
+        borderColor: '#A9273B',
+        backgroundColor: '#A9273B',
         padding: 8,
         borderRadius: 10,
     },
-    deleteButtonText: { color: '#A9273B', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+    deleteButtonText: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
     completeButton: {
         minHeight: 44,
         flexDirection: 'row',
