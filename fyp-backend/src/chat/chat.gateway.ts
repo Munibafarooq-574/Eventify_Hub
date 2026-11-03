@@ -1,3 +1,4 @@
+import { BookingChatLine, BookingChatOrder, BookingChatStage, formatBookingNotice } from './booking-chat-notice';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -1060,64 +1061,40 @@ export class ChatGateway
             return;
         }
 
-        // --------------------------------------------------------
-        // RECEIVER CURRENTLY ONLINE
-        // --------------------------------------------------------
+        await this.publishMessage(payload.chatId, payload.receiverId, message);
+    }
 
-        if (
-            this.isUserOnline(
-                payload.receiverId,
-            )
-        ) {
-            const deliveredAt =
-                new Date();
+    async sendBookingNotice(order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage, push = false) {
+        try {
+            const message = await this.chatService.createBookingNotice(
+                String(order.organizerId), String(booking.vendorId), String(booking._id),
+                stage, formatBookingNotice(order, booking, stage),
+            );
+            if (!message) return;
+            await this.publishMessage(message.chatId, message.receiverId, message);
+            if (push) {
+                void this.chatService.sendPushNotification('Booking confirmed', message.message, message.receiverId, 'MESSAGE')
+                    .catch(error => this.logger.warn('Booking chat push failed', error));
+            }
+        } catch (error) {
+            // The booking or payment is already committed. Chat must not turn it into a checkout error.
+            this.logger.warn(`Booking chat notice failed for ${booking._id}`, error);
+        }
+    }
 
-            await this.chatService
-                .markMessageDelivered(
-                    message._id.toString(),
-                    deliveredAt,
-                );
-
-            message.deliveredAt =
-                deliveredAt;
+    private async publishMessage(chatId: string, receiverId: string, message: Awaited<ReturnType<ChatService['createMessage']>>) {
+        const online = this.isUserOnline(receiverId);
+        if (online) {
+            const deliveredAt = new Date();
+            await this.chatService.markMessageDelivered(message._id.toString(), deliveredAt);
+            message.deliveredAt = deliveredAt;
         }
 
-        // --------------------------------------------------------
-        // NEW MESSAGE
-        // --------------------------------------------------------
-
-        this.server
-            .to(
-                payload.chatId,
-            )
-            .emit(
-                'newMessage',
-                message,
-            );
-
-        // --------------------------------------------------------
-        // DELIVERY RECEIPT
-        // --------------------------------------------------------
-
-        if (
-            this.isUserOnline(
-                payload.receiverId,
-            )
-        ) {
-            this.server
-                .to(
-                    payload.chatId,
-                )
-                .emit(
-                    'messageDelivered',
-                    {
-                        messageId:
-                            message._id.toString(),
-
-                        deliveredAt:
-                            message.deliveredAt,
-                    },
-                );
+        this.server?.to(chatId).emit('newMessage', message);
+        if (online) {
+            this.server?.to(chatId).emit('messageDelivered', {
+                messageId: message._id.toString(), deliveredAt: message.deliveredAt,
+            });
         }
     }
 

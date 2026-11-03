@@ -12,6 +12,7 @@ import { CommissionConfig } from 'src/schemas/commission-config.schema';
 import { Category } from 'src/schemas/category.schema';
 import { RescheduleRequest } from 'src/schemas/reschedule-request.schema';
 import { ChatService } from 'src/chat/chat.service';
+import { ChatGateway } from 'src/chat/chat.gateway';
 import { VendorAvailabilityService } from 'src/vendor-availability/vendor-availability.service';
 import { PayoutService } from 'src/payout/payout.service';
 import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
@@ -84,6 +85,7 @@ describe('OrderService - Unit Tests', () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 OrderService,
+                { provide: ChatGateway, useValue: { sendBookingNotice: jest.fn() } },
                 { provide: CancellationService, useValue: cancellation },
                 { provide: getModelToken(User.name), useValue: userModel },
                 { provide: getModelToken(Order.name), useValue: orderModel },

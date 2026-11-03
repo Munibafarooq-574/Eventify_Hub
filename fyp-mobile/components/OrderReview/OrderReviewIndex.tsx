@@ -1140,7 +1140,19 @@ const isInvalidCode =
         await deleteSecureData('cartData');
         await deleteSecureData('eventDetails');
 
-        router.push('/OrderSummary');
+        const chatVendors = new Map<string, { id: string; name: string; avatar: string }>();
+        for (const { vendor, vendorName } of cartData.vendors) {
+          const id = String(vendor._id);
+          chatVendors.set(id, {
+            id,
+            name: vendor.contactDetails?.brandName || vendor.brandName || vendorName || vendor.name || 'Vendor',
+            avatar: vendor.contactDetails?.brandLogo || '',
+          });
+        }
+        router.push({
+          pathname: '/OrderSummary',
+          params: { chatVendors: JSON.stringify([...chatVendors.values()]) },
+        });
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);

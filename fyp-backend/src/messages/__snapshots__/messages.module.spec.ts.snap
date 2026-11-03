@@ -7,6 +7,7 @@ exports[`MessagesModule Snapshot Testing should ensure schema fields are stable 
   "chatId",
   "senderId",
   "receiverId",
+  "bookingNoticeKey",
   "message",
   "imageUrl",
   "videoUrl",
@@ -51,6 +52,11 @@ exports[`MessagesModule Snapshot Testing should match snapshot for Mongoose sche
   "audioUrl": {
     "default": "",
     "type": [Function],
+  },
+  "bookingNoticeKey": {
+    "sparse": true,
+    "type": [Function],
+    "unique": true,
   },
   "chatId": {
     "required": true,
@@ -132,6 +138,7 @@ exports[`MessagesModule Snapshot Testing should snapshot schema structure keys 1
   "chatId",
   "senderId",
   "receiverId",
+  "bookingNoticeKey",
   "message",
   "imageUrl",
   "videoUrl",

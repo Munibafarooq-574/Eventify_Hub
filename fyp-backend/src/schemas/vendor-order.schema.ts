@@ -70,6 +70,8 @@ const DeliverySnapshotSchema = SchemaFactory.createForClass(DeliverySnapshot);
 export class VendorOrder extends Document {
     @Prop({ type: DeliverySnapshotSchema }) delivery?: DeliverySnapshot;
     @Prop() bookingType?: string;
+    @Prop() bookingChatTimeZone?: string;
+    @Prop() bookingChatService?: string;
 
     @Prop({ type: LaterTimeRequestSchema })
     laterTimeRequest?: LaterTimeRequest;

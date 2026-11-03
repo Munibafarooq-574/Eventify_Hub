@@ -67,9 +67,16 @@ describe('OrderController - Unit Tests', () => {
   });
 
   it('should respond to vendor order', async () => {
-    const res = await controller.respondToOrder('v123', { status: 'accepted' });
+    const res = await controller.respondToOrder('v123', { status: 'accepted' }, { user: { id: 'vendor', role: 'vendor' } });
     expect(res).toBeDefined();
     expect(res.status).toBe('accepted');
+  });
+
+  it('blocks a vendor response when booking ownership fails', async () => {
+    service.assertVendorBookingOwner.mockRejectedValueOnce(new Error('Forbidden'));
+    await expect(controller.respondToOrder('v123', { status: 'accepted' }, { user: { id: 'other', role: 'vendor' } }))
+      .rejects.toThrow('Forbidden');
+    expect(service.updateVendorResponse).not.toHaveBeenCalled();
   });
 
   it('should complete vendor order', async () => {

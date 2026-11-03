@@ -94,19 +94,20 @@ function checkout(replacement = false) {
     const session = { withTransaction: async (callback: () => Promise<void>) => callback(), endSession: jest.fn() };
     const availability = { checkVendorAvailability: async () => ({ available: true,
         requiredServiceWindow: { startDateTime: '2099-01-01T12:00:00Z', endDateTime: '2099-01-01T13:00:00Z' } }) };
+    const sendBookingNotice = jest.fn();
     const service = new OrderService(user as any, orders as any, vendorOrders as any, {} as any, requests as any, {} as any,
         { find: () => query([{ _id: categoryId, name: 'Cake' }]) } as any,
         { startSession: async () => session } as any, availability as any, {} as any,
         { hasActiveSubscription: async () => true } as any,
         { requireActiveCity: async () => ({}), requireCityTimeZone: async () => 'UTC' } as any,
-        {} as any, {} as any, policy);
+        {} as any, {} as any, policy, { sendBookingNotice } as any);
     jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'attachReplacementOrder').mockResolvedValue(undefined);
     const services = vendors.slice(0, replacement ? 1 : 2).map(vendor => ({ vendorId: vendor._id, packageId: vendor.packages[0]._id,
         serviceName: 'Client label', price: 1, policySnapshot: { selectedPolicy: 'NON-REFUNDABLE', policyRevision: 999 } }));
     const run = () => service.createOrder(organizerId, new Date('2099-01-01'), '12:00', services,
         'Event', 10, 'Wedding', 60, cityId, 'Address', [categoryId], id(), replacement ? request._id : undefined);
-    return { run, policy, source, snapshots, vendorOrders, orders, session, service, request };
+    return { run, policy, source, snapshots, vendorOrders, orders, session, service, request, sendBookingNotice };
 }
 
 describe('Snapshot in existing checkout transaction', () => {
@@ -128,6 +129,28 @@ describe('Snapshot in existing checkout transaction', () => {
         expect(fixture.snapshots[0].policySnapshot.selectedPolicy).toBe('REFUNDABLE');
         expect((fixture.service as any).attachReplacementOrder).toHaveBeenCalled();
     });
+    it('opens only the new vendor chats after the checkout transaction commits', async () => {
+        const fixture = checkout();
+        fixture.session.withTransaction = async callback => {
+            await callback();
+            expect(fixture.sendBookingNotice).not.toHaveBeenCalled();
+        };
+        await fixture.run();
+        expect(fixture.sendBookingNotice).toHaveBeenCalledTimes(2);
+        expect(fixture.sendBookingNotice.mock.calls.map(([, line, stage]) => [String(line.vendorId), stage]))
+            .toEqual(fixture.snapshots.map(line => [String(line.vendorId), 'requested']));
+    });
+
+    it('sends no chat messages when the checkout transaction fails', async () => {
+        const fixture = checkout();
+        fixture.session.withTransaction = async callback => {
+            await callback();
+            throw new Error('Commit failed');
+        };
+        await expect(fixture.run()).rejects.toThrow('Commit failed');
+        expect(fixture.sendBookingNotice).not.toHaveBeenCalled();
+    });
+
     it('fails before any booking write when Admin settings are invalid', async () => {
         const fixture = checkout(); fixture.source.policySettings.clientRefunds.refundable[0].percentage = 101;
         await expect(fixture.run()).rejects.toThrow('invalid');

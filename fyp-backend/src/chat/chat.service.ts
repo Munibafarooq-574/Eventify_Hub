@@ -1,3 +1,4 @@
+import type { BookingChatStage } from './booking-chat-notice';
 import { BookingChatAccessService } from './booking-chat-access.service';
 
 // fyp-backend/src/chat/chat.service.ts
@@ -44,36 +45,55 @@ export class ChatService {
         return this.bookingAccess.assertChat(chatId, userId, true);
     }
 
-    // Create a new conversation
     async createConversation(participants: string[]): Promise<Conversation> {
-        await this.bookingAccess.assertPair(participants[0], participants[1]);
-        const chatId = participants.sort().join('-');  // Chat ID can be a sorted combination of participant IDs
-        const existingConversation = await this.conversationModel.findOne({ chatId });
-        if (existingConversation) return existingConversation;
-
-        const conversation = new this.conversationModel({ chatId, participants });
-        return conversation.save();
+        const [first, second] = participants;
+        await this.bookingAccess.assertPair(first, second);
+        return this.findOrCreatePair(first, second);
     }
 
     async createOrGetConversation(userId: string, vendorId: string): Promise<string> {
-        await this.bookingAccess.assertPair(userId, vendorId);
-        // Sort userId and vendorId to always have a consistent chatId
-        const participants = [userId, vendorId].sort();
-        const chatId = participants.join('-'); // Unique chatId based on participants
+        const conversation = await this.createConversation([userId, vendorId]);
+        return conversation.chatId;
+    }
 
-        // Check if conversation already exists
-        let conversation = await this.conversationModel.findOne({ chatId });
-
-        if (!conversation) {
-            // If no conversation exists, create a new one
-            conversation = new this.conversationModel({
-                chatId,
-                participants,
-            });
-            await conversation.save();
+    private async findOrCreatePair(first: string, second: string): Promise<Conversation> {
+        const participants = [first, second].sort();
+        const chatId = participants.join('-');
+        const existing = await this.conversationModel.findOne({ chatId });
+        if (existing) return existing;
+        try {
+            return await new this.conversationModel({ chatId, participants }).save();
+        } catch (error) {
+            if ((error as { code?: number }).code !== 11000) throw error;
+            const conversation = await this.conversationModel.findOne({ chatId });
+            if (!conversation) throw error;
+            return conversation;
         }
+    }
 
-        return conversation.chatId; // Return the chatId of the conversation
+    async createBookingNotice(
+        organizerId: string, vendorId: string, bookingId: string, stage: BookingChatStage, content: string,
+    ): Promise<Message | null> {
+        // Use the same participant access and canonical pair as manually opened chats.
+        const chatId = await this.createOrGetConversation(organizerId, vendorId);
+        const [senderId, receiverId] = stage === 'requested'
+            ? [organizerId, vendorId]
+            : [vendorId, organizerId];
+        let message: Message;
+        try {
+            message = await this.messageModel.create({
+                chatId, senderId, receiverId, message: content,
+                bookingNoticeKey: `${bookingId}:${stage}`,
+            });
+        } catch (error) {
+            if ((error as { code?: number }).code === 11000) return null;
+            throw error;
+        }
+        await this.conversationModel.updateOne(
+            { chatId, $or: [{ lastMessage: null }, { lastMessage: { $lt: message._id } }] },
+            { lastMessage: message._id },
+        );
+        return message;
     }
 
     // Get all conversations for a user

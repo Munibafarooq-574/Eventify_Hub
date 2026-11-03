@@ -147,10 +147,13 @@ async placeOrder(
     }
 
     @Patch('vendor-response/:id')
+    @UseGuards(JwtAuthGuard)
     async respondToOrder(
         @Param('id') vendorOrderId: string,
         @Body() body: { status: 'accepted' | 'rejected'; message?: string },
+        @Request() req: any,
     ) {
+        await this.orderService.assertVendorBookingOwner(vendorOrderId, req.user);
         return this.orderService.updateVendorResponse(vendorOrderId, body.status, body.message);
     }
 

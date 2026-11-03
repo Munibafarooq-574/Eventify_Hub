@@ -1,3 +1,4 @@
+import { ChatGateway } from '../chat/chat.gateway';
 import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
 import { getVendorDownPaymentConfig, effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
 import { Payment } from '../schemas/payment.schema';
@@ -72,6 +73,7 @@ export class OrderService {
     private readonly discountService: DiscountService,
     private readonly chatService: ChatService,
     private readonly cancellationService: CancellationService,
+    private readonly chatGateway: ChatGateway,
 ) { }
 
 
@@ -371,6 +373,7 @@ export class OrderService {
     try {
         let savedOrder: Order | undefined;
         let savedDeliveryServices: any[] = [];
+        let savedVendorOrderIds: Types.ObjectId[] = [];
 
         try {
             await session.withTransaction(
@@ -529,6 +532,7 @@ export class OrderService {
                     type ValidatedService = {
                         delivery?: any;
                         bookingType?: string;
+                        bookingChatService?: string;
                         policySnapshot: BookingPolicySnapshot;
                         serviceIndex: number;
                         vendorId: string;
@@ -1026,6 +1030,7 @@ export class OrderService {
                         validatedServices.push(
                             {
                                 serviceIndex, delivery, bookingType: packageDoc.bookingType === 'DELIVERY_BASED' ? packageDoc.bookingType : undefined,
+                                bookingChatService: category?.name,
                                 policySnapshot: this.cancellationService.buildBookingPolicySnapshot(vendor, bookingPolicyConfig),
                                 vendorId:
                                     String(
@@ -1190,6 +1195,8 @@ export class OrderService {
                                                 null,
                                             delivery: validatedService.delivery,
                                             bookingType: validatedService.bookingType,
+                                            bookingChatService: validatedService.bookingChatService,
+                                            bookingChatTimeZone: eventTimeZone,
                                             originalAmount:
                                                 validatedService.originalAmount,
                                             discountAmount:
@@ -1273,6 +1280,7 @@ export class OrderService {
 
                     savedOrder = order;
                     savedDeliveryServices = validatedServices;
+                    savedVendorOrderIds = vendorOrderIds;
                 },
             );
         } catch (error: any) {
@@ -1297,6 +1305,21 @@ export class OrderService {
 
         if (cancellationReplacement?.laterTimePending && savedOrder) {
             await this.notifyLaterTimeDecision(savedOrder, cancellationReplacement.vendorOrder, 'The client requested a replacement vendor. Your previous pending booking is no longer assigned to you.');
+        }
+        // Preserve the committed booking even if the chat transport is unavailable.
+        if (savedOrder) {
+            for (const [index, booking] of savedDeliveryServices.entries()) {
+                await this.chatGateway?.sendBookingNotice(savedOrder, {
+                    _id: savedVendorOrderIds[index],
+                    vendorId: booking.vendorId,
+                    serviceName: booking.serviceName,
+                    bookingType: booking.bookingType,
+                    bookingChatService: booking.bookingChatService,
+                    bookingChatTimeZone: eventTimeZone,
+                    eventStartDateTime: booking.startDateTime,
+                    eventEndDateTime: booking.endDateTime,
+                }, 'requested');
+            }
         }
         // Notifications only after a successful transaction commit.
         try {
@@ -2275,6 +2298,9 @@ vendorOrder.vendorNetAmount =
         try {
             const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id });
             if (order) {
+                if (status === 'accepted' && vendorOrder.bookingChatTimeZone && vendorOrder.confirmationTime && vendorOrder.downPaymentAmount === 0) {
+                    await this.chatGateway?.sendBookingNotice(order, vendorOrder, 'confirmed');
+                }
                 const title = status === 'accepted' ? 'Booking request accepted' : 'Booking request rejected';
                 const body = status === 'accepted'
                     ? `Your request for ${vendorOrder.serviceName} was accepted.`

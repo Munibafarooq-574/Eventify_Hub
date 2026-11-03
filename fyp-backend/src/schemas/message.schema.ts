@@ -14,6 +14,9 @@ export class Message extends Document {
     @Prop({ required: true })
     receiverId: string;
 
+    @Prop({ unique: true, sparse: true })
+    bookingNoticeKey?: string;
+
     @Prop({
     required: function (this: Message) {
         return !this.imageUrl && !this.videoUrl && !this.audioUrl;

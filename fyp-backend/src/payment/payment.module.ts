@@ -1,3 +1,4 @@
+import { ChatModule } from '../chat/chat.module';
 // fyp-backend/src/payment/payment.module.ts
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -47,6 +48,7 @@ import { RescheduleRequest, RescheduleRequestSchema } from 'src/schemas/reschedu
   },
 ]),
     PayoutModule,
+    ChatModule,
     AuthModule,
     EmailModule,
 ],

@@ -30,6 +30,6 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
     ],
     providers: [BookingChatAccessService, ChatGateway, ChatService, FileUploadService],
     controllers: [ChatController],
-    exports: [ChatService],
+    exports: [ChatService, ChatGateway],
 })
 export class ChatModule { }

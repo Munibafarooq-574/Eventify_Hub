@@ -1,6 +1,10 @@
-import { router } from "expo-router";
-import React from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import createConversation from "@/services/createConversation";
+import { getUserData, saveSecureData } from "@/store";
+import { reportMarketplaceLoadError } from "@/services/reportMarketplaceLoadError";
+import React, { useRef, useState } from "react";
 import {
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -9,7 +13,51 @@ import {
     View,
 } from "react-native";
 
+type BookingChatVendor = { id: string; name: string; avatar: string };
+
+function getChatVendors(value?: string): BookingChatVendor[] {
+    if (!value) return [];
+    try {
+        const vendors: unknown = JSON.parse(value);
+        if (!Array.isArray(vendors)) return [];
+        return vendors.filter(vendor => typeof vendor?.id === 'string' && vendor.id &&
+            typeof vendor.name === 'string' && typeof vendor.avatar === 'string');
+    } catch {
+        return [];
+    }
+}
+
 const SummaryScreen = () => {
+    const { chatVendors } = useLocalSearchParams<{ chatVendors?: string }>();
+    const vendors = getChatVendors(chatVendors);
+    const opening = useRef(false);
+    const [openingVendorId, setOpeningVendorId] = useState<string>();
+
+    const openVendorChat = async (vendor: BookingChatVendor) => {
+        if (opening.current) return;
+        opening.current = true;
+        setOpeningVendorId(vendor.id);
+        try {
+            const user = await getUserData();
+            if (!user?._id) throw new Error('Sign in to open this conversation.');
+            const result = await createConversation(user._id, vendor.id);
+            if (!result?.chatId) throw new Error('Conversation ID was missing.');
+            await Promise.all([
+                saveSecureData('chatId', result.chatId),
+                saveSecureData('receiverId', vendor.id),
+                saveSecureData('receiverName', vendor.name),
+                saveSecureData('receiverAvatar', vendor.avatar),
+            ]);
+            router.push('/message');
+        } catch (error) {
+            reportMarketplaceLoadError('Booking chat unavailable', error);
+            Alert.alert('Conversation unavailable', 'Please try again or open the booking in My Bookings.');
+        } finally {
+            opening.current = false;
+            setOpeningVendorId(undefined);
+        }
+    };
+
     const { width, height } = useWindowDimensions();
 
     // Responsive scaling helpers
@@ -100,6 +148,25 @@ const SummaryScreen = () => {
                     </View>
                 </View>
 
+                {vendors.length > 0 && (
+                    <View style={styles.statusCard}>
+                        <Text style={styles.statusTitle}>Chat with your vendors</Text>
+                        {vendors.map(vendor => (
+                            <TouchableOpacity
+                                key={vendor.id}
+                                accessibilityRole="button"
+                                disabled={openingVendorId !== undefined}
+                                style={[styles.dashboardButton, styles.vendorChatButton]}
+                                onPress={() => openVendorChat(vendor)}
+                            >
+                                <Text style={styles.dashboardButtonText}>
+                                    {openingVendorId === vendor.id ? 'Opening chat…' : `Chat with ${vendor.name}`}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
                 {/* Button Section */}
                 <View style={styles.buttonSection}>
                     <TouchableOpacity
@@ -125,6 +192,7 @@ const SummaryScreen = () => {
 };
 
 const styles = StyleSheet.create({
+    vendorChatButton: { marginTop: 8 },
     container: {
         flexGrow: 1,
         backgroundColor: "#FCEFF8",

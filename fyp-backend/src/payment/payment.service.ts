@@ -1,3 +1,4 @@
+import { ChatGateway } from '../chat/chat.gateway';
 import { displayDeliveryWeight } from '../common/utils/delivery-booking';
 import { effectiveDownPaymentDeadline, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue, servicePaymentCutoff } from '../common/utils/booking-payment-window';
 import { ClientSession } from 'mongoose';
@@ -44,6 +45,7 @@ export class PaymentService {
         private readonly emailService: EmailService,
         private readonly payoutService: PayoutService,
         private readonly configService: ConfigService,
+        private readonly chatGateway: ChatGateway,
     ) {}
 
     private async normalizeLegacyPaymentWindow(booking:any) {
@@ -1260,6 +1262,16 @@ if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline =
 
         return { payment, vendorOrder, paidSoFar, bookingAmount };
         });
+
+        if (payment.type === 'DOWN_PAYMENT' && vendorOrder.confirmationTime && vendorOrder.bookingChatTimeZone) {
+            try {
+                const bookingOrder = await this.orderModel.findById(vendorOrder.orderId).lean();
+                if (bookingOrder) await this.chatGateway?.sendBookingNotice(bookingOrder, vendorOrder, 'confirmed', true);
+            } catch (error) {
+                console.warn('Could not load the order for its booking chat confirmation', error);
+            }
+        }
+
 
 if (
     vendorOrder.status === 'completed' &&

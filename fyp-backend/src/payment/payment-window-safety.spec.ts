@@ -16,16 +16,37 @@ describe('Down payment and expiry safety',()=>{
  it('submits once before cutoff and rejects duplicate pending payment',async()=>{const f=fixture();await f.s.initiatePayment('booking','CARD','client');await expect(f.s.initiatePayment('booking','CARD','client')).rejects.toThrow('already pending');expect(f.payments).toHaveLength(1)});
  it('blocks exact deadline and late payment without creating a record',async()=>{for(const now of ['2026-10-24T11:00:00Z','2026-10-24T12:59:00Z']){jest.setSystemTime(new Date(now));const f=fixture();await expect(f.s.initiatePayment('booking','CARD','client')).rejects.toThrow('deadline');expect(f.paymentModel.create).not.toHaveBeenCalled()}});
  it('confirmation commits successful payment and secured booking together',async()=>{const f=fixture();await f.s.initiatePayment('booking','CARD','client');await f.s.confirmPayment('payment');expect(f.booking.paymentStatus).toBe('PARTIALLY_PAID');expect(f.booking.confirmationTime).toEqual(f.payments[0].paidAt);expect(f.booking.paymentDeadline).toBeNull();expect(f.payments[0].save).toHaveBeenCalledWith({session:f.session});expect(f.booking.save).toHaveBeenCalledWith({session:f.session})});
+ it('posts a booking confirmation only after a verified down payment commits', async () => {
+  const f = fixture();
+  f.booking.bookingChatTimeZone = 'Asia/Karachi';
+  const parent = { _id:'order', organizerId:'client' };
+  f.s.orderModel.findById = () => q(parent);
+  const sendBookingNotice = jest.fn();
+  f.s.chatGateway = { sendBookingNotice };
+  await f.s.initiatePayment('booking', 'CARD', 'client');
+  expect(sendBookingNotice).not.toHaveBeenCalled();
+  f.session.withTransaction = async (callback: () => Promise<void>) => {
+    await callback();
+    expect(sendBookingNotice).not.toHaveBeenCalled();
+  };
+  await f.s.confirmPayment('payment');
+  expect(sendBookingNotice).toHaveBeenCalledWith(parent, f.booking, 'confirmed', true);
+  await expect(f.s.confirmPayment('payment')).rejects.toThrow('already resolved');
+  expect(sendBookingNotice).toHaveBeenCalledTimes(1);
+ });
  it('blocks overdue confirmation and leaves pending payment available for review',async()=>{const f=fixture();await f.s.initiatePayment('booking','CARD','client');jest.setSystemTime(new Date('2026-10-24T11:00:00Z'));await expect(f.s.confirmPayment('payment')).rejects.toThrow('verification is overdue');expect(f.payments[0].status).toBe('PENDING');expect(f.booking.paymentStatus).toBe('PAYMENT_REQUIRED')});
  it('rejecting pending advance allows retry only within the original deadline',async()=>{const f=fixture();await f.s.initiatePayment('booking','CARD','client');await f.s.failPayment('payment','Rejected');expect(f.booking.paymentStatus).toBe('PAYMENT_FAILED');expect(f.booking.paymentDeadline).toEqual(new Date('2026-10-24T11:00:00Z'));jest.setSystemTime(new Date('2026-10-24T11:01:00Z'));await expect(f.s.initiatePayment('booking','CARD','client')).rejects.toThrow('deadline')});
  it.each(['PENDING','SUCCESS'])('expiry preserves a %s payment',async status=>{const f=fixture();f.payments.push({status});jest.setSystemTime(new Date('2026-10-24T11:01:00Z'));const order:any=Object.create(OrderService.prototype);Object.assign(order,{connection:f.connection,vendorOrderModel:f.bookingModel});const result=await order.expireStaleHolds();expect(result.expiredCount).toBe(0);expect(f.booking.status).toBe('accepted')});
  it('expires only an unpaid booking and notifies both parties',async()=>{const f=fixture();jest.setSystemTime(new Date('2026-10-24T11:01:00Z'));const order:any=Object.create(OrderService.prototype);Object.assign(order,{connection:f.connection,vendorOrderModel:f.bookingModel,orderModel:{findById:async()=>({organizerId:'client'})},sendPushNotification:jest.fn()});expect((await order.expireStaleHolds()).expiredCount).toBe(1);expect(f.booking.status).toBe('expired');expect(f.booking.paymentStatus).toBe('PAYMENT_EXPIRED');expect(f.booking.expiredAt).toEqual(new Date());expect(order.sendPushNotification).toHaveBeenCalledTimes(2)});
  it('repeat vendor acceptance cannot reset an existing payment window',async()=>{const f=fixture();const order:any=Object.create(OrderService.prototype);order.vendorOrderModel={findById:async()=>f.booking};const before=f.booking.paymentDeadline;await order.updateVendorResponse('booking','accepted');expect(f.booking.paymentDeadline).toBe(before);expect(f.booking.save).not.toHaveBeenCalled()});
  it.each([0,50])('acceptance preserves no-advance behavior or snapshots a deadline (%s)',async downPayment=>{
-  const f=fixture();f.booking.status='pending';const o:any=Object.create(OrderService.prototype);
-  Object.assign(o,{vendorOrderModel:{findById:async()=>f.booking},userModel:{findById:()=>q({availabilitySettings:{minimumAdvanceMinutes:120},cakeBusinessDetails:{downPaymentType:'FIXED',downPayment}})},orderModel:{findById:()=>q(null),findOne:async()=>null},commissionConfigModel:{findOne:async()=>null}});
+  const f=fixture();f.booking.status='pending';f.booking.bookingChatTimeZone='UTC';const o:any=Object.create(OrderService.prototype);
+  const parent={ organizerId:'client' }; const sendBookingNotice=jest.fn();
+  Object.assign(o,{vendorOrderModel:{findById:async()=>f.booking},userModel:{findById:()=>q({availabilitySettings:{minimumAdvanceMinutes:120},cakeBusinessDetails:{downPaymentType:'FIXED',downPayment}})},orderModel:{findById:()=>q(null),findOne:async()=>parent},commissionConfigModel:{findOne:async()=>null},chatGateway:{sendBookingNotice},sendPushNotification:jest.fn()});
   await o.updateVendorResponse('booking','accepted');expect(f.booking.status).toBe('accepted');
   expect(f.booking.acceptedAt).toEqual(new Date());
+  if (downPayment===0) expect(sendBookingNotice).toHaveBeenCalledWith(parent,f.booking,'confirmed');
+  else expect(sendBookingNotice).not.toHaveBeenCalled();
   if(downPayment===0){expect(f.booking.confirmationTime).toEqual(f.booking.acceptedAt);expect(f.booking.paymentStatus).toBe('PARTIALLY_PAID');expect(f.booking.paymentDeadline).toBeNull();expect(f.booking.holdExpiresAt).toBeNull()}
   else{expect(f.booking.paymentDeadline).toEqual(new Date('2026-10-24T11:00:00Z'));expect(f.booking.paymentPreparationMinutes).toBe(120)}
  });
