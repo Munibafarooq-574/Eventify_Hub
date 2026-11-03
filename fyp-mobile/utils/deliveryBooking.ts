@@ -34,9 +34,10 @@ export function deliverySettingsError(d: DeliverySettings) {
 }
 export function deliveryFee(pkg: DeliverySettings, quantity = 1, guests = 1, isCatering = false) {
   if ((pkg.bookingType && pkg.bookingType !== 'DELIVERY_BASED') || pkg.deliveryFeeType !== 'PAID') return { baseFee:0, extraFee:0, weightKg:0, totalFee:0 };
-  const weightKg = pkg.deliveryExtraWeightEnabled ? Number(pkg.deliveryWeightKg) * quantity * (isCatering ? guests : 1) : 0;
+  const hasKnownWeight = Number.isFinite(Number(pkg.deliveryWeightKg)) && Number(pkg.deliveryWeightKg) > 0;
+  const weightKg = pkg.deliveryExtraWeightEnabled && hasKnownWeight ? Number(pkg.deliveryWeightKg) * quantity * (isCatering && pkg.deliveryWeightBasis === 'PER_GUEST' ? guests : 1) : 0;
   const unitKg = deliveryUnitKg(pkg.deliveryWeightUnit);
-  const extraUnits = pkg.deliveryExtraWeightEnabled ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
+  const extraUnits = pkg.deliveryExtraWeightEnabled && hasKnownWeight ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
   const baseFee = Number(pkg.deliveryFee || 0);
   const extraFee = Math.round(extraUnits * Number(pkg.deliveryExtraFeePerKg || 0) * unitKg * 100) / 100;
   return { baseFee, extraFee, weightKg, totalFee:baseFee + extraFee };
