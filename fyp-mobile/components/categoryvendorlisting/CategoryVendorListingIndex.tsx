@@ -1,6 +1,8 @@
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
 
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
+import axios from "axios";
+import { API_BASE_URL } from "@/services/apiConfig";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import { emptyVendorFilters, loadVendorFilters, saveVendorFilters, SORT_OPTIONS, sortVendorResults, vendorStartingPrice, VendorSearchPreferences } from '@/services/vendorSearchPreferences';
@@ -29,6 +31,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function App() {
   const [preferences, setPreferences] = useState<VendorSearchPreferences>(emptyVendorFilters);
   const [searchError, setSearchError] = useState(false);
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
   const requestId = useRef(0);
   const [data, setData] = useState<any>([]);
   const [headerTitle, setHeaderTitle] = useState<string>("");
@@ -192,6 +195,7 @@ const getServiceWindowLabel = (
   const currentRequest = ++requestId.current;
   setCheckingAvailability(true);
   setSearchError(false);
+  setUnavailableReason(null);
   try {
     const savedFilters = override ?? await loadVendorFilters();
     if (currentRequest !== requestId.current) return;
@@ -300,6 +304,53 @@ const mergedResults = resultsPerCategory.flat();
 
     if (!vendorResults.length) {
       setData([]);
+      // Diagnose the event-specific exclusion without guessing from an empty list.
+      // Browse results and existing booking rules are unchanged.
+      if (!isBrowseMode && !isReplacementMode && timing?.eventCityId && timing.eventDate && timing.startTime) {
+        try {
+          const candidatesByCategory = await Promise.all(categoryIds.map(catId =>
+            searchVendorsWithFilters({
+              ...filters,
+              categoryId: catId,
+              eventDate: undefined,
+              startTime: undefined,
+              durationMinutes: undefined,
+            })
+          ));
+          if (currentRequest !== requestId.current) return;
+          const candidates = [...new Map(candidatesByCategory.flat().filter((v: any) => v?._id).map((v: any) => [String(v._id), v]))].map(([, v]) => v);
+          if (candidates.length) {
+            const response = await axios.post(`${API_BASE_URL}/vendor-availability/check`, {
+              vendorIds: candidates.map((v: any) => String(v._id)),
+              eventCityId: timing.eventCityId,
+              eventDate: timing.eventDate,
+              startTime: timing.startTime,
+              durationMinutes: timing.durationMinutes,
+            });
+            if (currentRequest !== requestId.current) return;
+            const checks = Array.isArray(response.data) ? response.data : [];
+            if (checks.length === candidates.length && checks.every((v: any) => v.available === false)) {
+              const reasons = checks.map((v: any) => String(v.reason || '').toLowerCase());
+              const all = (pattern: RegExp) => reasons.every((reason: string) => pattern.test(reason));
+              if (all(/at least .*before the service starts|advance notice|minimum.*notice/)) {
+                const notice = checks.map((v: any) => String(v.reason || '').match(/at least (\d+) day/i)?.[1]);
+                const sameDays = notice.length > 0 && notice.every((day: string | undefined) => day && day === notice[0]);
+                setUnavailableReason(sameDays
+                  ? `Available vendors require at least ${notice[0]} day${notice[0] === '1' ? '' : 's'} of notice before service starts. Please choose a later date or time.`
+                  : 'Available vendors require more advance notice. Please choose a later date or time.');
+              } else if (all(/working hours|outside.*hours|working window/)) {
+                setUnavailableReason('No vendors are available at your selected time.');
+              } else if (all(/blocked date|date.*blocked/)) {
+                setUnavailableReason('Vendors are unavailable on your selected date.');
+              } else if (all(/fully booked|maximum.*booking|concurrent|overlap/)) {
+                setUnavailableReason('Vendors are fully booked for this time.');
+              }
+            }
+          }
+        } catch (diagnosticError) {
+          console.warn('Could not determine the vendor unavailability reason:', diagnosticError);
+        }
+      }
       return;
     }
 
@@ -565,8 +616,13 @@ const renderEmptyState = () => {
       <View style={styles.emptyIconWrap}>
         <Ionicons name="calendar-outline" size={scale(34)} color={COLORS.primary} />
       </View>
-      <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : "No vendors match these filters"}</Text>
-      <Text style={styles.emptySubtitle}>{isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? 'Try adjusting your filters or event date and time.' : 'Try adjusting your search or clearing filters.'}</Text>
+      <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : !isBrowseMode && eventTiming ? "No vendors available for your event" : "No vendors match these filters"}</Text>
+      <Text style={styles.emptySubtitle}>{isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? (unavailableReason || 'No vendors are available for this event. Try another date or time, or adjust your search filters.') : 'Try adjusting your search or filters.'}</Text>
+      {!isBrowseMode && !isReplacementMode && eventTiming && (
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/EventDetailsForm")} style={{ padding: 14 }}>
+          <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Change Event Date & Time</Text>
+        </TouchableOpacity>
+      )}
       {activeChips.length > 0 && <TouchableOpacity disabled={checkingAvailability} onPress={() => updateFilters(emptyVendorFilters())} style={{ padding: 14 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear filters</Text></TouchableOpacity>}
     </View>
   );
