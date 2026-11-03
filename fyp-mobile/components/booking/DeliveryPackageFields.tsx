@@ -35,7 +35,6 @@ export default function DeliveryPackageFields({ value, onChange }: { value: Deli
     {value.deliveryFeeType === 'PAID' && <>
       {number('Base delivery fee (Rs.)','deliveryFee','Charged once for this booking.')}
     </>}
-    </>}
     {number('Time reserved for each delivery','deliveryReserveMinutes','Choose how long you need for a delivery. This time must fit within your working hours. Customers only choose the delivery time. Choose Minutes or Hours; for example, 1 hour reserves the same time as 60 minutes.')}
     {!!deliverySettingsError(value) && <Text style={s.error}>{deliverySettingsError(value)}</Text>}
   </View>;
