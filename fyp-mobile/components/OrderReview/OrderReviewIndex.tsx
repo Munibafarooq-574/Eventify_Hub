@@ -1369,48 +1369,6 @@ const isInvalidCode =
         </Text>
       </View>
 
-      {cartData?.vendors?.flatMap((vendor: any) =>
-        (vendor?.packages || []).filter((pkg: any) =>
-          String(pkg?.bookingType || '').toUpperCase() === 'DELIVERY_BASED' &&
-          !!(pkg?.deliveryStartDateTime || (pkg?.deliveryFeeType && pkg?.requiredServiceWindow?.startDateTime))
-        ).map((pkg: any, index: number) => {
-          const selected = pkg.deliveryStartDateTime || pkg.requiredServiceWindow.startDateTime;
-          const date = new Date(selected);
-          if (!Number.isFinite(date.getTime())) return null;
-          const deliveredAt = date.toLocaleString('en-GB', {
-            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
-            day: 'numeric', month: 'short', year: 'numeric',
-            hour: 'numeric', minute: '2-digit', hour12: true,
-          });
-          return (
-            <View key={`delivery-${String(pkg.packageId || pkg._id || index)}`} style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Delivered At</Text>
-              <Text style={styles.detailValue}>{deliveredAt}</Text>
-            </View>
-          );
-        })
-      )}
-
-      {cartData?.vendors?.flatMap((vendor: any) =>
-        (vendor?.packages || []).filter((pkg: any) =>
-          String(pkg?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' &&
-          pkg?.requiredServiceWindow?.startDateTime &&
-          pkg?.requiredServiceWindow?.endDateTime
-        ).map((pkg: any) => {
-          const start = new Date(pkg.requiredServiceWindow.startDateTime);
-          const end = new Date(pkg.requiredServiceWindow.endDateTime);
-          const format = (date: Date) => date.toLocaleTimeString('en-US', {
-            timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true,
-          });
-          return (
-            <View key={String(pkg.packageId || pkg._id || pkg.packageName)} style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Appointment Time</Text>
-              <Text style={styles.detailValue}>{`${format(start)} - ${format(end)}`}</Text>
-            </View>
-          );
-        })
-      )}
-
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>
           Duration
@@ -1421,28 +1379,6 @@ const isInvalidCode =
           )}
         </Text>
       </View>
-
-      {cartData?.vendors?.flatMap((vendor: any) =>
-        (vendor?.packages || []).filter((pkg: any) =>
-          String(pkg?.bookingType || '').toUpperCase() === 'SETUP_BASED'
-        ).map((pkg: any, index: number) => {
-          const window = getResolvedServiceWindow(pkg);
-          if (!window) return null;
-          const start = new Date(window.startDateTime);
-          const end = new Date(window.endDateTime);
-          if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
-          const format = (date: Date) => date.toLocaleTimeString('en-US', {
-            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
-            hour: 'numeric', minute: '2-digit', hour12: true,
-          });
-          return (
-            <View key={`setup-${String(pkg.packageId || pkg._id || index)}`} style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Setup Time</Text>
-              <Text style={styles.detailValue}>{`${format(start)} - ${format(end)}`}</Text>
-            </View>
-          );
-        })
-      )}
 
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>
@@ -1570,7 +1506,7 @@ const packages =
 
       // ---------------------------------
       // DELIVERY_BASED display fallback
-      // Delivered At = event start + delivery offset
+      // Scheduled delivery = event start + delivery offset
       // This is DISPLAY ONLY.
       // Checkout/backend validation stays unchanged.
       // ---------------------------------
@@ -1701,7 +1637,7 @@ const packages =
   bookingType ===
   'DELIVERY_BASED'
 ) {
-  title = 'Delivered At';
+  title = 'Scheduled Delivery';
 
   label =
     `${startDate} • ${startTime}`;
@@ -1709,7 +1645,7 @@ const packages =
         bookingType ===
         'SETUP_BASED'
       ) {
-        title = 'Setup Time';
+        title = 'Setup Window';
       } else if (
         bookingType ===
         'TIME_SLOT_BASED'
@@ -1902,7 +1838,7 @@ const packages =
                 styles.serviceWindowPackage
               }
             >
-              {item.title}
+              {packages.length > 1 ? `${item.packageName} · ${item.title}` : item.title}
             </Text>
 
             <Text
