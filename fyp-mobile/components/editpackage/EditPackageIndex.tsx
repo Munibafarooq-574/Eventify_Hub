@@ -86,7 +86,7 @@ const bookingTypeOptions: {
 ];
 
 import { EMPTY_OFFSET, OFFSET_UNITS, offsetUnitLabel, offsetToMinutes, minutesToOffset, serviceWindowError, type FriendlyOffset, type OffsetDirection } from "@/utils/serviceWindowInput";
-type DurationInputUnit = "MINUTES" | "HOURS";
+type DurationInputUnit = "MINUTES" | "HOURS" | "DAYS";
 
 interface FriendlyDuration {
   value: string;
@@ -111,9 +111,7 @@ function durationInputToMinutes(
     return undefined;
   }
 
-  return duration.unit === "HOURS"
-    ? numeric * 60
-    : numeric;
+  return duration.unit === "DAYS" ? numeric * 1440 : duration.unit === "HOURS" ? numeric * 60 : numeric;
 }
 
 // plain minutes from the backend/DB -> friendly value+unit for the UI
@@ -128,12 +126,8 @@ function minutesToDurationInput(
     return { ...EMPTY_DURATION_INPUT };
   }
 
-  if (minutes >= 60 && minutes % 60 === 0) {
-    return {
-      value: String(minutes / 60),
-      unit: "HOURS",
-    };
-  }
+  if (minutes >= 1440 && minutes % 1440 === 0) return { value: String(minutes / 1440), unit: "DAYS" };
+  if (minutes >= 60 && minutes % 60 === 0) return { value: String(minutes / 60), unit: "HOURS" };
 
   return {
     value: String(minutes),
@@ -148,6 +142,9 @@ function formatDurationDisplay(
   if (minutes === undefined || !Number.isFinite(minutes)) {
     return "—";
   }
+
+  if (minutes >= 1440 && minutes % 1440 === 0) { const days = minutes / 1440; return `${days} day${days === 1 ? "" : "s"}`; }
+
 
   if (minutes >= 60 && minutes % 60 === 0) {
     const hours = minutes / 60;
@@ -861,7 +858,7 @@ const removeExistingImage = (index: number) => {
   const startOffset = serviceWindowStartOffsetMinutesValue;
   const endOffset = serviceWindowEndOffsetMinutesValue;
 
-  const validWindow = !serviceWindowError(startOffset, endOffset, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue);
+  const validWindow = !serviceWindowError(startOffset, endOffset, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) && (bookingType !== "SETUP_BASED" || (startOffset !== undefined && startOffset <= 0 && endOffset !== undefined && endOffset <= 0));
 
   if (bookingType === "DELIVERY_BASED" && deliverySettingsError(delivery)) return false;
   if (bookingType === "CUSTOM" || bookingType === "DELIVERY_BASED") {
@@ -2309,7 +2306,7 @@ Alert.alert(
           />
 
           <View style={styles.friendlyToggleRow}>
-            {(["MINUTES", "HOURS"] as DurationInputUnit[]).map(
+            {((bookingType === "SETUP_BASED" ? ["MINUTES", "HOURS", "DAYS"] : ["MINUTES", "HOURS"]) as DurationInputUnit[]).map(
               (unit) => {
                 const active = serviceDuration.unit === unit;
 
@@ -2334,7 +2331,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {unit === "MINUTES" ? "Minutes" : "Hours"}
+                      {unit === "MINUTES" ? "Minutes" : unit === "HOURS" ? "Hours" : "Days"}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2407,7 +2404,7 @@ Alert.alert(
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
             {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+            {((bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
               (direction) => {
                 const active = windowStart.direction === direction;
 
@@ -2419,10 +2416,7 @@ Alert.alert(
                       active && styles.friendlyDirectionButtonActive,
                     ]}
                     onPress={() =>
-                      setWindowStart((prev) => ({
-                        ...prev,
-                        direction,
-                      }))
+                      setWindowStart((prev) => ({ ...prev, direction: bookingType === "SETUP_BASED" ? "BEFORE" : direction }))
                     }
                     activeOpacity={0.8}
                   >
@@ -2503,7 +2497,7 @@ Alert.alert(
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
             {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowEnd({...windowEnd,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-            {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
+            {((bookingType === "SETUP_BASED" ? ["BEFORE", "AFTER"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
               (direction) => {
                 const active = windowEnd.direction === direction;
 
@@ -2515,10 +2509,7 @@ Alert.alert(
                       active && styles.friendlyDirectionButtonActive,
                     ]}
                     onPress={() =>
-                      setWindowEnd((prev) => ({
-                        ...prev,
-                        direction,
-                      }))
+                      setWindowEnd((prev) => bookingType === "SETUP_BASED" && direction === "AFTER" ? { ...prev, value: "0", direction: "AFTER" } : { ...prev, direction })
                     }
                     activeOpacity={0.8}
                   >
@@ -2530,7 +2521,7 @@ Alert.alert(
                     >
                       {direction === "BEFORE"
                         ? "Before the event"
-                        : "At / after event starts"}
+                        : bookingType === "SETUP_BASED" ? "At event start" : "At / after event starts"}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2547,8 +2538,7 @@ Alert.alert(
           )}
 
           {bookingType !== "DELIVERY_BASED" && <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
-            Tip: enter 0 + "After event starts" to mean right when the
-            event begins.
+            {bookingType === "SETUP_BASED" ? 'Tip: choose 0 + "At event start" to finish exactly when the event begins.' : 'Tip: enter 0 + "After event starts" to mean right when the event begins.'}
           </Text>}
         </View>
       </>

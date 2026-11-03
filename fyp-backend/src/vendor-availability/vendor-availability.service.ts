@@ -305,6 +305,7 @@ if (!hasAccess) {
     replacementMode = false,
     eventTimeZone = 'UTC',
     deliverySelection?: { startDateTime: string | Date; configuration?: any },
+    setupSelection?: { startDateTime: string | Date; endDateTime: string | Date },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -558,7 +559,55 @@ if (!hasAccess) {
           replacementMode = true;
           break;
         }
-        case 'SETUP_BASED':
+        case 'SETUP_BASED': {
+          const startOffset = selectedPackage.serviceWindowStartOffsetMinutes;
+          const endOffset = selectedPackage.serviceWindowEndOffsetMinutes;
+          const duration = selectedPackage.requiredServiceDurationMinutes;
+          if (![startOffset, endOffset, duration].every((n) => Number.isSafeInteger(n)) ||
+              startOffset > endOffset || startOffset > 0 || endOffset > 0 ||
+              duration <= 0 || duration > endOffset - startOffset) {
+            return { vendorId, available: false, reason: 'Setup must fit in a valid window ending no later than event start.' };
+          }
+          const earliest = eventStartDateTime.getTime() + startOffset * 60000;
+          const latestEnd = eventStartDateTime.getTime() + endOffset * 60000;
+          const durationMs = duration * 60000;
+          if (setupSelection) {
+            const selectedStart = new Date(setupSelection.startDateTime);
+            const selectedEnd = new Date(setupSelection.endDateTime);
+            if (!Number.isFinite(selectedStart.getTime()) || !Number.isFinite(selectedEnd.getTime()) ||
+                selectedStart.getTime() < earliest || selectedEnd.getTime() > latestEnd ||
+                selectedEnd.getTime() - selectedStart.getTime() !== durationMs) {
+              return { vendorId, available: false, reason: 'Selected setup interval is outside the allowed window or has the wrong duration.' };
+            }
+            startDateTime = selectedStart;
+            endDateTime = selectedEnd;
+            break;
+          }
+          // Find a concrete duration-long interval, not the entire allowed window.
+          // Each candidate passes the same working hours, blocked dates, notice and overlap checks.
+          const stepMs = 15 * 60000;
+          for (let candidate = earliest; candidate + durationMs <= latestEnd; candidate += stepMs) {
+            if (candidate <= Date.now()) continue;
+            const result = await this.checkVendorAvailability(
+              vendorId, eventStartDateTime, requestedEnd, packageId, session,
+              excludeVendorOrderId, replacementMode, eventTimeZone, undefined,
+              { startDateTime: new Date(candidate), endDateTime: new Date(candidate + durationMs) },
+            );
+            if (result.available) return result;
+          }
+          // Always test the final exact boundary even when it is off the 15-minute grid.
+          const lastStart = latestEnd - durationMs;
+          if (lastStart >= earliest && lastStart > Date.now() &&
+              (lastStart - earliest) % stepMs !== 0) {
+            const result = await this.checkVendorAvailability(
+              vendorId, eventStartDateTime, requestedEnd, packageId, session,
+              excludeVendorOrderId, replacementMode, eventTimeZone, undefined,
+              { startDateTime: new Date(lastStart), endDateTime: new Date(latestEnd) },
+            );
+            if (result.available) return result;
+          }
+          return { vendorId, available: false, reason: 'No available setup interval fits the allowed window.' };
+        }
         case 'CUSTOM': {
           const startOffset =
             selectedPackage.serviceWindowStartOffsetMinutes;

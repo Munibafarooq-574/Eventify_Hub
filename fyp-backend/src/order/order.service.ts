@@ -738,6 +738,9 @@ export class OrderService {
                                     ),
                                     session, undefined, false, eventTimeZone,
                                     service.deliveryStartDateTime ? { startDateTime: service.deliveryStartDateTime } : undefined,
+                                    packageDoc.bookingType === 'SETUP_BASED' && service.requiredServiceWindow
+                                      ? { startDateTime: service.requiredServiceWindow.startDateTime, endDateTime: service.requiredServiceWindow.endDateTime }
+                                      : undefined,
                                 );
 
                         if (

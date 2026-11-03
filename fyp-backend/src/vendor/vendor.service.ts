@@ -724,6 +724,8 @@ private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
       return;
 
     case PackageBookingType.SETUP_BASED:
+      if (hasValidStartOffset && pkg.serviceWindowStartOffsetMinutes! > 0) throw new BadRequestException('Setup must start before or at event start.');
+      if (hasValidEndOffset && pkg.serviceWindowEndOffsetMinutes! > 0) throw new BadRequestException('Setup must finish before or at event start.');
       if (!hasValidRequiredDuration) {
         throw new BadRequestException(
           'SETUP_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
