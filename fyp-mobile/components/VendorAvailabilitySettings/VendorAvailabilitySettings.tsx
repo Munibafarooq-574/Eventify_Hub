@@ -37,16 +37,10 @@ const DAYS: { code: string; label: string }[] = [
   { code: 'SUN', label: 'Sunday' },
 ];
 
-const ADVANCE_OPTIONS = [
-  { label: 'No minimum', value: 0 },
-  { label: '30 minutes', value: 30 },
-  { label: '1 hour', value: 60 },
-  { label: '2 hours', value: 120 },
-  { label: '4 hours', value: 240 },
-  { label: '8 hours', value: 480 },
-  { label: '1 day', value: 1440 },
-  { label: '2 days', value: 2880 },
-];
+const ADVANCE_OPTIONS = [1, 2, 3, 5, 7, 14, 30].map((days) => ({
+  label: `${days} ${days === 1 ? 'day' : 'days'}`,
+  value: days * 1440,
+}));
 
 type TimeSlot = {
   start: string;
@@ -98,11 +92,11 @@ const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
 const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
 
 const [blockedDates, setBlockedDates] = useState<string[]>([]);
- const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(0);
+ const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(1440);
  const [minimumWorkingWindow, setMinimumWorkingWindow] = useState(60);
 
 const [advanceNoticeOptionsMinutes, setAdvanceNoticeOptionsMinutes] =
-  useState<number[]>([]);
+  useState<number[]>([1440]);
 
   const [showStartPicker, setShowStartPicker] = useState(false);
 const [showEndPicker, setShowEndPicker] = useState(false);
@@ -183,7 +177,7 @@ advanceNoticeOptionsMinutes: Array.isArray(
 )
   ? item.advanceNoticeOptionsMinutes.filter(
       (value: number) =>
-        Number.isFinite(value) && value >= 0,
+        Number.isFinite(value) && value >= 1440 && value % 1440 === 0,
     )
   : [],
         })),
@@ -197,13 +191,13 @@ advanceNoticeOptionsMinutes: Array.isArray(
     }
 
     if (typeof data?.minimumAdvanceMinutes === 'number') {
-  setMinimumAdvanceMinutes(data.minimumAdvanceMinutes);
+  setMinimumAdvanceMinutes(Math.max(1440, Math.ceil(data.minimumAdvanceMinutes / 1440) * 1440));
 }
 
 if (Array.isArray(data?.advanceNoticeOptionsMinutes)) {
   setAdvanceNoticeOptionsMinutes(
     data.advanceNoticeOptionsMinutes.filter(
-      (value: number) => Number.isFinite(value) && value >= 0,
+      (value: number) => Number.isFinite(value) && value >= 1440 && value % 1440 === 0,
     ),
   );
 }
@@ -468,7 +462,7 @@ const handleResetAvailability = () => {
               workingHoursEnd: '18:00',
               daySlots: [],
               blockedDates: [],
-              minimumAdvanceMinutes: 0,
+              minimumAdvanceMinutes: 1440,
               advanceNoticeOptionsMinutes: [],
               maxConcurrentBookings: 1,
             });
@@ -478,8 +472,8 @@ const handleResetAvailability = () => {
             setWorkingHoursEnd('18:00');
             setDaySlots([]);
             setBlockedDates([]);
-            setMinimumAdvanceMinutes(0);
-            setAdvanceNoticeOptionsMinutes([]);
+            setMinimumAdvanceMinutes(1440);
+            setAdvanceNoticeOptionsMinutes([1440]);
             setShowBlockCalendar(false);
             setHasAvailability(false);
 
