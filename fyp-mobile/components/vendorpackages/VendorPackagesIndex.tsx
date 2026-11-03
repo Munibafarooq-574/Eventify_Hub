@@ -439,7 +439,6 @@ const PackageScreen = () => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {packageDetails?.bookingType === 'DELIVERY_BASED' && <DeliveryDetails pkg={packageDetails} />}
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator
@@ -491,6 +490,21 @@ const PackageScreen = () => {
                   <View style={styles.divider} />
                 </>
               )}
+
+            {packageDetails.bookingType === "DELIVERY_BASED" && (
+              <>
+                <View style={styles.infoRow}>
+                  <View style={styles.infoIconCircle}>
+                    <Ionicons name="car-outline" size={16} color="#780C60" />
+                  </View>
+                  <View style={styles.infoTextWrapper}>
+                    <Text style={styles.sectionHeader}>Delivery Charges</Text>
+                    <DeliveryDetails pkg={packageDetails} />
+                  </View>
+                </View>
+                <View style={styles.divider} />
+              </>
+            )}
 
             {/* ---------------------------------------------
                 Package Images
