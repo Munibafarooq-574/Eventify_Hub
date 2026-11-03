@@ -12,7 +12,14 @@ describe('package minute window validation', () => {
       expect(() => validate({ ...pkg, requiredServiceDurationMinutes: 31 })).toThrow('Time needed must fit');
     }
     expect(() => validate({ ...pkg, serviceWindowStartOffsetMinutes: -10 })).toThrow();
-    expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 15 })).not.toThrow();
+    if (bookingType === 'SETUP_BASED') expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 15 })).toThrow('Setup must finish');
+    else expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 15 })).not.toThrow();
+  });
+  it('rejects setup windows after event start and allows zero deadline', () => {
+    const pkg = { bookingType: 'SETUP_BASED', requiredServiceDurationMinutes: 60, serviceWindowStartOffsetMinutes: -180, serviceWindowEndOffsetMinutes: 0 };
+    expect(() => validate(pkg)).not.toThrow();
+    expect(() => validate({ ...pkg, serviceWindowStartOffsetMinutes: 1 })).toThrow('Setup must start');
+    expect(() => validate({ ...pkg, serviceWindowEndOffsetMinutes: 1 })).toThrow('Setup must finish');
   });
   it('preserves optional custom duration and other booking types', () => {
     expect(() => validate({ bookingType: 'CUSTOM', serviceWindowStartOffsetMinutes: -45, serviceWindowEndOffsetMinutes: -15 })).not.toThrow();
