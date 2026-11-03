@@ -422,14 +422,10 @@ const bookingNoticeLabel = useMemo(() => {
   if (!availability) return null;
   const config = getDaySlotConfig(selectedDate);
   const options = config && Array.isArray(config.advanceNoticeOptionsMinutes) && config.advanceNoticeOptionsMinutes.length > 0 ? config.advanceNoticeOptionsMinutes : Array.isArray(availability.advanceNoticeOptionsMinutes) ? availability.advanceNoticeOptionsMinutes : [];
-  if (options.length === 0) return 'No minimum notice';
-  const minMinutes = Math.min(...options);
-  if (minMinutes % 1440 === 0 && minMinutes >= 1440) {
-    const days = minMinutes / 1440;
-    return `Book at least ${days} ${days === 1 ? 'day' : 'days'} before your event`;
-  }
-  const hours = minMinutes / 60;
-  return `Book at least ${hours % 1 === 0 ? hours : hours.toFixed(1)} ${hours === 1 ? 'hour' : 'hours'} before your event`;
+  const validOptions = options.filter((minutes) => Number.isFinite(minutes) && minutes >= 1440);
+  const minMinutes = validOptions.length > 0 ? Math.min(...validOptions) : 1440;
+  const days = minMinutes / 1440;
+  return `Book at least ${days} ${days === 1 ? 'day' : 'days'} before service starts`;
 }, [availability, selectedDate, getDaySlotConfig]);
 
 const workingHoursLabel = useMemo(() => {
