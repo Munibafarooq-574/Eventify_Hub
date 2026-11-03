@@ -1786,6 +1786,7 @@ Toast.show({
           price: resolvedPrice,
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
+          categoryName: profileCategoryName || undefined,
           basePrice: Number(pkg.price || 0),
           baseIncludedDurationMinutes: pkg.baseIncludedDurationMinutes,
           priceBasis: basis || 'fixed',

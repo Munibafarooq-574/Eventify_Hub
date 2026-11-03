@@ -15,6 +15,7 @@ import Toast from 'react-native-toast-message';
 
 import { getSecureData, saveSecureData } from '@/store';
 import getActiveCities from '@/services/getActiveCities';
+import getAllCategories from '@/services/getAllCategories';
 
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8EAF2';
@@ -38,11 +39,21 @@ const formatCartDuration = (rawMinutes: unknown): string => {
     return `${minutes} ${minutes === 1 ? 'Minute' : 'Minutes'}`;
 };
 
+const cartCategory = (pkg: any, entry: any) => {
+    const category = entry?.vendor?.buisnessCategory;
+    const id = [pkg?.categoryId, category?._id, category, entry?.vendor?.categoryId]
+        .find(value => typeof value === 'string' && value.trim() && value !== '[object Object]');
+    const name = [pkg?.categoryName, category?.name, entry?.vendor?.categoryName]
+        .find(value => typeof value === 'string' && value.trim());
+    return { id, name: name?.trim() };
+};
+
 const CartManagementIndexScreen: React.FC = () => {
 const router = useRouter();
 const navigation = useNavigation();
 
 const [cartData, setCartData] = useState<any>(null);
+const [categoryNames, setCategoryNames] = useState<Map<string, string>>(() => new Map());
 const [cateringCategory, setCateringCategory] = useState<any>(null);
 const [guests, setGuests] = useState<number>(0);
 
@@ -109,28 +120,40 @@ if (eventDetailsRaw) {
         }
 
                 const categoriesRaw = await getSecureData('categories');
+                const categories = categoriesRaw ? JSON.parse(categoriesRaw) : [];
+                const cachedCategories = Array.isArray(categories) ? categories : [];
+                setCateringCategory(cachedCategories.find(
+                    (category: any) => category?.name?.toLowerCase() === 'caterings'
+                ) || null);
 
-                if (categoriesRaw) {
-                    const categories = JSON.parse(categoriesRaw);
+                const parsedCart = storedCart ? JSON.parse(storedCart) : null;
+                const cart = Array.isArray(parsedCart?.vendors) ? parsedCart : { vendors: [] };
+                setCartData(cart);
 
-                    const catering = categories.find(
-                        (x: any) =>
-                            x?.name?.toLowerCase() === 'caterings'
-                    );
+                const names = new Map<string, string>(cachedCategories.map(
+                    (category: any) => [String(category?._id), category?.name]
+                ));
+                setCategoryNames(names);
 
-                    setCateringCategory(catering || null);
-                }
-
-                if (storedCart) {
-                    const parsedCart = JSON.parse(storedCart);
-
-                    setCartData(
-                        parsedCart?.vendors
-                            ? parsedCart
-                            : { vendors: [] }
-                    );
-                } else {
-                    setCartData({ vendors: [] });
+                const needsCategoryLookup = cart.vendors.some((entry: any) =>
+                    entry.packages?.some((pkg: any) => {
+                        const { id, name } = cartCategory(pkg, entry);
+                        return id && !name && !names.get(id);
+                    })
+                );
+                if (needsCategoryLookup) {
+                    try {
+                        const fetched = await getAllCategories();
+                        if (Array.isArray(fetched)) {
+                            const resolvedNames = new Map(names);
+                            for (const category of fetched) {
+                                if (category?._id && category?.name) resolvedNames.set(String(category._id), category.name);
+                            }
+                            setCategoryNames(resolvedNames);
+                        }
+                    } catch {
+                        // Keep the cart usable when category names cannot be loaded.
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching cart data:', error);
@@ -732,6 +755,8 @@ if (eventDetailsRaw) {
                                                 pkg: any,
                                                 packageIndex: number
                                             ) => {
+                                                const category = cartCategory(pkg, vendor);
+                                                const categoryName = category.name || (category.id && categoryNames.get(category.id));
                                                 const isCatering =
                                                     cateringCategory?._id &&
                                                     vendor?.vendor
@@ -796,6 +821,11 @@ if (eventDetailsRaw) {
                                                         </View>
 
                                                         <View style={styles.packageInfo}>
+                                                            {categoryName && (
+                                                                <Text style={styles.packageCategory} numberOfLines={1}>
+                                                                    {categoryName}
+                                                                </Text>
+                                                            )}
                                                             <Text
                                                                 style={styles.packageName}
                                                                 numberOfLines={2}
@@ -1473,6 +1503,13 @@ const styles = StyleSheet.create({
     packageInfo: {
         flex: 1,
         marginLeft: 10,
+    },
+
+    packageCategory: {
+        color: MUTED,
+        fontSize: 11,
+        fontWeight: '600',
+        marginBottom: 3,
     },
 
     packageName: {
