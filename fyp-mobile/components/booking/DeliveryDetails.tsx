@@ -3,13 +3,14 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { deliveryFee, deliveryDateTime, displayDeliveryWeight, displayDeliveryRate, formatDeliveryReserve, DELIVERY_WEIGHT_UNITS } from '@/utils/deliveryBooking';
 export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCatering = false, timeZone = 'UTC', showConfiguration = false }: { pkg:any; quantity?:number; guests?:number; isCatering?:boolean; timeZone?:string; showConfiguration?:boolean }) {
-  const d = pkg.delivery || pkg;
+  if (!pkg || typeof pkg !== 'object') return null;
+  const d = pkg.delivery && typeof pkg.delivery === 'object' ? pkg.delivery : pkg;
   if (!d.deliveryFeeType || (pkg.bookingType && pkg.bookingType !== 'DELIVERY_BASED')) return null;
   const unit = d.deliveryWeightUnit || 'kg';
   const weight = (kg:number) => displayDeliveryWeight(kg,unit).toLocaleString();
   const rate = displayDeliveryRate(Number(d.deliveryExtraFeePerKg || 0),unit).toLocaleString();
-  const fees = pkg.delivery || deliveryFee(d,quantity,guests,isCatering);
-  const booked = !!pkg.delivery || !!pkg.deliveryStartDateTime;
+  const fees = pkg.delivery && typeof pkg.delivery === 'object' ? pkg.delivery : deliveryFee(d,quantity,guests,isCatering);
+  const booked = !!(pkg.delivery && typeof pkg.delivery === 'object') || !!pkg.deliveryStartDateTime;
   const selected = pkg.deliveryStartDateTime || pkg.requiredServiceWindow?.startDateTime || pkg.eventStartDateTime;
   if (showConfiguration) {
     const paid = d.deliveryFeeType === 'PAID';
@@ -28,7 +29,7 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
     </View>;
   }
   return <View style={{marginVertical:8,gap:4}}>
-    {pkg.delivery && <Text style={{color:'#68225D'}}>Package amount: Rs. {Number(d.packageAmount).toLocaleString()}</Text>}
+    {!!(pkg.delivery && typeof pkg.delivery === 'object') && <Text style={{color:'#68225D'}}>Package amount: Rs. {Number(d.packageAmount || 0).toLocaleString()}</Text>}
     {d.deliveryFeeType === 'FREE' ? <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',alignSelf:'flex-start',borderRadius:8,paddingHorizontal:10,paddingVertical:5,fontWeight:'700'}}>Free Delivery</Text> : <>
       <Text style={{color:'#68225D'}}>Delivery: Rs. {Number(fees.baseFee).toLocaleString()}</Text>
       {!!d.deliveryExtraWeightEnabled && booked && <Text style={{color:'#68225D'}}>Extra weight fee: Rs. {Number(fees.extraFee).toLocaleString()} · {weight(Number(fees.weightKg))} {unit}</Text>}
