@@ -2,6 +2,7 @@
 //fyp-mobile/store/index.ts
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { cancelCartReminder } from "../services/cartReminder";
 import { Platform } from "react-native";
 
 export async function saveSecureData(key: string, value: string) {
@@ -10,7 +11,12 @@ export async function saveSecureData(key: string, value: string) {
     return;
   }
 
+  const replacesEvent = key === 'eventDetails' &&
+    JSON.parse(await SecureStore.getItemAsync(key) || '{}')?.eventId !== JSON.parse(value)?.eventId;
   await SecureStore.setItemAsync(key, value);
+  if (replacesEvent || (key === 'cartData' && !JSON.parse(value)?.vendors?.length)) {
+    await cancelCartReminder();
+  }
 }
 
 export async function getSecureData(key: string) {
@@ -28,6 +34,7 @@ export async function deleteSecureData(key: string) {
   }
 
   await SecureStore.deleteItemAsync(key);
+  if (key === 'cartData' || key === 'eventDetails') await cancelCartReminder();
 }
 
 // ===============================
@@ -45,4 +52,5 @@ export async function getUserData() {
 
 export async function deleteUserData() {
   await AsyncStorage.removeItem("user");
+  await cancelCartReminder();
 }

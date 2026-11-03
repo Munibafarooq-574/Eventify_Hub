@@ -1,8 +1,8 @@
 const{test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
-function load(failure){const source=fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx','utf8');const start=source.indexOf('  const handleCheckout = async () => {');const end=source.indexOf('  // -----------------------------------------\n  // Loading',start);const code=ts.transpileModule(source.slice(start,end)+'\nmodule.exports=handleCheckout;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;const cleaned=[],alerts=[],errors=[],deleted=[],navigation=[],loading=[],toasts=[],requests=[];const context={clearExpiredReplacementCart:async(cart,event)=>cleaned.push({cart,event}),module:{exports:{}},placingOrder:false,checkoutLock:{current:false},setCheckoutError:v=>errors.push(v),setPlacingOrder:v=>loading.push(v),getUserData:async()=>({_id:'client'}),getSecureData:async()=>JSON.stringify({replacementVendorOrderId:'cancelled',eventId:'event',eventDate:'2026-10-24',startTime:'14:30',eventName:'Deadline test',guests:15,eventCityId:'city',eventAddress:'Venue'}),cartData:{vendors:[{vendor:{_id:'vendor'},packages:[{_id:'package',packageName:'Package',price:1000,quantity:1}]}]},appliedPromotions:{},getPromotionKey:()=> 'key',getResolvedServiceWindow:()=>null,reportMarketplaceLoadError:()=>{},postPlaceOrder:async p=>{requests.push(p);if(failure)throw Error(failure);return{_id:'same-event'}},deleteSecureData:async key=>deleted.push(key),router:{push:p=>navigation.push(p)},Toast:{show:p=>toasts.push(p)},Alert:{alert:(...args)=>alerts.push(args)}};vm.runInNewContext(code,context);return{cleaned,...context,run:context.module.exports,alerts,deleted,navigation,loading,toasts,requests,errors,context};}
+function load(failure){const source=fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx','utf8');const start=source.indexOf('  const handleCheckout = async () => {');const end=source.indexOf('  // -----------------------------------------\n  // Loading',start);const code=ts.transpileModule(source.slice(start,end)+'\nmodule.exports=handleCheckout;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;const cleaned=[],alerts=[],errors=[],deleted=[],navigation=[],loading=[],toasts=[],requests=[];const context={clearExpiredReplacementCart:async(cart,event)=>cleaned.push({cart,event}),module:{exports:{}},placingOrder:false,checkoutLock:{current:false},bookingSubmitted:{current:false},navigation:{dispatch:s=>navigation.push(...s.payload.routes)},setCheckoutError:v=>errors.push(v),setPlacingOrder:v=>loading.push(v),getUserData:async()=>({_id:'client'}),getSecureData:async()=>JSON.stringify({replacementVendorOrderId:'cancelled',eventId:'event',eventDate:'2026-10-24',startTime:'14:30',eventName:'Deadline test',guests:15,eventCityId:'city',eventAddress:'Venue'}),cartData:{vendors:[{vendor:{_id:'vendor'},packages:[{_id:'package',packageName:'Package',price:1000,quantity:1}]}]},appliedPromotions:{},getPromotionKey:()=> 'key',getResolvedServiceWindow:()=>null,reportMarketplaceLoadError:()=>{},postPlaceOrder:async p=>{requests.push(p);if(failure)throw Error(failure);return{_id:'same-event'}},cancelCartReminder:async()=>{},deleteSecureData:async key=>deleted.push(key),router:{push:p=>navigation.push(p)},Toast:{show:p=>toasts.push(p)},Alert:{alert:(...args)=>alerts.push(args)}};vm.runInNewContext(code,context);return{cleaned,...context,run:context.module.exports,alerts,deleted,navigation,loading,toasts,requests,errors,context};}
 test('expired replacement cleans its cart, shows deadline message and unlocks button',async()=>{const message='Replacement vendors can only be selected before the event starts.';const f=load(message);await f.run();assert.equal(f.errors.at(-1),message);assert.equal(f.deleted.length,0);assert.equal(f.navigation.length,0);assert.deepEqual(f.loading,[true,false]);assert.equal(f.requests[0].replacementVendorOrderId,'cancelled');assert.equal(f.cleaned.length,1);assert.equal(f.cleaned[0].event.replacementVendorOrderId,'cancelled')});
-test('network failure also produces visible feedback without deleting checkout data',async()=>{const f=load('Booking could not be submitted right now. Your cart is saved. Please try again shortly.');await f.run();assert.match(f.errors.at(-1),/cart is saved/);assert.equal(f.deleted.length,0);assert.equal(f.loading.at(-1),false)});
-test('successful checkout keeps existing success and cleanup behavior',async()=>{const f=load();await f.run();assert.equal(f.alerts.length,0);assert.deepEqual(f.deleted,['cartData','eventDetails']);assert.equal(f.navigation[0].pathname,'/OrderSummary');assert.deepEqual(JSON.parse(f.navigation[0].params.chatVendors),[{id:'vendor',name:'Vendor',avatar:''}]);assert.equal(f.toasts[0].type,'success')});
+test('network failure also produces visible feedback without deleting checkout data',async()=>{const f=load('Booking could not be submitted right now. Your cart is saved. Please try again shortly.');await f.run();assert.match(f.errors.at(-1),/cart is saved/);assert.equal(f.alerts[0][0],'Booking not submitted');assert.equal(f.deleted.length,0);assert.equal(f.loading.at(-1),false)});
+test('successful checkout keeps existing success and cleanup behavior',async()=>{const f=load();await f.run();assert.equal(f.alerts.length,0);assert.deepEqual(f.deleted,['cartData','eventDetails']);assert.equal(f.navigation[0].name,'dashboard');assert.deepEqual(JSON.parse(f.navigation[1].params.chatVendors),[{id:'vendor',name:'Vendor',avatar:''}]);assert.equal(f.toasts[0].type,'success')});
 test('booking POST has a bounded timeout and is not automatically retried',()=>{const s=fs.readFileSync('services/postPlaceOrder.ts','utf8');assert.match(s,/timeout: 30000/);assert.equal((s.match(/await axios\(config\)/g)||[]).length,1)});
 
 test('missing session and empty cart show visible feedback and release the button',async()=>{
@@ -20,5 +20,43 @@ test('booking success offers one chat per vendor, including multi-package orders
  f.cartData.vendors.push({ vendor: {_id:'vendor'}, packages: [{ _id:'second-package', packageName:'Extra', price:400 }] });
  f.cartData.vendors.push({ vendor: {_id:'cake', contactDetails:{brandName:'Cake Shop'}}, packages:[{_id:'cake-package',packageName:'Cake',price:2000}] });
  await f.run();
- assert.deepEqual(JSON.parse(f.navigation[0].params.chatVendors).map(vendor=>[vendor.id,vendor.name]), [['vendor','Vendor'],['cake','Cake Shop']]);
+ assert.deepEqual(JSON.parse(f.navigation[1].params.chatVendors).map(vendor=>[vendor.id,vendor.name]), [['vendor','Vendor'],['cake','Cake Shop']]);
+});
+
+test('a lost checkout response recovers only the matching committed replacement', async () => {
+ const source=fs.readFileSync('services/postPlaceOrder.ts','utf8');
+ const start=source.indexOf('async function findSubmittedBooking');
+ const end=source.indexOf('/**',start);
+ const booking={vendorId:{_id:'vendor'},packageId:'package',replacesVendorOrderId:'old'};
+ const order={eventId:'event',vendorOrders:[booking]};
+ const lookup=vm.runInNewContext(ts.transpileModule(source.slice(start,end)+'\nfindSubmittedBooking;',{}).outputText,
+  {getVendorOrders:async()=>[order]});
+ const payload={organizerId:'client',eventId:'event',replacementVendorOrderId:'old',services:[{vendorId:'vendor',packageId:'package'}]};
+ assert.equal(await lookup(payload),order);
+ assert.equal(await lookup({...payload,replacementVendorOrderId:'other'}),undefined);
+});
+
+test('cart reminder schedules once across repeated attempts and can be cancelled', async () => {
+ const source=fs.readFileSync('services/cartReminder.ts','utf8');
+ const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const scheduled=[],cancelled=[],saved=new Map();
+ const mocks={
+  '@react-native-async-storage/async-storage':{__esModule:true,default:{getItem:async key=>saved.get(key),setItem:async(key,value)=>saved.set(key,value)}},
+  'expo-notifications':{
+   getPermissionsAsync:async()=>({granted:true}),
+   scheduleNotificationAsync:async notification=>scheduled.push(notification),
+   cancelScheduledNotificationAsync:async id=>cancelled.push(id),
+   SchedulableTriggerInputTypes:{TIME_INTERVAL:'timeInterval'},
+  },
+  'react-native':{Platform:{OS:'android'}},
+ };
+ const exports={};
+ vm.runInNewContext(code,{exports,require:name=>mocks[name],console});
+ const schedule=()=>exports.scheduleCartReminder('client','event',async()=>true);
+ await Promise.all([schedule(),schedule()]);
+ await exports.cancelCartReminder();
+ await schedule();
+ assert.equal(scheduled.length,1);
+ assert.equal(scheduled[0].trigger.seconds,3600);
+ assert.equal(cancelled[0],scheduled[0].identifier);
 });

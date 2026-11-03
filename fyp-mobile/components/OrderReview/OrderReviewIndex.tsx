@@ -7,10 +7,12 @@ import postPlaceOrder from '@/services/postPlaceOrder';
 import axios from 'axios';
 import { deleteSecureData, getSecureData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { cancelCartReminder, scheduleCartReminder } from '@/services/cartReminder';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Platform,
   ScrollView,
@@ -42,6 +44,8 @@ const OrderReviewScreen = () => {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
   const checkoutLock = useRef(false);
+  const bookingSubmitted = useRef(false);
+  const navigation = useNavigation();
   const replacementDeadlinePassed = /replacement.*only.*before.*event.*starts/i.test(checkoutError);
 
   const [publicCoupons, setPublicCoupons] =
@@ -61,6 +65,28 @@ const [applyingDiscountCodeKey, setApplyingDiscountCodeKey] =
 
   const [eventDetails, setEventDetails] =
   useState<any>(null);
+
+  const eventId = cartData?.vendors?.length ? eventDetails?.eventId : undefined;
+  useFocusEffect(useCallback(() => {
+    if (!eventId) return;
+    const remind = async () => {
+      if (checkoutLock.current || bookingSubmitted.current) return;
+      const user = await getUserData();
+      if (!user?._id) return;
+      await scheduleCartReminder(user._id, eventId, async () => {
+        const [cart, event, currentUser] = await Promise.all([
+          getSecureData('cartData'), getSecureData('eventDetails'), getUserData(),
+        ]);
+        return !checkoutLock.current && !bookingSubmitted.current && currentUser?._id === user._id &&
+          JSON.parse(event || '{}')?.eventId === eventId && !!JSON.parse(cart || '{}')?.vendors?.length;
+      });
+    };
+    const schedule = () => { void remind().catch(error => reportMarketplaceLoadError('Cart reminder unavailable', error)); };
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'background') schedule();
+    });
+    return () => { subscription.remove(); schedule(); };
+  }, [eventId]));
 
 const [eventCityName, setEventCityName] =
   useState('');
@@ -1130,6 +1156,7 @@ const isInvalidCode =
 
       if (!response) throw new Error('Booking confirmation was not received. Refresh My Events before trying again.');
       if (response) {
+        bookingSubmitted.current = true;
         Toast.show({
           type: 'success',
           text1: 'Order Placed',
@@ -1137,8 +1164,9 @@ const isInvalidCode =
           position: 'bottom',
         });
 
-        await deleteSecureData('cartData');
-        await deleteSecureData('eventDetails');
+        await Promise.allSettled([
+          cancelCartReminder(), deleteSecureData('cartData'), deleteSecureData('eventDetails'),
+        ]);
 
         const chatVendors = new Map<string, { id: string; name: string; avatar: string }>();
         for (const { vendor, vendorName } of cartData.vendors) {
@@ -1149,10 +1177,13 @@ const isInvalidCode =
             avatar: vendor.contactDetails?.brandLogo || '',
           });
         }
-        router.push({
-          pathname: '/OrderSummary',
-          params: { chatVendors: JSON.stringify([...chatVendors.values()]) },
-        });
+        navigation.dispatch({ type: 'RESET', payload: {
+          index: 1,
+          routes: [
+            { name: 'dashboard' },
+            { name: 'OrderSummary', params: { chatVendors: JSON.stringify([...chatVendors.values()]) } },
+          ],
+        } });
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
@@ -1161,11 +1192,14 @@ const isInvalidCode =
     try {
       await clearExpiredReplacementCart(cartData, submittedEvent);
     } catch {
-      setCheckoutError(`${message} Cart cleanup could not finish. Please remove the expired package from My Cart.`);
+      const cleanupMessage = `${message} Cart cleanup could not finish. Please remove the expired package from My Cart.`;
+      setCheckoutError(cleanupMessage);
+      Alert.alert('Booking not submitted', cleanupMessage);
       return;
     }
   }
   setCheckoutError(message);
+  Alert.alert('Booking not submitted', message);
 } finally {
       checkoutLock.current = false;
       setPlacingOrder(false);

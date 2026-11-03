@@ -10,6 +10,8 @@ export interface GetOrdersResponse {
         phone?: string;
         contactDetails?: any;
     } | string | null;
+    eventId?: string;
+    replacementRescheduleRequestId?: string;
     vendorOrders: {
         _id: string;
         vendorId: {
@@ -21,6 +23,7 @@ export interface GetOrdersResponse {
         } | string;
         serviceName: string;
         price: number;
+        replacesVendorOrderId?: string;
         packageId?: string | null;
         status: string;
         message?: string;
@@ -55,6 +58,7 @@ export default async function getVendorOrders(type: string, userId: string, stat
 
     const config: AxiosRequestConfig = {
         method: "GET",
+        timeout: 10000,
         url,
         params,
     };

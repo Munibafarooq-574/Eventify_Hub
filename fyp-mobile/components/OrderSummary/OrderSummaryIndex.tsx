@@ -181,7 +181,7 @@ const SummaryScreen = () => {
                     <TouchableOpacity
                         style={styles.dashboardButton}
                         activeOpacity={0.85}
-                        onPress={() => router.push("/dashboard")}
+                        onPress={() => router.dismissTo("/dashboard")}
                     >
                         <Text style={styles.dashboardButtonText}>Go to Dashboard</Text>
                     </TouchableOpacity>

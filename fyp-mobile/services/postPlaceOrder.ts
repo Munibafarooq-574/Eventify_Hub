@@ -4,6 +4,7 @@
 
 import axios, { AxiosRequestConfig } from "axios";
 import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
+import getVendorOrders from "./getVendorOrders";
 import { getSecureData } from "../store";
 
 /**
@@ -47,6 +48,26 @@ export interface PlaceOrderPayload {
   selectedCategoryIds?: string[];
   replacementRescheduleRequestId?: string;
   replacementVendorOrderId?: string;
+}
+
+async function findSubmittedBooking(payload: PlaceOrderPayload) {
+  const pageSize = 10;
+  for (let offset = 0; ; offset += pageSize) {
+    const orders = await getVendorOrders('Organizer', payload.organizerId, undefined, pageSize, offset);
+    const order = orders.find(item => item.eventId === payload.eventId);
+    if (order) {
+      const bookings = order.vendorOrders.filter(booking =>
+        !payload.replacementVendorOrderId || booking.replacesVendorOrderId === payload.replacementVendorOrderId,
+      );
+      const matches = payload.services.every(service => bookings.some(booking =>
+        String(typeof booking.vendorId === 'string' ? booking.vendorId : booking.vendorId?._id) === service.vendorId &&
+        String(booking.packageId) === service.packageId,
+      ));
+      return matches && (!payload.replacementRescheduleRequestId ||
+        order.replacementRescheduleRequestId === payload.replacementRescheduleRequestId) ? order : undefined;
+    }
+    if (orders.length < pageSize) return undefined;
+  }
 }
 
 /**
@@ -249,13 +270,16 @@ if (!orderData.eventAddress?.trim()) {
       const status = error.response?.status;
       if (status === 401) throw new Error('Your session has expired. Please sign in again.');
       if (status === 404) throw new Error('A selected vendor or package is no longer available. Please review your cart.');
-      if (!status || status >= 500) {
-        throw new Error('Booking could not be submitted right now. Your cart is saved. Please try again shortly.');
-      }
       const data = error.response?.data;
       const rawMessage = typeof data?.message === 'object' && !Array.isArray(data?.message)
         ? data.message?.message : data?.message;
       const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;
+      if (!status || status >= 500 || (status === 409 && /already been booked|replacement/i.test(String(message)))) {
+        const existing = await findSubmittedBooking(orderData).catch(() => undefined);
+        if (existing) return existing;
+        if (!status) throw new Error('Connection interrupted. Your cart is saved. Please check your connection and try again.');
+        if (status >= 500) throw new Error('Booking confirmation is unavailable. Your cart is saved. Please try again shortly.');
+      }
       if (typeof message === 'string' && message.trim() &&
           message.length <= 500 && !/[<>]|https?:|AxiosError|stack trace/i.test(message)) {
         throw new Error(message.trim());

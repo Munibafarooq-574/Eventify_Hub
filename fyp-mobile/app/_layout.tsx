@@ -1,18 +1,29 @@
 //import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
+import { CART_REMINDER } from '@/services/cartReminder';
+import { getSecureData, getUserData } from '@/store';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+Notifications.setNotificationHandler({
+  handleNotification: async ({ request }) => {
+    const isReminder = request.content.data?.type === CART_REMINDER;
+    return { shouldShowBanner: isReminder, shouldShowList: isReminder, shouldPlaySound: false, shouldSetBadge: false };
+  },
+});
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const navigation = useNavigationContainerRef();
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -23,6 +34,33 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    const openCart = async (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data;
+      if (data?.type !== CART_REMINDER) return;
+      await Notifications.clearLastNotificationResponseAsync();
+      const [user, event, cart] = await Promise.all([
+        getUserData(), getSecureData('eventDetails'), getSecureData('cartData'),
+      ]);
+      if (user?._id === data.userId && JSON.parse(event || '{}')?.eventId === data.eventId &&
+          JSON.parse(cart || '{}')?.vendors?.length && navigation.isReady()) {
+        navigation.dispatch({ type: 'RESET', payload: {
+          index: 1,
+          routes: [{ name: 'dashboard' }, { name: 'cartmanagement' }],
+        } });
+      }
+    };
+    const handle = (response: Notifications.NotificationResponse) => {
+      void openCart(response).catch(error => console.warn('Could not open saved cart', error));
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+    void Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) handle(response);
+    }).catch(error => console.warn('Could not read notification response', error));
+    return () => subscription.remove();
+  }, [loaded, navigation]);
 
   if (!loaded) {
     return null;
