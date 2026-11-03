@@ -24,23 +24,16 @@ export function deliverySettings(pkg: DeliverySettings): DeliverySettings {
   return Object.fromEntries(Object.keys({...defaultDelivery,deliveryIncludedWeightKg:0,deliveryExtraFeePerKg:0,deliveryWeightKg:0}).map(key=>[key,result[key]]));
 }
 export function deliverySettingsError(d: DeliverySettings) {
-  if (!DELIVERY_WEIGHT_UNITS.some(u => u.value === (d.deliveryWeightUnit || 'kg'))) return 'Choose a delivery weight unit.';
   if (!d.deliveryFeeType) return 'Choose a delivery option.';
   if (!Number.isSafeInteger(Number(d.deliveryReserveMinutes)) || Number(d.deliveryReserveMinutes) < 1 || Number(d.deliveryReserveMinutes) > 1440) return 'Enter a reserve time from 1 minute to 24 hours, in whole minutes.';
   if (d.deliveryFeeType === 'FREE') return '';
   if (!(Number(d.deliveryFee) > 0)) return 'Enter the delivery fee.';
-  if (d.deliveryExtraWeightEnabled && ![d.deliveryIncludedWeightKg,d.deliveryExtraFeePerKg].every(n => Number(n) > 0)) return 'Enter covered weight and extra fee.';
   return '';
 }
 export function deliveryFee(pkg: DeliverySettings, quantity = 1, guests = 1, isCatering = false) {
   if ((pkg.bookingType && pkg.bookingType !== 'DELIVERY_BASED') || pkg.deliveryFeeType !== 'PAID') return { baseFee:0, extraFee:0, weightKg:0, totalFee:0 };
-  const hasKnownWeight = Number.isFinite(Number(pkg.deliveryWeightKg)) && Number(pkg.deliveryWeightKg) > 0;
-  const weightKg = pkg.deliveryExtraWeightEnabled && hasKnownWeight ? Number(pkg.deliveryWeightKg) * quantity * (isCatering && pkg.deliveryWeightBasis === 'PER_GUEST' ? guests : 1) : 0;
-  const unitKg = deliveryUnitKg(pkg.deliveryWeightUnit);
-  const extraUnits = pkg.deliveryExtraWeightEnabled && hasKnownWeight ? Math.ceil(Math.max(0, Number(((weightKg - Number(pkg.deliveryIncludedWeightKg)) / unitKg).toFixed(6)))) : 0;
   const baseFee = Number(pkg.deliveryFee || 0);
-  const extraFee = Math.round(extraUnits * Number(pkg.deliveryExtraFeePerKg || 0) * unitKg * 100) / 100;
-  return { baseFee, extraFee, weightKg, totalFee:baseFee + extraFee };
+  return { baseFee, extraFee: 0, weightKg: 0, totalFee: baseFee };
 }
 export function deliveryDateTime(value: string, timeZone: string) {
   return new Date(value).toLocaleString('en-GB', { timeZone, day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
