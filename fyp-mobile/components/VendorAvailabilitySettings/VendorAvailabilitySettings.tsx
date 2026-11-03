@@ -412,8 +412,8 @@ const toggleBlockedDate = (dateStr: string) => {
       daySlots,
 
             blockedDates,
-      minimumAdvanceMinutes,
-      advanceNoticeOptionsMinutes,
+      minimumAdvanceMinutes: 1440,
+      advanceNoticeOptionsMinutes: advanceNoticeOptionsMinutes.length ? advanceNoticeOptionsMinutes : [1440],
     });
 
     setHasAvailability(true);
@@ -463,7 +463,7 @@ const handleResetAvailability = () => {
               daySlots: [],
               blockedDates: [],
               minimumAdvanceMinutes: 1440,
-              advanceNoticeOptionsMinutes: [],
+              advanceNoticeOptionsMinutes: [1440],
               maxConcurrentBookings: 1,
             });
 
