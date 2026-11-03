@@ -62,7 +62,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     sections: [
       { id: 'start', title: 'Open and check your event', summary: 'Find the correct event and expand its vendor cards.', steps: [
         'Open My Events and expand the event. Check its date, time, city, address, guests and desired services.',
-        'Expand each vendor card to review its package, service timing, price, booking activity and payment status. Different vendors can be at different stages.',
+        'Each vendor card shows the package and its category when available. Expand the card to review service timing, price, booking activity and payment status.',
         'Pull down to refresh after a payment, vendor response or schedule decision. Check notifications for updates, then open the booking to see its latest state.',
       ] }, status, service, delivery,
       { id: 'pay', title: 'Pay the down payment and remaining balance', summary: 'Use only the payment action shown on that booking.', steps: [

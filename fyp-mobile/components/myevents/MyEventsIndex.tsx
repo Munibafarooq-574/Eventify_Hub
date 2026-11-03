@@ -33,6 +33,11 @@ import {
 } from 'react-native';
 import BottomNavigationFinal from '../dashboard/BottomNavigationFinal';
 
+const getVendorBookingCategory = (booking: any): string => {
+  const category = booking?.vendorId?.buisnessCategory;
+  return category?.name || booking?.bookingChatService || category?.normalizedName || '';
+};
+
 // Large system font sizes ko limit karo taake layout na tootay
 (Text as any).defaultProps = {
   ...((Text as any).defaultProps || {}),
@@ -1016,10 +1021,7 @@ const MyEventsScreen = () => {
 
                       const vendorAccountName = vendorData?.name || 'N/A';
 
-                      const vendorCategory =
-                        vendorData?.buisnessCategory?.name ||
-                        vendorData?.buisnessCategory?.normalizedName ||
-                        'N/A';
+                      const vendorCategory = getVendorBookingCategory(vendor);
 
                       const vendorServiceCities = Array.isArray(vendorData?.serviceLocationCityIds)
                         ? vendorData.serviceLocationCityIds
@@ -1129,6 +1131,11 @@ const MyEventsScreen = () => {
                                 <Text style={styles.packageText} numberOfLines={1}>
                                   {vendor.serviceName}
                                 </Text>
+                                {!!vendorCategory && (
+                                  <Text style={styles.vendorCategoryText} numberOfLines={1}>
+                                    {vendorCategory}
+                                  </Text>
+                                )}
                               </View>
 
                               <Ionicons
@@ -1185,7 +1192,7 @@ const MyEventsScreen = () => {
 
                               <DetailRow label="Brand name" value={vendorBrandName} />
                               <DetailRow label="Vendor name" value={vendorAccountName} />
-                              <DetailRow label="Category" value={vendorCategory} />
+                              <DetailRow label="Category" value={vendorCategory || 'N/A'} />
                               <DetailRow label="Service cities" value={vendorServiceCities || 'N/A'} />
                               <DetailRow label="Business city" value={vendorBusinessCity} />
                               <DetailRow label="Phone" value={vendorPhone} />
@@ -1481,6 +1488,7 @@ const MyEventsScreen = () => {
                           These vendors are no longer part of the active event total.
                         </Text>
                         {inactiveVendorOrders.map((vendor: any, index: number) => {
+                          const vendorCategory = getVendorBookingCategory(vendor);
                           const vendorData = vendor?.vendorId || {};
                           const vendorName =
                             vendorData?.contactDetails?.brandName ||
@@ -1511,6 +1519,11 @@ const MyEventsScreen = () => {
                                   <Text style={styles.inactiveHistoryService}>
                                     {vendor?.serviceName || 'Service'}
                                   </Text>
+                                  {!!vendorCategory && (
+                                    <Text style={styles.vendorCategoryText} numberOfLines={1}>
+                                      {vendorCategory}
+                                    </Text>
+                                  )}
                                 </View>
                                 <View style={styles.inactiveHistoryChip}>
                                   <Text style={styles.inactiveHistoryChipText}>{historyLabel}</Text>
@@ -2095,6 +2108,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#333',
+  },
+  vendorCategoryText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 3,
   },
   packageText: {
     fontSize: 12,
