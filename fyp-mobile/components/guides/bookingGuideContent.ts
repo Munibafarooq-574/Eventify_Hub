@@ -6,9 +6,9 @@ const timing: GuideSection = {
   id: 'payment-time', title: 'Payment deadlines, made simple', summary: 'Read the exact deadline on each vendor booking.',
   steps: [
     'The payment clock starts when the vendor accepts, not when the client sends the booking request. The deadline is usually within 24 hours of acceptance, but can be earlier to leave time for preparation.',
-    'Booking Notice tells clients how early they must request a service. The current payment rules also use the applicable notice to protect preparation time, with a minimum preparation buffer. It is not always a fixed two hours.',
-    'Example only: service starts at 3 PM and its preparation buffer is one hour. The payment cutoff is 2 PM. Acceptance at 1:40 PM leaves 20 minutes for payment confirmation.',
-    'The usual minimum time for payment is 15 minutes. In that example, acceptance at 1:55 PM is blocked because only five minutes remain. Follow the actual deadline and any message shown for your booking.',
+    'Booking Notice requires at least 1 full day (24 hours) before the booked service starts. Vendors can set a longer notice in whole days. The payment deadline is separate; always follow the exact deadline shown on the booking.',
+    'Example: if the service starts tomorrow at 3 PM, a new booking requiring 1 day notice must be requested by 3 PM today. Delivery or setup may start earlier than the event.',
+    'Payment confirmation has its own time requirements. If there is not enough time to accept or pay, the app blocks the action. Follow the actual deadline and message shown for your booking.',
     'Delivery and setup times may be earlier than the event. Payment timing uses the booked service time, so always read the service details as well as the event time.',
   ], note: 'Payment must be confirmed in time. Submitting a payment is not the same as a successful payment. Refreshing or retrying does not extend a saved deadline.',
 };
@@ -36,7 +36,7 @@ const delivery: GuideSection = {
   id: 'delivery', title: 'Delivery bookings', summary: 'Choose and check the exact delivery time and fee.',
   steps: [
     'Choose an available delivery date and time within the package’s earliest and latest times. Quick choices may include one hour before, thirty minutes before or at event start. No service duration is needed for delivery.',
-    'Delivery time is separate from event time. Read the date, time and displayed timezone. Working hours, existing bookings, booking notice and time to pay can make a delivery time unavailable.',
+    'Delivery time is separate from event time. Booking notice requires at least 24 hours before the delivery/service starts, or longer if set by the vendor. Read the date, time and displayed timezone; working hours, existing bookings and payment timing can also make a delivery time unavailable.',
     'Free Delivery has no delivery fee. Otherwise, review the base delivery fee and any extra weight fee before submitting. When extra weight charges apply, check the vendor’s selected unit: kg, g, lb or oz. Each started extra unit is charged at the shown rate. Delivery fees are charged once for that package booking, not once per guest.',
     'Catering package prices are calculated per guest. Other package prices are not multiplied by the event guest count. The delivery fee is shown separately.',
     'Payment deadlines and request expiry follow the agreed delivery time. The vendor can mark delivery complete only once that time arrives and the required payment is secured. The remaining payment follows completion.',
@@ -110,10 +110,10 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'availability', title: 'Edit working hours and notice', summary: 'Save the settings for the intended working day.', steps: [
         'Use Edit on Your Availability. Check the day, enabled/disabled working days, working windows, blocked dates and booking notice before saving.',
-        'Booking Notice is the minimum advance notice for new service requests. Select the intended notice, save, then return to the same day and verify the displayed value.',
+        'Booking Notice is at least 1 full day (24 hours) before the service starts, not necessarily the event start. Choose 1, 2, 3, 5, 7, 14 or 30 days in availability settings; a specific day can have its own notice. Save and recheck the selected day.',
         'Normal working windows must be at least one hour; a start such as 6:30 PM is allowed if the window is long enough. Vendors with eligible active delivery/setup packages can use shorter minute-based windows.',
         'A remaining 30-minute segment on the calendar does not mean a one-hour package can fit there. The package’s complete required window must fit inside working hours.',
-        'Availability is checked again when booking. Existing reservations, blocked dates, working hours, notice and simultaneous-booking limits can affect whether a service is available.',
+        'Availability is checked again when booking. Legacy notice values below 1 day do not override the 24-hour minimum. Existing reservations, blocked dates, working hours and simultaneous-booking limits can also affect availability.',
       ], note: 'Changing availability does not cancel an existing customer booking. Accepted bookings keep their saved payment deadline; changing notice is not a way to extend it.' },
       service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
