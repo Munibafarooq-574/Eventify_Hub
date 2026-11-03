@@ -574,6 +574,15 @@ const [availabilityCheck, setAvailabilityCheck] =
     };
   } | null>(null);
 
+    const [setupSlots, setSetupSlots] = useState<Array<{
+      startDateTime: string; endDateTime: string; available: boolean; reason?: string;
+    }>>([]);
+    const [selectedSetup, setSelectedSetup] = useState<{
+      startDateTime: string; endDateTime: string;
+    } | null>(null);
+    const [setupSlotsLoading, setSetupSlotsLoading] = useState(false);
+    const [setupSlotsError, setSetupSlotsError] = useState('');
+
     const [availabilityLoading, setAvailabilityLoading] =
       useState(false);
 
@@ -723,6 +732,46 @@ useEffect(() => {
   });
   return () => { active = false; };
 }, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
+
+// Setup choices are fetched from the same backend authority used by checkout.
+useEffect(() => {
+  let active = true;
+  setSelectedSetup(null);
+  setSetupSlots([]);
+  setSetupSlotsError('');
+  const pkg = vendorData?.packages?.find((item: any) => String(item._id) === String(activePackage));
+  if (!isEventMode || !vendorData?._id || pkg?.bookingType !== 'SETUP_BASED') return;
+  const date = String(Array.isArray(eventDate) ? eventDate[0] : eventDate || '');
+  const time = String(Array.isArray(startTime) ? startTime[0] : startTime || '');
+  const routeCity = String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || '');
+  setSetupSlotsLoading(true);
+  (async () => {
+    const context = routeCity ? null : await getMarketplaceEventContext();
+    const city = routeCity || context?.eventCityId || '';
+    if (!city) throw new Error('Select an event city before choosing setup time');
+    const response = await axios.post('https://eventify-hub.onrender.com/vendor-availability/setup-candidates', {
+      vendorId: String(vendorData._id), packageId: String(pkg._id),
+      eventCityId: city, eventDate: date, eventStartTime: time,
+      eventDurationMinutes: Number(durationMinutes),
+    });
+    return response.data;
+  })().then(data => {
+    if (!active) return;
+    const choices = Array.isArray(data?.slots) ? data.slots : [];
+    setSetupSlots(choices);
+    const first = choices.find((item: any) => item.available);
+    setSelectedSetup(first ? { startDateTime: first.startDateTime, endDateTime: first.endDateTime } : null);
+  }).catch(error => {
+    if (!active) return;
+    reportMarketplaceLoadError('Setup time choices unavailable:', error);
+    setSetupSlotsError('Unable to load setup times. Please refresh and try again.');
+  }).finally(() => { if (active) setSetupSlotsLoading(false); });
+  return () => { active = false; };
+}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
+
+const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
+  'en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true },
+);
 
 const fetchPublicCoupons = async () => {
   if (!vendorData?._id) {
@@ -1613,7 +1662,7 @@ Toast.show({
 
       // Event mode:
       // Vendor must be available for the selected event.
-      if (pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? !selectedDelivery?.available : pkg.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck?.available) {
+      if (pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? !selectedDelivery?.available : pkg.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : pkg.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck?.available) {
         Toast.show({
           type: 'error',
           text1: 'Vendor Not Available',
@@ -1626,6 +1675,10 @@ Toast.show({
       }
 
       if (pkg.bookingType === 'TIME_SLOT_BASED' && !selectedAppointment) return;
+      if (pkg.bookingType === 'SETUP_BASED' && (!selectedSetup || setupSlotsLoading)) {
+        Toast.show({ type: 'error', text1: 'Choose Setup Time', text2: 'Please select an available setup time.' });
+        return;
+      }
 
       const resolvedEventId = String(
         Array.isArray(eventId) ? eventId[0] : eventId || '',
@@ -1769,6 +1822,8 @@ Toast.show({
     ? { startDateTime:selectedDelivery.startDateTime, endDateTime:selectedDelivery.endDateTime }
     : pkg.bookingType === 'TIME_SLOT_BASED' && selectedAppointment
     ? { startDateTime: selectedAppointment.startDateTime, endDateTime: selectedAppointment.endDateTime }
+    : pkg.bookingType === 'SETUP_BASED' && selectedSetup
+    ? { startDateTime: selectedSetup.startDateTime, endDateTime: selectedSetup.endDateTime }
     : availabilityCheck?.requiredServiceWindow
     ? {
         startDateTime:
@@ -4048,7 +4103,9 @@ const serviceCityNamesFromIds =
           : 'Select your appointment time'
         : selectedBookingType === 'DELIVERY_BASED'
           ? selectedPackage?.deliveryFeeType ? selectedDelivery ? new Date(selectedDelivery.startDateTime).toLocaleString('en-GB', {timeZone:selectedDelivery.timeZone,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}) : 'Choose a delivery time' : deliveredAtTime || 'Delivery time unavailable'
-          : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+          : selectedBookingType === 'SETUP_BASED' && selectedSetup
+            ? `${formatSetupChoice(selectedSetup.startDateTime)} - ${formatSetupChoice(selectedSetup.endDateTime)}`
+            : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
     </Text>
   </View>
 )}
@@ -4856,6 +4913,71 @@ const serviceCityNamesFromIds =
                 Setup Completion Deadline:{' '}
                 {formatServiceOffset(selectedPackage.serviceWindowEndOffsetMinutes)}
               </Text>
+              {isEventMode && !isOwnerView && (
+                <View style={{
+                  marginTop: 16, borderWidth: 1, borderColor: BORDER,
+                  borderRadius: 18, padding: 16, backgroundColor: '#FCF8FB',
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                    <Ionicons name="time-outline" size={19} color={PRIMARY} />
+                    <Text style={{ marginLeft: 9, fontSize: 16, fontWeight: '700', color: TEXT_DARK }}>
+                      Choose Setup Time
+                    </Text>
+                  </View>
+                  <Text style={{ color: TEXT_MUTED, fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+                    Select when the vendor should set up. Only available times within the vendor's allowed window are shown.
+                  </Text>
+                  {setupSlotsLoading ? (
+                    <ActivityIndicator size="small" color={PRIMARY} />
+                  ) : setupSlotsError ? (
+                    <Text style={{ color: '#B42318', fontSize: 13 }}>{setupSlotsError}</Text>
+                  ) : setupSlots.filter(item => item.available).length === 0 ? (
+                    <Text style={{ color: TEXT_MUTED, fontSize: 13 }}>
+                      No setup times available. Please select another event time.
+                    </Text>
+                  ) : (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
+                      {setupSlots.filter(item => item.available).map(item => {
+                        const chosen = selectedSetup?.startDateTime === item.startDateTime;
+                        return (
+                          <TouchableOpacity
+                            key={item.startDateTime}
+                            testID={`setup-time-${item.startDateTime}`}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: chosen }}
+                            onPress={() => setSelectedSetup({
+                              startDateTime: item.startDateTime, endDateTime: item.endDateTime,
+                            })}
+                            activeOpacity={0.8}
+                            style={{
+                              width: '48%', margin: '1%', paddingVertical: 12,
+                              paddingHorizontal: 7, borderRadius: 12, borderWidth: 1.5,
+                              borderColor: chosen ? PRIMARY : BORDER,
+                              backgroundColor: chosen ? PRIMARY_SOFT : CARD,
+                              alignItems: 'center', justifyContent: 'center',
+                            }}>
+                            <Text style={{
+                              color: chosen ? PRIMARY : TEXT_DARK,
+                              fontSize: 12, fontWeight: chosen ? '700' : '500',
+                              textAlign: 'center',
+                            }}>
+                              {formatSetupChoice(item.startDateTime)} - {formatSetupChoice(item.endDateTime)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {selectedSetup && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                      <Ionicons name="checkmark-circle" size={17} color="#24865A" />
+                      <Text style={{ color: '#24865A', marginLeft: 7, fontSize: 13, fontWeight: '600' }}>
+                        Selected: {formatSetupChoice(selectedSetup.startDateTime)} - {formatSetupChoice(selectedSetup.endDateTime)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           )}
 
@@ -4930,9 +5052,9 @@ const serviceCityNamesFromIds =
                         {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available}
-                              accessibilityState={{ disabled: selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available }}
-                              style={[styles.cartButton, (selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : !availabilityCheck.available) && { opacity: 0.45 }]}
+                              disabled={selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available}
+                              accessibilityState={{ disabled: selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available }}
+                              style={[styles.cartButton, (selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? !selectedDelivery?.available : selectedPackage.bookingType === 'TIME_SLOT_BASED' ? !selectedAppointment?.available : selectedPackage.bookingType === 'SETUP_BASED' ? setupSlotsLoading || !selectedSetup : !availabilityCheck.available) && { opacity: 0.45 }]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,
