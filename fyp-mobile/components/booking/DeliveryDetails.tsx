@@ -15,16 +15,11 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
   if (showConfiguration) {
     const paid = d.deliveryFeeType === 'PAID';
     const rows = [
-      ...(paid ? [['Base delivery fee',`Rs. ${Number(fees.baseFee).toLocaleString()}`],['Extra weight charges',d.deliveryExtraWeightEnabled ? 'On' : 'Off']] : []),
-      ...(paid && d.deliveryExtraWeightEnabled ? [
-        ['Weight unit',DELIVERY_WEIGHT_UNITS.find(u => u.value === unit)?.label || unit],
-        ['Weight covered',`${weight(Number(d.deliveryIncludedWeightKg || 0))} ${unit}`],
-        ['Extra fee',`Rs. ${rate} per additional ${unit}`],
-      ] : []),
+      ...(paid ? [['Base delivery fee',`Rs. ${Number(fees.baseFee).toLocaleString()}`]] : []),
       ['Time reserved',`${formatDeliveryReserve(d.deliveryReserveMinutes)} per delivery`],
     ];
     return <View style={s.card}>
-      <View style={s.header}><View style={s.titleGroup}><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the selected delivery fee, weight unit and time reserved. When extra weight charges are on, each started additional unit above the covered weight is charged at the shown rate." /></View><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
+      <View style={s.header}><View style={s.titleGroup}><Text style={s.title}>Delivery details</Text><InfoHelp title="Delivery details" message="Review the fixed delivery fee and time reserved." /></View><Text style={[s.badge,!paid && s.free]}>{paid ? 'Paid delivery' : 'Free Delivery'}</Text></View>
       {rows.map(([label,value]) => <View key={label} style={s.row}><Text style={s.label}>{label}</Text><Text style={s.value}>{value}</Text></View>)}
     </View>;
   }
@@ -32,11 +27,6 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
     {!!(pkg.delivery && typeof pkg.delivery === 'object') && <Text style={{color:'#68225D'}}>Package amount: Rs. {Number(d.packageAmount || 0).toLocaleString()}</Text>}
     {d.deliveryFeeType === 'FREE' ? <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',alignSelf:'flex-start',borderRadius:8,paddingHorizontal:10,paddingVertical:5,fontWeight:'700'}}>Free Delivery</Text> : <>
       <Text style={{color:'#68225D'}}>Delivery: Rs. {Number(fees.baseFee).toLocaleString()}</Text>
-      {!!d.deliveryExtraWeightEnabled && booked && <Text style={{color:'#68225D'}}>Extra weight fee: Rs. {Number(fees.extraFee).toLocaleString()} · {weight(Number(fees.weightKg))} {unit}</Text>}
-      {d.deliveryExtraWeightEnabled && <View style={{gap:3,marginTop:3}}>
-        <Text style={{color:'#766572'}}>Covers {weight(Number(d.deliveryIncludedWeightKg))} {unit}</Text>
-        <Text style={{color:'#88717F',fontSize:12,fontStyle:'italic',lineHeight:18}}>Note: Rs. {rate} for each started additional {unit}.</Text>
-      </View>}
     </>}
     {!!selected && <Text style={{color:'#68225D'}}>Delivery date &amp; time: {deliveryDateTime(selected, d.timeZone || pkg.deliveryTimeZone || timeZone)}</Text>}
   </View>;
