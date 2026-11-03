@@ -2306,7 +2306,7 @@ Alert.alert(
           />
 
           <View style={styles.friendlyToggleRow}>
-            {(bookingType === "SETUP_BASED" ? ["MINUTES", "HOURS", "DAYS"] : ["MINUTES", "HOURS"] as DurationInputUnit[]).map(
+            {((bookingType === "SETUP_BASED" ? ["MINUTES", "HOURS", "DAYS"] : ["MINUTES", "HOURS"]) as DurationInputUnit[]).map(
               (unit) => {
                 const active = serviceDuration.unit === unit;
 
@@ -2404,7 +2404,7 @@ Alert.alert(
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
             {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-            {(bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"] as OffsetDirection[]).map(
+            {((bookingType === "SETUP_BASED" ? ["BEFORE"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
               (direction) => {
                 const active = windowStart.direction === direction;
 
@@ -2497,7 +2497,7 @@ Alert.alert(
 
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
             {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowEnd({...windowEnd,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
-            {(bookingType === "SETUP_BASED" ? ["BEFORE", "AFTER"] : ["BEFORE", "AFTER"] as OffsetDirection[]).map(
+            {((bookingType === "SETUP_BASED" ? ["BEFORE", "AFTER"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
               (direction) => {
                 const active = windowEnd.direction === direction;
 
