@@ -56,7 +56,7 @@ const MONTH_NAMES = [
 ];
 
 //type OrderStats = { totalOrders: number; processing: number; completed: number; cancelled: number };
-type OrderStats = { totalOrders: number; pending: number; processing: number; confirmed: number; completed: number; cancelled: number; requestExpired: number; paymentExpired: number; noLongerAssigned: number };
+type OrderStats = { totalOrders: number; pending: number; processing: number; confirmed: number; completed: number; fullyPaid: number; cancelled: number; requestExpired: number; paymentExpired: number; noLongerAssigned: number };
 
 function formatPKR(amount: number): string {
     if (!amount) return "Rs. 0";
@@ -74,6 +74,7 @@ const DashboardScreen = () => {
         processing: 0,
         confirmed: 0,
         completed: 0,
+        fullyPaid: 0,
         cancelled: 0,
         requestExpired: 0,
         paymentExpired: 0,
@@ -237,6 +238,7 @@ const packageLimitReached =
                 processing: statsData.processing ?? 0,
                 confirmed: (statsData as any).confirmed ?? 0,
                 completed: statsData.completed ?? 0,
+                fullyPaid: statsData.fullyPaid ?? 0,
                 cancelled: (statsData as any).cancelled ?? 0,
                 requestExpired: (statsData as any).requestExpired ?? 0,
                 paymentExpired: (statsData as any).paymentExpired ?? 0,
@@ -956,6 +958,16 @@ if (!hasValidSubscription) {
                                     params: { selectedTab: "Completed" },
                                 })
                             }
+                        />
+                        <StatBox
+                            icon="wallet-outline"
+                            value={orderStats.fullyPaid}
+                            label="Fully Paid Orders"
+                            accent="#8F6CCF"
+                            onPress={() => router.push({
+                                pathname: "/vendorordersummary",
+                                params: { selectedTab: "Fully Paid" },
+                            })}
                         />
                         <StatBox
                             icon="close-circle-outline"

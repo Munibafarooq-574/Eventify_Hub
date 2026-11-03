@@ -9,6 +9,7 @@ interface OrderStats {
   pending: number;
   processing: number;
   completed: number;
+  fullyPaid?: number;
 }
 
 export default async function getVendorOrderStats(

@@ -1571,6 +1571,22 @@ export class OrderService {
     }
 
 
+    private async getFullyPaidVendorOrderIds(vendorId: Types.ObjectId): Promise<Types.ObjectId[]> {
+        const orders = await this.vendorOrderModel.aggregate<{ _id: Types.ObjectId }>([
+            { $match: { vendorId, replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' } } },
+            { $group: {
+                _id: '$orderId',
+                fullyPaid: { $min: { $cond: [{ $and: [
+                    { $eq: ['$status', 'completed'] },
+                    { $eq: ['$paymentStatus', 'PAID'] },
+                    { $eq: ['$remainingAmount', 0] },
+                ] }, 1, 0] } },
+            } },
+            { $match: { _id: { $ne: null }, fullyPaid: 1 } },
+        ]);
+        return orders.map(order => order._id);
+    }
+
    async getOrders(
     type: string,
     userId: string,
@@ -1584,7 +1600,10 @@ export class OrderService {
         ...(status && { status }),
     };
 
-    if (type === 'Vendor') {
+    if (type === 'Vendor' && status === 'fully_paid') {
+        delete query.status;
+        query._id = { $in: await this.getFullyPaidVendorOrderIds(userIdObj) };
+    } else if (type === 'Vendor') {
         const vendorOrders = await this.vendorOrderModel.find({
             vendorId: userIdObj,
         });
@@ -1793,6 +1812,7 @@ async getOrderStats(type: string, userId: string) {
       paymentExpired,
       noLongerAssigned,
       requestExpired,
+      fullyPaidOrderIds,
     ] = await Promise.all([
       this.vendorOrderModel.countDocuments(vQuery),
       this.vendorOrderModel.countDocuments({
@@ -1837,6 +1857,7 @@ async getOrderStats(type: string, userId: string) {
         $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }],
         paymentStatus: { $ne: 'PAYMENT_EXPIRED' },
       }),
+      this.getFullyPaidVendorOrderIds(userIdObj),
     ]);
 
     console.log('📊 Vendor order stats:', {
@@ -1852,6 +1873,7 @@ async getOrderStats(type: string, userId: string) {
     });
 
     return {
+      fullyPaid: fullyPaidOrderIds.length,
       totalOrders,
       pending,
       processing,

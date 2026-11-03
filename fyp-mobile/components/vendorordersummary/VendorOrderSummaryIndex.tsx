@@ -10,7 +10,7 @@ import getVendorCancellationPreview, { type VendorCancellationPreview } from '@/
 import VendorCancellationSummary from '../cancellation/VendorCancellationSummary';
 import cancelConfirmedBooking from '@/services/cancelConfirmedBooking';
 import useRefundUpdates from '@/hooks/useRefundUpdates';
-import { canCompleteVendorBooking } from '@/utils/vendorCompletion';
+import { canCompleteVendorBooking, getVendorCompletionTime, isFullyPaidVendorOrder } from '@/utils/vendorCompletion';
 import BookingCancellationDetails from '../booking/BookingCancellationDetails';
 import createConversation from "@/services/createConversation";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
@@ -135,12 +135,14 @@ const getVendorStatus = (order: any) => {
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Cancelled" | "Expired" | "Payment Expired" | "No Longer Assigned";
+type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Fully Paid" | "Cancelled" | "Expired" | "Payment Expired" | "No Longer Assigned";
 
 const OrderSummary = () => {
     const { selectedTab, orderId: targetOrderId } = useLocalSearchParams(); // Read tab from navigation params
     const [selectedFilter, setSelectedFilter] = useState<FilterType>("All");
     const [orders, setOrders] = useState<any[]>([]);
+    const [fullyPaidOrders, setFullyPaidOrders] = useState<any[]>([]);
+    const [completionTick, setCompletionTick] = useState(0);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
@@ -157,23 +159,36 @@ const OrderSummary = () => {
     const summaryScrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
     const [lateAcceptanceId, setLateAcceptanceId] = useState<string | null>(null);
+    useEffect(() => {
+        const now = Date.now();
+        const next = orders.flatMap(order => order.vendorOrders || [])
+            .filter(booking => booking.status === 'accepted')
+            .map(getVendorCompletionTime)
+            .reduce<number>((earliest, time) => time !== null && time > now ? Math.min(earliest, time) : earliest, Infinity);
+        if (!Number.isFinite(next)) return;
+        const timer = setTimeout(() => setCompletionTick(value => value + 1), Math.min(next - now, 2_147_483_647));
+        return () => clearTimeout(timer);
+    }, [orders, completionTick]);
+
     const refreshScreenData = useCallback(async () => {
         const user = await getUserData();
         if (!user) throw new Error("user not found");
 
         // Re-read both sources together so dates/times, statuses, stats and
         // reschedule cards always represent the latest backend state.
-        const [ordersData, requests] = await Promise.all([
+        const [ordersData, requests, paid] = await Promise.all([
             getVendorOrders("Vendor", user._id),
             getRescheduleRequests(),
+            getVendorOrders("Vendor", user._id, "fully_paid", 0).catch(() => null),
         ]);
         setOrders(ordersData || []);
+        setFullyPaidOrders((paid ?? ordersData ?? []).filter(isFullyPaidVendorOrder));
         setRescheduleRequests(Array.isArray(requests) ? requests : []);
     }, []);
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
-        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Confirmed", "Completed", "Cancelled", "Expired", "Payment Expired", "No Longer Assigned"];
+        const validTabs: FilterType[] = ["All", "Pending", "Processing", "Confirmed", "Completed", "Fully Paid", "Cancelled", "Expired", "Payment Expired", "No Longer Assigned"];
         if (tab && validTabs.includes(tab as FilterType)) {
             setSelectedFilter(tab as FilterType);
 
@@ -287,6 +302,7 @@ const OrderSummary = () => {
     // - Processing -> confirmed orders only
     // - Completed -> completed orders only
         const filteredOrders = useMemo(() => {
+        if (selectedFilter === "Fully Paid") return fullyPaidOrders;
         return orders.filter((order) => {
             if (selectedFilter === "All") return true;
             if (selectedFilter === "Pending") return getVendorStatus(order) === PENDING_STATUS;
@@ -299,7 +315,7 @@ const OrderSummary = () => {
             if (selectedFilter === "No Longer Assigned") return getVendorStatus(order) === "no_longer_assigned";
             return true;
         });
-    }, [orders, selectedFilter]);
+    }, [orders, selectedFilter, fullyPaidOrders]);
 
     /*const handleDelete = async (id: string) => {
         await patchUpdateOrderStatus(id, "cancelled");
@@ -421,6 +437,7 @@ const OrderSummary = () => {
             })
         );
 
+        if (status === "completed") void refreshScreenData().catch(() => {});
         alert("Order Updated");
 
     } catch (error: any) {
@@ -571,6 +588,11 @@ const OrderSummary = () => {
                         />
                     </TouchableOpacity>
 
+                    <TouchableOpacity onPress={() => handleSummaryCardClick("Fully Paid")} activeOpacity={0.7}>
+                        <SummaryCard label="Fully Paid" value={fullyPaidOrders.length} icon="wallet-outline"
+                            isActive={selectedFilter === "Fully Paid"} />
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                         onPress={() => handleSummaryCardClick("Cancelled")}
                         activeOpacity={0.7}
@@ -672,6 +694,11 @@ const OrderSummary = () => {
                                         />
                                     </View>
 
+                                    {fullyPaidOrders.some(order => order._id === item._id) && (
+                                        <View style={styles.paidInFullBadge}>
+                                            <Text style={styles.paidInFullText}>Paid in Full</Text>
+                                        </View>
+                                    )}
                                     {(item.vendorOrders || []).map((booking: any) => (
                                         <BookingActivity key={booking._id} booking={booking} timeZone={item.eventCityId?.timeZone} cancellationDetailsVisible />
                                     ))}
@@ -964,27 +991,41 @@ const OrderSummary = () => {
                                                     <Ionicons name="time-outline" size={14} color="#fff" />
                                                     <Text style={styles.buttonText}>Mark Processing</Text>
                                                 </TouchableOpacity>
-                                            ) : canCompleteVendorBooking(item.vendorOrders?.[0]) ? (
-                                                <TouchableOpacity
-                                                    style={styles.completeButton}
-                                                    //onPress={() => mark(item._id, "completed")}
-                                                    onPress={() => Alert.alert(
-                                                        "Complete booking?",
-                                                        "Have you provided the booked service?",
-                                                        [
-                                                            { text: "Keep Booking", style: "cancel" },
-                                                            { text: "Mark Completed", onPress: () => {
-                                                                if (canCompleteVendorBooking(item.vendorOrders?.[0])) {
-                                                                    void mark(item._id, item.vendorOrders?.[0]?._id, "completed");
-                                                                }
-                                                            } },
-                                                        ],
-                                                    )}
-                                                >
-                                                    <Ionicons name="checkmark-outline" size={14} color="#fff" />
-                                                    <Text style={styles.buttonText}>Mark Completed</Text>
-                                                </TouchableOpacity>
-                                            ) : null
+                                            ) : (item.vendorOrders || [])
+                                                .filter((booking: any) => booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')
+                                                .map((booking: any) => {
+                                                    const canComplete = canCompleteVendorBooking(booking);
+                                                    const time = getVendorCompletionTime(booking);
+                                                    const hint = time === null
+                                                        ? 'Scheduled service time unavailable.'
+                                                        : time > Date.now()
+                                                            ? `Available after ${formatBookingActivityTime(new Date(time).toISOString(), item.eventCityId?.timeZone || 'UTC')}.`
+                                                            : 'Available after the required payment is secured.';
+                                                    return (
+                                                        <View key={booking._id} style={styles.completionAction}>
+                                                            {(item.vendorOrders || []).length > 1 && <Text style={styles.detailText}>{booking.serviceName}</Text>}
+                                                            <TouchableOpacity
+                                                                disabled={!canComplete}
+                                                                accessibilityState={{ disabled: !canComplete }}
+                                                                style={[styles.completeButton, !canComplete && { opacity: 0.45 }]}
+                                                                onPress={() => Alert.alert(
+                                                                    "Complete booking?",
+                                                                    "Have you provided the booked service?",
+                                                                    [
+                                                                        { text: "Keep Booking", style: "cancel" },
+                                                                        { text: "Mark Completed", onPress: () => {
+                                                                            if (canCompleteVendorBooking(booking)) void mark(item._id, booking._id, "completed");
+                                                                        } },
+                                                                    ],
+                                                                )}
+                                                            >
+                                                                <Ionicons name="checkmark-outline" size={14} color="#fff" />
+                                                                <Text style={styles.buttonText}>Mark Completed</Text>
+                                                            </TouchableOpacity>
+                                                            {!canComplete && <Text style={styles.detailText}>{hint}</Text>}
+                                                        </View>
+                                                    );
+                                                })
                                         )}
 
                                         {getVendorStatus(item) !== "cancelled" && <TouchableOpacity
@@ -1331,6 +1372,9 @@ const styles = StyleSheet.create({
         marginBottom: 4,
         textTransform: "uppercase",
     },
+    paidInFullBadge: { alignSelf: 'flex-start', backgroundColor: '#E5F5EB', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, marginTop: 7 },
+    paidInFullText: { color: '#236947', fontWeight: '700', fontSize: 11 },
+    completionAction: { gap: 4, maxWidth: '100%' },
     actionButtons: {
         flexDirection: "row",
         flexWrap: "wrap",

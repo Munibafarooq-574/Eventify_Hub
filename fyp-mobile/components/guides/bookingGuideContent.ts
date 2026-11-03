@@ -171,7 +171,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'complete-chat', title: 'Complete service and contact the client', summary: 'Finish only your work, then check the remaining payment.', steps: [
         'Use Message on an available booking to open that client’s chat. Chat does not replace a formal booking, cancellation or schedule action.',
-        'After actually fulfilling the service, use Mark Completed when available. It requires the accepted booking’s advance to be secured (or no advance required) and the scheduled delivery/service end time to have arrived.',
+        'After providing the service, use Mark Completed when available. Check the time shown under the button and wait until the required payment is secured. Fully Paid shows completed orders with no balance left.',
         'Completion applies only to your vendor booking. If money remains, the client gets the remaining-payment action and its separate deadline; completion does not itself mark the balance paid.',
         'If your subscription is inactive, manage valid existing bookings through My Orders and open Message from the booking. The general Messages list can be restricted. Expiry of your subscription does not itself cancel customer bookings.',
       ] },

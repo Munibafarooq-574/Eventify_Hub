@@ -6,3 +6,14 @@ test('processing and unpaid orders stay blocked',()=>{for(const paymentStatus of
 test('accepted secured orders require scheduled service end',()=>{assert.equal(can(b,now),false);for(const paymentStatus of ['PARTIALLY_PAID','PAID'])assert.equal(can({...b,paymentStatus,eventEndDateTime:'2026-10-18T08:00:00Z'},now),true);for(const status of ['pending','completed','cancelled','cancelled_by_vendor'])assert.equal(can({...b,status},now),false)});
 test('delivery uses delivery time and all other types use service end',()=>{for(const bookingType of ['DELIVERY_BASED','DURATION_BASED','SETUP_BASED','CUSTOM','TIME_SLOT_BASED'])assert.equal(can({...b,vendorId:{packages:[{_id:'pkg',bookingType}]}},now),bookingType==='DELIVERY_BASED')});
 test('invalid dates and reassigned orders stay blocked',()=>{for(const value of [null,undefined,'invalid'])assert.equal(can({...b,eventEndDateTime:value},now),false);assert.equal(can({...b,eventEndDateTime:'2026-10-18T07:00:00Z',replacementOutcome:'NO_LONGER_ASSIGNED'},now),false)});
+
+test('Fully Paid requires every current vendor booking to be completed with zero balance', () => {
+  const paid = { status: 'completed', paymentStatus: 'PAID', remainingAmount: 0 };
+  const isFullyPaid = result.exports.isFullyPaidVendorOrder;
+  assert.equal(isFullyPaid({ vendorOrders: [paid] }), true);
+  assert.equal(isFullyPaid({ vendorOrders: [paid, { replacementOutcome: 'NO_LONGER_ASSIGNED' }] }), true);
+  assert.equal(isFullyPaid({ vendorOrders: [paid, { ...paid, status: 'accepted' }] }), false);
+  assert.equal(isFullyPaid({ vendorOrders: [{ ...paid, paymentStatus: 'PARTIALLY_PAID' }] }), false);
+  assert.equal(isFullyPaid({ vendorOrders: [{ ...paid, remainingAmount: 100 }] }), false);
+  assert.equal(isFullyPaid({ vendorOrders: [] }), false);
+});

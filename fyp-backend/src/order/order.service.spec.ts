@@ -70,6 +70,7 @@ describe('OrderService - Unit Tests', () => {
         };
 
         vendorOrderModel = {
+            aggregate: jest.fn().mockResolvedValue([]),
             find: jest.fn().mockResolvedValue([{ _id: validObjectId }]),
             deleteMany: jest.fn().mockResolvedValue({}),
             updateMany: jest.fn().mockResolvedValue({}),
@@ -199,6 +200,18 @@ describe('OrderService - Unit Tests', () => {
         expect(stats.requestExpired).toBe(2);
         expect(stats.paymentExpired).toBe(3);
         expect(vendorOrderModel.countDocuments).toHaveBeenCalledWith({ vendorId: new (require('mongoose').Types.ObjectId)(validObjectId), $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }], paymentStatus: { $ne: 'PAYMENT_EXPIRED' } });
+    });
+
+    it('counts completed, fully paid orders with zero balance for the dashboard', async () => {
+        vendorOrderModel.aggregate.mockResolvedValueOnce([{ _id: validObjectId }]);
+        const stats = await service.getOrderStats('Vendor', validObjectId);
+        expect(stats).toHaveProperty('fullyPaid', 1);
+        const pipeline = vendorOrderModel.aggregate.mock.calls[0][0];
+        expect(pipeline[1].$group.fullyPaid.$min.$cond[0].$and).toEqual([
+            { $eq: ['$status', 'completed'] },
+            { $eq: ['$paymentStatus', 'PAID'] },
+            { $eq: ['$remainingAmount', 0] },
+        ]);
     });
 
     it('should get order stats', async () => {
