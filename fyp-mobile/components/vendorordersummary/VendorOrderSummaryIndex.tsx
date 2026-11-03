@@ -1025,7 +1025,7 @@ const OrderSummary = () => {
                                                                 style={[styles.completeButton, styles.finishButton, (!canComplete || completingBookingId !== null) && styles.disabledAction]}
                                                                 onPress={() => confirmCompletion(item._id, booking)}
                                                             >
-                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete && completingBookingId === null ? "#fff" : "#236947"} />
+                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete && completingBookingId === null ? "#fff" : "#626262"} />
                                                                 <Text style={[styles.buttonText, (!canComplete || completingBookingId !== null) && styles.disabledActionText]}>
                                                                     {completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}
                                                                 </Text>
@@ -1401,8 +1401,8 @@ const styles = StyleSheet.create({
     completionAction: { gap: 6 },
     completionHint: { color: '#695562', fontSize: 12, lineHeight: 17, textAlign: 'center' },
     finishButton: { backgroundColor: '#237247' },
-    disabledAction: { backgroundColor: '#E5F5EB' },
-    disabledActionText: { color: '#236947' },
+    disabledAction: { backgroundColor: '#E5E5E5' },
+    disabledActionText: { color: '#626262' },
     actionButtons: {
         flexDirection: 'row',
         flexWrap: 'wrap',
