@@ -782,6 +782,13 @@ const handleContinue = async () => {
   />
 )}
 
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 8, marginBottom: 12, gap: 8 }}>
+        <Ionicons name="information-circle-outline" size={16} color={PRIMARY} />
+        <Text style={[styles.helperText, { flex: 1 }]}>
+          Vendors require at least 1 day's advance notice. Availability depends on when the selected service starts.
+        </Text>
+      </View>
+
       {/* ==================================================
           STEP 5 — EVENT DURATION
       ================================================== */}
