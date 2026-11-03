@@ -439,7 +439,7 @@ const PackageScreen = () => {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <DeliveryDetails pkg={packageDetails} />
+        {packageDetails?.bookingType === 'DELIVERY_BASED' && <DeliveryDetails pkg={packageDetails} />}
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator
