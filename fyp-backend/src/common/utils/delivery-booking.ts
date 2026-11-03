@@ -11,9 +11,7 @@ export interface DeliveryConfiguration {
   deliveryWeightBasis?: 'PACKAGE' | 'PER_GUEST';
   deliveryReserveMinutes?: number;
 }
-export const DELIVERY_FIELDS = ['deliveryWeightUnit', 'deliveryFeeType', 'deliveryFee', 'deliveryExtraWeightEnabled',
-  'deliveryIncludedWeightKg', 'deliveryExtraFeePerKg', 'deliveryWeightKg',
-  'deliveryWeightBasis', 'deliveryReserveMinutes'] as const;
+export const DELIVERY_FIELDS = ['deliveryFeeType', 'deliveryFee', 'deliveryReserveMinutes'] as const;
 
 export function deliveryUnitKg(unit = 'kg'): number {
   const factor = { kg:1, g:0.001, lb:0.45359237, oz:0.028349523125 }[unit];
