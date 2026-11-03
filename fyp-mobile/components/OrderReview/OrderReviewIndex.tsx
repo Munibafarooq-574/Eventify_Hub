@@ -502,9 +502,9 @@ const getResolvedServiceWindow = (
     };
   }
 
-  // TIME_SLOT_BASED must use the exact appointment selected by the client.
+  // Appointments and setup bookings must use the exact client-selected interval.
   // Never silently replace it with the event start time.
-  if (bookingType === 'TIME_SLOT_BASED' || (bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType)) {
+  if (bookingType === 'TIME_SLOT_BASED' || bookingType === 'SETUP_BASED' || (bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType)) {
     const chosen = pkg?.requiredServiceWindow;
     if (!chosen?.startDateTime || !chosen?.endDateTime) return null;
     const start = new Date(chosen.startDateTime);
@@ -515,14 +515,12 @@ const getResolvedServiceWindow = (
   }
 
   // ---------------------------------
-  // DELIVERY / SETUP / CUSTOM
+  // DELIVERY / CUSTOM
   // event start + configured offsets
   // ---------------------------------
   if (
     bookingType ===
       'DELIVERY_BASED' ||
-    bookingType ===
-      'SETUP_BASED' ||
     bookingType ===
       'CUSTOM'
   ) {
@@ -1081,9 +1079,9 @@ const isInvalidCode =
           : undefined,
 
         durationMinutes: Number(
-          pkg.durationMinutes ||
-            eventDetails?.durationMinutes ||
-            60,
+          String(pkg?.bookingType || '').toUpperCase() === 'SETUP_BASED'
+            ? pkg.requiredServiceDurationMinutes
+            : (pkg.durationMinutes || eventDetails?.durationMinutes || 60),
         ),
 
         quantity: Math.max(
@@ -1413,6 +1411,28 @@ const isInvalidCode =
         </Text>
       </View>
 
+      {cartData?.vendors?.flatMap((vendor: any) =>
+        (vendor?.packages || []).filter((pkg: any) =>
+          String(pkg?.bookingType || '').toUpperCase() === 'SETUP_BASED'
+        ).map((pkg: any, index: number) => {
+          const window = getResolvedServiceWindow(pkg);
+          if (!window) return null;
+          const start = new Date(window.startDateTime);
+          const end = new Date(window.endDateTime);
+          if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+          const format = (date: Date) => date.toLocaleTimeString('en-US', {
+            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
+            hour: 'numeric', minute: '2-digit', hour12: true,
+          });
+          return (
+            <View key={`setup-${String(pkg.packageId || pkg._id || index)}`} style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Setup Time</Text>
+              <Text style={styles.detailValue}>{`${format(start)} - ${format(end)}`}</Text>
+            </View>
+          );
+        })
+      )}
+
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>
           Guests
@@ -1678,7 +1698,7 @@ const packages =
         bookingType ===
         'SETUP_BASED'
       ) {
-        title = 'Setup Window';
+        title = 'Setup Time';
       } else if (
         bookingType ===
         'TIME_SLOT_BASED'
@@ -1956,15 +1976,9 @@ const packages =
     />
 
     <Text style={styles.packageMetaText}>
-      {String(
-        pkg?.bookingType || '',
-      ).toUpperCase() === 'TIME_SLOT_BASED'
-        ? formatDuration(
-            Number(
-              pkg?.requiredServiceDurationMinutes ||
-              0,
-            ),
-          )
+      {(String(pkg?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ||
+        String(pkg?.bookingType || '').toUpperCase() === 'SETUP_BASED')
+        ? formatDuration(Number(pkg?.requiredServiceDurationMinutes || 0))
         : formatDuration(
             Number(
               pkg?.durationMinutes ||
