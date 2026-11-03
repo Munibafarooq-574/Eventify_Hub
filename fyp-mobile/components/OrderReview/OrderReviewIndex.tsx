@@ -1362,6 +1362,28 @@ const isInvalidCode =
 
       {cartData?.vendors?.flatMap((vendor: any) =>
         (vendor?.packages || []).filter((pkg: any) =>
+          String(pkg?.bookingType || '').toUpperCase() === 'DELIVERY_BASED' &&
+          !!(pkg?.deliveryStartDateTime || (pkg?.deliveryFeeType && pkg?.requiredServiceWindow?.startDateTime))
+        ).map((pkg: any, index: number) => {
+          const selected = pkg.deliveryStartDateTime || pkg.requiredServiceWindow.startDateTime;
+          const date = new Date(selected);
+          if (!Number.isFinite(date.getTime())) return null;
+          const deliveredAt = date.toLocaleString('en-GB', {
+            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
+            day: 'numeric', month: 'short', year: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true,
+          });
+          return (
+            <View key={`delivery-${String(pkg.packageId || pkg._id || index)}`} style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Delivered At</Text>
+              <Text style={styles.detailValue}>{deliveredAt}</Text>
+            </View>
+          );
+        })
+      )}
+
+      {cartData?.vendors?.flatMap((vendor: any) =>
+        (vendor?.packages || []).filter((pkg: any) =>
           String(pkg?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' &&
           pkg?.requiredServiceWindow?.startDateTime &&
           pkg?.requiredServiceWindow?.endDateTime
