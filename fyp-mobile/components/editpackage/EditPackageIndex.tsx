@@ -2539,8 +2539,6 @@ Alert.alert(
 
           {bookingType !== "DELIVERY_BASED" && <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
             {bookingType === "SETUP_BASED" ? 'Tip: choose 0 + "At event start" to finish exactly when the event begins.' : 'Tip: enter 0 + "After event starts" to mean right when the event begins.'}
-            {/* 
-            */}
           </Text>}
         </View>
       </>
