@@ -933,10 +933,10 @@ const OrderSummary = () => {
                                     ))}
                                     {(isClosedVendorStatus(getVendorStatus(item)) || getVendorStatus(item) === 'cancelled') && <View style={styles.actionButtons}>
                                         <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId, item.vendorOrders?.[0]?._id)}>
-                                            <Text style={styles.buttonText}>View chat history</Text>
+                                            <Text style={styles.messageButtonText}>View chat history</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
-                                            <Text style={styles.buttonText}>Contact Support</Text>
+                                            <Text style={styles.messageButtonText}>Contact Support</Text>
                                         </TouchableOpacity>
                                     </View>}
                                     {isClosedVendorStatus(getVendorStatus(item)) ? (
@@ -956,23 +956,7 @@ const OrderSummary = () => {
                                             </View>
                                         </View>
                                     ) : (
-                                    <View style={styles.actionButtons}>
-                                        {getVendorStatus(item) !== "cancelled" && getVendorStatus(item) !== "completed" && (
-                                            <TouchableOpacity
-                                                style={styles.deleteButton}
-                                               // onPress={() => handleDelete(item._id)}
-                                            onPress={() =>
-                                        handleDelete(
-                                            item._id,
-                                            item.vendorOrders?.[0]?._id
-                                        )
-                                    }
-                                            >
-                                                <Ionicons name="close-circle-outline" size={14} color="#fff" />
-                                                <Text style={styles.buttonText}>Cancel Order</Text>
-                                            </TouchableOpacity>
-                                        )}
-
+                                    <View style={styles.bookingActions}>
                                         {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
                                             getVendorStatus(item) === "pending" ? (
                                                 <TouchableOpacity
@@ -1005,9 +989,10 @@ const OrderSummary = () => {
                                                         <View key={booking._id} style={styles.completionAction}>
                                                             {(item.vendorOrders || []).length > 1 && <Text style={styles.detailText}>{booking.serviceName}</Text>}
                                                             <TouchableOpacity
+                                                                accessibilityRole="button"
                                                                 disabled={!canComplete}
                                                                 accessibilityState={{ disabled: !canComplete }}
-                                                                style={[styles.completeButton, !canComplete && { opacity: 0.45 }]}
+                                                                style={[styles.completeButton, !canComplete && styles.disabledAction]}
                                                                 onPress={() => Alert.alert(
                                                                     "Complete booking?",
                                                                     "Have you provided the booked service?",
@@ -1019,22 +1004,37 @@ const OrderSummary = () => {
                                                                     ],
                                                                 )}
                                                             >
-                                                                <Ionicons name="checkmark-outline" size={14} color="#fff" />
-                                                                <Text style={styles.buttonText}>Mark Completed</Text>
+                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete ? "#fff" : "#695562"} />
+                                                                <Text style={[styles.buttonText, !canComplete && styles.disabledActionText]}>Mark Completed</Text>
                                                             </TouchableOpacity>
-                                                            {!canComplete && <Text style={styles.detailText}>{hint}</Text>}
+                                                            {!canComplete && <Text style={styles.completionHint}>{hint}</Text>}
                                                         </View>
                                                     );
                                                 })
                                         )}
 
-                                        {getVendorStatus(item) !== "cancelled" && <TouchableOpacity
-                                            style={styles.messageButton}
-                                            onPress={() => handleMessageButtonClick(item.organizerId)}
-                                        >
-                                            <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
-                                            <Text style={styles.buttonText}>Message</Text>
-                                        </TouchableOpacity>}
+                                        {getVendorStatus(item) !== "cancelled" && (
+                                            <View style={styles.actionButtons}>
+                                                <TouchableOpacity
+                                                    accessibilityRole="button"
+                                                    style={styles.messageButton}
+                                                    onPress={() => handleMessageButtonClick(item.organizerId)}
+                                                >
+                                                    <Ionicons name="chatbubble-ellipses-outline" size={16} color={PRIMARY} />
+                                                    <Text style={styles.messageButtonText}>Message</Text>
+                                                </TouchableOpacity>
+                                                {getVendorStatus(item) !== "completed" && (
+                                                    <TouchableOpacity
+                                                        accessibilityRole="button"
+                                                        style={styles.deleteButton}
+                                                        onPress={() => handleDelete(item._id, item.vendorOrders?.[0]?._id)}
+                                                    >
+                                                        <Ionicons name="close-circle-outline" size={16} color="#A9273B" />
+                                                        <Text style={styles.deleteButtonText}>Cancel Order</Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
                                     )}
                                 </View>
@@ -1374,42 +1374,58 @@ const styles = StyleSheet.create({
     },
     paidInFullBadge: { alignSelf: 'flex-start', backgroundColor: '#E5F5EB', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, marginTop: 7 },
     paidInFullText: { color: '#236947', fontWeight: '700', fontSize: 11 },
-    completionAction: { gap: 4, maxWidth: '100%' },
+    bookingActions: { gap: 10 },
+    completionAction: { gap: 6 },
+    completionHint: { color: '#695562', fontSize: 12, lineHeight: 17, textAlign: 'center' },
+    disabledAction: { backgroundColor: '#EEE5EC' },
+    disabledActionText: { color: '#695562' },
     actionButtons: {
-        flexDirection: "row",
-        flexWrap: "wrap",
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
     },
     deleteButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: "#D9534F",
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 8,
+        flexGrow: 1,
+        flexBasis: 120,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#EBCAD1',
+        padding: 8,
+        borderRadius: 10,
     },
+    deleteButtonText: { color: '#A9273B', fontSize: 12, fontWeight: '700', textAlign: 'center' },
     completeButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: "#337AB7",
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 8,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        backgroundColor: PRIMARY,
+        padding: 8,
+        borderRadius: 10,
     },
     closedBookingBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12, padding: 13, borderRadius: 12, backgroundColor: '#F8EEF5', borderWidth: 1, borderColor: '#E7CFDF' },
     closedBookingTitle: { color: PRIMARY, fontWeight: '800', fontSize: 13 },
     closedBookingText: { color: '#76636F', fontSize: 11.5, lineHeight: 17, marginTop: 2 },
     messageButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        backgroundColor: "#5CB85C",
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 8,
+        flexGrow: 1,
+        flexBasis: 120,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#E7CFDF',
+        backgroundColor: '#F8EEF5',
+        padding: 8,
+        borderRadius: 10,
     },
+    messageButtonText: { color: PRIMARY, fontSize: 12, fontWeight: '700', textAlign: 'center' },
     buttonText: {
         color: "white",
         fontSize: 11,
