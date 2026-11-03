@@ -33,7 +33,10 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
     {d.deliveryFeeType === 'FREE' ? <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',alignSelf:'flex-start',borderRadius:8,paddingHorizontal:10,paddingVertical:5,fontWeight:'700'}}>Free Delivery</Text> : <>
       <Text style={{color:'#68225D'}}>Delivery: Rs. {Number(fees.baseFee).toLocaleString()}</Text>
       {!!d.deliveryExtraWeightEnabled && booked && <Text style={{color:'#68225D'}}>Extra weight fee: Rs. {Number(fees.extraFee).toLocaleString()} · {weight(Number(fees.weightKg))} {unit}</Text>}
-      {d.deliveryExtraWeightEnabled && <Text style={{color:'#766572'}}>Covers {weight(Number(d.deliveryIncludedWeightKg))} {unit}; Rs. {rate} for each started additional {unit}.</Text>}
+      {d.deliveryExtraWeightEnabled && <View style={{gap:3,marginTop:3}}>
+        <Text style={{color:'#766572'}}>Covers {weight(Number(d.deliveryIncludedWeightKg))} {unit}</Text>
+        <Text style={{color:'#88717F',fontSize:12,fontStyle:'italic',lineHeight:18}}>Note: Rs. {rate} for each started additional {unit}.</Text>
+      </View>}
     </>}
     {!!selected && <Text style={{color:'#68225D'}}>Delivery date &amp; time: {deliveryDateTime(selected, d.timeZone || pkg.deliveryTimeZone || timeZone)}</Text>}
   </View>;
