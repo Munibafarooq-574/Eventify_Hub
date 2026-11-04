@@ -131,6 +131,11 @@ describe('Admin subscription catalog', () => {
     await expect(purchase(7000)).rejects.toThrow('price changed');
     await expect(purchase(7500)).resolves.toMatchObject({
       plan: 'studio-plus', amountDue: 7500, isCurrent: false, planChangeType: 'upgrade', activationType: 'immediate',
+      entitlementSnapshot: {
+        name: 'Studio Plus',
+        limits: { maxPackages: 4 },
+        features: { coupons: true },
+      },
     });
     expect(create).toHaveBeenCalledTimes(1);
     current.plan = 'studio-plus';
@@ -139,5 +144,38 @@ describe('Admin subscription catalog', () => {
     expect(await access.canUseFeature(vendorId, FeatureKey.COUPONS)).toBe(true);
     expect(await access.canUseFeature(vendorId, FeatureKey.CAMPAIGNS)).toBe(false);
     expect(await access.getFeatureLimit(vendorId, LimitKey.MAX_PACKAGES)).toBe(4);
+  });
+
+  it('preserves purchased features and limits after an admin edits the live plan', async () => {
+    const catalog = createCatalog();
+    await catalog.savePlan('studio-plus', planInput, true);
+    const purchased = await catalog.get('studio-plus');
+    const subscription: any = {
+      plan: 'studio-plus', status: 'active', paymentStatus: 'paid',
+      endDate: new Date(Date.now() + 86400000),
+      entitlementSnapshot: {
+        name: purchased!.name, rank: purchased!.rank,
+        features: { ...purchased!.features },
+        limits: { ...purchased!.limits },
+        featureLabels: [...purchased!.featureLabels],
+      },
+    };
+    await catalog.savePlan('studio-plus', {
+      ...planInput, featureKeys: [], limits: { ...planInput.limits, maxPackages: 1, couponLimit: 0 },
+    }, false);
+    const subscriptionService = Object.assign(Object.create(SubscriptionService.prototype), {
+      catalog, getCurrentSubscription: async () => subscription,
+    }) as SubscriptionService;
+    const access = new FeatureAccessService(subscriptionService);
+    expect((await catalog.get('studio-plus'))?.limits.maxPackages).toBe(1);
+    expect(await access.getFeatureLimit('vendor', LimitKey.MAX_PACKAGES)).toBe(4);
+    expect(await access.canUseFeature('vendor', FeatureKey.COUPONS)).toBe(true);
+    expect((await subscriptionService.getPlanForSubscription(subscription as any)).featureLabels)
+      .toContain('Up to 4 active coupons');
+
+    // A new renewal without its predecessor's snapshot takes the edited plan.
+    const renewal = await catalog.get('studio-plus');
+    expect(renewal?.features.coupons).toBe(false);
+    expect(renewal?.limits.maxPackages).toBe(1);
   });
 });
