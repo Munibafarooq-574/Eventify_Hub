@@ -440,8 +440,20 @@ export class ReviewsService {
         },
 
         {
+            $lookup: {
+                from: 'cities',
+                localField: 'vendor.serviceLocationCityIds',
+                foreignField: '_id',
+                pipeline: [{ $project: { _id: 0, name: 1 } }],
+                as: 'serviceCities',
+            },
+        },
+
+        {
             $project: {
                 _id: 0,
+
+                serviceCities: { $setUnion: ['$serviceCities.name', []] },
 
                 vendorId: '$_id',
 

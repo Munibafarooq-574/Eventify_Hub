@@ -38,6 +38,8 @@ export interface FeaturedVendorPublicEntry {
   promotionId: string;
   vendorId: string;
   vendorName: string;
+  brandName?: string | null;
+  serviceCities?: string[];
   brandLogo: string | null;
   businessCategoryName: string | null;
   city: string | null;

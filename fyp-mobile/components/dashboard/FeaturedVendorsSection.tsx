@@ -166,8 +166,16 @@ setVendors(featured);
       </View>
 
       <Text style={styles.vendorName} numberOfLines={1}>
-        {vendor.vendorName}
+        {vendor.brandName || vendor.vendorName}
       </Text>
+      {!!vendor.brandName && (
+        <Text style={styles.vendorDetail} numberOfLines={1}>{vendor.vendorName}</Text>
+      )}
+      {!!vendor.serviceCities?.length && (
+        <Text style={styles.vendorDetail} numberOfLines={fullWidth ? undefined : 2}>
+          {vendor.serviceCities.join(', ')}
+        </Text>
+      )}
 
       <View style={styles.ratingRow}>
         <Ionicons
@@ -460,6 +468,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 3,
     marginHorizontal: 8,
+  },
+
+  vendorDetail: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginHorizontal: 8,
+    marginTop: 2,
   },
 
   vendorMeta: {

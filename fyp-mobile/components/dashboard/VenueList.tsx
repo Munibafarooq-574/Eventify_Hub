@@ -99,9 +99,23 @@ const ItemCard: React.FC<{
       <Text style={styles.name} numberOfLines={1}>
         {item.vendor.name}
       </Text>
+      {!!item.vendor.contactDetails?.brandName && (
+        <Text style={styles.location} numberOfLines={1}>{item.vendor.contactDetails.brandName}</Text>
+      )}
+      {!!item.serviceCities?.length && (
+        <Text style={styles.location} numberOfLines={fullWidth ? undefined : 2}>
+          {item.serviceCities.join(', ')}
+        </Text>
+      )}
       <View style={styles.infoContainer}>
         <Ionicons name="chatbubble-ellipses-outline" size={12} color={COLORS.textMuted} />
         <Text style={styles.location}> {item.totalReviews} reviews</Text>
+      </View>
+      <View style={styles.infoContainer}>
+        <Ionicons name="receipt-outline" size={12} color={COLORS.textMuted} />
+        <Text style={styles.location}>
+          {' '}{item.completedOrders ?? 0} completed {item.completedOrders === 1 ? 'order' : 'orders'}
+        </Text>
       </View>
     </View>
   </TouchableOpacity>

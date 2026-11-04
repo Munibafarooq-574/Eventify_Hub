@@ -5,13 +5,14 @@ export interface TopVendor {
     averageRating: number;
     totalReviews: number;
     completedOrders: number;
+    serviceCities?: string[];
     reliabilityScore: number;
     popularityScore: number;
     vendor: {
         _id: string;
         name: string;
         coverImage?: string;
-        contactDetails?: any;
+        contactDetails?: { brandName?: string };
         BusinessDetails?: {
             minimumPrice?: number;
             cityCovered?: string;

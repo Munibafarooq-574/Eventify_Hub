@@ -23,6 +23,8 @@ export interface FeaturedVendorPublicEntry {
   promotionId: string;
   vendorId: string;
   vendorName: string;
+  brandName: string | null;
+  serviceCities: string[];
   brandLogo: string | null;
   businessCategoryName: string | null;
   city: string | null;
@@ -547,6 +549,7 @@ if (hasAvailabilityContext) {
         'name contactDetails city buisnessCategory serviceLocationCityIds packages',
       )
       .populate('buisnessCategory', 'name')
+      .populate<{ serviceLocationCityIds: { name: string }[] }>('serviceLocationCityIds', 'name')
       .lean();
 
     if (!vendor) {
@@ -628,6 +631,8 @@ const featuredScore =
       promotionId: String(promotion._id),
       vendorId,
       vendorName: vendor.name ?? 'Vendor',
+      brandName: vendor.contactDetails?.brandName?.trim() || null,
+      serviceCities: [...new Set((vendor.serviceLocationCityIds ?? []).map(city => city.name).filter(Boolean))],
       brandLogo:
         (vendor as any).contactDetails?.brandLogo ??
         null,
