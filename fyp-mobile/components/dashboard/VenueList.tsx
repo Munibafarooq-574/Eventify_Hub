@@ -84,17 +84,11 @@ const ItemCard: React.FC<{
       router.push(`/vendorprofiledetails?id=${item.vendorId}`);
     }}
   >
-    <View style={styles.imageWrap}>
-      <Image
-        resizeMode="cover"
-        source={{ uri: item.vendor.coverImage }}
-        style={styles.image}
-      />
-      <View style={styles.ratingBadge}>
-        <Ionicons name="star" size={11} color={COLORS.accent} />
-        <Text style={styles.ratingBadgeText}>{item.averageRating}</Text>
-      </View>
-    </View>
+    <Image
+      resizeMode="cover"
+      source={{ uri: item.vendor.coverImage }}
+      style={styles.image}
+    />
     <View style={styles.cardBody}>
       <Text style={styles.name} numberOfLines={1}>
         {item.vendor.name}
@@ -107,16 +101,19 @@ const ItemCard: React.FC<{
           {item.serviceCities.join(', ')}
         </Text>
       )}
-      <View style={styles.infoContainer}>
-        <Ionicons name="chatbubble-ellipses-outline" size={12} color={COLORS.textMuted} />
-        <Text style={styles.location}> {item.totalReviews} reviews</Text>
-      </View>
-      <View style={styles.infoContainer}>
-        <Ionicons name="receipt-outline" size={12} color={COLORS.textMuted} />
-        <Text style={styles.location}>
-          {' '}{item.completedOrders ?? 0} completed {item.completedOrders === 1 ? 'order' : 'orders'}
-        </Text>
-      </View>
+      <Text style={[styles.location, styles.review]}>
+        {item.totalReviews > 0
+          ? `${item.averageRating.toFixed(1)} (${item.totalReviews})`
+          : 'No reviews yet'}
+      </Text>
+      {item.completedOrders > 0 && (
+        <View style={styles.infoContainer}>
+          <Ionicons name="receipt-outline" size={12} color={COLORS.textMuted} />
+          <Text style={styles.location}>
+            {' '}{item.completedOrders} completed {item.completedOrders === 1 ? 'order' : 'orders'}
+          </Text>
+        </View>
+      )}
     </View>
   </TouchableOpacity>
 );
@@ -246,29 +243,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  imageWrap: {
-    position: 'relative',
-  },
   image: {
     width: '100%',
     height: 105,
-  },
-  ratingBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(43,27,38,0.85)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  ratingBadgeText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '700',
-    marginLeft: 3,
   },
   cardBody: {
     padding: 10,
@@ -278,6 +255,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
     marginBottom: 4,
+  },
+  review: {
+    marginTop: 3,
   },
   infoContainer: {
     flexDirection: 'row',
