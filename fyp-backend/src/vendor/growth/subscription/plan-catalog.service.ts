@@ -15,21 +15,23 @@ type PlanDocument = { _id: string; plan: CatalogPlan };
 export const PLAN_KEY = /^[a-z][a-z0-9-]{0,63}$/;
 // The catalog is intentionally fixed to app capabilities. Admins can assign
 // these entitlements to any plan, but cannot invent a new functional feature.
-const FIXED_FEATURES: Feature[] = [
-  FeatureKey.FEATURED_VENDOR,
-  FeatureKey.FEATURED_PACKAGE,
-  FeatureKey.PROMOTIONAL_BADGES,
-  FeatureKey.COUPONS,
-  FeatureKey.DISCOUNT_CODES,
-  FeatureKey.CAMPAIGNS,
-  FeatureKey.GROWTH_ANALYTICS,
-  FeatureKey.ADVANCED_ANALYTICS,
-  FeatureKey.BUSINESS_INSIGHTS,
-  FeatureKey.CAMPAIGN_ANALYTICS,
-].map(key => ({
-  key,
-  name: key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase()),
-  controlsAccess: true,
+// Use the same customer-facing wording in the admin catalog and vendor plans.
+// Only feature keys with existing app behavior are exposed.
+const FEATURE_LABELS: Partial<Record<FeatureKey, string>> = {
+  [FeatureKey.FEATURED_VENDOR]: 'Growth visibility & featured eligibility',
+  [FeatureKey.FEATURED_PACKAGE]: 'Featured packages',
+  [FeatureKey.PROMOTIONAL_BADGES]: 'Promotional badges',
+  [FeatureKey.COUPONS]: 'Coupons',
+  [FeatureKey.DISCOUNT_CODES]: 'Discount codes',
+  [FeatureKey.CAMPAIGNS]: 'Promotional campaigns',
+  [FeatureKey.GROWTH_ANALYTICS]: 'Growth analytics',
+  [FeatureKey.ADVANCED_ANALYTICS]: 'Advanced analytics & business insights',
+  [FeatureKey.BUSINESS_INSIGHTS]: 'Business insights',
+  [FeatureKey.CAMPAIGN_ANALYTICS]: 'Campaign analytics',
+  [FeatureKey.PREMIUM_BADGE]: 'Premium Partner visibility',
+};
+const FIXED_FEATURES: Feature[] = Object.entries(FEATURE_LABELS).map(([key, name]) => ({
+  key, name: name!, controlsAccess: true,
 }));
 
 // These are available to every vendor and are not paid feature toggles.
@@ -89,7 +91,10 @@ export class PlanCatalogService {
           [LimitKey.MONTHLY_CAMPAIGN_LIMIT, 'Up to', 'promotional campaigns per month'],
         ] as const).filter(([limit]) => plan.limits[limit] > 0 && (limit !== LimitKey.MONTHLY_CAMPAIGN_LIMIT || enabled.has(FeatureKey.CAMPAIGNS)))
           .map(([limit, prefix, label]) => `${prefix} ${plan.limits[limit]} ${label}`),
-        ...features.filter(feature => enabled.has(feature.key)).map(feature => feature.name),
+        ...features.filter(feature => enabled.has(feature.key) &&
+          // Avoid repeating the same paired marketing benefit on vendor cards.
+          !(feature.key === FeatureKey.BUSINESS_INSIGHTS && enabled.has(FeatureKey.ADVANCED_ANALYTICS))
+        ).map(feature => feature.name),
       ])],
     };
   }
