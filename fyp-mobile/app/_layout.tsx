@@ -15,7 +15,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 Notifications.setNotificationHandler({
   handleNotification: async ({ request }) => {
     const isReminder = request.content.data?.type === CART_REMINDER;
-    return { shouldShowBanner: isReminder, shouldShowList: isReminder, shouldPlaySound: false, shouldSetBadge: false };
+    return { shouldShowBanner: isReminder, shouldShowList: isReminder, shouldPlaySound: isReminder, shouldSetBadge: false };
   },
 });
 

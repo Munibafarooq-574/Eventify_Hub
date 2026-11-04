@@ -39,11 +39,13 @@ test('a lost checkout response recovers only the matching committed replacement'
 test('cart reminder schedules once across repeated attempts and can be cancelled', async () => {
  const source=fs.readFileSync('services/cartReminder.ts','utf8');
  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
- const scheduled=[],cancelled=[],saved=new Map();
+ const scheduled=[],cancelled=[],channels=[],saved=new Map();
  const mocks={
   '@react-native-async-storage/async-storage':{__esModule:true,default:{getItem:async key=>saved.get(key),setItem:async(key,value)=>saved.set(key,value)}},
   'expo-notifications':{
    getPermissionsAsync:async()=>({granted:true}),
+   setNotificationChannelAsync:async (id, channel)=>channels.push({id, channel}),
+   AndroidImportance:{HIGH:4},
    scheduleNotificationAsync:async notification=>scheduled.push(notification),
    cancelScheduledNotificationAsync:async id=>cancelled.push(id),
    SchedulableTriggerInputTypes:{TIME_INTERVAL:'timeInterval'},
@@ -58,6 +60,9 @@ test('cart reminder schedules once across repeated attempts and can be cancelled
  await schedule();
  assert.equal(scheduled.length,1);
  assert.equal(scheduled[0].trigger.seconds,3600);
+ assert.equal(channels.length,1);
+ assert.equal(scheduled[0].trigger.channelId,channels[0].id);
+ assert.equal(channels[0].channel.importance,4);
  assert.equal(cancelled[0],scheduled[0].identifier);
 });
 
