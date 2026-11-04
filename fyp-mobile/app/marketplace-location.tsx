@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import getActiveCities, { ActiveCity } from '@/services/getActiveCities';
 import { growthApi } from '@/services/growthApiClient';
@@ -40,6 +42,22 @@ export default function MarketplaceLocation() {
 
   const cityOnly = mode === "city" && !!current?.countryCode;
   const switching = current?.countryCode !== country;
+  const countryName = country === 'US' ? 'United States' : 'Pakistan';
+  const title = cityOnly ? 'Browsing City' : 'Marketplace Location';
+  const countryCities = cities.filter(city => city.countryCode === country);
+  const saveDisabled = saving || (!!cityId && !countryCities.some(city => city._id === cityId));
+
+  function cityOption(id: string, name: string) {
+    const selected = cityId === id;
+    return (
+      <TouchableOpacity key={id} accessibilityRole="button" accessibilityState={{ selected, disabled: saving }}
+        disabled={saving} onPress={() => setCityId(id)} style={[styles.option, selected && styles.selected]}>
+        <Ionicons name={id ? 'location-outline' : 'globe-outline'} size={20} color={PRIMARY} />
+        <Text style={styles.optionText}>{name}</Text>
+        <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={21} color={selected ? PRIMARY : '#9B8795'} />
+      </TouchableOpacity>
+    );
+  }
 
   async function save() {
     setSaving(true);
@@ -65,42 +83,71 @@ export default function MarketplaceLocation() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: cityOnly ? 'Browsing city' : 'Marketplace location', gestureEnabled: !!current?.countryCode }} />
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
-        <Text style={{ fontSize: 23, fontWeight: '700' }}>{cityOnly ? "Choose a browsing city" : "Choose your marketplace country"}</Text>
-        <Text>Your country determines where you can browse and book. Your city helps us show nearby vendors.</Text>
-        {!!error && <Text accessibilityRole="alert">{error}</Text>}
-        {!!error && <TouchableOpacity onPress={() => { setError(''); setRetry(value => value + 1); }}><Text>Try again</Text></TouchableOpacity>}
-        {!current && !error && <ActivityIndicator />}
-        {current && <>
-          {!cityOnly && <View style={{ flexDirection: 'row', gap: 12 }}>
-            {[['PK', 'Pakistan'], ['US', 'United States']].map(([code, name]) => (
-              <TouchableOpacity key={code} accessibilityRole="button" accessibilityState={{ selected: country === code }}
-                disabled={saving} onPress={() => {
-                  if (country === code) return;
-                  setCountry(code);
-                  setCityId('');
-                  setCities([]);
-                  setError('');
-                }} style={{ padding: 12, borderWidth: 1, borderColor: country === code ? '#780C60' : '#DDD', borderRadius: 8 }}>
-                <Text>{country === code ? '✓ ' : ''}{name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>}
-          <Text style={{ fontWeight: '700' }}>Browsing city (optional)</Text>
-          <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: !cityId }}
-            disabled={saving} onPress={() => setCityId("")} style={{ padding: 12 }}>
-            <Text>{!cityId ? "✓ " : ""}All cities</Text>
-          </TouchableOpacity>
-          {cities.filter(city => city.countryCode === country).map(city => (
-            <TouchableOpacity key={city._id} accessibilityRole="button" accessibilityState={{ selected: cityId === city._id }}
-              disabled={saving} onPress={() => setCityId(city._id)} style={{ padding: 12 }}>
-              <Text>{cityId === city._id ? '✓ ' : ''}{city.name}</Text>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: !!current?.countryCode }} />
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <View style={styles.headerSide}>
+          {!!current?.countryCode && (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back"
+              style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.replace('/dashboard')}>
+              <Ionicons name="arrow-back" size={24} color={PRIMARY} />
             </TouchableOpacity>
-          ))}
-          <TouchableOpacity accessibilityRole="button" disabled={saving || (!!cityId && !cities.some(city => city._id === cityId && city.countryCode === country))}
-            onPress={() => {
+          )}
+        </View>
+        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+        <View style={styles.headerSide} />
+      </View>
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.heading}>{cityOnly ? `Browse ${countryName}` : 'Choose your marketplace'}</Text>
+          <Text style={styles.description}>{cityOnly
+            ? 'Choose a city to see local vendors first, or browse all cities in your marketplace.'
+            : 'Your country determines where you can browse and book. Your browsing city is optional.'}</Text>
+        </View>
+        {!!error && (
+          <View style={styles.card}>
+            <Text accessibilityRole="alert" style={styles.error}>{error}</Text>
+            <TouchableOpacity accessibilityRole="button" disabled={saving} onPress={() => { setError(''); setRetry(value => value + 1); }}>
+              <Text style={styles.retry}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!current && !error && <ActivityIndicator color={PRIMARY} />}
+        {current && (
+          <>
+            {!cityOnly && (
+              <View style={styles.card}>
+                <Text style={styles.heading}>Country</Text>
+                <View style={styles.countries}>
+                  {[['PK', 'Pakistan'], ['US', 'United States']].map(([code, name]) => (
+                    <TouchableOpacity key={code} accessibilityRole="button" accessibilityState={{ selected: country === code, disabled: saving }}
+                      disabled={saving} onPress={() => {
+                        if (country === code) return;
+                        setCountry(code);
+                        setCityId('');
+                        setCities([]);
+                        setError('');
+                      }} style={[styles.country, country === code && styles.selected]}>
+                      <Text style={styles.countryText}>{country === code ? '✓ ' : ''}{name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View style={styles.card}>
+              <Text style={styles.heading}>Browsing city</Text>
+              {cityOption('', 'All cities')}
+              {countryCities.map(city => cityOption(city._id, city.name))}
+            </View>
+          </>
+        )}
+      </ScrollView>
+      {current && (
+        <View style={styles.footer}>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: saveDisabled, busy: saving }}
+            disabled={saveDisabled} onPress={() => {
               if (switching) {
                 Alert.alert('Change marketplace?', 'Your current cart and event draft will be cleared. Your booking history stays available.', [
                   { text: 'Cancel', style: 'cancel' }, { text: 'Continue', onPress: () => void save() },
@@ -108,11 +155,41 @@ export default function MarketplaceLocation() {
               } else {
                 void save();
               }
-            }} style={{ padding: 14, borderRadius: 8, backgroundColor: '#780C60', opacity: saving ? 0.5 : 1 }}>
-            <Text style={{ color: '#FFF', fontWeight: '700' }}>{saving ? 'Saving…' : 'Save location'}</Text>
+            }} style={[styles.save, saveDisabled && styles.disabled]}>
+            {saving && <ActivityIndicator color="#FFF" />}
+            <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save location'}</Text>
           </TouchableOpacity>
-        </>}
-      </ScrollView>
-    </>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
+
+const PRIMARY = '#780C60';
+const INK = '#2A1F27';
+const BORDER = '#F0DCE7';
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#FBF1F7' },
+  header: { paddingHorizontal: 16, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', minHeight: 60 },
+  headerSide: { width: 44 },
+  back: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3E4EF' },
+  title: { flex: 1, textAlign: 'center', color: INK, fontSize: 21, fontWeight: '800' },
+  scroll: { flex: 1 },
+  content: { padding: 16, gap: 14 },
+  card: { backgroundColor: '#FFF', borderColor: BORDER, borderWidth: 1, borderRadius: 18, padding: 16, gap: 10 },
+  heading: { color: INK, fontSize: 17, fontWeight: '800' },
+  description: { color: '#695561', fontSize: 14, lineHeight: 21 },
+  countries: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  country: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderColor: BORDER, borderWidth: 1, borderRadius: 12 },
+  countryText: { color: INK, fontWeight: '600' },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, padding: 12, borderColor: BORDER, borderWidth: 1, borderRadius: 12 },
+  selected: { borderColor: PRIMARY, backgroundColor: '#F8EAF2' },
+  optionText: { flex: 1, color: INK, fontSize: 15, fontWeight: '600' },
+  error: { color: '#A42636', fontSize: 14 },
+  retry: { color: PRIMARY, fontWeight: '700', paddingVertical: 8 },
+  footer: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: BORDER },
+  save: { minHeight: 50, padding: 12, borderRadius: 14, backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  saveText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  disabled: { opacity: 0.5 },
+});
