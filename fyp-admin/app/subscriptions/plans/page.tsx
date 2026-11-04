@@ -7,15 +7,23 @@ import { backendFetch } from "@/lib/backend";
 const catalogPath = "/admin/subscription-catalog";
 const pagePath = "/subscriptions/plans";
 const limits = {
-  maxPackages: "Packages",
-  maxPortfolioImages: "Portfolio images",
-  maxImagesPerPackage: "Images per package",
-  monthlyCampaignLimit: "Monthly campaigns",
-  featuredVendorLimit: "Featured vendor slots",
-  featuredPackageLimit: "Featured package slots",
-  couponLimit: "Active coupons",
-  discountCodeLimit: "Active discount codes",
+  maxPackages: "packages",
+  maxPortfolioImages: "portfolio images",
+  maxImagesPerPackage: "images per package",
+  monthlyCampaignLimit: "promotional campaigns per month",
+  featuredVendorLimit: "featured vendor slots",
+  featuredPackageLimit: "featured package slots",
+  couponLimit: "active coupons",
+  discountCodeLimit: "active discount codes",
 } as const;
+
+function limitLabel(key: keyof typeof limits, value: number): string {
+  if (key === "monthlyCampaignLimit") return `${value} promotional campaigns per month`;
+  if (key === "maxPackages" || key === "maxPortfolioImages" || key === "maxImagesPerPackage") {
+    return `Up to ${value} ${limits[key]}`;
+  }
+  return `Up to ${value} ${limits[key]}`;
+}
 
 type Feature = { key: string; name: string; controlsAccess: boolean };
 type Plan = {
@@ -25,6 +33,7 @@ type Plan = {
   monthlyPrice: number | null;
   rank: number;
   featureKeys: string[];
+  featureLabels?: string[];
   limits: Record<keyof typeof limits, number>;
   isPurchasable: boolean;
   isMostPopular: boolean;
@@ -108,6 +117,7 @@ function PlanForm({ plan, features }: { plan?: Plan; features: Feature[] }) {
       </div>
       <fieldset className="rounded-lg border border-slate-200 p-4">
         <legend className="px-2 font-semibold">Include / exclude app features</legend>
+        <p className="mb-3 text-xs text-slate-600">Feature names match the vendor subscription benefits. A feature only works when its backend entitlement is implemented.</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {features.map(feature => (
             <label key={feature.key} className="flex items-start gap-2">
@@ -119,9 +129,10 @@ function PlanForm({ plan, features }: { plan?: Plan; features: Feature[] }) {
         </div>
       </fieldset>
       <fieldset className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2">
-        <legend className="px-2 font-semibold">Numeric limits</legend>
-        {Object.entries(limits).map(([key, label]) => (
-          <label key={key}>{label}
+        <legend className="px-2 font-semibold">Numeric limits (same wording as vendor cards)</legend>
+        {Object.entries(limits).map(([key]) => (
+          <label key={key}>
+            {limitLabel(key as keyof typeof limits, plan?.limits[key as keyof typeof limits] ?? 0)}
             <input type="number" min={0} step={1} name={key} required className={input}
               defaultValue={plan?.limits[key as keyof typeof limits] ?? 0} />
           </label>
@@ -175,6 +186,12 @@ export default async function SubscriptionPlansPage({ searchParams }: {
                   {plan.name} · {plan.isPurchasable ? "Available" : "Hidden"}
                 </summary>
                 <PlanForm plan={plan} features={catalog.features} />
+                <p className="mt-4 text-sm font-semibold">Vendor card preview (saved plan)</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  {plan.featureLabels?.map(benefit => (
+                    <li key={benefit}>{benefit}</li>
+                  ))}
+                </ul>
                 </details>
               </div>
             ))}
