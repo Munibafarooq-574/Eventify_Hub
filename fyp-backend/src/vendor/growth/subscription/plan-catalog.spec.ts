@@ -48,25 +48,53 @@ describe('Admin subscription catalog', () => {
     const defaults = await catalog.list();
     expect(defaults.map(plan => plan.key)).toEqual(['basic', 'growth', 'premium']);
     expect(defaults.find(plan => plan.key === 'growth')?.features.coupons).toBe(true);
-    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Growth visibility & featured eligibility');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 1 featured vendor slot');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 1 featured package slot');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 5 active coupons');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 5 active discount codes');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 2 promotional campaigns per month');
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Advanced analytics & business insights');
-    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Featured packages');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Promotional campaigns');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Growth visibility & featured eligibility');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Growth analytics');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Campaign analytics');
     expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Premium Partner visibility');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Up to 2 featured vendor slots');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Up to 3 featured package slots');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Up to 15 active coupons');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Up to 15 active discount codes');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).not.toContain('Campaign analytics');
     const features = await catalog.getFeatures();
     expect(features.map(feature => feature.key)).toContain(FeatureKey.COUPONS);
     expect(features.every(feature => feature.controlsAccess)).toBe(true);
-    expect(features.find(feature => feature.key === FeatureKey.FEATURED_VENDOR)?.name).toBe('Growth visibility & featured eligibility');
+    expect(features.find(feature => feature.key === FeatureKey.FEATURED_VENDOR)?.name).toBe('Featured vendor slots');
     expect(features.find(feature => feature.key === FeatureKey.PREMIUM_BADGE)?.name).toBe('Premium Partner visibility');
     const input = { ...planInput };
     await catalog.savePlan('studio-plus', input, true);
     expect(await catalog.getPurchasable('studio-plus')).toMatchObject({
-      monthlyPrice: 7500, featureLabels: expect.arrayContaining(['Coupons', 'Up to 4 packages']),
+      monthlyPrice: 7500, featureLabels: expect.arrayContaining(['Up to 4 active coupons', 'Up to 4 packages']),
       features: { coupons: true, campaigns: false },
     });
     await expect(catalog.savePlan('studio-plus', input, true)).rejects.toThrow('already exists');
     await catalog.savePlan('studio-plus', { ...input, isPurchasable: false }, false);
     await expect(catalog.getPurchasable('studio-plus')).rejects.toThrow('available subscription plan');
     expect((await catalog.get('studio-plus'))?.features.coupons).toBe(true);
+  });
+
+  it('only advertises active feature limits, while keeping campaign analytics access available', async () => {
+    const catalog = createCatalog();
+    const custom = {
+      ...planInput,
+      featureKeys: [FeatureKey.CAMPAIGN_ANALYTICS, FeatureKey.COUPONS, FeatureKey.GROWTH_ANALYTICS],
+      limits: { ...planInput.limits, couponLimit: 0, monthlyCampaignLimit: 3 },
+    };
+    await catalog.savePlan('display-test', custom, true);
+    const plan = await catalog.get('display-test');
+    expect(plan?.features.campaignAnalytics).toBe(true);
+    expect(plan?.featureLabels).not.toContain('Campaign analytics');
+    expect(plan?.featureLabels).not.toContain('Up to 3 promotional campaigns per month');
+    expect(plan?.featureLabels).not.toContain('Up to 0 active coupons');
+    expect(plan?.featureLabels).toContain('Growth analytics');
   });
 
   it('validates prices, limits, keys and feature selections before saving', async () => {
