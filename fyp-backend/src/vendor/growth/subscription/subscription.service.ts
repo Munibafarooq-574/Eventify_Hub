@@ -72,6 +72,49 @@ export class SubscriptionService {
     return (await this.catalog.get(key)) ?? (await this.catalog.get(SubscriptionPlan.FREE))!;
   }
 
+  private snapshotPlan(plan: {
+    name: string;
+    rank: number;
+    features: Record<string, boolean>;
+    limits: Record<string, number>;
+    featureLabels: string[];
+  }) {
+    return {
+      name: plan.name,
+      rank: plan.rank,
+      features: { ...plan.features },
+      limits: { ...plan.limits },
+      featureLabels: [...plan.featureLabels],
+    };
+  }
+
+  // Never resolve paid entitlements against an edited catalog plan.
+  // Legacy paid rows without a snapshot are frozen on their first read after
+  // deployment. Historical entitlements before that read cannot be recovered.
+  async getPlanForSubscription(subscription: VendorSubscription) {
+    if (subscription.entitlementSnapshot) return subscription.entitlementSnapshot;
+    const currentPlan = await this.getPlanForAccess(subscription.plan);
+    const snapshot = this.snapshotPlan(currentPlan);
+    if (
+      subscription._id &&
+      subscription.paymentStatus === PaymentStatus.PAID &&
+      [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED, SubscriptionStatus.SCHEDULED]
+        .includes(subscription.status)
+    ) {
+      const stored = await this.subscriptionModel.findOneAndUpdate(
+        { _id: subscription._id, entitlementSnapshot: null },
+        { $set: { entitlementSnapshot: snapshot } },
+        { new: true },
+      );
+      if (stored?.entitlementSnapshot) return stored.entitlementSnapshot;
+      const existing = await this.subscriptionModel.findById(subscription._id);
+      if (existing?.entitlementSnapshot) return existing.entitlementSnapshot;
+      // Do not serve a possibly inconsistent value after a concurrent write.
+      throw new BadRequestException('Unable to load subscription benefits. Please retry.');
+    }
+    return currentPlan;
+  }
+
   getPaymentInstructions() {
   const accountTitle =
     process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
@@ -404,6 +447,7 @@ export class SubscriptionService {
         vendorObjectId,
 
         plan,
+        entitlementSnapshot: this.snapshotPlan(definition),
 
       planChangeType,
 
@@ -871,7 +915,7 @@ export class SubscriptionService {
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
-    await this.catalog.getPurchasable(plan);
+    const demoDefinition = await this.catalog.getPurchasable(plan);
 
     const vendorObjectId =
       new Types.ObjectId(vendorId);
@@ -908,6 +952,7 @@ export class SubscriptionService {
         vendorObjectId,
 
       plan,
+      entitlementSnapshot: this.snapshotPlan(demoDefinition),
 
       status:
         SubscriptionStatus.ACTIVE,
@@ -1149,7 +1194,7 @@ export class SubscriptionService {
     .sort({ scheduledActivationDate: 1 })
     .lean();
 
-    const planDefinition = await this.getPlanForAccess(subscription.plan);
+    const planDefinition = await this.getPlanForSubscription(subscription);
 
 /**
  * Expired vendors keep their historical plan,
