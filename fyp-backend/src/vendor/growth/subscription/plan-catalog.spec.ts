@@ -49,6 +49,8 @@ describe('Admin subscription catalog', () => {
     expect(defaults.map(plan => plan.key)).toEqual(['basic', 'growth', 'premium']);
     expect(defaults.find(plan => plan.key === 'growth')?.features.coupons).toBe(true);
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Growth visibility & featured eligibility');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Advanced analytics & business insights');
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Featured packages');
     expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Premium Partner visibility');
     const features = await catalog.getFeatures();
     expect(features.map(feature => feature.key)).toContain(FeatureKey.COUPONS);
