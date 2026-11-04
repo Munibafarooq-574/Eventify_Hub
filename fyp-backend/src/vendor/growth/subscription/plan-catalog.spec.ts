@@ -43,17 +43,18 @@ const planInput = {
 };
 
 describe('Admin subscription catalog', () => {
-  it('preserves built-in definitions, adds reusable benefits and hides plans from sale without removing access', async () => {
+  it('uses a fixed feature catalog and hides plans from sale without removing access', async () => {
     const catalog = createCatalog();
     const defaults = await catalog.list();
     expect(defaults.map(plan => plan.key)).toEqual(['basic', 'growth', 'premium']);
     expect(defaults.find(plan => plan.key === 'growth')?.features.coupons).toBe(true);
-    const feature = await catalog.addFeature('  Monthly onboarding call  ');
-    await expect(catalog.addFeature('monthly onboarding call')).rejects.toThrow('already exists');
-    const input = { ...planInput, featureKeys: [...planInput.featureKeys, feature.key] };
+    const features = await catalog.getFeatures();
+    expect(features.map(feature => feature.key)).toContain(FeatureKey.COUPONS);
+    expect(features.every(feature => feature.controlsAccess)).toBe(true);
+    const input = { ...planInput };
     await catalog.savePlan('studio-plus', input, true);
     expect(await catalog.getPurchasable('studio-plus')).toMatchObject({
-      monthlyPrice: 7500, featureLabels: expect.arrayContaining(['Monthly onboarding call', 'Up to 4 packages']),
+      monthlyPrice: 7500, featureLabels: expect.arrayContaining(['Coupons', 'Up to 4 packages']),
       features: { coupons: true, campaigns: false },
     });
     await expect(catalog.savePlan('studio-plus', input, true)).rejects.toThrow('already exists');
@@ -66,6 +67,7 @@ describe('Admin subscription catalog', () => {
     const catalog = createCatalog();
     await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPrice: 0 }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['unknown'] }, true)).rejects.toThrow();
+    await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['custom:fake feature'] }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, limits: { ...planInput.limits, maxPackages: -1 } }, true)).rejects.toThrow();
     await expect(catalog.savePlan('free', planInput, true)).rejects.toThrow();
     expect(await catalog.get('studio-plus')).toBeNull();
