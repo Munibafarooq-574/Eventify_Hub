@@ -25,13 +25,13 @@ const COLORS = {
 
 const DashboardIndex: React.FC = () => {
   const [locationStatus, setLocationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [marketplaceKey, setMarketplaceKey] = useState('');
+  const [location, setLocation] = useState<{ countryCode: string | null; cityId: string | null; cityName?: string }>();
   const [locationRetry, setLocationRetry] = useState(0);
   useFocusEffect(useCallback(() => {
     let active = true;
-    growthApi.get<{ countryCode: string | null; cityId: string | null }>('/auth/marketplace-location').then(async location => {
+    growthApi.get<NonNullable<typeof location>>('/auth/marketplace-location').then(async location => {
       if (!active) return;
-      if (!location.cityId) {
+      if (!location.countryCode) {
         setLocationStatus('loading');
         router.push('/marketplace-location');
         return;
@@ -42,7 +42,7 @@ const DashboardIndex: React.FC = () => {
         await saveUserData({ ...user, clientCityId: location.cityId, marketplaceCountryCode: location.countryCode });
       }
       if (!active) return;
-      setMarketplaceKey(`${location.countryCode}|${location.cityId}`);
+      setLocation(location);
       setLocationStatus('ready');
     }).catch(() => { if (active) setLocationStatus('error'); });
     return () => { active = false; };
@@ -53,7 +53,7 @@ const DashboardIndex: React.FC = () => {
     () => Promise.allSettled(Array.from(sections, reload => reload())),
   );
 
-  if (locationStatus !== 'ready') {
+  if (locationStatus !== 'ready' || !location) {
     return <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
       {locationStatus === 'loading' ? <ActivityIndicator /> : (
         <TouchableOpacity accessibilityRole="button" onPress={() => setLocationRetry(value => value + 1)}>
@@ -64,7 +64,7 @@ const DashboardIndex: React.FC = () => {
   }
 
   return (
-    <DashboardRefreshContext.Provider key={marketplaceKey} value={sections}>
+    <DashboardRefreshContext.Provider key={`${location.countryCode}|${location.cityId}`} value={sections}>
       <View style={styles.container}>
         <ScrollView
           refreshControl={refreshControl}
@@ -73,6 +73,15 @@ const DashboardIndex: React.FC = () => {
         >
           <Header />
           <View style={styles.content}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.marketplacePicker}
+              onPress={() => router.push({ pathname: '/marketplace-location', params: { mode: 'city' } })}
+            >
+              <Text style={styles.marketplaceLabel}>
+                Browsing {location.countryCode === 'US' ? 'United States' : 'Pakistan'} · {location.cityName || 'All cities'} ▾
+              </Text>
+            </TouchableOpacity>
             <CategoryGrid />
 
             <PublicCouponOffers />
@@ -107,6 +116,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
+  marketplacePicker: { paddingVertical: 12, alignSelf: "flex-start" },
+  marketplaceLabel: { color: "#780C60", fontWeight: "700" },
   welcomeSection: {
     marginBottom: 20,
   },

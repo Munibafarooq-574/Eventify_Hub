@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import getActiveCities, { ActiveCity } from '@/services/getActiveCities';
 import { growthApi } from '@/services/growthApiClient';
 import { deleteSecureData, getUserData, saveSecureData, saveUserData } from '@/store';
@@ -8,6 +8,7 @@ import { deleteSecureData, getUserData, saveSecureData, saveUserData } from '@/s
 type Location = { countryCode: string | null; cityId: string | null };
 
 export default function MarketplaceLocation() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [current, setCurrent] = useState<Location>();
   const [country, setCountry] = useState('PK');
   const [cityId, setCityId] = useState('');
@@ -36,12 +37,13 @@ export default function MarketplaceLocation() {
     return () => { active = false; };
   }, [country, current, retry]);
 
+  const cityOnly = mode === "city" && !!current?.countryCode;
   const switching = current?.countryCode !== country;
 
   async function save() {
     setSaving(true);
     try {
-      const location = await growthApi.patch<Location>('/auth/marketplace-location', { cityId });
+      const location = await growthApi.patch<Location>('/auth/marketplace-location', { countryCode: country, cityId: cityId || null });
       if (switching) {
         await Promise.all([deleteSecureData('cartData'), deleteSecureData('eventDetails')]);
       }
@@ -50,7 +52,8 @@ export default function MarketplaceLocation() {
         const updated = { ...user, clientCityId: location.cityId, marketplaceCountryCode: location.countryCode };
         await Promise.all([saveUserData(updated), saveSecureData('user', JSON.stringify(updated))]);
       }
-      router.replace('/dashboard');
+      if (cityOnly && router.canGoBack()) router.back();
+      else router.replace('/dashboard');
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not save your marketplace.');
     } finally {
@@ -60,15 +63,15 @@ export default function MarketplaceLocation() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Marketplace location', gestureEnabled: !!current?.countryCode }} />
+      <Stack.Screen options={{ title: cityOnly ? 'Browsing city' : 'Marketplace location', gestureEnabled: !!current?.countryCode }} />
       <ScrollView contentContainerStyle={{ padding: 20, gap: 12 }}>
-        <Text style={{ fontSize: 23, fontWeight: '700' }}>Choose your country and city</Text>
+        <Text style={{ fontSize: 23, fontWeight: '700' }}>{cityOnly ? "Choose a browsing city" : "Choose your marketplace country"}</Text>
         <Text>Your country determines where you can browse and book. Your city helps us show nearby vendors.</Text>
         {!!error && <Text accessibilityRole="alert">{error}</Text>}
         {!!error && <TouchableOpacity onPress={() => { setError(''); setRetry(value => value + 1); }}><Text>Try again</Text></TouchableOpacity>}
         {!current && !error && <ActivityIndicator />}
         {current && <>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          {!cityOnly && <View style={{ flexDirection: 'row', gap: 12 }}>
             {[['PK', 'Pakistan'], ['US', 'United States']].map(([code, name]) => (
               <TouchableOpacity key={code} accessibilityRole="button" accessibilityState={{ selected: country === code }}
                 disabled={saving} onPress={() => {
@@ -81,15 +84,19 @@ export default function MarketplaceLocation() {
                 <Text>{country === code ? '✓ ' : ''}{name}</Text>
               </TouchableOpacity>
             ))}
-          </View>
-          <Text style={{ fontWeight: '700' }}>City</Text>
+          </View>}
+          <Text style={{ fontWeight: '700' }}>Browsing city (optional)</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: !cityId }}
+            disabled={saving} onPress={() => setCityId("")} style={{ padding: 12 }}>
+            <Text>{!cityId ? "✓ " : ""}All cities</Text>
+          </TouchableOpacity>
           {cities.filter(city => city.countryCode === country).map(city => (
             <TouchableOpacity key={city._id} accessibilityRole="button" accessibilityState={{ selected: cityId === city._id }}
               disabled={saving} onPress={() => setCityId(city._id)} style={{ padding: 12 }}>
               <Text>{cityId === city._id ? '✓ ' : ''}{city.name}</Text>
             </TouchableOpacity>
           ))}
-          <TouchableOpacity accessibilityRole="button" disabled={saving || !cities.some(city => city._id === cityId && city.countryCode === country)}
+          <TouchableOpacity accessibilityRole="button" disabled={saving || (!!cityId && !cities.some(city => city._id === cityId && city.countryCode === country))}
             onPress={() => {
               if (switching) {
                 Alert.alert('Change marketplace?', 'Your current cart and event draft will be cleared. Your booking history stays available.', [
@@ -98,7 +105,7 @@ export default function MarketplaceLocation() {
               } else {
                 void save();
               }
-            }} style={{ padding: 14, borderRadius: 8, backgroundColor: '#780C60', opacity: !cityId || saving ? 0.5 : 1 }}>
+            }} style={{ padding: 14, borderRadius: 8, backgroundColor: '#780C60', opacity: saving ? 0.5 : 1 }}>
             <Text style={{ color: '#FFF', fontWeight: '700' }}>{saving ? 'Saving…' : 'Save location'}</Text>
           </TouchableOpacity>
         </>}

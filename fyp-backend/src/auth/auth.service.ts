@@ -211,7 +211,7 @@ private readonly availabilityService: VendorAvailabilityService,
 // =====================================================
 
     const marketplace = isClient
-      ? await this.requireMarketplaceCity(registerDto.clientCityId)
+      ? await this.validateMarketplaceLocation(registerDto.marketplaceCountryCode, registerDto.clientCityId)
       : undefined;
 
     let phoneNumber = registerDto.mobileNumber;
@@ -280,15 +280,11 @@ private readonly availabilityService: VendorAvailabilityService,
       role,
     };
     
-        if (
-      isClient &&
-      registerDto.clientCityId
-    ) {
-      userPayload.marketplaceCountryCode = marketplace?.countryCode;
-      userPayload.clientCityId =
-        new Types.ObjectId(
-          registerDto.clientCityId,
-        );
+    delete userPayload.clientCityId;
+    delete userPayload.marketplaceCountryCode;
+    if (marketplace) {
+      userPayload.marketplaceCountryCode = marketplace.countryCode;
+      userPayload.clientCityId = marketplace.cityId;
     }
     /**
      * Only vendors should have
@@ -361,27 +357,31 @@ private readonly availabilityService: VendorAvailabilityService,
     return safeUser;
   }
 
-  private async requireMarketplaceCity(cityId?: string) {
-    if (typeof cityId !== 'string' || !cityId) throw new BadRequestException('Choose your country and city.');
-    const city = await this.cityService.requireActiveCity(cityId);
-    if (!['PK', 'US'].includes(city.countryCode)) {
-      throw new BadRequestException('Choose a city in Pakistan or the United States.');
+  private async validateMarketplaceLocation(countryCode?: string, cityId?: string | null) {
+    if (cityId != null && typeof cityId !== 'string') throw new BadRequestException('Invalid city ID.');
+    const city = cityId == null ? null : await this.cityService.requireActiveCity(cityId);
+    const selectedCountry = countryCode ?? city?.countryCode;
+    if (selectedCountry !== 'PK' && selectedCountry !== 'US') {
+      throw new BadRequestException('Choose Pakistan or the United States.');
     }
-    return city;
+    if (city && city.countryCode !== selectedCountry) {
+      throw new BadRequestException('Choose a city in your marketplace country.');
+    }
+    return { countryCode: selectedCountry, cityId: city ? String(city._id) : null };
   }
 
   async getMarketplaceLocation(actor: { role: string; clientCityId?: string; marketplaceCountryCode?: string }) {
-    const scope = isClientRole(actor.role) ? await this.cityService.getMarketplaceScope(actor) : null;
-    return { countryCode: scope?.countryCode ?? null, cityId: scope?.cityId ?? null };
+    const location = isClientRole(actor.role) ? await this.cityService.getMarketplaceLocation(actor) : null;
+    return location ?? { countryCode: null, cityId: null };
   }
 
-  async updateMarketplaceLocation(actor: { id: string; role: string }, cityId?: string) {
+  async updateMarketplaceLocation(actor: { id: string; role: string }, countryCode?: string, cityId?: string | null) {
     if (!isClientRole(actor.role)) throw new ForbiddenException('Only clients can change their marketplace.');
-    const city = await this.requireMarketplaceCity(cityId);
+    const location = await this.validateMarketplaceLocation(countryCode, cityId);
     await this.userModel.updateOne({ _id: actor.id }, {
-      $set: { clientCityId: city._id, marketplaceCountryCode: city.countryCode },
+      $set: { clientCityId: location.cityId, marketplaceCountryCode: location.countryCode },
     });
-    return { cityId: String(city._id), countryCode: city.countryCode };
+    return location;
   }
 
   async login(

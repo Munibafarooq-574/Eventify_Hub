@@ -44,14 +44,22 @@ export class CityService {
     .lean();
 }
 
-  async getMarketplaceScope(user: { clientCityId?: string; marketplaceCountryCode?: string }) {
-    if (!Types.ObjectId.isValid(user.clientCityId ?? '')) return null;
-    const city = await this.cityModel.findOne({ _id: user.clientCityId, isActive: true }).lean();
-    if (!city || !['PK', 'US'].includes(city.countryCode) ||
-        (user.marketplaceCountryCode && user.marketplaceCountryCode !== city.countryCode)) return null;
+  async getMarketplaceLocation(user: { clientCityId?: string; marketplaceCountryCode?: string }) {
+    const city = Types.ObjectId.isValid(user.clientCityId ?? '')
+      ? await this.cityModel.findById(user.clientCityId).lean()
+      : null;
+    const countryCode = user.marketplaceCountryCode ?? city?.countryCode;
+    if (countryCode !== 'PK' && countryCode !== 'US') return null;
 
-    const businessCityIds = await this.cityModel.distinct('_id', { countryCode: city.countryCode, isActive: true });
-    return { countryCode: city.countryCode, cityId: String(city._id), businessCityIds };
+    const cityId = city?.isActive && city.countryCode === countryCode ? String(city._id) : null;
+    return { countryCode, cityId, cityName: cityId ? city?.name : undefined };
+  }
+
+  async getMarketplaceScope(user: { clientCityId?: string; marketplaceCountryCode?: string }) {
+    const location = await this.getMarketplaceLocation(user);
+    if (!location) return null;
+    const businessCityIds = await this.cityModel.distinct('_id', { countryCode: location.countryCode, isActive: true });
+    return { ...location, businessCityIds };
   }
 
   private validateCityTimeZone(value: string | undefined): string {

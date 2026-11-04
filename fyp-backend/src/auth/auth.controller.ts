@@ -63,8 +63,8 @@ async searchOrganizers(@Query('q') query: string) {
 
   @Patch('marketplace-location')
   @UseGuards(JwtAuthGuard)
-  updateMarketplaceLocation(@Req() request: any, @Body('cityId') cityId?: string) {
-    return this.authService.updateMarketplaceLocation(request.user, cityId);
+  updateMarketplaceLocation(@Req() request: any, @Body('countryCode') countryCode?: string, @Body('cityId') cityId?: string | null) {
+    return this.authService.updateMarketplaceLocation(request.user, countryCode, cityId);
   }
 
   @Post('marketplace-cart')

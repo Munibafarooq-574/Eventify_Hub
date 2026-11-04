@@ -6,7 +6,7 @@ import { CityService } from './city.service';
 
 export type MarketplaceScope = {
   countryCode: string;
-  cityId: string;
+  cityId: string | null;
   businessCityIds: Types.ObjectId[];
 };
 
@@ -25,7 +25,7 @@ export class MarketplaceGuard implements CanActivate {
     if (!isClientRole(role)) throw new ForbiddenException('A marketplace account is required.');
 
     const scope = await this.cities.getMarketplaceScope(request.user);
-    if (!scope) throw new ForbiddenException('Choose your marketplace country and city first.');
+    if (!scope) throw new ForbiddenException('Choose your marketplace country first.');
     request.marketplace = scope;
 
     const eventCityId = request.body?.eventCityId ?? request.query?.eventCityId;

@@ -9,7 +9,7 @@ export default async function Register(
   role: string,
   categoryId?: string,
   phone?: string,
-  clientCityId?: string,
+  countryCode?: string,
 ) {
   try {
     const url =
@@ -34,19 +34,8 @@ export default async function Register(
       data.categoryId = categoryId;
     }
 
-    /**
-     * Canonical DB city belongs to Client registration.
-     * Vendor location is handled separately through
-     * the existing vendor contact-details flow.
-     *
-     * Keep it optional for backward compatibility.
-     */
-    if (
-      role !== "Vendor" &&
-      clientCityId
-    ) {
-      data.clientCityId =
-        clientCityId;
+    if (countryCode) {
+      data.marketplaceCountryCode = countryCode;
     }
 
     const config: AxiosRequestConfig = {

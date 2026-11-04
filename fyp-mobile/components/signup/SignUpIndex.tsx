@@ -23,9 +23,6 @@ import {
 import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker"; 
 import patchUpdateProfile from "@/services/patchUpdateProfile"; 
-import getActiveCities, {
-  ActiveCity,
-} from "@/services/getActiveCities";
 
 export default function SignUpIndex() {
 
@@ -42,21 +39,6 @@ const [confirmPassword, setConfirmPassword] = useState("");
 const [countryCode, setCountryCode] = useState("");
 const [role, setRole] = useState("");
 const [categoryId, setCategoryId] = useState("");
-const [cities, setCities] =
-  useState<ActiveCity[]>([]);
-
-const [clientCityId, setClientCityId] =
-  useState("");
-
-const [citySearch, setCitySearch] =
-  useState("");
-
-const [cityDropdownOpen, setCityDropdownOpen] =
-  useState(false);
-
-const [citiesLoading, setCitiesLoading] =
-  useState(false);
-
 const [showPassword, setShowPassword] = useState(false);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -124,48 +106,6 @@ const getSelectedCategory = async () => {
   const selectedCategoryId = await getSecureData("categoryId");
   setCategoryId(selectedCategoryId || "");
 };
-useEffect(() => {
-  if (role === "Vendor") {
-    return;
-  }
-
-  const loadCities = async () => {
-    try {
-      setCitiesLoading(true);
-
-      const result =
-        await getActiveCities();
-
-      setCities(
-        Array.isArray(result)
-          ? result
-          : [],
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load client cities:",
-        error,
-      );
-
-      setCities([]);
-    } finally {
-      setCitiesLoading(false);
-    }
-  };
-
-  loadCities();
-}, [role]);
-
-const filteredCities = cities.filter(
-  (city) =>
-    city.countryCode === countryCode && city.name
-      .toLowerCase()
-      .includes(
-        citySearch
-          .trim()
-          .toLowerCase(),
-      ),
-);
 // Email Validation
 const validateEmail = (text: string) => {
   setEmail(text);
@@ -183,7 +123,7 @@ const validateEmail = (text: string) => {
 
 const isClient = role === "Client" || role === "Organizer";
 const isUSPhone = isClient && countryCode === "US";
-const phoneReady = !isClient || Boolean(clientCityId);
+const phoneReady = !isClient || Boolean(countryCode);
 const compactPhone = phone.replace(/[\s().-]/g, "");
 const validPhone = isUSPhone
   ? /^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)
@@ -313,10 +253,6 @@ const handleRegister = async () => {
       });
       return;
     }
-    if (role !== "Vendor" && !cities.some(city => city._id === clientCityId && city.countryCode === countryCode)) {
-      Toast.show({ type: "error", text1: "Choose your country and city" });
-      return;
-    }
     setIsLoading(true);
     setIsDisabled(true);
 
@@ -327,9 +263,7 @@ const handleRegister = async () => {
   role,
   categoryId,
   isClient ? compactPhone : phone,
-  role === "Vendor"
-    ? undefined
-    : clientCityId || undefined,
+  isClient ? countryCode : undefined,
 );
 
     await saveSecureData("token", response.token);
@@ -545,7 +479,7 @@ return (
         </Text>
       )}
 
-      {/* Client City */}
+      {/* Client country */}
 {isClient && (
   <>
     <Text style={styles.label}>Country</Text>
@@ -555,125 +489,13 @@ return (
           accessibilityState={{ selected: countryCode === code }} onPress={() => {
             if (code === countryCode) return;
             setCountryCode(code);
-            setClientCityId("");
-            setCitySearch("");
-            setCityDropdownOpen(false);
             setPhone("");
           }}>
           <Text>{countryCode === code ? "✓ " : ""}{label}</Text>
         </TouchableOpacity>
       ))}
     </View>
-    <Text style={styles.label}>
-      City
-    </Text>
 
-    <TouchableOpacity
-      style={styles.inputCard}
-      activeOpacity={0.8}
-      disabled={!countryCode}
-      onPress={() =>
-        setCityDropdownOpen(
-          (current) => !current,
-        )
-      }
-    >
-      <Ionicons
-        name="location-outline"
-        size={20}
-        color="#780C60"
-      />
-
-      <Text
-        style={[
-          styles.input,
-          {
-            color: clientCityId
-              ? "#222"
-              : "#999",
-          },
-        ]}
-      >
-        {clientCityId
-          ? cities.find(
-              (city) =>
-                city._id === clientCityId,
-            )?.name || "Select your city"
-          : countryCode ? "Select your city" : "Select your country first"}
-      </Text>
-
-      <Ionicons
-        name={
-          cityDropdownOpen
-            ? "chevron-up"
-            : "chevron-down"
-        }
-        size={18}
-        color="#780C60"
-      />
-    </TouchableOpacity>
-
-    {cityDropdownOpen && (
-      <View style={styles.cityDropdown}>
-        <View style={styles.citySearchBox}>
-          <Ionicons
-            name="search-outline"
-            size={18}
-            color="#780C60"
-          />
-
-          <TextInput
-            style={styles.citySearchInput}
-            placeholder="Search city"
-            placeholderTextColor="#999"
-            value={citySearch}
-            onChangeText={setCitySearch}
-          />
-        </View>
-
-        {citiesLoading ? (
-          <ActivityIndicator
-            style={{ padding: 16 }}
-            color="#780C60"
-          />
-        ) : filteredCities.length > 0 ? (
-          filteredCities.map((city) => (
-            <TouchableOpacity
-              key={city._id}
-              style={styles.cityOption}
-              onPress={() => {
-                setClientCityId(city._id);
-                setCitySearch("");
-                setCityDropdownOpen(false);
-              }}
-            >
-              <Text
-                style={styles.cityOptionText}
-              >
-                {city.name}
-              </Text>
-
-              {clientCityId === city._id && (
-                <Ionicons
-                  name="checkmark"
-                  size={18}
-                  color="#780C60"
-                />
-              )}
-            </TouchableOpacity>
-          ))
-        ) : (
-          <Text
-            style={{
-              padding: 16,
-              color: "#999",
-            }}
-          >
-            No cities found
-          </Text>
-        )}
-      </View>
-    )}
   </>
 )}
 
@@ -702,9 +524,9 @@ return (
         />
       </View>
 
-      {isClient && countryCode !== "" && (
+      {isClient && (
         <Text style={{ color: "#666", marginTop: 6 }}>
-          {phoneReady ? (isUSPhone ? "US country code +1" : "Pakistan country code +92") : "Select your city first."}
+          {phoneReady ? (isUSPhone ? "US country code +1" : "Pakistan country code +92") : "Select your country first."}
         </Text>
       )}
 
@@ -1164,44 +986,4 @@ const styles = StyleSheet.create({
     color: "#333",
     fontWeight: "500",
   },
-  cityDropdown: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 14,
-  borderWidth: 1,
-  borderColor: "#E7D7E2",
-  marginTop: 6,
-  marginBottom: 12,
-  overflow: "hidden",
-},
-
-citySearchBox: {
-  flexDirection: "row",
-  alignItems: "center",
-  paddingHorizontal: 14,
-  borderBottomWidth: 1,
-  borderBottomColor: "#F0E5EC",
-},
-
-citySearchInput: {
-  flex: 1,
-  paddingVertical: 12,
-  paddingHorizontal: 10,
-  color: "#222",
-},
-
-cityOption: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingHorizontal: 16,
-  paddingVertical: 13,
-  borderBottomWidth: 1,
-  borderBottomColor: "#F5EDF2",
-},
-
-cityOptionText: {
-  fontSize: 14,
-  color: "#2A1B25",
-  fontWeight: "500",
-},
 });

@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsMongoId,
+  IsIn,
   IsOptional,
   IsString,
   MinLength,
@@ -48,4 +49,8 @@ export class RegisterDto {
   @IsOptional()
 @IsMongoId()
 clientCityId?: string;
+
+  @IsOptional()
+  @IsIn(['PK', 'US'])
+  marketplaceCountryCode?: string;
 }
