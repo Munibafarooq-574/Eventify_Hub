@@ -159,7 +159,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'These actions are restricted to before the event starts. The same pending request cannot be repeatedly created to send duplicate updates.',
       ] },
       { id: 'reschedule', title: 'Respond to a client’s date/time request', summary: 'Review the proposed schedule before agreeing.', steps: [
-        'Open the schedule request in the booking. Compare the original and requested event/service times, duration, reason and response deadline.',
+        'Open Review Reschedule Request in the booking. Compare the original and requested event/service times, duration, reason and response deadline.',
         'Confirm availability if you can fulfil the new schedule, or choose the unavailable response if you cannot. Availability is checked again; a message in chat is not an approval.',
         'Your response applies only to your assignment. In a multi-vendor event, follow the group result; the original schedule remains until the required decisions or replacement steps complete.',
         'If the client keeps the original schedule, continue with the original booking. If they replace your assignment, read No longer assigned and the resulting history before taking further action.',

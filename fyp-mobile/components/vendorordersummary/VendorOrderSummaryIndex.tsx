@@ -851,7 +851,7 @@ const OrderSummary = () => {
                                                             <View key={request._id} style={styles.rescheduleCard}>
                                                                 <View style={styles.rescheduleHeader}>
                                                                     <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
-                                                                    <Text style={styles.rescheduleTitle}>Schedule Update Request</Text>
+                                                                    <Text style={styles.rescheduleTitle}>Review Reschedule Request</Text>
                                                                 </View>
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New date: {new Date(request.newEventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}

@@ -38,14 +38,22 @@ test('delivery time picker waits for availability, disables unavailable choices 
  let hook=0;const state=[],effects=[],pending=[],buttons=[],changes=[],slots=[];
  const hooks={...React,useState:init=>{const i=hook++;if(!(i in state))state[i]=typeof init==='function'?init():init;return[state[i],v=>{state[i]=typeof v==='function'?v(state[i]):v}];},useEffect:(fn,deps)=>{const i=hook++;const previous=slots[i];if(!previous||deps.some((v,j)=>!Object.is(v,previous.deps[j]))){effects.push(()=>{previous?.cleanup?.();slots[i]={deps,cleanup:fn()};});}}};
  const mockNative={...native,ActivityIndicator:()=>React.createElement('span',null,'Checking delivery'),Platform:{OS:'android'},TouchableOpacity:props=>{buttons.push(props);return React.createElement('button',null,props.children)}};
- const Picker=load('components/booking/DeliveryTimePicker.tsx',{'react':hooks,'react-native':mockNative,'@react-native-community/datetimepicker':()=>null,'@/utils/deliveryBooking':utils,'@/services/growthApiClient':{growthApi:{post:(url,body)=>new Promise((resolve,reject)=>pending.push({url,body,resolve,reject}))}}}).default;
+ const Picker=load('components/booking/DeliveryTimePicker.tsx',{'react':hooks,'react-native':mockNative,'@react-native-community/datetimepicker':()=>null,'./PickerSheet':()=>null,'@/utils/deliveryBooking':utils,'@/services/growthApiClient':{growthApi:{post:(url,body)=>new Promise((resolve,reject)=>pending.push({url,body,resolve,reject}))}}}).default;
  const props={vendorId:'vendor',packageId:'package',eventCityId:'city',eventDate:'2026-11-09',eventStartTime:'14:00',eventDurationMinutes:120,onChange:slot=>changes.push(slot)};
  const render=()=>{hook=0;buttons.length=0;const html=renderToStaticMarkup(Picker(props));while(effects.length)effects.shift()();return html;};
  assert.match(render(),/Checking delivery/);render();assert.equal(pending.length,1);assert.equal(changes.at(-1),null);
  const response={timeZone:'Asia/Karachi',date:'2026-11-09',earliest:'2026-11-09T08:00:00Z',latest:'2026-11-09T09:00:00Z',eventStartDateTime:'2026-11-09T09:00:00Z',slots:[{startDateTime:'2026-11-09T08:00:00Z',endDateTime:'2026-11-09T08:30:00Z',available:false,reason:'Already booked'},{startDateTime:'2026-11-09T08:30:00Z',endDateTime:'2026-11-09T09:00:00Z',available:true}]};
- pending[0].resolve(response);await new Promise(setImmediate);const html=render();assert.match(html,/30 minutes before event/);assert.match(html,/Already booked/);const disabled=buttons.find(b=>b.accessibilityState?.disabled);assert.ok(disabled);disabled.onPress();assert.equal(changes.at(-1),null);buttons.find(b=>b.accessibilityState?.disabled===false).onPress();assert.equal(changes.at(-1).startDateTime,response.slots[1].startDateTime);
+ pending[0].resolve(response);await new Promise(setImmediate);const html=render();assert.match(html,/Delivery date · 9 Nov 2026/);assert.doesNotMatch(html,/Choose delivery date ·/);assert.match(html,/30 minutes before event/);assert.match(html,/Already booked/);const disabled=buttons.find(b=>b.accessibilityState?.disabled);assert.ok(disabled);disabled.onPress();assert.equal(changes.at(-1),null);buttons.find(b=>b.accessibilityState?.disabled===false).onPress();assert.equal(changes.at(-1).startDateTime,response.slots[1].startDateTime);
  props.eventStartTime='15:00';render();render();assert.equal(changes.at(-1),null);assert.equal(pending.length,2);assert.match(render(),/Checking delivery/);
  pending[1].reject(new Error('Unavailable'));await new Promise(setImmediate);assert.match(render(),/Try again/);assert.equal(changes.at(-1),null);
+ buttons[0].onPress();render();
+ pending[2].resolve({...response, earliest:'2026-11-08T08:00:00Z', slots:response.slots.map(slot=>({...slot,available:false,reason:'Booking must be made at least 1 day(s) before the service starts'}))});
+ await new Promise(setImmediate);
+ const multiDay = render();
+ assert.match(multiDay,/Choose delivery date · 9 Nov 2026/);
+ assert.match(multiDay,/Try another delivery date or choose a later event date or time/);
+ assert.match(multiDay,/at least 1 day before the service starts/);
+
 });
 
 test('add and edit preview show the flat delivery fee and reserved time', () => {

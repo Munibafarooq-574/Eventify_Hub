@@ -1,3 +1,4 @@
+import PickerSheet from '@/components/booking/PickerSheet';
 import DeliveryTimePicker from '@/components/booking/DeliveryTimePicker';
 import { growthApi } from '@/services/growthApiClient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -8,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -62,7 +62,7 @@ export default function ClientRescheduleScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const [deliveryBookings,setDeliveryBookings] = useState<any[]>([]);
-  const [deliveryTimes,setDeliveryTimes] = useState<Record<string,string>>({});
+  const [deliveryTimes,setDeliveryTimes] = useState<Record<string, { startDateTime: string; schedule: string } | null>>({});
   const [deliveryLoading,setDeliveryLoading] = useState(true);
   const [deliveryError,setDeliveryError] = useState('');
   useEffect(() => {
@@ -73,9 +73,12 @@ export default function ClientRescheduleScreen() {
   const newDateKey = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   const newTimeKey = `${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
 
+  const schedule = `${newDateKey}|${newTimeKey}|${Number(duration)}`;
+  const missingDeliveryTime = deliveryBookings.some(booking => deliveryTimes[String(booking._id)]?.schedule !== schedule);
+  const submitDisabled = submitting || deliveryLoading || !!deliveryError || missingDeliveryTime;
+
   const submit = async () => {
-    if (deliveryLoading || deliveryError) return Alert.alert('Please wait',deliveryError || 'Checking delivery details.');
-    if (deliveryBookings.some(b => !deliveryTimes[String(b._id)])) return Alert.alert('Choose delivery times','Select an available delivery time for each delivery package.');
+    if (submitDisabled) return;
     const durationMinutes = Number(duration);
     if (!params.orderId) return Alert.alert('Error', 'Booking ID is missing.');
     if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
@@ -104,7 +107,11 @@ export default function ClientRescheduleScreen() {
         eventTime,
         durationMinutes,
         reason: reason.trim(),
-        deliveryTimes,
+        deliveryTimes: Object.fromEntries(deliveryBookings.flatMap(booking => {
+          const id = String(booking._id);
+          const selection = deliveryTimes[id];
+          return selection?.schedule === schedule ? [[id, selection.startDateTime]] : [];
+        })),
       });
 
       Alert.alert(
@@ -135,11 +142,11 @@ export default function ClientRescheduleScreen() {
         <View style={styles.heroDecorB} />
 
         <View style={styles.heroTopRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back" activeOpacity={0.8}>
             <Ionicons name="chevron-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.heroTitle}>Request Date/Time Change</Text>
-          <View style={styles.backBtn} />
+          <Text style={styles.heroTitle}>Request Date &amp; Time Change</Text>
+          <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.heroEvent}>
@@ -244,7 +251,7 @@ export default function ClientRescheduleScreen() {
           {!!deliveryError && <Text style={styles.warningText}>{deliveryError}</Text>}
           {deliveryBookings.map(booking => <View key={booking._id} style={styles.card}>
             <Text style={styles.cardTitle}>{booking.serviceName} · New delivery time</Text>
-            <DeliveryTimePicker orderId={params.orderId} vendorOrderId={String(booking._id)} eventDate={newDateKey} eventStartTime={newTimeKey} eventDurationMinutes={Number(duration)} onChange={slot => setDeliveryTimes(current => ({...current,[String(booking._id)]:slot?.startDateTime || ''}))} />
+            <DeliveryTimePicker orderId={params.orderId} vendorOrderId={String(booking._id)} eventDate={newDateKey} eventStartTime={newTimeKey} eventDurationMinutes={Number(duration)} onChange={slot => setDeliveryTimes(current => ({...current,[String(booking._id)]:slot ? { startDateTime: slot.startDateTime, schedule } : null}))} />
           </View>)}
           {/* Reason card */}
           <View style={styles.card}>
@@ -279,9 +286,10 @@ export default function ClientRescheduleScreen() {
         {/* Sticky bottom bar */}
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 14) }]}>
           <TouchableOpacity
-            disabled={submitting}
+            disabled={submitDisabled}
+            accessibilityState={{ disabled: submitDisabled }}
             activeOpacity={0.9}
-            style={[styles.submit, submitting && { opacity: 0.6 }]}
+            style={[styles.submit, submitDisabled && { opacity: 0.6 }]}
             onPress={submit}
           >
             {submitting ? (
@@ -355,37 +363,6 @@ export default function ClientRescheduleScreen() {
         </>
       )}
     </View>
-  );
-}
-
-function PickerSheet({
-  visible,
-  title,
-  onDone,
-  children,
-}: {
-  visible: boolean;
-  title: string;
-  onDone: () => void;
-  children: React.ReactNode;
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDone}>
-      <View style={styles.sheetBackdrop}>
-        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onDone} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <TouchableOpacity onPress={onDone}>
-              <Text style={styles.sheetDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ alignItems: 'center' }}>{children}</View>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -593,23 +570,4 @@ const styles = StyleSheet.create({
   submitText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 
   // iOS picker sheet
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(61,18,51,0.45)' },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 44,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: BORDER,
-    marginBottom: 12,
-  },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  sheetTitle: { color: PRIMARY_DARK, fontWeight: '800', fontSize: 16 },
-  sheetDone: { color: PRIMARY, fontWeight: '800', fontSize: 16 },
 });
