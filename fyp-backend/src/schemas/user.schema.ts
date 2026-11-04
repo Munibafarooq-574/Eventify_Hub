@@ -211,8 +211,8 @@ export class SalonBusinessDetails extends BusinessDetails {
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({ required: true })
-  cityCovered: string;
+  @Prop()
+  cityCovered?: string;
 
   @Prop({
     type: [String],
@@ -267,8 +267,8 @@ export class CateringBusinessDetails extends BusinessDetails {
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({ required: true })
-    cityCovered: string;
+  @Prop()
+  cityCovered?: string;
 
   @Prop({
     type: [String],
@@ -405,7 +405,7 @@ export class CakeBusinessDetails extends BusinessDetails {
   expertise: string;
 
   @Prop()
-  cityCovered: string;
+  cityCovered?: string;
 
   @Prop({
     type: [String],
@@ -453,8 +453,8 @@ export class MehndiBusinessDetails extends BusinessDetails {
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({ required: true })
-  cityCovered: string;
+  @Prop()
+  cityCovered?: string;
 
   @Prop({
     type: [String],
@@ -508,8 +508,8 @@ export class SoundBusinessDetails extends BusinessDetails {
   @Prop({ type: Boolean, required: true })
   travelsToClientHome: boolean;
 
-  @Prop({ required: true })
-  cityCovered: string;
+  @Prop()
+  cityCovered?: string;
 
   @Prop({
     type: [String],

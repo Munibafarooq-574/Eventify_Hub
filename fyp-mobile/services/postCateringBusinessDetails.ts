@@ -11,11 +11,6 @@ export default async function postCateringBusinessDetails(userId: string, cateri
         data: cateringBusinessDetails,
     };
 
-    try {
-        const response = await axios(config);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching vendor categories:", error);
-        throw error;
-    }
+    const response = await axios(config);
+    return response.data;
 }

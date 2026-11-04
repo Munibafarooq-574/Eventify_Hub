@@ -12,8 +12,9 @@ export class CreateSalonBusinessDetailsDto {
     @IsBoolean()
     travelsToClientHome: boolean;
 
+    @IsOptional()
     @IsString()
-    cityCovered: string;
+    cityCovered?: string;
 
     @IsArray()
     @IsString({ each: true })

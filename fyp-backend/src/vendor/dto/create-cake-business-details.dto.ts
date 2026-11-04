@@ -19,8 +19,9 @@ export class CreateCakeBusinessDetailsDto {
   @IsString()
   expertise: string;
 
+  @IsOptional()
   @IsString()
-  cityCovered: string;
+  cityCovered?: string;
 
   @IsBoolean()
   deliveryToHome: boolean;

@@ -17,8 +17,6 @@ timeout: 60000,
   maxContentLength: Infinity,
 });
 
-console.log("Contact details response:", response.data);
-
 return response.data;
 
 

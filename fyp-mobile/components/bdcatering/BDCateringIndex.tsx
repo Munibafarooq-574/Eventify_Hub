@@ -5,6 +5,7 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { bookingActionError } from "@/services/bookingActionError";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
 import {
   Alert,
@@ -240,12 +241,7 @@ if (edit === "true") {
 
     } catch (err) {
 
-        console.log(err);
-
-        Alert.alert(
-            "Error",
-            "Something went wrong."
-        );
+        Alert.alert("Error", bookingActionError(err, "Could not save your catering business details. Please try again.").message);
 
     }
 

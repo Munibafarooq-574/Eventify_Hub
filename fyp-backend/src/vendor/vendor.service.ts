@@ -2,7 +2,7 @@ import type { MarketplaceScope } from '../city/marketplace.guard';
 import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Error as MongooseError, Model, Types } from 'mongoose';
 import {
   CateringBusinessDetails,
   PhotographerBusinessDetails,
@@ -184,6 +184,7 @@ return vendorAccessResults
     async findVendorById(id: string) {
         return await this.userModel
             .findOne({ _id: id, role: 'Vendor' })
+            .select('-password -providerId -pushToken')
             .populate('buisnessCategory')
             .exec();
     }
@@ -195,6 +196,7 @@ async createContactDetails(
 ): Promise<User> {
   const user = await this.userModel
     .findById(userId)
+    .select('-password -providerId -pushToken')
     .exec();
 
   if (!user) {
@@ -266,7 +268,8 @@ async updateContactDetails(
   file: Express.Multer.File,
 ): Promise<User> {
   const user = await this.userModel
-    .findById(userId);
+    .findById(userId)
+    .select('-password -providerId -pushToken');
 
   if (!user) {
     throw new NotFoundException(
@@ -372,6 +375,7 @@ async submitVendorProfileForReview(
 ): Promise<User> {
   const user = await this.userModel
     .findById(userId)
+    .select('-password -providerId -pushToken')
     .populate('buisnessCategory')
     .exec();
 
@@ -451,6 +455,7 @@ user.vendorApprovalStatus =
 ): Promise<User> {
   const user = await this.userModel
     .findById(userId)
+    .select('-password -providerId -pushToken')
     .populate('buisnessCategory')
     .exec();
 
@@ -524,8 +529,20 @@ user.vendorApprovalStatus =
       break;
   }
 
-  return user.save();
+  return this.saveBusinessDetails(user);
 }
+
+  private async saveBusinessDetails(user: User): Promise<User> {
+    try {
+      return await user.save();
+    } catch (error) {
+      if (error instanceof MongooseError.ValidationError) {
+        const fields = Object.keys(error.errors).map(path => path.split('.').pop());
+        throw new BadRequestException(`Check these business details: ${fields.join(', ')}.`);
+      }
+      throw error;
+    }
+  }
 
  async updateBusinessDetails(
   userId: string,
@@ -541,6 +558,7 @@ user.vendorApprovalStatus =
 ): Promise<User> {
   const user = await this.userModel
     .findById(userId)
+    .select('-password -providerId -pushToken')
     .populate('buisnessCategory')
     .exec();
 
@@ -670,7 +688,7 @@ user.vendorApprovalStatus =
       break;
   }
 
-  return user.save();
+  return this.saveBusinessDetails(user);
 }
 private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
   bookingType?: PackageBookingType | typeof RETIRED_PACKAGE_BOOKING_TYPE;
@@ -928,7 +946,7 @@ async getVendorApprovalStatus(userId: string) {
     }
 
     async getVendor(userId: string): Promise<any> {
-        const user = await this.userModel.findById(userId).lean();
+        const user = await this.userModel.findById(userId).select('-password -providerId -pushToken').lean();
         const userObjToReturn = {
             ...user,
             BusinessDetails: user && user.photographerBusinessDetails

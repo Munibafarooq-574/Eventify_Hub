@@ -40,8 +40,9 @@ export class CreateSoundBusinessDetailsDto {
     @IsBoolean()
     travelsToClientHome: boolean;
 
+    @IsOptional()
     @IsString()
-    cityCovered: string;
+    cityCovered?: string;
 
     @IsArray()
     @ArrayNotEmpty()
