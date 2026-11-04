@@ -157,6 +157,20 @@ export class PlanCatalogService {
     return this.definition(key, plan, features);
   }
 
+  async deleteFeature(key: string) {
+    if (!key.startsWith('custom:')) {
+      throw new BadRequestException('Built-in features cannot be deleted. Uncheck them in individual plans instead.');
+    }
+    const feature = await this.customFeatures.findOne({ _id: key });
+    if (!feature) throw new NotFoundException('Feature not found.');
+    await this.connection.db!.collection<PlanDocument>('subscriptionplanconfigs').updateMany(
+      { 'plan.featureKeys': key },
+      { $pull: { 'plan.featureKeys': key } } as any,
+    );
+    await this.customFeatures.deleteOne({ _id: key });
+    return { deleted: true, key };
+  }
+
   async addFeature(name: unknown) {
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) {
       throw new BadRequestException('Enter a feature name of up to 100 characters.');
