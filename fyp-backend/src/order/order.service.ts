@@ -1,3 +1,4 @@
+import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
 import { ChatGateway } from '../chat/chat.gateway';
 import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
 import { getVendorDownPaymentConfig, effectiveDownPaymentDeadline, snapshotDownPaymentWindow, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue } from '../common/utils/booking-payment-window';
@@ -111,7 +112,11 @@ export class OrderService {
     eventId?: string,
     replacementRescheduleRequestId?: string,
     replacementVendorOrderId?: string,
+    bookingDraftRevision?: number,
 ): Promise<Order> {
+    if (bookingDraftRevision !== undefined && (!Number.isSafeInteger(bookingDraftRevision) || bookingDraftRevision < 1)) {
+        throw new BadRequestException('Invalid booking draft revision.');
+    }
     if (replacementVendorOrderId && replacementRescheduleRequestId) throw new BadRequestException('Choose one replacement flow.');
     let cancellationReplacement: Awaited<ReturnType<OrderService['cancellationReplacementContext']>> | null = null;
     if (replacementVendorOrderId) {
@@ -1250,6 +1255,20 @@ export class OrderService {
                     await order.save({
                         session,
                     });
+
+                    const clearedDraft = await this.connection.db!.collection<BookingDraft>(BOOKING_DRAFT_COLLECTION).updateOne(
+                        {
+                            _id: new Types.ObjectId(organizerId),
+                            'eventDetails.eventId': eventId!.trim(),
+                            ...(bookingDraftRevision !== undefined && { revision: bookingDraftRevision }),
+                        },
+                        { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
+                        { session },
+                    );
+
+                    if (bookingDraftRevision !== undefined && !clearedDraft.matchedCount) {
+                        throw new ConflictException('Your cart changed on another device. Reopen Review Order before booking.');
+                    }
 
                     // Preserve existing promotion redemption behavior,
                     // but only after every booking validation and all

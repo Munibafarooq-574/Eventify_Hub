@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
+import { BookingDraftController } from '../cart/booking-draft.controller';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -94,6 +95,7 @@ import { VendorGrowthModule } from '../vendor/growth/vendor-growth.module';
 
   controllers: [
     AuthController,
+    BookingDraftController,
   ],
 
   providers: [

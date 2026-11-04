@@ -33,6 +33,7 @@ export interface ServiceItem {
  */
 export interface PlaceOrderPayload {
   organizerId: string;
+  bookingDraftRevision?: number;
   eventId: string;
   eventDate: string;
   eventTime: string;
@@ -162,6 +163,7 @@ if (!orderData.eventAddress?.trim()) {
 
     data: {
       organizerId: orderData.organizerId,
+      bookingDraftRevision: orderData.bookingDraftRevision,
       eventId: orderData.eventId,
 
       eventDate: orderData.eventDate,

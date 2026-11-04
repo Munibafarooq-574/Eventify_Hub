@@ -18,7 +18,7 @@ function fixture(bookingType = 'DURATION_BASED'){
  s.cityService={requireActiveCity:async()=>({}),requireCityTimeZone:async()=>'Asia/Karachi'};
  s.featureAccessService={hasActiveSubscription:async()=>true};
  s.availabilityService={checkVendorAvailability:jest.fn(async()=>({available:true,requiredServiceWindow:{startDateTime:order.eventStartDateTime,endDateTime:new Date('2026-11-10T11:00:00Z')},maxConcurrentBookings:1}))};
- s.connection={startSession:async()=>({endSession:async()=>{},withTransaction:async(callback:any)=>callback()})};s.sendPushNotification=jest.fn(async()=>{});
+ s.connection={db:{collection:()=>({updateOne:async()=>({matchedCount:0})})},startSession:async()=>({endSession:async()=>{},withTransaction:async(callback:any)=>callback()})};s.sendPushNotification=jest.fn(async()=>{});
  const actor={id:String(organizer),role:'client'};
  const create=()=>s.createOrder(actor.id,new Date('2027-01-01'),'18:00',[{vendorId:String(newVendor),packageId:String(pkg),serviceName:'Forged',price:1,durationMinutes:180}], 'Forged',2,'Other',60,String(id()),'Other',[], 'other-event',undefined,String(old._id));
  return{s,old,sibling,order,actor,newVendor,category,create};

@@ -1,10 +1,11 @@
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import React, { useCallback, useRef, useState } from 'react';
 import {
     Alert,
+    AppState,
     ScrollView,
     StyleSheet,
     Text,
@@ -50,6 +51,7 @@ const cartCategory = (pkg: any, entry: any) => {
 
 const CartManagementIndexScreen: React.FC = () => {
   const [draft] = useState(createBookingDraftStore);
+  const savingCart = useRef(false);
 const router = useRouter();
 const navigation = useNavigation();
 
@@ -63,16 +65,19 @@ const [eventCityName, setEventCityName] = useState('');
 const [eventDetails, setEventDetails] = useState<any>(null);
 
 
-    useEffect(() => {
-        navigation.setOptions({
-            headerShown: false,
-        });
-
-        const fetchCartData = async () => {
+    const fetchCartData = useCallback(async () => {
+        if (savingCart.current) return;
             try {
-                const storedCart = await draft.get('cartData');
-
-                 const eventDetailsRaw = await draft.get('eventDetails');
+                const [storedCart, eventDetailsRaw] = await Promise.all([
+                    draft.get('cartData'), draft.get('eventDetails'),
+                ]);
+                if (!draft.isCurrent()) return;
+                if (!eventDetailsRaw) {
+                    setEventDetails(null);
+                    setEventAddress('');
+                    setEventCityName('');
+                    setGuests(0);
+                }
 
 if (eventDetailsRaw) {
     const eventDetails = JSON.parse(eventDetailsRaw);
@@ -168,10 +173,35 @@ if (eventDetailsRaw) {
                     position: 'bottom',
                 });
             }
-        };
+    }, [draft]);
 
-        fetchCartData();
-    }, [navigation]);
+    useFocusEffect(useCallback(() => {
+        navigation.setOptions({ headerShown: false });
+        void fetchCartData();
+        const subscription = AppState.addEventListener('change', state => {
+            if (state === 'active') void fetchCartData();
+        });
+        return () => subscription.remove();
+    }, [fetchCartData, navigation]));
+
+    const saveCart = async (updatedCart: any) => {
+        if (savingCart.current) return false;
+        savingCart.current = true;
+        try {
+            await draft.save('cartData', JSON.stringify(updatedCart));
+            if (!draft.isCurrent()) return false;
+            setCartData(updatedCart);
+            return true;
+        } catch (error) {
+            if (draft.isCurrent()) {
+                Toast.show({ type: 'error', text1: 'Could not update cart', text2: error instanceof Error ? error.message : 'Please try again.' });
+            }
+        } finally {
+            savingCart.current = false;
+        }
+        if (draft.isCurrent()) await fetchCartData();
+        return false;
+    };
 
     // -----------------------------------------
     // Remove complete cart
@@ -191,12 +221,7 @@ if (eventDetailsRaw) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await draft.save(
-                                'cartData',
-                                JSON.stringify({ vendors: [] })
-                            );
-
-                            setCartData({ vendors: [] });
+                            if (!await saveCart({ vendors: [] })) return;
 
                             Toast.show({
                                 type: 'success',
@@ -220,7 +245,7 @@ if (eventDetailsRaw) {
     // Remove individual package
     // -----------------------------------------
 
-    const handleDeletePackage = (
+    const handleDeletePackage = async (
         vendorIndex: number,
         packageIndex: number
     ) => {
@@ -249,9 +274,7 @@ if (eventDetailsRaw) {
             updatedCart.vendors.splice(vendorIndex, 1);
         }
 
-        void draft.save('cartData', JSON.stringify(updatedCart)).catch(console.error);
-
-        setCartData(updatedCart);
+        if (!await saveCart(updatedCart)) return;
 
         Toast.show({
             type: 'success',
@@ -261,7 +284,7 @@ if (eventDetailsRaw) {
         });
     };
 
-    const handleUpdateQuantity = (
+    const handleUpdateQuantity = async (
         vendorIndex: number,
         packageIndex: number,
         delta: number
@@ -292,9 +315,7 @@ if (eventDetailsRaw) {
         vendor.packages[packageIndex] = pkg;
         updatedCart.vendors[vendorIndex] = vendor;
 
-        void draft.save('cartData', JSON.stringify(updatedCart)).catch(console.error);
-
-        setCartData(updatedCart);
+        if (!await saveCart(updatedCart)) return;
     };
 
     // -----------------------------------------

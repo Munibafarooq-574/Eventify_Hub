@@ -59,6 +59,7 @@ const OrderReviewScreen = () => {
   const [refreshNotice, setRefreshNotice] = useState('');
   const connectivityRequest = useRef(0);
   const checkoutLock = useRef(false);
+  const loadedDraft = useRef<{ cart: string | null; event: string | null } | null>(null);
   const bookingSubmitted = useRef(false);
   const replacementDeadlinePassed = /replacement.*only.*before.*event.*starts/i.test(checkoutError);
 
@@ -88,8 +89,10 @@ const [applyingDiscountCodeKey, setApplyingDiscountCodeKey] =
       const user = await getUserData();
       if (!user?._id) return;
       await scheduleCartReminder(user._id, eventId, async () => {
+        if (!draft.isCurrent()) return false;
+        const reminderDraft = createBookingDraftStore();
         const [cart, event, currentUser] = await Promise.all([
-          draft.get('cartData'), draft.get('eventDetails'), getUserData(),
+          reminderDraft.get('cartData'), reminderDraft.get('eventDetails'), getUserData(),
         ]);
         return !checkoutLock.current && !bookingSubmitted.current && currentUser?._id === user._id &&
           JSON.parse(event || '{}')?.eventId === eventId && !!JSON.parse(cart || '{}')?.vendors?.length;
@@ -120,10 +123,10 @@ const [cityOptions, setCityOptions] =
   useEffect(() => {
     const fetchCartData = async () => {
       try {
-        const storedCart = await draft.get('cartData');
-
-        const eventDetailsRaw =
-  await draft.get('eventDetails');
+        const [storedCart, eventDetailsRaw] = await Promise.all([
+          draft.get('cartData'), draft.get('eventDetails'),
+        ]);
+        loadedDraft.current = { cart: storedCart, event: eventDetailsRaw };
 
 const savedEventDetails =
   eventDetailsRaw
@@ -1204,8 +1207,13 @@ const isInvalidCode =
       )) throw new Error('Remove the package with a retired booking type from your cart before booking.');
 
 
-      const eventDetailsRaw = await draft.get('eventDetails');
+      const [eventDetailsRaw, latestCartRaw] = await Promise.all([
+        draft.get('eventDetails'), draft.get('cartData'),
+      ]);
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
+      if (!latestCartRaw || loadedDraft.current?.cart !== latestCartRaw || loadedDraft.current?.event !== eventDetailsRaw) {
+        throw new Error('Your cart changed on another device. Reopen Review Order before booking.');
+      }
       submittedEvent = eventDetails;
 
   const services = cartData.vendors.flatMap(
@@ -1270,6 +1278,7 @@ const isInvalidCode =
     if (!draft.isCurrent() || !eventDetails) throw new Error("Your session or event draft is unavailable.");
     const response = await postPlaceOrder({
       organizerId: session.userId,
+      bookingDraftRevision: draft.getRevision(),
       eventId: eventDetails?.eventId,
 
       eventDate: eventDetails?.eventDate,
@@ -1313,9 +1322,7 @@ const isInvalidCode =
           position: 'bottom',
         });
 
-        await Promise.allSettled([
-          cancelCartReminder(), draft.delete('cartData'), draft.delete('eventDetails'),
-        ]);
+        await cancelCartReminder();
         if (!draft.isCurrent()) return;
 
         const chatVendors = new Map<string, { id: string; name: string; avatar: string }>();

@@ -97,7 +97,7 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
     const sendBookingNotice = jest.fn();
     const service = new OrderService(user as any, orders as any, vendorOrders as any, {} as any, requests as any, {} as any,
         { find: () => query([{ _id: categoryId, name: 'Cake' }]) } as any,
-        { startSession: async () => session } as any, availability as any, {} as any,
+        { startSession: async () => session, db: { collection: () => ({ updateOne: async () => ({ matchedCount: 0 }) }) } } as any, availability as any, {} as any,
         { hasActiveSubscription: async () => true } as any,
         { requireActiveCity: async () => ({}), requireCityTimeZone: async () => 'UTC' } as any,
         {} as any, {} as any, policy, { sendBookingNotice } as any);

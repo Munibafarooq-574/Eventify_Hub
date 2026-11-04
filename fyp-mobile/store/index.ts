@@ -2,8 +2,35 @@ import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cancelCartReminder } from "../services/cartReminder";
 import { Platform } from "react-native";
+import { API_BASE_URL } from "../services/apiConfig";
 
-type DraftKey = 'cartData' | 'eventDetails' | 'aiPackage';
+type ServerDraftKey = 'cartData' | 'eventDetails';
+type DraftKey = ServerDraftKey | 'aiPackage';
+type DraftSnapshot = {
+  revision: number;
+  cartData: Record<string, unknown> | null;
+  eventDetails: Record<string, unknown> | null;
+};
+
+async function requestDraft(token: string, update?: { key: ServerDraftKey; value: unknown; revision: number }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/booking-draft`, {
+      method: update ? 'PATCH' : 'GET',
+      headers: { Authorization: `Bearer ${token}`, ...(update && { 'Content-Type': 'application/json' }) },
+      body: update ? JSON.stringify(update) : undefined,
+      signal: controller.signal,
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body || !Number.isInteger(body.revision)) {
+      throw new Error(typeof body?.message === 'string' ? body.message : 'Unable to sync your booking draft. Please try again.');
+    }
+    return body as DraftSnapshot;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 const isDraftKey = (key: string): key is DraftKey => key === 'cartData' || key === 'eventDetails' || key === 'aiPackage';
 
 let sessionVersion = 0;
@@ -43,37 +70,55 @@ export function createBookingDraftStore() {
       : null;
   }
 
-  const keyFor = (key: DraftKey, userId: string) => `booking-draft.${userId}.${key}`;
+  const aiKey = (userId: string) => `booking-draft.${userId}.aiPackage`;
+  let snapshot: DraftSnapshot | undefined;
+  let reading: Promise<DraftSnapshot> | undefined;
+
+  async function load(token: string) {
+    if (!reading) {
+      reading = requestDraft(token).finally(() => { reading = undefined; });
+    }
+    snapshot = await reading;
+    return snapshot;
+  }
+
+  function update(key: DraftKey, value: string | null) {
+    return serialize(async () => {
+      const session = await getSession();
+      if (!session) return;
+      if (key === 'aiPackage') {
+        if (value === null) await remove(aiKey(session.userId));
+        else await write(aiKey(session.userId), value);
+        return;
+      }
+      const previous = snapshot ?? await load(session.token);
+      if (!isCurrent()) return;
+      snapshot = await requestDraft(session.token, {
+        key, value: value === null ? null : JSON.parse(value), revision: previous.revision,
+      });
+      const vendors = snapshot.cartData?.vendors;
+      if (previous.eventDetails?.eventId !== snapshot.eventDetails?.eventId ||
+          (key === 'cartData' && (!Array.isArray(vendors) || !vendors.length))) {
+        await cancelCartReminder();
+      }
+    });
+  }
+
   return {
     isCurrent,
     getSession,
+    getRevision: () => snapshot?.revision,
     async get(key: DraftKey) {
       const session = await getSession();
       if (!session) return null;
-      const value = await read(keyFor(key, session.userId));
-      return isCurrent() ? value : null;
+      const value = key === 'aiPackage' ? await read(aiKey(session.userId)) : (await load(session.token))[key];
+      return !isCurrent() || value == null ? null : typeof value === 'string' ? value : JSON.stringify(value);
     },
     save(key: DraftKey, value: string) {
-      return serialize(async () => {
-        const session = await getSession();
-        if (!session) return;
-        const storageKey = keyFor(key, session.userId);
-        const replacesEvent = key === 'eventDetails' &&
-          JSON.parse(await read(storageKey) || '{}')?.eventId !== JSON.parse(value)?.eventId;
-        if (!isCurrent()) return;
-        await write(storageKey, value);
-        if (replacesEvent || (key === 'cartData' && !JSON.parse(value)?.vendors?.length)) {
-          await cancelCartReminder();
-        }
-      });
+      return update(key, value);
     },
     delete(key: DraftKey) {
-      return serialize(async () => {
-        const session = await getSession();
-        if (!session) return;
-        await remove(keyFor(key, session.userId));
-        await cancelCartReminder();
-      });
+      return update(key, null);
     },
   };
 }
@@ -99,8 +144,10 @@ export async function startUserSession(token: string, user: any) {
   sessionAvailable = false;
   await serialize(async () => {
     await cancelCartReminder();
-    // Shared drafts predate account ownership. Never adopt them into an account.
-    await Promise.allSettled([remove('cartData'), remove('eventDetails'), remove('aiPackage')]);
+    // Device drafts are retired. The server snapshot is the source of truth.
+    await Promise.allSettled([
+      remove('cartData'), remove('eventDetails'), remove('aiPackage'),
+    ]);
     try {
       await remove('token');
       await remove('user');

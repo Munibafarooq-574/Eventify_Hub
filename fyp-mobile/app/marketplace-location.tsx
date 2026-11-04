@@ -47,7 +47,7 @@ export default function MarketplaceLocation() {
       const location = await growthApi.patch<Location>('/auth/marketplace-location', { countryCode: country, cityId: cityId || null });
       if (!draft.isCurrent()) return;
       if (switching) {
-        await Promise.all([draft.delete('cartData'), draft.delete('eventDetails')]);
+        await createBookingDraftStore().delete('eventDetails');
       }
       const user = await getUserData();
       if (!draft.isCurrent()) return;

@@ -50,6 +50,7 @@ async placeOrder(
   @Request() req: any,
   @Body() body: {
     organizerId?: string;
+    bookingDraftRevision?: number;
     eventId: string;
     eventDate: string;
     eventTime: string;
@@ -133,6 +134,7 @@ async placeOrder(
                 body.eventId,
                 body.replacementRescheduleRequestId,
                 body.replacementVendorOrderId,
+                ...(body.bookingDraftRevision === undefined ? [] : [body.bookingDraftRevision] as const),
             );
             
             return order;

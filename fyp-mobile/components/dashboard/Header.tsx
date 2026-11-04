@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
 import React, { useCallback, useState } from 'react';
-import {
+import { AppState,
   Image,
   ScrollView,
   StyleSheet,
@@ -90,6 +90,10 @@ const Header: React.FC = () => {
   useCallback(() => {
     fetchUsername();
     fetchCartPackageCount();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void fetchCartPackageCount();
+    });
+    return () => subscription.remove();
   }, [])
 );
 
