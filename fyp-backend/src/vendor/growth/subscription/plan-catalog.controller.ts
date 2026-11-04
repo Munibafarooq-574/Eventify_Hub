@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import { AdminRoleGuard } from '../../../auth/admin-role.guard';
 import { PlanCatalogService } from './plan-catalog.service';
@@ -22,6 +22,11 @@ export class PlanCatalogController {
   @Put('plans/:key')
   updatePlan(@Param('key') key: string, @Body() body: unknown) {
     return this.catalog.savePlan(key, body, false);
+  }
+
+  @Patch('plans/:key/active')
+  setPlanActive(@Param('key') key: string, @Body('active') active: unknown) {
+    return this.catalog.setPlanActive(key, active);
   }
 
   @Delete('features/:key')
