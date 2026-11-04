@@ -411,7 +411,7 @@ useEffect(() => {
             Minimum Order
         ================================= */}
 
-        <Field label="Minimum Order Amount (Rs.) â€” optional">
+        <Field label="Minimum Order Amount (Rs.) - optional">
           <TextInput style={styles.input} placeholder="e.g. 75000" keyboardType="numeric" value={minimumOrderAmount} onChangeText={setMinimumOrderAmount} />
         </Field>
 
@@ -420,7 +420,7 @@ useEffect(() => {
         ================================= */}
 
         {discountType === DiscountKind.PERCENTAGE && (
-          <Field label="Maximum Discount (Rs.) â€” optional">
+          <Field label="Maximum Discount (Rs.) - optional">
             <TextInput style={styles.input} placeholder="e.g. 10000" keyboardType="numeric" value={maximumDiscountAmount} onChangeText={setMaximumDiscountAmount} />
           </Field>
         )}
