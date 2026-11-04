@@ -64,6 +64,14 @@ async function deleteFeature(form: FormData) {
   await submitCatalog(`/features/${encodeURIComponent(key)}`, "DELETE", {});
 }
 
+async function togglePlan(form: FormData) {
+  "use server";
+  const key = String(form.get("key") ?? "");
+  await submitCatalog(`/plans/${encodeURIComponent(key)}/active`, "PATCH", {
+    active: form.get("active") === "true",
+  });
+}
+
 async function savePlan(existingKey: string | null, form: FormData) {
   "use server";
   const key = existingKey ?? String(form.get("key") ?? "").trim();
@@ -164,16 +172,16 @@ export default async function SubscriptionPlansPage({ searchParams }: {
             </section>
             <section className="rounded-xl border border-slate-200 bg-white p-5">
               <h2 className="mb-2 font-bold">Manage custom features</h2>
-              <p className="mb-3 text-sm text-slate-600">Delete removes a custom display benefit from all plans. Built-in access features cannot be deleted; uncheck them in the plan editor.</p>
+              <p className="mb-3 text-sm text-slate-600">Delete removes a custom display benefit from all plans. Deleting a built-in feature removes it from the catalog and every plan, and disables its subscription entitlement. Existing booking and payment records are preserved.</p>
               <div className="grid gap-2">
-                {catalog.features.filter(feature => feature.key.startsWith("custom:")).map(feature => (
+                {catalog.features.map(feature => (
                   <form key={feature.key} action={deleteFeature} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 p-3">
-                    <span>{feature.name}</span>
+                    <span>{feature.name} {feature.controlsAccess ? "(app feature)" : "(display benefit)"}</span>
                     <input type="hidden" name="key" value={feature.key} />
                     <button type="submit" className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-50">Delete</button>
                   </form>
                 ))}
-                {!catalog.features.some(feature => feature.key.startsWith("custom:")) && <p className="text-sm text-slate-500">No custom features added yet.</p>}
+
               </div>
             </section>
             <details className="rounded-xl border border-slate-200 bg-white p-5">
@@ -181,12 +189,22 @@ export default async function SubscriptionPlansPage({ searchParams }: {
               <PlanForm features={catalog.features} />
             </details>
             {catalog.plans.map(plan => (
-              <details key={plan.key} className="rounded-xl border border-slate-200 bg-white p-5">
+              <div key={plan.key} className="rounded-xl border border-slate-200 bg-white p-5">
+                <form action={togglePlan} className="mb-3 flex items-center justify-between gap-3">
+                  <span className="font-semibold">{plan.name} — {plan.isPurchasable ? "Active" : "Inactive"}</span>
+                  <input type="hidden" name="key" value={plan.key} />
+                  <input type="hidden" name="active" value={String(!plan.isPurchasable)} />
+                  <button type="submit" disabled={plan.key === "free"} className={plan.isPurchasable ? "rounded-md border border-amber-400 px-3 py-2 text-amber-800" : "rounded-md border border-green-500 px-3 py-2 text-green-800"}>
+                    {plan.isPurchasable ? "Deactivate plan" : "Activate plan"}
+                  </button>
+                </form>
+                <details className="border-t border-slate-100 pt-3">
                 <summary className="mb-4 cursor-pointer font-bold">
                   {plan.name} · {plan.isPurchasable ? "Available" : "Hidden"}
                 </summary>
                 <PlanForm plan={plan} features={catalog.features} />
-              </details>
+                </details>
+              </div>
             ))}
           </>
         )}
