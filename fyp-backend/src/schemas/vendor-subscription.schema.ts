@@ -63,6 +63,15 @@ export class VendorSubscription extends Document {
     Types.ObjectId;
 
 
+  @Prop({ type: MongooseSchema.Types.Mixed, default: null })
+  entitlementSnapshot: {
+    name: string;
+    rank: number;
+    features: Record<string, boolean>;
+    limits: Record<string, number>;
+    featureLabels: string[];
+  } | null;
+
   @Prop({
     type:
       String,
