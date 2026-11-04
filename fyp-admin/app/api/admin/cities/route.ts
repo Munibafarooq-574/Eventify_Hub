@@ -67,9 +67,17 @@ export async function POST(
     );
   }
 
+  let body: unknown;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { message: "Invalid request body." },
+      { status: 400 },
+    );
+  }
 
+  try {
     const response = await backendFetch(
       "/admin/cities",
       {
@@ -87,7 +95,7 @@ export async function POST(
       .json()
       .catch(() => ({
         message:
-          "Unable to create city.",
+          `Unable to create city. The backend returned HTTP ${response.status}.`,
       }));
 
     return NextResponse.json(data, {
@@ -95,13 +103,8 @@ export async function POST(
     });
   } catch {
     return NextResponse.json(
-      {
-        message:
-          "Invalid request body.",
-      },
-      {
-        status: 400,
-      },
+      { message: "The city service is unavailable. Please try again." },
+      { status: 502 },
     );
   }
 }

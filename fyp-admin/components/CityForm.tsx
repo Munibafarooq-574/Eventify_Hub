@@ -5,6 +5,22 @@ import {
   useState,
 } from "react";
 
+const COUNTRIES = [
+  { code: "PK", name: "Pakistan" },
+  { code: "US", name: "United States" },
+];
+
+const US_TIME_ZONES = [
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Phoenix",
+  "America/Los_Angeles",
+  "America/Anchorage",
+  "America/Adak",
+  "Pacific/Honolulu",
+];
+
 type City = {
   _id: string;
   name: string;
@@ -12,6 +28,7 @@ type City = {
   countryName: string;
   stateProvinceCode?: string;
   stateProvinceName?: string;
+  timeZone?: string;
   isActive?: boolean;
 };
 
@@ -58,15 +75,13 @@ export default function CityForm({
   const [name, setName] =
     useState(city?.name || "");
 
-  const [countryCode, setCountryCode] =
-    useState(
-      city?.countryCode || "PK",
-    );
-
-  const [countryName, setCountryName] =
-    useState(
-      city?.countryName || "Pakistan",
-    );
+  const [countryCode, setCountryCode] = useState(city?.countryCode || "PK");
+  const [timeZone, setTimeZone] = useState(
+    city?.timeZone || (countryCode === "PK" ? "Asia/Karachi" : ""),
+  );
+  const countries = city && !COUNTRIES.some(({ code }) => code === city.countryCode)
+    ? [...COUNTRIES, { code: city.countryCode, name: city.countryName }]
+    : COUNTRIES;
 
   const [
     stateProvinceCode,
@@ -102,17 +117,22 @@ export default function CityForm({
       return;
     }
 
-    if (!countryCode.trim()) {
-      setError(
-        "Country code is required.",
-      );
+    const country = countries.find(({ code }) => code === countryCode);
+    if (!country) {
+      setError("Select a country.");
       return;
     }
 
-    if (!countryName.trim()) {
-      setError(
-        "Country name is required.",
-      );
+    const cityTimeZone = timeZone.trim();
+    if (!cityTimeZone) {
+      setError("Enter the city's timezone.");
+      return;
+    }
+
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: cityTimeZone });
+    } catch {
+      setError("Enter a valid IANA timezone, such as America/Los_Angeles.");
       return;
     }
 
@@ -136,13 +156,9 @@ export default function CityForm({
           body: JSON.stringify({
             name: name.trim(),
 
-            countryCode:
-              countryCode
-                .trim()
-                .toUpperCase(),
-
-            countryName:
-              countryName.trim(),
+            countryCode: country.code,
+            countryName: country.name,
+            timeZone: cityTimeZone,
 
             stateProvinceCode:
               stateProvinceCode
@@ -188,7 +204,7 @@ export default function CityForm({
       className="space-y-5"
     >
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
         </div>
       ) : null}
@@ -262,48 +278,49 @@ export default function CityForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label
-            htmlFor="country-name"
-            className="mb-2 block text-sm font-semibold text-slate-700"
-          >
+          <label htmlFor="country-code" className="mb-2 block text-sm font-semibold text-slate-700">
             Country *
           </label>
-
-          <input
-            id="country-name"
-            value={countryName}
-            onChange={(event) =>
-              setCountryName(
-                event.target.value,
-              )
-            }
-            required
+          <select
+            id="country-code"
+            value={countryCode}
+            onChange={(event) => {
+              const code = event.target.value;
+              setCountryCode(code);
+              setTimeZone(
+                (code === city?.countryCode ? city.timeZone : undefined) ||
+                  (code === "PK" ? "Asia/Karachi" : ""),
+              );
+            }}
             disabled={submitting}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:bg-slate-50"
-          />
+          >
+            {countries.map(({ code, name }) => (
+              <option key={code} value={code}>{name} ({code})</option>
+            ))}
+          </select>
         </div>
 
         <div>
-          <label
-            htmlFor="country-code"
-            className="mb-2 block text-sm font-semibold text-slate-700"
-          >
-            Country Code *
+          <label htmlFor="city-timezone" className="mb-2 block text-sm font-semibold text-slate-700">
+            Timezone *
           </label>
-
           <input
-            id="country-code"
-            value={countryCode}
-            onChange={(event) =>
-              setCountryCode(
-                event.target.value,
-              )
-            }
-            required
-            maxLength={3}
+            id="city-timezone"
+            value={timeZone}
+            onChange={(event) => setTimeZone(event.target.value)}
+            list={countryCode === "US" ? "us-timezones" : undefined}
+            aria-describedby="city-timezone-help"
+            placeholder={countryCode === "PK" ? "Asia/Karachi" : "America/Los_Angeles"}
             disabled={submitting}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm uppercase text-slate-900 outline-none transition focus:border-slate-500 disabled:bg-slate-50"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:bg-slate-50"
           />
+          <datalist id="us-timezones">
+            {US_TIME_ZONES.map((zone) => <option key={zone} value={zone} />)}
+          </datalist>
+          <p id="city-timezone-help" className="mt-2 text-xs text-slate-500">
+            Use the city’s IANA timezone so booking times follow local daylight saving rules.
+          </p>
         </div>
       </div>
 

@@ -15,6 +15,7 @@ type City = {
   countryName: string;
   stateProvinceCode?: string;
   stateProvinceName?: string;
+  timeZone?: string;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;

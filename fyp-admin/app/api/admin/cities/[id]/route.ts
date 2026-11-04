@@ -39,9 +39,17 @@ export async function PATCH(
     );
   }
 
+  let body: unknown;
   try {
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { message: "Invalid request body." },
+      { status: 400 },
+    );
+  }
 
+  try {
     const response = await backendFetch(
       `/admin/cities/${encodeURIComponent(
         id,
@@ -61,7 +69,7 @@ export async function PATCH(
       .json()
       .catch(() => ({
         message:
-          "Unable to update city.",
+          `Unable to update city. The backend returned HTTP ${response.status}.`,
       }));
 
     return NextResponse.json(data, {
@@ -69,13 +77,8 @@ export async function PATCH(
     });
   } catch {
     return NextResponse.json(
-      {
-        message:
-          "Invalid request body.",
-      },
-      {
-        status: 400,
-      },
+      { message: "The city service is unavailable. Please try again." },
+      { status: 502 },
     );
   }
 }
