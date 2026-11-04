@@ -49,6 +49,16 @@ function isConnectionError(error: unknown) {
     (error instanceof Error && /connection interrupted/i.test(error.message));
 }
 
+function getCartPromotions(cart: any): Record<string, any> {
+  const entries = (cart?.vendors || []).flatMap((vendor: any) =>
+    (vendor.packages || []).map((pkg: any) => {
+      const key = `${vendor.vendor?._id}:${pkg.packageId || pkg._id}`;
+      return [key, cart.appliedPromotions?.[key]];
+    }),
+  );
+  return Object.fromEntries(entries.filter(([, promotion]: any[]) => !!promotion));
+}
+
 const OrderReviewScreen = () => {
   const [draft] = useState(createBookingDraftStore);
   const [cartData, setCartData] = useState<any>(null);
@@ -59,7 +69,8 @@ const OrderReviewScreen = () => {
   const [refreshNotice, setRefreshNotice] = useState('');
   const connectivityRequest = useRef(0);
   const checkoutLock = useRef(false);
-  const loadedDraft = useRef<{ cart: string | null; event: string | null } | null>(null);
+  const promotionWriteLock = useRef(false);
+  const loadedDraft = useRef<{ cart: string | null; event: string | null; revision?: number } | null>(null);
   const bookingSubmitted = useRef(false);
   const replacementDeadlinePassed = /replacement.*only.*before.*event.*starts/i.test(checkoutError);
 
@@ -126,7 +137,7 @@ const [cityOptions, setCityOptions] =
         const [storedCart, eventDetailsRaw] = await Promise.all([
           draft.get('cartData'), draft.get('eventDetails'),
         ]);
-        loadedDraft.current = { cart: storedCart, event: eventDetailsRaw };
+        loadedDraft.current = { cart: storedCart, event: eventDetailsRaw, revision: draft.getRevision() };
 
 const savedEventDetails =
   eventDetailsRaw
@@ -189,7 +200,9 @@ try {
         );
         setCateringCategory(catering || null);
 
-        setCartData(storedCart ? JSON.parse(storedCart) : { vendors: [] });
+        const cart = storedCart ? JSON.parse(storedCart) : { vendors: [] };
+        setCartData(cart);
+        setAppliedPromotions(getCartPromotions(cart));
       } catch (error) {
         console.error('Error fetching cart data:', error);
         setCartData({ vendors: [] });
@@ -711,12 +724,35 @@ useEffect(() => {
   );
 }, [cartData]);
 
+const savePromotion = async (key: string, promotion: any | null) => {
+  if (promotionWriteLock.current || checkoutLock.current || !draft.isCurrent()) {
+    throw new Error('Please wait for your current cart update to finish.');
+  }
+  promotionWriteLock.current = true;
+  try {
+    const current = loadedDraft.current;
+    if (!current?.cart) throw new Error('Open My Cart and try again.');
+    const cart = JSON.parse(current.cart);
+    const promotions = getCartPromotions(cart);
+    if (promotion) promotions[key] = promotion;
+    else delete promotions[key];
+    const updated = JSON.stringify({ ...cart, appliedPromotions: promotions });
+    // The bound store writes against the revision read by this screen.
+    await draft.save('cartData', updated, current.revision);
+    if (!draft.isCurrent()) return;
+    loadedDraft.current = { ...current, cart: updated, revision: draft.getRevision() };
+    setAppliedPromotions(promotions);
+  } finally {
+    promotionWriteLock.current = false;
+  }
+};
+
 const handleApplyPublicCoupon = async (
   vendor: any,
   pkg: any,
   coupon: any,
 ) => {
-  if (refreshing) return;
+  if (refreshing || applyingCouponId || applyingDiscountCodeKey || checkoutLock.current) return;
   const vendorId = String(
     vendor?.vendor?._id || '',
   );
@@ -800,25 +836,14 @@ try {
 
     const result = response.data;
 
-    setAppliedPromotions(
-      (current) => ({
-        ...current,
-        [key]: {
-          promotionId:
-            result.discountEntryId,
-          promotionType: 'COUPON',
-          promotionCode:
-            result.code,
-          originalAmount,
-          discountAmount: Number(
-            result.discountAmount || 0,
-          ),
-          finalAmount: Number(
-            result.finalAmount,
-          ),
-        },
-      }),
-    );
+    await savePromotion(key, {
+      promotionId: result.discountEntryId,
+      promotionType: 'COUPON',
+      promotionCode: result.code,
+      originalAmount,
+      discountAmount: Number(result.discountAmount || 0),
+      finalAmount: Number(result.finalAmount),
+    });
 
     Toast.show({
       type: 'success',
@@ -835,7 +860,7 @@ const backendMessage =
     ? rawMessage
     : typeof rawMessage?.message === 'string'
       ? rawMessage.message
-      : 'This offer could not be applied.';
+      : error instanceof Error ? error.message : 'This offer could not be applied.';
 
 Alert.alert(
   'Offer Requirements Not Met',
@@ -874,34 +899,22 @@ const confirmPromotionReplacement = (
   });
 };
 
-const handleRemovePromotion = (
-  promotionKey: string,
-) => {
-  if (refreshing) return;
-  setAppliedPromotions((current) => {
-    const next = { ...current };
-    delete next[promotionKey];
-    return next;
-  });
-
-  setDiscountCodes((current) => ({
-    ...current,
-    [promotionKey]: '',
-  }));
-
-  Toast.show({
-    type: 'info',
-    text1: 'Discount Removed',
-    text2: 'The applied discount has been removed.',
-    position: 'bottom',
-  });
+const handleRemovePromotion = async (promotionKey: string) => {
+  if (refreshing || applyingCouponId || applyingDiscountCodeKey || checkoutLock.current) return;
+  try {
+    await savePromotion(promotionKey, null);
+    setDiscountCodes(current => ({ ...current, [promotionKey]: '' }));
+    Toast.show({ type: 'info', text1: 'Discount Removed', position: 'bottom' });
+  } catch (error) {
+    Alert.alert('Unable to remove discount', error instanceof Error ? error.message : 'Please try again.');
+  }
 };
 
 const handleApplyDiscountCode = async (
   vendor: any,
   pkg: any,
 ) => {
-  if (refreshing) return;
+  if (refreshing || applyingCouponId || applyingDiscountCodeKey || checkoutLock.current) return;
   const vendorId = String(
     vendor?.vendor?._id || '',
   );
@@ -992,26 +1005,14 @@ try {
 
     const result = response.data;
 
-    setAppliedPromotions(
-      (current) => ({
-        ...current,
-        [key]: {
-          promotionId:
-            result.discountEntryId,
-          promotionType:
-            'DISCOUNT_CODE',
-          promotionCode:
-            result.code,
-          originalAmount,
-          discountAmount: Number(
-            result.discountAmount || 0,
-          ),
-          finalAmount: Number(
-            result.finalAmount,
-          ),
-        },
-      }),
-    );
+    await savePromotion(key, {
+      promotionId: result.discountEntryId,
+      promotionType: 'DISCOUNT_CODE',
+      promotionCode: result.code,
+      originalAmount,
+      discountAmount: Number(result.discountAmount || 0),
+      finalAmount: Number(result.finalAmount),
+    });
 
     setDiscountCodes((current) => ({
   ...current,
@@ -1036,7 +1037,7 @@ const backendMessage =
     ? rawMessage
     : typeof rawMessage?.message === 'string'
       ? rawMessage.message
-      : undefined;
+      : error instanceof Error ? error.message : undefined;
 
 const isInvalidCode =
   status === 404;
@@ -1083,7 +1084,7 @@ const isInvalidCode =
   }, []);
 
   const { refreshing, refreshControl } = usePullToRefresh(async () => {
-    if (checkoutLock.current || applyingCouponId || applyingDiscountCodeKey) return;
+    if (checkoutLock.current || promotionWriteLock.current || applyingCouponId || applyingDiscountCodeKey) return;
     ++connectivityRequest.current;
 
     try {
@@ -1103,7 +1104,19 @@ const isInvalidCode =
         return;
       }
 
-      const promotions = { ...appliedPromotions };
+      const [serverCartRaw, serverEventRaw] = await Promise.all([
+        draft.get('cartData'), draft.get('eventDetails'),
+      ]);
+      const saved = loadedDraft.current;
+      const serverCart = serverCartRaw ? JSON.parse(serverCartRaw) : null;
+      if (!serverCart || !saved?.cart || saved.event !== serverEventRaw ||
+          JSON.stringify(JSON.parse(saved.cart).vendors) !== JSON.stringify(serverCart.vendors)) {
+        setRefreshNotice('Your cart changed on another device. Open My Cart to review it.');
+        return;
+      }
+      loadedDraft.current = { cart: serverCartRaw, event: serverEventRaw, revision: draft.getRevision() };
+      const promotions = getCartPromotions(serverCart);
+      setAppliedPromotions(promotions);
       const results = await Promise.all(vendors.map(async vendor => {
         const vendorId = String(vendor.vendor?._id || '');
         const latestPackages = await getVendorPackagesList(vendorId);
@@ -1191,7 +1204,7 @@ const isInvalidCode =
   });
 
   const handleCheckout = async () => {
-    if (checkoutLock.current || bookingSubmitted.current || refreshing || refreshNotice) return;
+    if (checkoutLock.current || promotionWriteLock.current || applyingCouponId || applyingDiscountCodeKey || bookingSubmitted.current || refreshing || refreshNotice) return;
     checkoutLock.current = true;
     setCheckoutError('');
     setPlacingOrder(true);
@@ -2552,7 +2565,7 @@ const packages =
           <TouchableOpacity
             style={[styles.bookButton, (placingOrder || refreshing || (!!refreshNotice && !replacementDeadlinePassed)) && styles.bookButtonDisabled]}
             onPress={replacementDeadlinePassed ? () => router.replace('/myevents') : handleCheckout}
-            disabled={placingOrder || refreshing || (!!refreshNotice && !replacementDeadlinePassed)}
+            disabled={placingOrder || !!applyingCouponId || !!applyingDiscountCodeKey || refreshing || (!!refreshNotice && !replacementDeadlinePassed)}
             activeOpacity={0.85}
           >
             {placingOrder ? (

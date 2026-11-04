@@ -120,7 +120,7 @@ export function createBookingDraftStore() {
     return snapshot;
   }
 
-  function update(key: DraftKey, value: string | null) {
+  function update(key: DraftKey, value: string | null, expectedRevision?: number) {
     return serialize(async () => {
       const session = await getSession();
       if (!session) return;
@@ -132,7 +132,7 @@ export function createBookingDraftStore() {
       const previous = snapshot ?? await load(session);
       if (!isCurrent()) return;
       snapshot = await requestDraft(session.token, {
-        key, value: value === null ? null : JSON.parse(value), revision: previous.revision,
+        key, value: value === null ? null : JSON.parse(value), revision: expectedRevision ?? previous.revision,
       });
       const vendors = snapshot.cartData?.vendors;
       if (previous.eventDetails?.eventId !== snapshot.eventDetails?.eventId ||
@@ -152,8 +152,8 @@ export function createBookingDraftStore() {
       const value = key === 'aiPackage' ? await read(aiKey(session.userId)) : (await load(session))[key];
       return !isCurrent() || value == null ? null : typeof value === 'string' ? value : JSON.stringify(value);
     },
-    save(key: DraftKey, value: string) {
-      return update(key, value);
+    save(key: DraftKey, value: string, expectedRevision?: number) {
+      return update(key, value, expectedRevision);
     },
     delete(key: DraftKey) {
       return update(key, null);

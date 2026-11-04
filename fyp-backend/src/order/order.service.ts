@@ -462,6 +462,20 @@ export class OrderService {
 
                     // Claim and consume this cart revision inside the booking transaction.
                     // A failed booking rolls this write back along with the booking.
+                    const promotionMatch = bookingDraftRevision === undefined ? {} : Object.fromEntries(services.flatMap(service => {
+                        const vendorId = String(service.vendorId);
+                        const packageId = String(service.packageId);
+                        if (!/^[a-f\d]{24}$/i.test(vendorId) || !/^[a-f\d]{24}$/i.test(packageId)) {
+                            throw new BadRequestException('Invalid vendor or package ID.');
+                        }
+                        const path = `cartData.appliedPromotions.${vendorId}:${packageId}`;
+                        const promotion = service.promotion;
+                        return promotion ? [
+                            [`${path}.promotionId`, promotion.promotionId],
+                            [`${path}.promotionType`, promotion.promotionType],
+                            [`${path}.promotionCode`, promotion.promotionCode],
+                        ] : [[path, null]];
+                    }));
                     const clearedDraft = await this.connection.db!.collection<BookingDraft>(BOOKING_DRAFT_COLLECTION).updateOne(
                         {
                             _id: new Types.ObjectId(organizerId),
@@ -469,6 +483,10 @@ export class OrderService {
                             ...(bookingDraftRevision !== undefined && {
                                 revision: bookingDraftRevision,
                                 'cartData.vendors.0': { $exists: true },
+                                $or: [
+                                    { 'cartData.appliedPromotions': { $exists: false } },
+                                    promotionMatch,
+                                ],
                             }),
                         },
                         { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
