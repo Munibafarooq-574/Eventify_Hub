@@ -2723,6 +2723,16 @@ async completeVendorOrder(vendorOrderId: string) {
         if (!Number.isFinite(oldEventStart.getTime()) || oldEventStart.getTime() <= Date.now()) {
             throw new ConflictException('This event has already started and cannot be rescheduled.');
         }
+        const scheduleFormat = new Intl.DateTimeFormat('en-GB', {
+            day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit',
+            hour12: true, timeZone: rescheduleTimeZone,
+        });
+        const currentSchedule = order.eventStartDateTime
+            ? scheduleFormat.format(oldEventStart)
+            : [new Intl.DateTimeFormat('en-GB', {
+                day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+            }).format(oldEventStart), order.eventTime].filter(Boolean).join(', ');
+        const requestedSchedule = scheduleFormat.format(newEventStart);
         const oldEventEnd = order.eventEndDateTime
             ? new Date(order.eventEndDateTime)
             : new Date(oldEventStart.getTime() + Number(order.eventDurationMinutes || 60) * 60000);
@@ -2864,7 +2874,12 @@ async completeVendorOrder(vendorOrderId: string) {
                     chatId,
                     requesterId,
                     String(vendorOrder.vendorId),
-                    `Rescheduling requested: ${dto.eventDate} at ${dto.eventTime}. Please review the booking rescheduling request.`,
+                    [
+                        'The client has requested to reschedule this booking.',
+                        `Current: ${currentSchedule}`,
+                        `Requested: ${requestedSchedule}`,
+                        'Please review and respond.',
+                    ].join('\n'),
                 );
             } catch (error) {
                 console.log('Reschedule chat message failed:', error instanceof Error ? error.message : error);

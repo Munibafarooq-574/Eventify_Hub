@@ -85,12 +85,14 @@ describe('Automatic booking chat', () => {
 
     it('posts a distinct confirmation to the organizer and uses the existing push path once', async () => {
         const push = jest.spyOn(chat, 'sendPushNotification').mockResolvedValue(undefined);
-        await gateway.sendBookingNotice(order, photography, 'confirmed', true);
-        await gateway.sendBookingNotice(order, photography, 'confirmed', true);
+        const payment = { amount: 15000, remainingAmount: 35000 };
+        await gateway.sendBookingNotice(order, photography, 'confirmed', true, payment);
+        await gateway.sendBookingNotice(order, photography, 'confirmed', true, payment);
 
         const message = await db.model(Message.name).findOne({ bookingNoticeKey: `${photography._id}:confirmed` });
         expect(message).toMatchObject({ senderId: String(photographer), receiverId: String(organizerId) });
         expect(message?.message).toContain('Booking confirmed for Sara Wedding on 20 September.');
+        expect(message?.message).toContain('Down payment received for Sara Wedding.\nAmount: Rs. 15,000\nRemaining: Rs. 35,000');
         expect(push).toHaveBeenCalledTimes(1);
         expect(push).toHaveBeenCalledWith('Booking confirmed', message?.message, String(organizerId), 'MESSAGE');
         push.mockRestore();
@@ -114,6 +116,7 @@ describe('Automatic booking chat', () => {
         expect(messages[0]).toMatchObject({ chatId, senderId: String(baker), receiverId: String(organizerId) });
         expect(messages[0].message).toContain(`Booking ${stage} for Sara Wedding on 20 September.`);
         if (stage === 'cancelled') {
+            expect(messages[0].message).toContain('The vendor has cancelled this booking. Your payment/refund information is available in the booking details.');
             expect(assertHistoryBooking).toHaveBeenCalledWith(String(booking._id), String(organizerId), String(baker));
         }
     });

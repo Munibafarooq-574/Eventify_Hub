@@ -18,7 +18,6 @@ describe('Down payment and expiry safety',()=>{
  it('confirmation commits successful payment and secured booking together',async()=>{const f=fixture();await f.s.initiatePayment('booking','CARD','client');await f.s.confirmPayment('payment');expect(f.booking.paymentStatus).toBe('PARTIALLY_PAID');expect(f.booking.confirmationTime).toEqual(f.payments[0].paidAt);expect(f.booking.paymentDeadline).toBeNull();expect(f.payments[0].save).toHaveBeenCalledWith({session:f.session});expect(f.booking.save).toHaveBeenCalledWith({session:f.session})});
  it('posts a booking confirmation only after a verified down payment commits', async () => {
   const f = fixture();
-  f.booking.bookingChatTimeZone = 'Asia/Karachi';
   const parent = { _id:'order', organizerId:'client' };
   f.s.orderModel.findById = () => q(parent);
   const sendBookingNotice = jest.fn();
@@ -30,7 +29,7 @@ describe('Down payment and expiry safety',()=>{
     expect(sendBookingNotice).not.toHaveBeenCalled();
   };
   await f.s.confirmPayment('payment');
-  expect(sendBookingNotice).toHaveBeenCalledWith(parent, f.booking, 'confirmed', true);
+  expect(sendBookingNotice).toHaveBeenCalledWith(parent, f.booking, 'confirmed', true, { amount: 3000, remainingAmount: 3000 });
   await expect(f.s.confirmPayment('payment')).rejects.toThrow('already resolved');
   expect(sendBookingNotice).toHaveBeenCalledTimes(1);
  });

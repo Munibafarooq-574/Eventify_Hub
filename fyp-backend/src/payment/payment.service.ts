@@ -1173,7 +1173,7 @@ private buildPaymentReceiptEmail(
         
         const initialPayment = await this.paymentModel.findById(paymentId);
         if (!initialPayment) throw new NotFoundException('Payment not found');
-        const {payment, vendorOrder, paidSoFar, bookingAmount} = await withBookingPaymentLock(
+        const { payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount } = await withBookingPaymentLock(
             this.vendorOrderModel.db, this.vendorOrderModel, initialPayment.vendorOrderId, async session => {
         const payment =
             await this.paymentModel.findById(paymentId).session(session);
@@ -1246,10 +1246,8 @@ if (paidSoFar >= bookingAmount) {
         'PAYMENT_REQUIRED';
 }
 
-vendorOrder.remainingAmount = Math.max(
-    bookingAmount - paidSoFar,
-    0,
-);
+const remainingAmount = Math.max(bookingAmount - paidSoFar, 0);
+vendorOrder.remainingAmount = remainingAmount;
 if (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
     if (payment.type === 'DOWN_PAYMENT') vendorOrder.confirmationTime = vendorOrder.confirmationTime || payment.paidAt;
     vendorOrder.paymentDeadline = null;
@@ -1260,13 +1258,16 @@ if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline =
        if (payment.type === 'DOWN_PAYMENT' && paymentVerificationOverdue(vendorOrder,payment)) throw new ConflictException('Payment verification is overdue. Service is not secured; Admin review is required.');
        await vendorOrder.save({session});
 
-        return { payment, vendorOrder, paidSoFar, bookingAmount };
+        return { payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount };
         });
 
-        if (payment.type === 'DOWN_PAYMENT' && vendorOrder.confirmationTime && vendorOrder.bookingChatTimeZone) {
+        if (payment.type === 'DOWN_PAYMENT' && vendorOrder.confirmationTime) {
             try {
                 const bookingOrder = await this.orderModel.findById(vendorOrder.orderId).lean();
-                if (bookingOrder) await this.chatGateway?.sendBookingNotice(bookingOrder, vendorOrder, 'confirmed', true);
+                if (bookingOrder) await this.chatGateway?.sendBookingNotice(bookingOrder, vendorOrder, 'confirmed', true, {
+                    amount: payment.amount,
+                    remainingAmount,
+                });
             } catch (error) {
                 console.warn('Could not load the order for its booking chat confirmation', error);
             }

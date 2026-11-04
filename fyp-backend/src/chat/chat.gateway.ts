@@ -1,4 +1,4 @@
-import { BookingChatLine, BookingChatOrder, BookingChatStage, formatBookingNotice } from './booking-chat-notice';
+import { BookingChatLine, BookingChatOrder, BookingChatPayment, BookingChatStage, formatBookingNotice } from './booking-chat-notice';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
@@ -1064,11 +1064,13 @@ export class ChatGateway
         await this.publishMessage(payload.chatId, payload.receiverId, message);
     }
 
-    async sendBookingNotice(order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage, push = false) {
+    async sendBookingNotice(
+        order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage, push = false, payment?: BookingChatPayment,
+    ) {
         try {
             const message = await this.chatService.createBookingNotice(
                 String(order.organizerId), String(booking.vendorId), String(booking._id),
-                stage, formatBookingNotice(order, booking, stage),
+                stage, formatBookingNotice(order, booking, stage, payment),
             );
             if (!message) return;
             await this.publishMessage(message.chatId, message.receiverId, message);

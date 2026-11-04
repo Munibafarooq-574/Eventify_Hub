@@ -5,7 +5,11 @@ export type BookingChatOrder = Pick<Order, 'organizerId' | 'eventName' | 'eventD
 export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService'>;
 export type BookingChatStage = 'requested' | 'confirmed' | 'completed' | 'cancelled';
 
-export function formatBookingNotice(order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage) {
+export type BookingChatPayment = { amount: number; remainingAmount: number };
+
+export function formatBookingNotice(
+    order: BookingChatOrder, booking: BookingChatLine, stage: BookingChatStage, payment?: BookingChatPayment,
+) {
     const timeZone = booking.bookingChatTimeZone ?? 'UTC';
     const formatDate = (date: Date, zone: string) => new Intl.DateTimeFormat('en-GB', {
         day: 'numeric', month: 'long', timeZone: zone,
@@ -25,6 +29,10 @@ export function formatBookingNotice(order: BookingChatOrder, booking: BookingCha
         : end && `Time: ${formatTime(start)} – ${formatTime(end)}`);
     return [
         `Booking ${stage === 'requested' ? 'request sent' : stage} for ${order.eventName} on ${eventDate}.`,
+        payment && `Down payment received for ${order.eventName}.`,
+        payment && `Amount: Rs. ${payment.amount.toLocaleString('en-PK')}`,
+        payment && `Remaining: Rs. ${payment.remainingAmount.toLocaleString('en-PK')}`,
+        stage === 'cancelled' && 'The vendor has cancelled this booking. Your payment/refund information is available in the booking details.',
         booking.bookingChatService && `Service: ${booking.bookingChatService}`,
         `Package: ${booking.serviceName}`,
         schedule,

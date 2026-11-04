@@ -121,6 +121,19 @@ describe('Later-time decisions use the existing reschedule approval flow',()=>{
  function setup(){const f=laterFixture();f.s.orderModel.findById=()=>q(f.order);f.s.vendorOrderModel.find=()=>q([f.sibling,f.old]);f.s.vendorOrderModel.findById=()=>q(f.old);f.s.rescheduleRequestModel.findOne=()=>q(null);f.s.rescheduleRequestModel.create=jest.fn(async(data:any)=>Array.isArray(data)?data:data);f.s.chatService={createOrGetConversation:async()=>'chat',createMessage:async()=>{}};return f;}
  const dto={eventDate:'2026-11-11',eventTime:'15:00',durationMinutes:60,reason:'Later time requested'};
  it('client agreement to the exact suggested time reuses approval without asking that vendor again',async()=>{const f=setup();f.order.eventDurationMinutes=60;f.old.laterTimeRequest.suggestedEventStart=new Date('2026-11-11T10:00:00Z');f.s.applyRescheduleIfAllAccepted=jest.fn(async()=>({applied:false}));const result=await f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto);expect(result.requests[0].status).toBe('ACCEPTED');expect(result.requests[1].status).toBe('CHANGE_REQUESTED');expect(f.old.laterTimeRequest.clientAcceptedSuggestion).toBe(true);expect(f.old.status).toBe('pending');expect(f.s.applyRescheduleIfAllAccepted).toHaveBeenCalledTimes(1);expect(f.sibling.status).toBe('accepted');expect(f.order.eventTime).toBe('13:00')});
+ it('posts both event schedules to each affected vendor chat in the booking city time zone', async () => {
+  const f = setup();
+  const createMessage = jest.fn();
+  f.s.chatService.createMessage = createMessage;
+  await f.s.requestEventReschedule(String(f.order._id), f.actor.id, dto);
+
+  expect(createMessage).toHaveBeenCalledTimes(2);
+  for (const vendor of [f.old, f.sibling]) {
+   expect(createMessage).toHaveBeenCalledWith('chat', f.actor.id, String(vendor.vendorId), expect.stringMatching(
+    /Current: 10 November 2026(?:,| at)? 1:00 pm\nRequested: 11 November 2026(?:,| at)? 3:00 pm\nPlease review and respond\./i,
+   ));
+  }
+ });
  it('a different requested time still needs vendor review',async()=>{const f=setup();f.order.eventDurationMinutes=60;f.old.laterTimeRequest.suggestedEventStart=new Date('2026-11-11T11:00:00Z');f.s.applyRescheduleIfAllAccepted=jest.fn();const result=await f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto);expect(result.requests[0].status).toBe('CHANGE_REQUESTED');expect(f.old.laterTimeRequest.clientAcceptedSuggestion).toBe(false);expect(f.s.applyRescheduleIfAllAccepted).not.toHaveBeenCalled()});
  it('agreement cannot bypass new availability checks',async()=>{const f=setup();f.order.eventDurationMinutes=60;f.old.laterTimeRequest.suggestedEventStart=new Date('2026-11-11T10:00:00Z');f.s.availabilityService.checkVendorAvailability=async()=>({available:false,reason:'Slot unavailable'});await expect(f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto)).rejects.toThrow('Slot unavailable');expect(f.old.laterTimeRequest.status).toBe('PENDING');expect(f.s.rescheduleRequestModel.create).not.toHaveBeenCalled()});
  it('records the client decision atomically, retains both vendors and awaits their approvals',async()=>{const f=setup();const result=await f.s.requestEventReschedule(String(f.order._id),f.actor.id,dto);expect(result.requests).toHaveLength(2);expect(f.old.laterTimeRequest.status).toBe('RESCHEDULE_REQUESTED');expect(f.old.laterTimeRequest.resolvedAt).toEqual(new Date());expect(f.old.status).toBe('pending');expect(f.sibling.status).toBe('accepted');expect(f.order.eventTime).toBe('13:00');expect(f.s.rescheduleRequestModel.create.mock.calls[0][1]).toHaveProperty('session');expect(f.s.sendPushNotification).toHaveBeenCalledTimes(2)});
