@@ -28,7 +28,7 @@ interface DiscountEntryPayload {
   code: string;
   discountType: DiscountKind;
   discountValue: number;
-  minimumOrderAmount?: number;
+  minimumOrderAmount: number;
   maximumDiscountAmount?: number;
   packageId?: string;
   startDate: string;
@@ -984,7 +984,7 @@ return {
       code,
       discountType: dto.discountType,
       discountValue: dto.discountValue,
-      minimumOrderAmount: dto.minimumOrderAmount ?? 0,
+      minimumOrderAmount: dto.minimumOrderAmount,
       maximumDiscountAmount: dto.maximumDiscountAmount ?? null,
       packageId: dto.packageId ?? null,
       startDate: new Date(dto.startDate),
@@ -1186,6 +1186,9 @@ return {
   }
 
   private validatePayload(dto: DiscountEntryPayload) {
+    if (!Number.isFinite(dto.minimumOrderAmount) || dto.minimumOrderAmount < 0) {
+      throw new BadRequestException('Enter a valid minimum order amount of Rs. 0 or more.');
+    }
     if (dto.discountType === DiscountKind.PERCENTAGE && dto.discountValue > 100) {
       throw new BadRequestException('Percentage discount cannot exceed 100');
     }

@@ -196,17 +196,10 @@ useEffect(() => {
       return;
     }
 
-    // -----------------------------
-    // Optional amount validation
-    // -----------------------------
-
-    if (minimumOrderAmount) {
-      const minimumAmount = parseFloat(minimumOrderAmount);
-
-      if (isNaN(minimumAmount) || minimumAmount < 0) {
-        Alert.alert('Invalid minimum order', 'Enter a valid minimum order amount.');
-        return;
-      }
+    const minimumAmount = Number(minimumOrderAmount);
+    if (!minimumOrderAmount.trim() || !Number.isFinite(minimumAmount) || minimumAmount < 0) {
+      Alert.alert('Minimum order amount required', 'Enter a valid minimum order amount of Rs. 0 or more.');
+      return;
     }
 
     if (discountType === DiscountKind.PERCENTAGE && maximumDiscountAmount) {
@@ -280,7 +273,7 @@ useEffect(() => {
 
       discountValue: discountValueNum,
 
-      minimumOrderAmount: minimumOrderAmount ? parseFloat(minimumOrderAmount) : undefined,
+      minimumOrderAmount: minimumAmount,
 
       maximumDiscountAmount: discountType === DiscountKind.PERCENTAGE && maximumDiscountAmount ? parseFloat(maximumDiscountAmount) : undefined,
 
@@ -421,7 +414,7 @@ useEffect(() => {
             Minimum Order
         ================================= */}
 
-        <Field label="Minimum Order Amount (Rs.) - optional">
+        <Field label="Minimum Order Amount (Rs.) - required">
           <TextInput style={styles.input} placeholder="e.g. 75000" keyboardType="numeric" value={minimumOrderAmount} onChangeText={setMinimumOrderAmount} />
         </Field>
 

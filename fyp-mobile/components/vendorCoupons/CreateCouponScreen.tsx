@@ -86,6 +86,12 @@ export default function CreateCouponScreen() {
       return;
     }
 
+    const minimumAmount = Number(minimumOrderAmount);
+    if (!minimumOrderAmount.trim() || !Number.isFinite(minimumAmount) || minimumAmount < 0) {
+      Alert.alert('Minimum order amount required', 'Enter a valid minimum order amount of Rs. 0 or more.');
+      return;
+    }
+
     const usageLimitNum = parseInt(usageLimit, 10);
 
     if (!usageLimitNum || usageLimitNum <= 0) {
@@ -115,7 +121,7 @@ export default function CreateCouponScreen() {
       code: code.trim().toUpperCase(),
       discountType,
       discountValue: discountValueNum,
-      minimumOrderAmount: minimumOrderAmount ? parseFloat(minimumOrderAmount) : undefined,
+      minimumOrderAmount: minimumAmount,
       maximumDiscountAmount: discountType === DiscountKind.PERCENTAGE && maximumDiscountAmount ? parseFloat(maximumDiscountAmount) : undefined,
       startDate: start.toISOString(),
       endDate: end.toISOString(),
@@ -206,7 +212,7 @@ export default function CreateCouponScreen() {
           />
         </Field>
 
-        <Field label="Minimum Order Amount (Rs.) — optional">
+        <Field label="Minimum Order Amount (Rs.) - required">
           <TextInput style={styles.input} placeholder="e.g. 10000" keyboardType="numeric" value={minimumOrderAmount} onChangeText={setMinimumOrderAmount} />
         </Field>
 

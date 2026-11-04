@@ -52,7 +52,7 @@ export interface CreateCouponPayload {
   code: string;
   discountType: DiscountKind;
   discountValue: number;
-  minimumOrderAmount?: number;
+  minimumOrderAmount: number;
   maximumDiscountAmount?: number;
   packageId?: string;
   startDate: string;

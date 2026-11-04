@@ -31,10 +31,9 @@ export class CreateDiscountCodeDto {
   @IsPositive()
   discountValue: number;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumOrderAmount?: number;
+  @IsNumber({}, { message: 'Enter a minimum order amount.' })
+  @Min(0, { message: 'Minimum order amount cannot be negative.' })
+  minimumOrderAmount: number;
 
   @IsOptional()
   @IsNumber()

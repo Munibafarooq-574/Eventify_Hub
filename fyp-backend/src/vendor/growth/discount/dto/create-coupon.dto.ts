@@ -30,10 +30,9 @@ export class CreateCouponDto {
   @IsPositive()
   discountValue: number; // percentage (1-100) if discountType is PERCENTAGE, else a Rs. amount
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumOrderAmount?: number;
+  @IsNumber({}, { message: 'Enter a minimum order amount.' })
+  @Min(0, { message: 'Minimum order amount cannot be negative.' })
+  minimumOrderAmount: number;
 
   @IsOptional()
   @IsNumber()
