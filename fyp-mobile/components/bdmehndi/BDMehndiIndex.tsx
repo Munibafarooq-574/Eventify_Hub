@@ -267,10 +267,10 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-            â€¢ Bridal Mehndi
-            â€¢ Arabic Mehndi
-            â€¢ Home Service Available
-            â€¢ Organic Mehndi Used`}
+• Bridal Mehndi
+• Arabic Mehndi
+• Home Service Available
+• Organic Mehndi Used`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -284,9 +284,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-        â€¢ Extra charges after 10 PM
-        â€¢ Travel charges outside city
-        â€¢ Booking required 2 days before`}
+• Extra charges after 10 PM
+• Travel charges outside city
+• Booking required 2 days before`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}

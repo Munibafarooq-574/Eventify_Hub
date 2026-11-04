@@ -206,11 +206,11 @@ if (edit === "true") {
     multiline
     textAlignVertical="top"
     placeholder={`Example:
-â€¢ Bridal Makeup
-â€¢ Party Makeup
-â€¢ HD Makeup
-â€¢ Airbrush Makeup
-â€¢ Hair Styling`}
+• Bridal Makeup
+• Party Makeup
+• HD Makeup
+• Airbrush Makeup
+• Hair Styling`}
     placeholderTextColor="#B99DAF"
     value={expertise}
     onChangeText={setExpertise}
@@ -277,9 +277,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-â€¢ Professional salon with 8+ years of experience.
-â€¢ Specialized in bridal and party makeup.
-â€¢ Premium products with hygienic services.`}
+• Professional salon with 8+ years of experience.
+• Specialized in bridal and party makeup.
+• Premium products with hygienic services.`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -293,11 +293,11 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-â€¢ Home service available
-â€¢ Advance booking required
-â€¢ Bridal packages available
-â€¢ Weekend appointments only
-â€¢ Travel charges may apply`}
+• Home service available
+• Advance booking required
+• Bridal packages available
+• Weekend appointments only
+• Travel charges may apply`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}

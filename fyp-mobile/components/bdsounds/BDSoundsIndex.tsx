@@ -306,9 +306,9 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-â€¢ Professional DJ & Sound services for weddings and events.
-â€¢ High-quality sound system with experienced staff.
-â€¢ Available for indoor and outdoor functions.`}
+• Professional DJ & Sound services for weddings and events.
+• High-quality sound system with experienced staff.
+• Available for indoor and outdoor functions.`}
                     placeholderTextColor="#B99DAF"
                     value={description}
                     onChangeText={setDescription}
@@ -322,11 +322,11 @@ if (edit === "true") {
                     style={[styles.input, styles.textArea]}
                     multiline
                     placeholder={`Example:
-â€¢ Generator backup available
-â€¢ Setup completed before event starts
-â€¢ Travel charges may apply
-â€¢ Extra equipment available on request
-â€¢ Advance booking recommended`}
+• Generator backup available
+• Setup completed before event starts
+• Travel charges may apply
+• Extra equipment available on request
+• Advance booking recommended`}
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
                     onChangeText={setAdditionalInfo}

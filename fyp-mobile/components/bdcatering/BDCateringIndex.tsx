@@ -555,12 +555,12 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder={`Example:
-    â€¢ Wedding Catering
-    â€¢ Buffet & BBQ Setup
-    â€¢ Customized Menu
-    â€¢ Live Cooking Stations
-    â€¢ Professional Staff
-    â€¢ Complete Event Food Management`}
+• Wedding Catering
+• Buffet & BBQ Setup
+• Customized Menu
+• Live Cooking Stations
+• Professional Staff
+• Complete Event Food Management`}
         placeholderTextColor="#B8B8B8"
         
     />
@@ -584,12 +584,12 @@ i===2 && styles.dotAccent
             styles.textArea,
         ]}
         placeholder={`Example:
-    â€¢ Free Food Tasting Available
-    â€¢ Travel Charges Apply Outside City
-    â€¢ Minimum Booking: 100 Guests
-    â€¢ Advance Booking Recommended
-    â€¢ Extra Charges for Late-Night Events
-    â€¢ Customized Menu Available on Request`}
+• Free Food Tasting Available
+• Travel Charges Apply Outside City
+• Minimum Booking: 100 Guests
+• Advance Booking Recommended
+• Extra Charges for Late-Night Events
+• Customized Menu Available on Request`}
         placeholderTextColor="#B8B8B8"
     />
 </View>
