@@ -101,11 +101,19 @@ const ItemCard: React.FC<{
           {item.serviceCities.join(', ')}
         </Text>
       )}
-      <Text style={[styles.location, styles.review]}>
-        {item.totalReviews > 0
-          ? `${item.averageRating.toFixed(1)} (${item.totalReviews})`
-          : 'No reviews yet'}
-      </Text>
+      <View style={[styles.infoContainer, styles.reviewRow]}>
+        <Ionicons
+          name={item.totalReviews > 0 ? 'star' : 'star-outline'}
+          size={13}
+          color={COLORS.accent}
+        />
+        <Text style={styles.reviewScore}>
+          {item.totalReviews > 0 ? item.averageRating.toFixed(1) : 'No reviews yet'}
+        </Text>
+        {item.totalReviews > 0 && (
+          <Text style={styles.location}>({item.totalReviews})</Text>
+        )}
+      </View>
       {item.completedOrders > 0 && (
         <View style={styles.infoContainer}>
           <Ionicons name="receipt-outline" size={12} color={COLORS.textMuted} />
@@ -256,8 +264,15 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     marginBottom: 4,
   },
-  review: {
-    marginTop: 3,
+  reviewRow: {
+    marginTop: 4,
+    marginBottom: 2,
+    gap: 4,
+  },
+  reviewScore: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textDark,
   },
   infoContainer: {
     flexDirection: 'row',
