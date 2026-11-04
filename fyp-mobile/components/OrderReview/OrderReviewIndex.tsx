@@ -12,7 +12,7 @@ import postPlaceOrder from '@/services/postPlaceOrder';
 import axios from 'axios';
 import { deleteSecureData, getSecureData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { cancelCartReminder, scheduleCartReminder } from '@/services/cartReminder';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -59,7 +59,6 @@ const OrderReviewScreen = () => {
   const connectivityRequest = useRef(0);
   const checkoutLock = useRef(false);
   const bookingSubmitted = useRef(false);
-  const navigation = useNavigation();
   const replacementDeadlinePassed = /replacement.*only.*before.*event.*starts/i.test(checkoutError);
 
   const [publicCoupons, setPublicCoupons] =
@@ -1188,7 +1187,7 @@ const isInvalidCode =
   });
 
   const handleCheckout = async () => {
-    if (checkoutLock.current || refreshing || refreshNotice) return;
+    if (checkoutLock.current || bookingSubmitted.current || refreshing || refreshNotice) return;
     checkoutLock.current = true;
     setCheckoutError('');
     setPlacingOrder(true);
@@ -1324,13 +1323,10 @@ const isInvalidCode =
             avatar: vendor.contactDetails?.brandLogo || '',
           });
         }
-        navigation.dispatch({ type: 'RESET', payload: {
-          index: 1,
-          routes: [
-            { name: 'dashboard' },
-            { name: 'OrderSummary', params: { chatVendors: JSON.stringify([...chatVendors.values()]) } },
-          ],
-        } });
+        router.replace({
+          pathname: '/OrderSummary',
+          params: { chatVendors: JSON.stringify([...chatVendors.values()]) },
+        });
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
