@@ -90,7 +90,7 @@ export class FeatureAccessService {
     }
 
     return (
-      (await this.subscriptionService.getPlanForAccess(subscription.plan)).features[feature] === true
+      (await this.subscriptionService.getPlanForSubscription(subscription)).features[feature] === true
     );
   }
 
@@ -112,7 +112,7 @@ export class FeatureAccessService {
     }
 
     return (
-      (await this.subscriptionService.getPlanForAccess(subscription.plan)).limits[limit] ?? 0
+      (await this.subscriptionService.getPlanForSubscription(subscription)).limits[limit] ?? 0
     );
   }
 
