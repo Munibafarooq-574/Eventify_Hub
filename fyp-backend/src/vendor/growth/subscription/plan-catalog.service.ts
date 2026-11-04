@@ -32,6 +32,13 @@ const FIXED_FEATURES: Feature[] = [
   controlsAccess: true,
 }));
 
+// These are available to every vendor and are not paid feature toggles.
+const CORE_BENEFITS = [
+  'Standard marketplace listing',
+  'Bookings, messages & availability',
+  'Reviews and basic business stats',
+];
+
 const DEFAULT_RANK: Record<string, number> = { basic: 1, growth: 2, premium: 3 };
 const humanize = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
 
@@ -74,6 +81,7 @@ export class PlanCatalogService {
         : `Rs. ${plan.monthlyPrice.toLocaleString('en-PK')} / month`,
       features: Object.fromEntries(features.map(feature => [feature.key, enabled.has(feature.key)])),
       featureLabels: [...new Set([
+        ...(key === SubscriptionPlan.FREE ? [] : CORE_BENEFITS),
         ...([
           [LimitKey.MAX_PACKAGES, 'Up to', 'packages'],
           [LimitKey.MAX_PORTFOLIO_IMAGES, 'Up to', 'portfolio images'],
