@@ -95,9 +95,11 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
     const availability = { checkVendorAvailability: async () => ({ available: true,
         requiredServiceWindow: { startDateTime: '2099-01-01T12:00:00Z', endDateTime: '2099-01-01T13:00:00Z' } }) };
     const sendBookingNotice = jest.fn();
+    const updateDraft = jest.fn().mockResolvedValue({ matchedCount: 0 });
+    const eventId = id();
     const service = new OrderService(user as any, orders as any, vendorOrders as any, {} as any, requests as any, {} as any,
         { find: () => query([{ _id: categoryId, name: 'Cake' }]) } as any,
-        { startSession: async () => session, db: { collection: () => ({ updateOne: async () => ({ matchedCount: 0 }) }) } } as any, availability as any, {} as any,
+        { startSession: async () => session, db: { collection: () => ({ updateOne: updateDraft }) } } as any, availability as any, {} as any,
         { hasActiveSubscription: async () => true } as any,
         { requireActiveCity: async () => ({}), requireCityTimeZone: async () => 'UTC' } as any,
         {} as any, {} as any, policy, { sendBookingNotice } as any);
@@ -105,9 +107,9 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
     jest.spyOn(service as any, 'attachReplacementOrder').mockResolvedValue(undefined);
     const services = vendors.slice(0, replacement ? 1 : 2).map(vendor => ({ vendorId: vendor._id, packageId: vendor.packages[0]._id,
         serviceName: 'Client label', price: 1, policySnapshot: { selectedPolicy: 'NON-REFUNDABLE', policyRevision: 999 } }));
-    const run = () => service.createOrder(organizerId, new Date('2099-01-01'), '12:00', services,
-        'Event', 10, 'Wedding', durationMinutes, cityId, 'Address', [categoryId], id(), replacement ? request._id : undefined);
-    return { run, policy, source, snapshots, vendorOrders, orders, session, service, request, sendBookingNotice };
+    const run = (revision?: number) => service.createOrder(organizerId, new Date('2099-01-01'), '12:00', services,
+        'Event', 10, 'Wedding', durationMinutes, cityId, 'Address', [categoryId], eventId, replacement ? request._id : undefined, undefined, revision);
+    return { run, policy, source, snapshots, vendorOrders, orders, session, service, request, sendBookingNotice, updateDraft, eventId };
 }
 
 describe('Snapshot in existing checkout transaction', () => {
@@ -122,6 +124,21 @@ describe('Snapshot in existing checkout transaction', () => {
         fixture.source.policySettings.clientRefunds.refundable[0].percentage = 60;
         expect(fixture.snapshots[0].policySnapshot.settings.clientRefunds.refundable[0].percentage).toBe(100);
         expect(fixture.session.endSession).toHaveBeenCalled();
+    });
+    it('accepts one checkout for a shared cart revision and rejects the other before booking writes', async () => {
+        const fixture = checkout();
+        fixture.updateDraft.mockResolvedValueOnce({ matchedCount: 1 });
+        const results = await Promise.allSettled([fixture.run(7), fixture.run(7)]);
+        expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+        const rejected = results.find(result => result.status === 'rejected');
+        expect(rejected).toMatchObject({ reason: { response: { code: 'BOOKING_DRAFT_CHANGED' } } });
+        expect(fixture.orders.create).toHaveBeenCalledTimes(1);
+        expect(fixture.snapshots).toHaveLength(2);
+        expect(fixture.updateDraft).toHaveBeenCalledWith(
+            expect.objectContaining({ revision: 7, 'eventDetails.eventId': fixture.eventId }),
+            { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
+            { session: fixture.session },
+        );
     });
     it('covers replacement bookings without copying the replaced vendor policy', async () => {
         const fixture = checkout(true); await fixture.run();

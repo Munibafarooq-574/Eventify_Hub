@@ -1212,7 +1212,7 @@ const isInvalidCode =
       ]);
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
       if (!latestCartRaw || loadedDraft.current?.cart !== latestCartRaw || loadedDraft.current?.event !== eventDetailsRaw) {
-        throw new Error('Your cart changed on another device. Reopen Review Order before booking.');
+        throw Object.assign(new Error('Your cart changed or was booked on another device.'), { checkoutConflict: 'BOOKING_DRAFT_CHANGED' });
       }
       submittedEvent = eventDetails;
 
@@ -1347,6 +1347,15 @@ const isInvalidCode =
     return;
   }
   const message = error?.message || 'Failed to place order. Please try again.';
+  if (error?.checkoutConflict === 'EVENT_ALREADY_BOOKED' || error?.checkoutConflict === 'BOOKING_DRAFT_CHANGED') {
+    const alreadyBooked = error.checkoutConflict === 'EVENT_ALREADY_BOOKED';
+    setCheckoutError(message);
+    Alert.alert(alreadyBooked ? 'Already booked' : 'Cart updated', message, [
+      ...(!alreadyBooked ? [{ text: 'My Cart', onPress: () => router.replace('/cartmanagement') }] : []),
+      { text: 'My Events', onPress: () => router.replace('/myevents') },
+    ]);
+    return;
+  }
   if (submittedEvent?.replacementVendorOrderId && /replacement.*only.*before.*event.*starts/i.test(message)) {
     try {
       await clearExpiredReplacementCart(draft, cartData, submittedEvent);

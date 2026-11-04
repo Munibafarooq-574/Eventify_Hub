@@ -257,6 +257,10 @@ if (!orderData.eventAddress?.trim()) {
       const rawMessage = typeof data?.message === 'object' && !Array.isArray(data?.message)
         ? data.message?.message : data?.message;
       const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;
+      const code = data?.message?.code ?? data?.code;
+      if (status === 409 && (code === 'EVENT_ALREADY_BOOKED' || code === 'BOOKING_DRAFT_CHANGED')) {
+        throw Object.assign(new Error(String(message)), { checkoutConflict: code });
+      }
       if (!status || status >= 500 || (status === 409 && /already been booked|replacement/i.test(String(message)))) {
         const existing = await findSubmittedBooking(orderData, token).catch(() => undefined);
         if (existing) return existing;

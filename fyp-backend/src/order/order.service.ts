@@ -457,9 +457,29 @@ export class OrderService {
                             .lean();
 
                     if (existingOrder && !cancellationReplacement) {
-                        throw new ConflictException(
-                            'This event has already been booked',
-                        );
+                        throw new ConflictException({ code: 'EVENT_ALREADY_BOOKED', message: 'This event has already been booked' });
+                    }
+
+                    // Claim and consume this cart revision inside the booking transaction.
+                    // A failed booking rolls this write back along with the booking.
+                    const clearedDraft = await this.connection.db!.collection<BookingDraft>(BOOKING_DRAFT_COLLECTION).updateOne(
+                        {
+                            _id: new Types.ObjectId(organizerId),
+                            'eventDetails.eventId': eventId!.trim(),
+                            ...(bookingDraftRevision !== undefined && {
+                                revision: bookingDraftRevision,
+                                'cartData.vendors.0': { $exists: true },
+                            }),
+                        },
+                        { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
+                        { session },
+                    );
+
+                    if (bookingDraftRevision !== undefined && !clearedDraft.matchedCount) {
+                        throw new ConflictException({
+                            code: 'BOOKING_DRAFT_CHANGED',
+                            message: 'Your cart changed on another device. Open My Cart to review it.',
+                        });
                     }
 
                     const vendors =
@@ -1256,20 +1276,6 @@ export class OrderService {
                         session,
                     });
 
-                    const clearedDraft = await this.connection.db!.collection<BookingDraft>(BOOKING_DRAFT_COLLECTION).updateOne(
-                        {
-                            _id: new Types.ObjectId(organizerId),
-                            'eventDetails.eventId': eventId!.trim(),
-                            ...(bookingDraftRevision !== undefined && { revision: bookingDraftRevision }),
-                        },
-                        { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
-                        { session },
-                    );
-
-                    if (bookingDraftRevision !== undefined && !clearedDraft.matchedCount) {
-                        throw new ConflictException('Your cart changed on another device. Reopen Review Order before booking.');
-                    }
-
                     // Preserve existing promotion redemption behavior,
                     // but only after every booking validation and all
                     // booking records have been prepared successfully.
@@ -1308,9 +1314,7 @@ export class OrderService {
             // Unique organizerId+eventId index is the final
             // race-proof idempotency backstop.
             if (error?.code === 11000) {
-                throw new ConflictException(
-                    'This event has already been booked',
-                );
+                throw new ConflictException({ code: 'EVENT_ALREADY_BOOKED', message: 'This event has already been booked' });
             }
 
             throw error;

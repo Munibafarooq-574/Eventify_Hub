@@ -114,3 +114,14 @@ test('pull after reconnect rechecks the saved duration and updates price without
  assert.equal(updated.vendors[0].packages[0].requiredServiceWindow,window);
  assert.equal(pkg.price,1000);
 });
+
+
+test('a second device receives an already-booked message and can open My Events', async () => {
+ const f=load();
+ f.context.postPlaceOrder=async()=>{throw Object.assign(new Error('This event has already been booked'),{checkoutConflict:'EVENT_ALREADY_BOOKED'});};
+ await f.run();
+ assert.equal(f.alerts[0][0],'Already booked');
+ f.alerts[0][2][0].onPress();
+ assert.equal(f.navigation[0],'/myevents');
+ assert.equal(f.deleted.length,0);
+});
