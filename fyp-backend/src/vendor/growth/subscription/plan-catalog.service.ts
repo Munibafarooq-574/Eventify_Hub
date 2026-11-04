@@ -90,12 +90,12 @@ export class PlanCatalogService {
           [LimitKey.MAX_IMAGES_PER_PACKAGE, 'images per package'],
         ] as const).filter(([limit]) => plan.limits[limit] > 0)
           .map(([limit, label]) => `Up to ${plan.limits[limit]} ${label}`),
-        ...(enabled.has(FeatureKey.CAMPAIGNS) && plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT] > 0
-          ? [`Up to ${plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT]} promotional campaigns per month`] : []),
         ...(enabled.has(FeatureKey.FEATURED_VENDOR) && plan.limits[LimitKey.FEATURED_VENDOR_LIMIT] > 0
           ? [`Up to ${plan.limits[LimitKey.FEATURED_VENDOR_LIMIT]} featured vendor ${plan.limits[LimitKey.FEATURED_VENDOR_LIMIT] === 1 ? 'slot' : 'slots'}`] : []),
         ...(enabled.has(FeatureKey.FEATURED_PACKAGE) && plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT] > 0
           ? [`Up to ${plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT]} featured package ${plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT] === 1 ? 'slot' : 'slots'}`] : []),
+        ...(enabled.has(FeatureKey.CAMPAIGNS) && plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT]} promotional campaigns per month`] : []),
         ...(enabled.has(FeatureKey.COUPONS) && plan.limits[LimitKey.COUPON_LIMIT] > 0
           ? [`Up to ${plan.limits[LimitKey.COUPON_LIMIT]} active coupons`] : []),
         ...(enabled.has(FeatureKey.DISCOUNT_CODES) && plan.limits[LimitKey.DISCOUNT_CODE_LIMIT] > 0
