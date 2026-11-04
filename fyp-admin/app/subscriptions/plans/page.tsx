@@ -20,7 +20,6 @@ const limits = {
 // Marketing labels are grouped only where multiple implemented entitlements
 // make up the same benefit. The saved plan still contains real feature keys.
 const groupedBenefits = [
-  { id: "growth-visibility", label: "Growth visibility & featured eligibility", keys: ["featuredVendor", "featuredPackage"] },
   { id: "advanced-insights", label: "Advanced analytics & business insights", keys: ["advancedAnalytics", "businessInsights"] },
   { id: "premium-visibility", label: "Premium Partner visibility", keys: ["premiumBadge"] },
 ] as const;
