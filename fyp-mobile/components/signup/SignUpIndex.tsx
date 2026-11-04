@@ -39,7 +39,7 @@ const [phone, setPhone] = useState("");
 const [password, setPassword] = useState("");
 const [confirmPassword, setConfirmPassword] = useState("");
 
-const [countryCode, setCountryCode] = useState("PK");
+const [countryCode, setCountryCode] = useState("");
 const [role, setRole] = useState("");
 const [categoryId, setCategoryId] = useState("");
 const [cities, setCities] =
@@ -63,7 +63,6 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 const [passwordStrength, setPasswordStrength] = useState("");
 const [passwordSuggestion, setPasswordSuggestion] = useState("");
 const [emailError, setEmailError] = useState("");
-const [phoneError, setPhoneError] = useState("");
 const [confirmError, setConfirmError] = useState("");
 
 // Assets
@@ -182,20 +181,22 @@ const validateEmail = (text: string) => {
   }
 };
 
-// Phone Validation
-const validatePhone = (text: string) => {
-  const cleaned = text.replace(/[^0-9]/g, "");
-
-  setPhone(cleaned);
-
-  if (cleaned.length === 0) {
-    setPhoneError("");
-  } else if (cleaned.length !== 11) {
-    setPhoneError("Phone number must be 11 digits");
-  } else {
-    setPhoneError("");
-  }
-};
+const isClient = role === "Client" || role === "Organizer";
+const isUSPhone = isClient && countryCode === "US";
+const phoneReady = !isClient || Boolean(clientCityId);
+const compactPhone = phone.replace(/[\s().-]/g, "");
+const validPhone = isUSPhone
+  ? /^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)
+  : isClient
+    ? /^(?:0|\+?92)3\d{9}$/.test(compactPhone)
+    : /^\d{11}$/.test(phone);
+const phoneError = phone && !validPhone
+  ? isUSPhone
+    ? "Enter a 10-digit US number, such as (415) 555-0123."
+    : isClient
+      ? "Enter a Pakistani mobile number starting with 03 or +92 3."
+      : "Phone number must be 11 digits."
+  : "";
 
 // Password Strength
 const checkPasswordStrength = (text: string) => {
@@ -254,7 +255,8 @@ useEffect(() => {
   if (
     name &&
     email &&
-    phone &&
+    phoneReady &&
+    validPhone &&
     password &&
     confirmPassword &&
     !emailError &&
@@ -268,7 +270,8 @@ useEffect(() => {
 }, [
   name,
   email,
-  phone,
+  phoneReady,
+  validPhone,
   password,
   confirmPassword,
   emailError,
@@ -300,6 +303,7 @@ const pickAvatar = async () => {
 
 // Register Function
 const handleRegister = async () => {
+  if (!phoneReady || !validPhone) return;
   try {
     if (role === "Vendor" && !categoryId) {
       Toast.show({
@@ -322,7 +326,7 @@ const handleRegister = async () => {
   name,
   role,
   categoryId,
-  phone,
+  isClient ? compactPhone : phone,
   role === "Vendor"
     ? undefined
     : clientCityId || undefined,
@@ -541,38 +545,8 @@ return (
         </Text>
       )}
 
-      {/* Phone */}
-
-      <Text style={styles.label}>
-        Phone Number
-      </Text>
-
-      <View style={styles.inputCard}>
-        <Ionicons
-          name="call-outline"
-          size={20}
-          color="#780C60"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="03XXXXXXXXX"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-          maxLength={11}
-          value={phone}
-          onChangeText={validatePhone}
-        />
-      </View>
-
-      {phoneError !== "" && (
-        <Text style={styles.errorText}>
-          {phoneError}
-        </Text>
-      )}
-
       {/* Client City */}
-{(role === "Client" || role === "Organizer") && (
+{isClient && (
   <>
     <Text style={styles.label}>Country</Text>
     <View style={{ flexDirection: "row", gap: 10 }}>
@@ -583,6 +557,8 @@ return (
             setCountryCode(code);
             setClientCityId("");
             setCitySearch("");
+            setCityDropdownOpen(false);
+            setPhone("");
           }}>
           <Text>{countryCode === code ? "✓ " : ""}{label}</Text>
         </TouchableOpacity>
@@ -595,6 +571,7 @@ return (
     <TouchableOpacity
       style={styles.inputCard}
       activeOpacity={0.8}
+      disabled={!countryCode}
       onPress={() =>
         setCityDropdownOpen(
           (current) => !current,
@@ -622,7 +599,7 @@ return (
               (city) =>
                 city._id === clientCityId,
             )?.name || "Select your city"
-          : "Select your city"}
+          : countryCode ? "Select your city" : "Select your country first"}
       </Text>
 
       <Ionicons
@@ -699,6 +676,43 @@ return (
     )}
   </>
 )}
+
+      {/* Phone */}
+
+      <Text style={styles.label}>
+        Phone Number
+      </Text>
+
+      <View style={styles.inputCard}>
+        <Ionicons
+          name="call-outline"
+          size={20}
+          color="#780C60"
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder={isUSPhone ? "(415) 555-0123" : "03XXXXXXXXX"}
+          placeholderTextColor="#999"
+          keyboardType="phone-pad"
+          maxLength={isClient ? 24 : 11}
+          editable={phoneReady}
+          value={phone}
+          onChangeText={(value) => setPhone(isClient ? value : value.replace(/[^0-9]/g, ""))}
+        />
+      </View>
+
+      {isClient && countryCode !== "" && (
+        <Text style={{ color: "#666", marginTop: 6 }}>
+          {phoneReady ? (isUSPhone ? "US country code +1" : "Pakistan country code +92") : "Select your city first."}
+        </Text>
+      )}
+
+      {phoneError !== "" && (
+        <Text style={styles.errorText}>
+          {phoneError}
+        </Text>
+      )}
 
             {/* Password */}
 

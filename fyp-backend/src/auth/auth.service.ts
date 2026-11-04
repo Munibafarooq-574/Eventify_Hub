@@ -214,6 +214,22 @@ private readonly availabilityService: VendorAvailabilityService,
       ? await this.requireMarketplaceCity(registerDto.clientCityId)
       : undefined;
 
+    let phoneNumber = registerDto.mobileNumber;
+    if (marketplace) {
+      const compactPhone = (phoneNumber ?? '').replace(/[\s().-]/g, '');
+      if (marketplace.countryCode === 'US') {
+        if (!/^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)) {
+          throw new BadRequestException('Enter a valid 10-digit US phone number.');
+        }
+        phoneNumber = `+1${compactPhone.slice(-10)}`;
+      } else {
+        if (!/^(?:0|\+?92)3\d{9}$/.test(compactPhone)) {
+          throw new BadRequestException('Enter a Pakistani mobile number starting with 03 or +92 3.');
+        }
+        phoneNumber = `0${compactPhone.slice(-10)}`;
+      }
+    }
+
     // =====================================================
     // CHECK EXISTING USER
     // =====================================================
@@ -256,8 +272,7 @@ private readonly availabilityService: VendorAvailabilityService,
 
       password: hashedPassword,
 
-      phone_number:
-        registerDto.mobileNumber,
+      phone_number: phoneNumber,
 
       address:
         registerDto.address,
