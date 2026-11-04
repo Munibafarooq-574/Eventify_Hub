@@ -1,9 +1,11 @@
+import { usePullToRefresh } from '@/components/refresh/usePullToRefresh';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     AppState,
     ScrollView,
@@ -17,6 +19,8 @@ import Toast from 'react-native-toast-message';
 import { createBookingDraftStore, getSecureData } from '@/store';
 import getActiveCities from '@/services/getActiveCities';
 import getAllCategories from '@/services/getAllCategories';
+
+const CART_REFRESH_INTERVAL_MS = 15000;
 
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8EAF2';
@@ -52,6 +56,10 @@ const cartCategory = (pkg: any, entry: any) => {
 const CartManagementIndexScreen: React.FC = () => {
   const [draft] = useState(createBookingDraftStore);
   const savingCart = useRef(false);
+  const fetchingCart = useRef(false);
+  const lastSnapshot = useRef<string | null>(null);
+  const [syncingCart, setSyncingCart] = useState(false);
+  const [syncError, setSyncError] = useState('');
 const router = useRouter();
 const navigation = useNavigation();
 
@@ -66,12 +74,17 @@ const [eventDetails, setEventDetails] = useState<any>(null);
 
 
     const fetchCartData = useCallback(async () => {
-        if (savingCart.current) return;
-            try {
+        if (savingCart.current || fetchingCart.current || !draft.isCurrent()) return;
+        fetchingCart.current = true;
+        setSyncingCart(true);
+        try {
                 const [storedCart, eventDetailsRaw] = await Promise.all([
                     draft.get('cartData'), draft.get('eventDetails'),
                 ]);
                 if (!draft.isCurrent()) return;
+                setSyncError('');
+                const snapshot = JSON.stringify([storedCart, eventDetailsRaw]);
+                if (lastSnapshot.current === snapshot) return;
                 if (!eventDetailsRaw) {
                     setEventDetails(null);
                     setEventAddress('');
@@ -161,18 +174,15 @@ if (eventDetailsRaw) {
                         // Keep the cart usable when category names cannot be loaded.
                     }
                 }
-            } catch (error) {
-                console.error('Error fetching cart data:', error);
-
-                setCartData({ vendors: [] });
-
-                Toast.show({
-                    type: 'error',
-                    text1: 'Error',
-                    text2: error instanceof Error ? error.message : 'Failed to load cart data. Please try again.',
-                    position: 'bottom',
-                });
+                lastSnapshot.current = snapshot;
+        } catch (error) {
+            if (draft.isCurrent()) {
+                setSyncError(error instanceof Error ? error.message : 'Failed to load cart data. Please try again.');
             }
+        } finally {
+            fetchingCart.current = false;
+            if (draft.isCurrent()) setSyncingCart(false);
+        }
     }, [draft]);
 
     useFocusEffect(useCallback(() => {
@@ -181,15 +191,28 @@ if (eventDetailsRaw) {
         const subscription = AppState.addEventListener('change', state => {
             if (state === 'active') void fetchCartData();
         });
-        return () => subscription.remove();
+        const timer = setInterval(() => {
+            if (AppState.currentState === 'active') void fetchCartData();
+        }, CART_REFRESH_INTERVAL_MS);
+        return () => {
+            clearInterval(timer);
+            subscription.remove();
+        };
     }, [fetchCartData, navigation]));
+
+    const { refreshControl } = usePullToRefresh(fetchCartData);
 
     const saveCart = async (updatedCart: any) => {
         if (savingCart.current) return false;
+        if (fetchingCart.current) {
+            Toast.show({ type: 'info', text1: 'Cart is refreshing', text2: 'Try your change again in a moment.' });
+            return false;
+        }
         savingCart.current = true;
         try {
             await draft.save('cartData', JSON.stringify(updatedCart));
             if (!draft.isCurrent()) return false;
+            lastSnapshot.current = null;
             setCartData(updatedCart);
             return true;
         } catch (error) {
@@ -494,17 +517,22 @@ if (eventDetailsRaw) {
     if (!cartData) {
         return (
             <View style={styles.loadingContainer}>
-                <View style={styles.loadingIcon}>
-                    <Ionicons
-                        name="cart-outline"
-                        size={30}
-                        color={PRIMARY}
-                    />
-                </View>
-
-                <Text style={styles.loadingText}>
-                    Loading your cart...
-                </Text>
+                {syncError && !syncingCart ? (
+                    <>
+                        <Text style={styles.loadingText}>{syncError}</Text>
+                        <TouchableOpacity accessibilityRole="button" onPress={() => void fetchCartData()}>
+                            <Text style={styles.loadingText}>Try again</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}>
+                            <Text style={styles.loadingText}>Go back</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    <>
+                        <ActivityIndicator accessibilityLabel="Loading cart" size="large" color={PRIMARY} />
+                        <Text style={styles.loadingText}>Loading your cart...</Text>
+                    </>
+                )}
             </View>
         );
     }
@@ -555,16 +583,16 @@ if (eventDetailsRaw) {
                     </Text>
 
                     <Text style={styles.headerSubtitle}>
-                        Review your selected services
+                        {syncingCart ? 'Refreshing cart…' : syncError ? 'Refresh failed. Pull down to retry.' : 'Review your selected services'}
                     </Text>
                 </View>
 
                 <View style={styles.headerCartIcon}>
-                    <Ionicons
+                    {syncingCart ? <ActivityIndicator accessibilityLabel="Refreshing cart" color={PRIMARY} /> : <Ionicons
                         name="cart-outline"
                         size={23}
                         color={PRIMARY}
-                    />
+                    />}
 
                     {packageCount > 0 && (
                         <View style={styles.cartBadge}>
@@ -656,6 +684,8 @@ if (eventDetailsRaw) {
 ===================================== */}
 
             <ScrollView
+                refreshControl={refreshControl}
+                alwaysBounceVertical
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
@@ -1239,24 +1269,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: PRIMARY_LIGHT,
-    },
-
-    loadingIcon: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 14,
-        elevation: 3,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
     },
 
     loadingText: {
