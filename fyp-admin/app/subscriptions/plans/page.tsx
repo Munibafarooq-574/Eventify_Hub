@@ -17,6 +17,16 @@ const limits = {
   discountCodeLimit: "active discount codes",
 } as const;
 
+// Marketing labels are grouped only where multiple implemented entitlements
+// make up the same benefit. The saved plan still contains real feature keys.
+const groupedBenefits = [
+  { id: "growth-visibility", label: "Growth visibility & featured eligibility", keys: ["featuredVendor", "featuredPackage"] },
+  { id: "advanced-insights", label: "Advanced analytics & business insights", keys: ["advancedAnalytics", "businessInsights"] },
+  { id: "premium-visibility", label: "Premium Partner visibility", keys: ["premiumBadge"] },
+] as const;
+
+const groupedKeys = new Set<string>(groupedBenefits.flatMap(group => [...group.keys]));
+
 function limitLabel(key: keyof typeof limits, value: number): string {
   if (key === "monthlyCampaignLimit") return `${value} promotional campaigns per month`;
   if (key === "maxPackages" || key === "maxPortfolioImages" || key === "maxImagesPerPackage") {
@@ -80,7 +90,11 @@ async function savePlan(existingKey: string | null, form: FormData) {
     rank: Number(form.get("rank")),
     isPurchasable: form.has("isPurchasable"),
     isMostPopular: form.has("isMostPopular"),
-    featureKeys: form.getAll("featureKeys"),
+    featureKeys: [...new Set([
+      ...form.getAll("featureKeys").map(String),
+      ...groupedBenefits.filter(group => form.getAll("featureGroups").includes(group.id))
+        .flatMap(group => [...group.keys]),
+    ])],
     limits: Object.fromEntries(Object.keys(limits).map(key => [key, Number(form.get(key))])),
   });
 }
@@ -119,7 +133,15 @@ function PlanForm({ plan, features }: { plan?: Plan; features: Feature[] }) {
         <legend className="px-2 font-semibold">Include / exclude app features</legend>
         <p className="mb-3 text-xs text-slate-600">Feature names match the vendor subscription benefits. A feature only works when its backend entitlement is implemented.</p>
         <div className="grid gap-2 sm:grid-cols-2">
-          {features.map(feature => (
+          {groupedBenefits.map(group => (
+            <label key={group.id} className="flex items-start gap-2">
+              <input type="checkbox" name="featureGroups" value={group.id}
+                defaultChecked={group.keys.every(key => plan?.featureKeys.includes(key))}
+                className="mt-1" />
+              <span>{group.label}</span>
+            </label>
+          ))}
+          {features.filter(feature => !groupedKeys.has(feature.key)).map(feature => (
             <label key={feature.key} className="flex items-start gap-2">
               <input type="checkbox" name="featureKeys" value={feature.key}
                 defaultChecked={plan?.featureKeys.includes(feature.key)} className="mt-1" />
