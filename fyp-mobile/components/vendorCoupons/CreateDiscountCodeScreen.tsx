@@ -320,7 +320,17 @@ useEffect(() => {
         },
       ]);
     } catch (e: any) {
-      Alert.alert('Could not create discount code', e?.message || 'Something went wrong.');
+      const message = e?.message || 'Something went wrong.';
+      const legacyDuplicate = /^You already have an active code "([^"]+)"$/.exec(message);
+      if (legacyDuplicate) {
+        Alert.alert(
+          'Code already in use',
+          `An active promotion already uses “${legacyDuplicate[1]}”. Choose a different code for this discount.`,
+        );
+      } else {
+        const duplicate = /^An active (coupon|discount code) already uses /.test(message);
+        Alert.alert(duplicate ? 'Code already in use' : 'Could not create discount code', message);
+      }
     } finally {
       setSubmitting(false);
     }

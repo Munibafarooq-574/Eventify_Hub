@@ -953,6 +953,14 @@ return {
       status: DiscountStatus.ACTIVE,
     });
     if (duplicateActiveCode) {
+      if (type === DiscountEntryType.DISCOUNT_CODE) {
+        const existingType = duplicateActiveCode.type === DiscountEntryType.COUPON
+          ? 'coupon'
+          : 'discount code';
+        throw new BadRequestException(
+          `An active ${existingType} already uses “${code}”. Choose a different code for this discount.`,
+        );
+      }
       throw new BadRequestException(`You already have an active code "${code}"`);
     }
 

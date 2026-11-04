@@ -57,10 +57,11 @@ if (!isFormData) {
       try {
         const body = JSON.parse(rawBody);
 
-        if (Array.isArray(body?.message)) {
-          message = body.message.join(', ');
-        } else if (body?.message) {
-          message = body.message;
+        const detail = body?.message?.message ?? body?.message;
+        if (Array.isArray(detail)) {
+          message = detail.filter(item => typeof item === 'string').join(', ') || message;
+        } else if (typeof detail === 'string' && detail.trim()) {
+          message = detail;
         }
       } catch {
         // Ignore invalid JSON.
