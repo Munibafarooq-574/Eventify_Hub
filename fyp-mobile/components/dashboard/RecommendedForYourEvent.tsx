@@ -1,5 +1,7 @@
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 
+import getActiveCities from "@/services/getActiveCities";
+import getAllCategories from "@/services/getAllCategories";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
@@ -39,6 +41,8 @@ const RecommendedForYourEvent: React.FC = () => {
   const [loading, setLoading] = useState(true);
     const [allVendors, setAllVendors] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+  const [cityNames, setCityNames] = useState<Record<string, string>>({});
 
   const loadRecommended = useCallback(async () => {
     try {
@@ -121,8 +125,10 @@ if (
       setVendors(recommended);
        setAllVendors(discoveredVendors);
 
-      const reviewEntries = await Promise.all(
-                discoveredVendors.map(async (vendor: any) => {
+      const [categories, cities, reviewEntries] = await Promise.all([
+        getAllCategories().catch(() => []),
+        getActiveCities().catch(() => []),
+        Promise.all(discoveredVendors.map(async (vendor: any) => {
           try {
             const summary =
               await getVendorReviewSummary(
@@ -142,12 +148,14 @@ if (
               },
             ] as const;
           }
-        }),
-      );
+        })),
+      ]);
 
-      setReviews(
-        Object.fromEntries(reviewEntries),
-      );
+      setCategoryNames(Object.fromEntries(
+        (categories ?? []).map(({ _id, name }: { _id: string; name: string }) => [_id, name]),
+      ));
+      setCityNames(Object.fromEntries(cities.map(({ _id, name }) => [_id, name])));
+      setReviews(Object.fromEntries(reviewEntries));
     } catch (error) {
       reportMarketplaceLoadError(
         "Failed to load recommended vendors:",
@@ -201,11 +209,21 @@ if (
       vendor?.coverImage ||
       vendor?.images?.[0];
 
-    const subscriptionBadge =
-      vendor?.marketplaceSubscription?.subscriptionBadge;
+    const category = vendor.buisnessCategory || vendor.categoryId;
+    const categoryName =
+      categoryNames[category?._id ?? category] ||
+      category?.name ||
+      vendor.categoryName;
 
-    const isPremium = subscriptionBadge === "Premium";
-    const isGrowth = subscriptionBadge === "Growth";
+    const serviceCities = Array.isArray(vendor.serviceLocationCityIds)
+      ? [...new Set<string>(
+          vendor.serviceLocationCityIds
+            .map((city: string | { _id: string; name?: string }) =>
+              typeof city === "string" ? cityNames[city] : city?.name || cityNames[city?._id],
+            )
+            .filter(Boolean),
+        )].join(", ")
+      : "";
 
     return (
       <TouchableOpacity
@@ -236,27 +254,22 @@ if (
           </View>
         )}
 
-        <View style={styles.nameRow}>
-          <Text style={styles.vendorName} numberOfLines={1}>
-            {brandName}
+        <Text style={styles.vendorName} numberOfLines={1}>
+          {brandName}
+        </Text>
+        {!!categoryName && (
+          <Text style={styles.vendorCategory} numberOfLines={fullWidth ? undefined : 1}>
+            {categoryName}
           </Text>
-
-          {isPremium ? (
-            <View style={[styles.badge, styles.premiumBadge]}>
-              <Ionicons name="diamond-outline" size={10} color="#7A4B00" />
-              <Text style={styles.premiumBadgeText}>Premium</Text>
-            </View>
-          ) : isGrowth ? (
-            <View style={[styles.badge, styles.growthBadge]}>
-              <Ionicons
-                name="trending-up-outline"
-                size={10}
-                color={COLORS.primary}
-              />
-              <Text style={styles.growthBadgeText}>Growth</Text>
-            </View>
-          ) : null}
-        </View>
+        )}
+        {!!serviceCities && (
+          <View style={styles.cityRow}>
+            <Ionicons name="location-outline" size={13} color={COLORS.muted} />
+            <Text style={styles.vendorCities} numberOfLines={fullWidth ? undefined : 2}>
+              {serviceCities}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.ratingRow}>
           <Ionicons name="star" size={12} color={COLORS.gold} />
@@ -486,46 +499,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
   vendorName: {
-    flexShrink: 1,
     fontSize: 14,
     fontWeight: "800",
     color: COLORS.text,
   },
 
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  premiumBadge: {
-    backgroundColor: "#FFF3D6",
-  },
-
-  premiumBadgeText: {
-    fontSize: 8,
-    fontWeight: "800",
-    color: "#7A4B00",
-  },
-
-  growthBadge: {
-    backgroundColor: COLORS.primarySoft,
-  },
-
-  growthBadgeText: {
-    fontSize: 8,
-    fontWeight: "800",
+  vendorCategory: {
+    marginTop: 3,
+    fontSize: 12,
+    fontWeight: "700",
     color: COLORS.primary,
+  },
+
+  cityRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    marginTop: 3,
+  },
+
+  vendorCities: {
+    flex: 1,
+    fontSize: 11,
+    color: COLORS.muted,
   },
 
   ratingRow: {
