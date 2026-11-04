@@ -92,9 +92,17 @@ export class PlanCatalogService {
         ] as const).filter(([limit]) => plan.limits[limit] > 0 && (limit !== LimitKey.MONTHLY_CAMPAIGN_LIMIT || enabled.has(FeatureKey.CAMPAIGNS)))
           .map(([limit, prefix, label]) => `${prefix} ${plan.limits[limit]} ${label}`),
         ...features.filter(feature => enabled.has(feature.key) &&
-          // Avoid repeating the same paired marketing benefit on vendor cards.
+          !(feature.key === FeatureKey.FEATURED_PACKAGE && enabled.has(FeatureKey.FEATURED_VENDOR)) &&
           !(feature.key === FeatureKey.BUSINESS_INSIGHTS && enabled.has(FeatureKey.ADVANCED_ANALYTICS))
-        ).map(feature => feature.name),
+        ).map(feature => {
+          if (feature.key === FeatureKey.FEATURED_VENDOR && !enabled.has(FeatureKey.FEATURED_PACKAGE)) {
+            return 'Featured vendor visibility';
+          }
+          if (feature.key === FeatureKey.ADVANCED_ANALYTICS && !enabled.has(FeatureKey.BUSINESS_INSIGHTS)) {
+            return 'Advanced analytics';
+          }
+          return feature.name;
+        }),
       ])],
     };
   }
