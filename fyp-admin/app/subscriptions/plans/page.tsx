@@ -58,6 +58,12 @@ async function addFeature(form: FormData) {
   await submitCatalog("/features", "POST", { name: form.get("name") });
 }
 
+async function deleteFeature(form: FormData) {
+  "use server";
+  const key = String(form.get("key") ?? "");
+  await submitCatalog(`/features/${encodeURIComponent(key)}`, "DELETE", {});
+}
+
 async function savePlan(existingKey: string | null, form: FormData) {
   "use server";
   const key = existingKey ?? String(form.get("key") ?? "").trim();
@@ -155,6 +161,20 @@ export default async function SubscriptionPlansPage({ searchParams }: {
                 <label className="grow">Feature name<input className={input} name="name" required maxLength={100} /></label>
                 <button className={button} type="submit">Add feature</button>
               </form>
+            </section>
+            <section className="rounded-xl border border-slate-200 bg-white p-5">
+              <h2 className="mb-2 font-bold">Manage custom features</h2>
+              <p className="mb-3 text-sm text-slate-600">Delete removes a custom display benefit from all plans. Built-in access features cannot be deleted; uncheck them in the plan editor.</p>
+              <div className="grid gap-2">
+                {catalog.features.filter(feature => feature.key.startsWith("custom:")).map(feature => (
+                  <form key={feature.key} action={deleteFeature} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 p-3">
+                    <span>{feature.name}</span>
+                    <input type="hidden" name="key" value={feature.key} />
+                    <button type="submit" className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-50">Delete</button>
+                  </form>
+                ))}
+                {!catalog.features.some(feature => feature.key.startsWith("custom:")) && <p className="text-sm text-slate-500">No custom features added yet.</p>}
+              </div>
             </section>
             <details className="rounded-xl border border-slate-200 bg-white p-5">
               <summary className="mb-4 cursor-pointer font-bold">Create a plan</summary>
