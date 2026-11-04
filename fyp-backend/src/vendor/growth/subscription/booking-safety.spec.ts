@@ -1,3 +1,5 @@
+import { getPlanDefinition } from '../plan-config';
+import { SubscriptionPlan } from './subscription.types';
 import { SubscriptionService } from './subscription.service';
 import { FeatureAccessService } from '../feature-access.service';
 
@@ -28,7 +30,7 @@ describe('Subscription expiry and existing booking safety', () => {
   ])('checks %s %s new-booking and campaign entitlement separately',async(status,plan,booking,campaign)=>{
     const subscription={status,plan,paymentStatus:status==='trial'?'none':'paid',endDate:new Date(Date.now()+86400000)};
     const service:any=Object.create(FeatureAccessService.prototype);
-    service.subscriptionService={getCurrentSubscription:jest.fn(async()=>subscription)};
+    service.subscriptionService={getCurrentSubscription:jest.fn(async()=>subscription),getPlanForAccess:async(key:SubscriptionPlan)=>getPlanDefinition(key)};
     expect(await service.hasActiveSubscription('vendor')).toBe(booking);
     expect(await service.canCreateCampaign('vendor')).toBe(campaign);
   });

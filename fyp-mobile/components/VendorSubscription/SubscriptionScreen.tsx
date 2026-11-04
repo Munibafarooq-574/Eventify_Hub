@@ -73,6 +73,7 @@ import {
   SubscriptionAccessState,
   SubscriptionPaymentInstructions,
   SubscriptionPlan,
+  formatSubscriptionPlanName,
   SubscriptionStatus,
   VendorSubscription,
 } from '../../types/subscription.types';
@@ -108,37 +109,6 @@ const COLORS = {
   gold: '#B8860B',
 };
 
-const PLAN_HIGHLIGHTS: Partial<
-  Record<SubscriptionPlan, string[]>
-> = {
-  [SubscriptionPlan.BASIC]: [
-    'Up to 5 packages',
-    'Up to 10 portfolio images',
-    'Up to 5 images per package',
-    'Standard marketplace listing',
-    'Bookings, messages & availability',
-    'Reviews and basic business stats',
-  ],
-
-  [SubscriptionPlan.GROWTH]: [
-    'Up to 10 packages',
-    'Up to 30 portfolio images',
-    'Up to 6 images per package',
-    '2 promotional campaigns per month',
-    'Growth visibility & featured eligibility',
-    'Advanced analytics & business insights',
-  ],
-
-  [SubscriptionPlan.PREMIUM]: [
-    'Up to 20 packages',
-    'Up to 60 portfolio images',
-    'Up to 10 images per package',
-    '5 promotional campaigns per month',
-    'Premium Partner visibility',
-    'Priority placement & support',
-  ],
-};
-
 function formatDate(
   value?: string | null,
 ): string {
@@ -154,24 +124,6 @@ function formatDate(
       year: 'numeric',
     },
   );
-}
-
-function getPlanName(
-  plan?: SubscriptionPlan | null,
-): string {
-  switch (plan) {
-    case SubscriptionPlan.BASIC:
-      return 'Basic';
-
-    case SubscriptionPlan.GROWTH:
-      return 'Growth';
-
-    case SubscriptionPlan.PREMIUM:
-      return 'Premium';
-
-    default:
-      return 'Subscription';
-  }
 }
 
 export default function SubscriptionScreen() {
@@ -389,6 +341,16 @@ export default function SubscriptionScreen() {
     accessState?.isPaidPlan ===
     true;
 
+  const getPlanName = (key?: string | null) =>
+    (key === accessState?.effectivePlan ? accessState?.planName : undefined) ||
+    plans.find(plan => plan.key === key)?.name || formatSubscriptionPlanName(key);
+  const rankFor = (key?: string | null) =>
+    (key === accessState?.effectivePlan ? accessState?.planRank : undefined) ??
+    plans.find(plan => plan.key === key)?.rank ??
+    ({ basic: 1, growth: 2, premium: 3 } as Record<string, number>)[key ?? ''] ?? 0;
+  const changingPaidPlan = isActivePaid && !!selectedPlan && selectedPlan.key !== currentSubscription?.plan;
+  const isUpgrade = changingPaidPlan && rankFor(selectedPlan?.key) > rankFor(currentSubscription?.plan);
+
     const selectPlan = (
     plan: PlanDefinition,
   ) => {
@@ -471,13 +433,11 @@ export default function SubscriptionScreen() {
       Alert.alert(
         'Submit Payment?',
        `Confirm that you have sent ${selectedPlan.priceLabel} through Easypaisa.\n\nActivation: ${
-      isActivePaid &&
-    currentSubscription?.plan === SubscriptionPlan.GROWTH &&
-    selectedPlan.key === SubscriptionPlan.PREMIUM
+      isUpgrade
     ? activationType === 'IMMEDIATE'
       ? 'Immediate — after Admin approval'
       : 'Scheduled — after current plan expires'
-    : 'After Admin approval'
+    : changingPaidPlan ? 'Scheduled — after current plan expires' : 'After Admin approval'
 }\nReference: ${reference}`,
         [
           {
@@ -497,11 +457,8 @@ export default function SubscriptionScreen() {
 
                   await requestSubscriptionPayment(
                     {
-                      plan:
-                        selectedPlan.key as
-                          | SubscriptionPlan.BASIC
-                          | SubscriptionPlan.GROWTH
-                          | SubscriptionPlan.PREMIUM,
+                      plan: selectedPlan.key,
+                      expectedAmount: selectedPlan.monthlyPrice ?? undefined,
 
                       paymentProvider:
                         PaymentProvider.EASYPAISA,
@@ -1266,6 +1223,9 @@ export default function SubscriptionScreen() {
 
           {/* ================================================= */}
           {/* PLANS */}
+          {plans.length === 0 && (
+            <Text style={styles.planDescription}>No plans are available for purchase right now.</Text>
+          )}
           {/* ================================================= */}
 
           {plans.map(
@@ -1275,19 +1235,8 @@ export default function SubscriptionScreen() {
                 currentSubscription?.plan ===
                   plan.key;
 
-              const highlights =
-                PLAN_HIGHLIGHTS[
-                  plan.key
-                ] || [];
-
-              const PlanIcon =
-                plan.key ===
-                SubscriptionPlan.PREMIUM
-                  ? Crown
-                  : plan.key ===
-                      SubscriptionPlan.GROWTH
-                    ? Star
-                    : null;
+              const highlights = plan.featureLabels ?? [];
+              const PlanIcon = plan.features.premiumBadge ? Crown : plan.isMostPopular ? Star : null;
 
               return (
                 <View
@@ -1335,8 +1284,7 @@ export default function SubscriptionScreen() {
                         <PlanIcon
                           size={18}
                           color={
-                            plan.key ===
-                            SubscriptionPlan.PREMIUM
+                            plan.features.premiumBadge
                               ? COLORS.gold
                               : COLORS.primary
                           }
@@ -1387,9 +1335,7 @@ export default function SubscriptionScreen() {
                         highlight,
                       ) => (
                         <View
-                          key={
-                            highlight
-                          }
+                          key={highlight}
                           style={
                             styles.highlightRow
                           }
@@ -1444,12 +1390,12 @@ export default function SubscriptionScreen() {
                       style={[
                         styles.primaryButton,
 
-                                                (hasPendingPayment ||
+                                                (hasPendingPayment || !plan.monthlyPrice ||
                           !!accessState.scheduledSubscription) &&
                           styles.disabledButton,
                       ]}
                       disabled={
-                        hasPendingPayment ||
+                        hasPendingPayment || !plan.monthlyPrice ||
                         !!accessState.scheduledSubscription
                       }
                       onPress={() =>
@@ -1463,11 +1409,7 @@ export default function SubscriptionScreen() {
                           styles.primaryButtonText
                         }
                       >
-                        {isTrial &&
-                        plan.key ===
-                          SubscriptionPlan.BASIC
-                          ? 'Subscribe to Basic'
-                          : `Choose ${plan.name}`}
+                        {isTrial ? `Subscribe to ${plan.name}` : `Choose ${plan.name}`}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1581,9 +1523,7 @@ export default function SubscriptionScreen() {
                   </Text>
                                 </View>
 
-                {isActivePaid &&
-  currentSubscription?.plan === SubscriptionPlan.GROWTH &&
-  selectedPlan.key === SubscriptionPlan.PREMIUM && (
+                {isUpgrade && (
                     <View style={{ marginTop: 18 }}>
                       <Text style={styles.referenceLabel}>
                         When should your new plan start?
@@ -1643,9 +1583,7 @@ export default function SubscriptionScreen() {
                     </View>
                   )}
 
-                                 {isActivePaid &&
-                  currentSubscription?.plan === SubscriptionPlan.GROWTH &&
-                  selectedPlan.key === SubscriptionPlan.BASIC && (
+                                 {changingPaidPlan && !isUpgrade && currentSubscription && (
                     <View
                       style={[
                         styles.statusCard,
@@ -1661,11 +1599,9 @@ export default function SubscriptionScreen() {
                         </Text>
 
                         <Text style={styles.statusDescription}>
-                          Your Growth benefits remain active until{' '}
+                          Your {getPlanName(currentSubscription.plan)} benefits remain active until{' '}
                           {formatDate(currentSubscription.endDate)}.
-                          {' '}Your Basic plan will start after your
-                          Growth plan expires, subject to Admin
-                          payment verification.
+                          {' '}Your {selectedPlan.name} plan will start after that, subject to Admin payment verification.
                         </Text>
                       </View>
                     </View>

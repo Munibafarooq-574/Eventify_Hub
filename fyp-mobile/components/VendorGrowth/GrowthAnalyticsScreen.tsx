@@ -43,11 +43,10 @@ import {
   Tag,
 } from 'lucide-react-native';
 
-import { getVendorSubscription } from '../../services/getVendorSubscription';
+import { getSubscriptionAccessState } from '../../services/getSubscriptionAccessState';
 import { getGrowthAnalytics } from '../../services/getGrowthAnalytics';
 import { getPremiumAnalytics } from '../../services/getPremiumAnalytics';
 import { getBusinessInsights } from '../../services/getBusinessInsights';
-import { SubscriptionPlan } from '../../types/subscription.types';
 import {
   BusinessInsight,
   GrowthAnalytics,
@@ -97,7 +96,7 @@ export default function GrowthAnalyticsScreen() {
 
   const vendorIdValue = Array.isArray(vendorId) ? vendorId[0] : vendorId;
 
-  const [plan, setPlan] = useState<SubscriptionPlan | null>(null);
+  const [hasAnalytics, setHasAnalytics] = useState(false);
   const [growth, setGrowth] = useState<GrowthAnalytics | null>(null);
   const [premium, setPremium] = useState<PremiumAnalytics | null>(null);
   const [insights, setInsights] = useState<BusinessInsight[]>([]);
@@ -118,23 +117,20 @@ export default function GrowthAnalyticsScreen() {
       }
       try {
         setError(null);
-        const subscription = await getVendorSubscription(vendorIdValue);
-        setPlan(subscription.plan);
+        const access = await getSubscriptionAccessState(vendorIdValue);
+        const features = access.features;
+        setHasAnalytics(access.accessAllowed &&
+          (features.growthAnalytics || features.advancedAnalytics || features.businessInsights));
+        if (!access.accessAllowed) return;
 
-        if (subscription.plan === SubscriptionPlan.FREE) {
-          return;
-        }
-
-        if (subscription.plan === SubscriptionPlan.PREMIUM) {
-          const [premiumData, insightData] = await Promise.all([
-            getPremiumAnalytics(vendorIdValue),
-            getBusinessInsights(vendorIdValue),
-          ]);
-          setPremium(premiumData);
-          setInsights(insightData);
-        } else {
-          setGrowth(await getGrowthAnalytics(vendorIdValue));
-        }
+        const [growthData, premiumData, insightData] = await Promise.all([
+          features.growthAnalytics ? getGrowthAnalytics(vendorIdValue) : null,
+          features.advancedAnalytics ? getPremiumAnalytics(vendorIdValue) : null,
+          features.businessInsights ? getBusinessInsights(vendorIdValue) : [],
+        ]);
+        setGrowth(growthData);
+        setPremium(premiumData);
+        setInsights(insightData);
       } catch (e: any) {
         setError(e?.message || 'Failed to load analytics');
       } finally {
@@ -217,7 +213,7 @@ export default function GrowthAnalyticsScreen() {
     );
   }
 
-  if (plan === SubscriptionPlan.FREE) {
+  if (!hasAnalytics) {
     return (
       <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -232,7 +228,7 @@ export default function GrowthAnalyticsScreen() {
             <BarChart3 size={30} color={COLORS.primary} strokeWidth={2} />
           </View>
           <Text style={styles.upsellTitle}>Growth Analytics</Text>
-          <Text style={styles.upsellSubtitle}>Upgrade to Growth or Premium to see revenue, customer, and package analytics.</Text>
+          <Text style={styles.upsellSubtitle}>Choose a plan with analytics to see revenue, customer, and package insights.</Text>
           <TouchableOpacity
             style={styles.upsellButton}
             onPress={() =>

@@ -35,7 +35,7 @@ import {
 
 import { VendorBadgeChips } from '../VendorFeature/VendorBadgeChips';
 
-import { getVendorSubscription } from '../../services/getVendorSubscription';
+import { getSubscriptionAccessState } from '../../services/getSubscriptionAccessState';
 
 import {
   getVendorAnalyticsSummary,
@@ -43,8 +43,9 @@ import {
 } from '../../services/getVendorAnalyticsSummary';
 
 import {
-  SubscriptionPlan,
-  VendorSubscription,
+  formatSubscriptionPlanName,
+  SubscriptionAccessState,
+  SubscriptionFeatures,
 } from '../../types/subscription.types';
 
 const COLORS = {
@@ -74,7 +75,7 @@ interface GrowthMenuItem {
   iconColor: string;
   title: string;
   subtitle: string;
-  requiresPaidPlan: boolean;
+  feature?: keyof SubscriptionFeatures;
 }
 
 const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
@@ -85,7 +86,7 @@ const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
     iconColor: '#C2703D',
     title: 'Feature Your Business',
     subtitle: 'Get top placement in search',
-    requiresPaidPlan: true,
+    feature: 'featuredVendor',
   },
   {
     key: 'featuredPackages',
@@ -94,7 +95,7 @@ const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
     iconColor: COLORS.primary,
     title: 'Featured Packages',
     subtitle: 'Highlight your best packages',
-    requiresPaidPlan: true,
+    feature: 'featuredPackage',
   },
   {
     key: 'badges',
@@ -103,7 +104,6 @@ const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
     iconColor: '#047857',
     title: 'Promotional Badges',
     subtitle: 'Top Rated, Fast Response & more',
-    requiresPaidPlan: false,
   },
   {
     key: 'coupons',
@@ -112,7 +112,7 @@ const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
     iconColor: '#BE185D',
     title: 'Coupons',
     subtitle: 'Create discount coupons',
-    requiresPaidPlan: true,
+    feature: 'coupons',
   },
   {
     key: 'discountCodes',
@@ -121,7 +121,7 @@ const GROWTH_MENU_ITEMS: GrowthMenuItem[] = [
     iconColor: '#2563EB',
     title: 'Discount Codes',
     subtitle: 'Run promotional campaigns',
-    requiresPaidPlan: true,
+    feature: 'discountCodes',
   },
 ];
 
@@ -137,12 +137,7 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
-function planDisplayName(plan: SubscriptionPlan): string {
-  if (plan === SubscriptionPlan.GROWTH) return 'Growth';
-  if (plan === SubscriptionPlan.PREMIUM) return 'Premium';
 
-  return 'Free';
-}
 
 export default function VendorGrowthScreen() {
   const router = useRouter();
@@ -157,7 +152,7 @@ export default function VendorGrowthScreen() {
     : vendorId;
 
   const [subscription, setSubscription] =
-    useState<VendorSubscription | null>(null);
+    useState<SubscriptionAccessState | null>(null);
 
   const [analytics, setAnalytics] =
     useState<VendorAnalyticsSummary | null>(null);
@@ -178,7 +173,7 @@ export default function VendorGrowthScreen() {
       setError(null);
 
       const [sub, analyticsSummary] = await Promise.all([
-        getVendorSubscription(vendorIdValue),
+        getSubscriptionAccessState(vendorIdValue),
 
         getVendorAnalyticsSummary(vendorIdValue).catch(
           (analyticsError) => {
@@ -219,18 +214,17 @@ export default function VendorGrowthScreen() {
     loadData();
   };
 
-  const isPaidPlan =
-    subscription
-      ? subscription.plan !== SubscriptionPlan.FREE
-      : false;
+  const isPaidPlan = subscription?.isPaidPlan === true;
+  const isPremium = subscription?.features.premiumBadge === true;
+  const planName = subscription?.planName || formatSubscriptionPlanName(subscription?.effectivePlan);
 
-  const isPremium =
-    subscription?.plan === SubscriptionPlan.PREMIUM;
+  const isLocked = (item: GrowthMenuItem) => !!item.feature &&
+    (!subscription?.accessAllowed || !subscription.features[item.feature]);
 
   const handleMenuItemPress = (
     item: GrowthMenuItem,
   ) => {
-    if (item.requiresPaidPlan && !isPaidPlan) {
+    if (isLocked(item)) {
       router.push({
         pathname: '/subscriptionscreen',
         params: {
@@ -409,7 +403,7 @@ export default function VendorGrowthScreen() {
       >
 
         {/* Paid Subscription Feature Note */}
-        {subscription && isPaidPlan && (
+        {subscription && isPaidPlan && !!subscription.featureLabels?.length && (
           <View style={styles.featureNote}>
             <View style={styles.featureNoteIcon}>
               <Sparkles
@@ -421,57 +415,19 @@ export default function VendorGrowthScreen() {
 
             <View style={styles.featureNoteContent}>
               <Text style={styles.featureNoteTitle}>
-                {planDisplayName(subscription.plan)} Plan Benefits
+                {planName} Plan Benefits
               </Text>
 
               <Text style={styles.featureNoteText}>
-                Your paid plan unlocks powerful growth tools:
+                Benefits included in your current plan:
               </Text>
 
               <View style={styles.featureList}>
-                <View style={styles.featureItem}>
-                  <Star
-                    size={13}
-                    color={COLORS.primary}
-                    strokeWidth={2.3}
-                  />
-                  <Text style={styles.featureItemText}>
-                    Feature Your Business
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Package
-                    size={13}
-                    color={COLORS.primary}
-                    strokeWidth={2.3}
-                  />
-                  <Text style={styles.featureItemText}>
-                    Featured Packages
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Ticket
-                    size={13}
-                    color={COLORS.primary}
-                    strokeWidth={2.3}
-                  />
-                  <Text style={styles.featureItemText}>
-                    Coupons
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Percent
-                    size={13}
-                    color={COLORS.primary}
-                    strokeWidth={2.3}
-                  />
-                  <Text style={styles.featureItemText}>
-                    Discount Codes
-                  </Text>
-                </View>
+                {subscription.featureLabels?.map(label => (
+                  <View key={label} style={styles.featureItem}>
+                    <Text style={styles.featureItemText}>{label}</Text>
+                  </View>
+                ))}
               </View>
             </View>
           </View>
@@ -496,7 +452,7 @@ export default function VendorGrowthScreen() {
               <View>
                 <View style={styles.planNameRow}>
                   <Text style={styles.planNameOnDark}>
-                    {planDisplayName(subscription.plan)}
+                    {planName}
                   </Text>
 
                   {isPremium && (
@@ -509,9 +465,9 @@ export default function VendorGrowthScreen() {
                 </View>
 
                 <Text style={styles.planMetaOnDark}>
-                  {subscription.endDate
+                  {subscription.subscription.endDate
                     ? `Active until ${formatDate(
-                        subscription.endDate,
+                        subscription.subscription.endDate,
                       )}`
                     : 'Your plan is active'}
                 </Text>
@@ -621,9 +577,7 @@ export default function VendorGrowthScreen() {
         <View style={styles.card}>
           {GROWTH_MENU_ITEMS.map(
             (item, index) => {
-              const locked =
-                item.requiresPaidPlan &&
-                !isPaidPlan;
+              const locked = isLocked(item);
 
               const ItemIcon = item.Icon;
 

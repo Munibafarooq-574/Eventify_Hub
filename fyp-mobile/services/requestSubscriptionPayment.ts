@@ -4,15 +4,12 @@ import { growthApi } from './growthApiClient';
 
 import {
   PaymentProvider,
-  SubscriptionPlan,
   VendorSubscription,
 } from '../types/subscription.types';
 
 interface RequestSubscriptionPaymentInput {
-  plan:
-    | SubscriptionPlan.BASIC
-    | SubscriptionPlan.GROWTH
-    | SubscriptionPlan.PREMIUM;
+  plan: string;
+  expectedAmount?: number;
 
   paymentProvider: PaymentProvider.EASYPAISA;
 

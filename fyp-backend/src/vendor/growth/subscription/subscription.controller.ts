@@ -1,3 +1,4 @@
+import { PLAN_KEY } from './plan-catalog.service';
 // fyp-backend/src/vendor/growth/subscription/subscription.controller.ts
 
 import {
@@ -16,6 +17,10 @@ import {
   IsIn,
   IsString,
   Length,
+  Matches,
+  IsOptional,
+  IsInt,
+  Min,
 } from 'class-validator';
 
 import {
@@ -29,7 +34,6 @@ import {
 import {
   PaymentProvider,
   SubscriptionActivationType,
-  SubscriptionPlan,
 } from './subscription.types';
 
 import {
@@ -41,15 +45,14 @@ import {
 } from '../../../auth/admin-role.guard';
 
 class RequestSubscriptionPaymentDto {
-  @IsIn([
-    SubscriptionPlan.BASIC,
-    SubscriptionPlan.GROWTH,
-    SubscriptionPlan.PREMIUM,
-  ])
-  plan!:
-    | SubscriptionPlan.BASIC
-    | SubscriptionPlan.GROWTH
-    | SubscriptionPlan.PREMIUM;
+  @IsString()
+  @Matches(PLAN_KEY)
+  plan!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedAmount?: number;
 
   @IsIn([
     PaymentProvider.BANK_TRANSFER,
@@ -173,6 +176,7 @@ getPaymentInstructions() {
         dto.paymentProvider,
         dto.paymentReference,
         dto.activationType,
+        dto.expectedAmount,
       );
   }
 

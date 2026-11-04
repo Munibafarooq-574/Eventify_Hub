@@ -342,12 +342,15 @@ export default async function SubscriptionsPage({
     "FAILED",
   ];
 
-  const planFilters = [
-    "ALL",
-    "BASIC",
-    "GROWTH",
-    "PREMIUM",
-  ];
+  const catalogResponse = await backendFetch("/admin/subscription-catalog", {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => null);
+  const catalog = catalogResponse?.ok ? await catalogResponse.json() : null;
+  const planNames = new Map<string, string>(
+    (catalog?.plans ?? []).map((plan: { key: string; name: string }) => [plan.key.toUpperCase(), plan.name]),
+  );
+  const planFilters = ["ALL", ...(planNames.size ? planNames.keys() : ["BASIC", "GROWTH", "PREMIUM"])];
+
 
   const filterHref = (
     nextStatus: string,
@@ -539,6 +542,9 @@ export default async function SubscriptionsPage({
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Subscription Plan
+                    <Link href="/subscriptions/plans" className="ml-3 text-violet-700 underline">
+                      Manage plans
+                    </Link>
                   </p>
 
                   <div className="flex flex-wrap gap-2">
@@ -561,9 +567,7 @@ export default async function SubscriptionsPage({
                               : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                           }`}
                         >
-                          {
-                            filter
-                          }
+                          {planNames.get(filter) || filter}
                         </Link>
                       ),
                     )}
@@ -721,9 +725,7 @@ export default async function SubscriptionsPage({
                                   item.plan,
                                 )}`}
                               >
-                                {prettyText(
-                                  item.plan,
-                                )}
+                                {planNames.get(item.plan.toUpperCase()) || prettyText(item.plan)}
                               </span>
                             </td>
 

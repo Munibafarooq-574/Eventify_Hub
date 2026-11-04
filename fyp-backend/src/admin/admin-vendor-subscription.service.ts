@@ -66,7 +66,7 @@ export class AdminVendorSubscriptionService {
 
     if (
       plan &&
-      !['basic', 'growth', 'premium'].includes(plan)
+      !/^[a-z][a-z0-9-]{0,63}$/.test(plan)
     ) {
       throw new BadRequestException(
         'Invalid subscription plan.',

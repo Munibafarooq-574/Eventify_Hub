@@ -10,6 +10,10 @@ export enum SubscriptionPlan {
   PREMIUM = 'premium',
 }
 
+export function formatSubscriptionPlanName(key?: string | null): string {
+  return key?.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Subscription';
+}
+
 export enum SubscriptionStatus {
   TRIAL = 'trial',
     ACTIVE = 'active',
@@ -73,7 +77,7 @@ export interface VendorSubscription {
   _id: string;
   vendorId: string;
 
-  plan: SubscriptionPlan;
+  plan: string;
   status: SubscriptionStatus;
 
   startDate: string;
@@ -106,7 +110,7 @@ export interface VendorSubscription {
 }
 
 export interface PlanDefinition {
-  key: SubscriptionPlan;
+  key: string;
 
   name: string;
   description: string;
@@ -116,6 +120,8 @@ export interface PlanDefinition {
 
   isMostPopular: boolean;
   isPurchasable: boolean;
+  rank?: number;
+  featureLabels?: string[];
 
   features: SubscriptionFeatures;
   limits: SubscriptionLimits;
@@ -123,7 +129,7 @@ export interface PlanDefinition {
 
 export interface PendingSubscriptionPayment {
   _id: string;
-  plan: SubscriptionPlan;
+  plan: string;
 
   status: SubscriptionStatus;
 
@@ -146,7 +152,10 @@ export interface SubscriptionAccessState {
 
   isTrial: boolean;
 
-  effectivePlan: SubscriptionPlan;
+  effectivePlan: string;
+  planName?: string;
+  planRank?: number;
+  featureLabels?: string[];
 
   features: SubscriptionFeatures;
   limits: SubscriptionLimits;
@@ -166,7 +175,7 @@ export interface SubscriptionAccessState {
 
 export interface ScheduledSubscription {
   subscriptionId: string;
-  plan: SubscriptionPlan;
+  plan: string;
   activationType: 'immediate' | 'scheduled' | null;
   planChangeType: 'upgrade' | 'downgrade' | 'renewal' | null;
   scheduledActivationDate: string | null;

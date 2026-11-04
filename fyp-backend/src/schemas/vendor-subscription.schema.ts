@@ -67,17 +67,13 @@ export class VendorSubscription extends Document {
     type:
       String,
 
-    enum:
-      SubscriptionPlan,
-
     required:
       true,
 
     default:
       SubscriptionPlan.BASIC,
   })
-  plan:
-    SubscriptionPlan;
+  plan: string;
 
   @Prop({
     type:

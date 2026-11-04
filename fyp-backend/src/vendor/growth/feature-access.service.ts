@@ -12,7 +12,6 @@ import {
   SubscriptionStatus,
 } from './subscription/subscription.types';
 
-import { getPlanDefinition } from './plan-config';
 
 @Injectable()
 export class FeatureAccessService {
@@ -23,7 +22,7 @@ export class FeatureAccessService {
 
   async getCurrentPlan(
     vendorId: string,
-  ): Promise<SubscriptionPlan> {
+  ): Promise<string> {
     const subscription =
       await this.subscriptionService.getCurrentSubscription(
         vendorId,
@@ -70,13 +69,7 @@ export class FeatureAccessService {
       return false;
     }
 
-    return [
-      SubscriptionPlan.BASIC,
-      SubscriptionPlan.GROWTH,
-      SubscriptionPlan.PREMIUM,
-    ].includes(
-      subscription.plan,
-    );
+    return subscription.plan !== SubscriptionPlan.FREE;
   }
 
   async canUseFeature(
@@ -97,9 +90,7 @@ export class FeatureAccessService {
     }
 
     return (
-      getPlanDefinition(
-        subscription.plan,
-      ).features[feature] === true
+      (await this.subscriptionService.getPlanForAccess(subscription.plan)).features[feature] === true
     );
   }
 
@@ -121,9 +112,7 @@ export class FeatureAccessService {
     }
 
     return (
-      getPlanDefinition(
-        subscription.plan,
-      ).limits[limit] ?? 0
+      (await this.subscriptionService.getPlanForAccess(subscription.plan)).limits[limit] ?? 0
     );
   }
 

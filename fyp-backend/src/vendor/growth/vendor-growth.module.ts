@@ -1,3 +1,5 @@
+import { PlanCatalogService } from './subscription/plan-catalog.service';
+import { PlanCatalogController } from './subscription/plan-catalog.controller';
 // fyp-backend/src/vendor/growth/vendor-growth.module.ts
 
 import { Module, forwardRef } from '@nestjs/common';
@@ -156,6 +158,7 @@ import {
 
   controllers: [
     SubscriptionController,
+    PlanCatalogController,
     PromotionController,
     CampaignController,
     BadgeController,
@@ -169,6 +172,7 @@ import {
   providers: [
     // Subscription
     SubscriptionService,
+    PlanCatalogService,
 
     // Centralized feature access
     FeatureAccessService,

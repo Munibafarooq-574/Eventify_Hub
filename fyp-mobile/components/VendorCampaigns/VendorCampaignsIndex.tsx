@@ -9,7 +9,7 @@ import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessStat
 import { getUserData } from "@/store";
 import {
   SubscriptionAccessState,
-  SubscriptionPlan,
+  formatSubscriptionPlanName,
 } from "@/types/subscription.types";
 
 import { Ionicons } from "@expo/vector-icons";
@@ -140,19 +140,7 @@ const getPlanLabel = (
     return "Subscription";
   }
 
-  switch (access.effectivePlan) {
-    case SubscriptionPlan.PREMIUM:
-      return "Premium";
-
-    case SubscriptionPlan.GROWTH:
-      return "Growth";
-
-    case SubscriptionPlan.BASIC:
-      return "Basic";
-
-    default:
-      return "Basic";
-  }
+  return access.planName || formatSubscriptionPlanName(access.effectivePlan);
 };
 
 export default function VendorCampaignsIndex() {
@@ -307,18 +295,7 @@ export default function VendorCampaignsIndex() {
     loadCampaignData(false);
   }, [loadCampaignData]);
 
-  const isGrowthOrPremium = useMemo(() => {
-    if (!subscriptionAccess) {
-      return false;
-    }
-
-    return (
-      subscriptionAccess.effectivePlan ===
-        SubscriptionPlan.GROWTH ||
-      subscriptionAccess.effectivePlan ===
-        SubscriptionPlan.PREMIUM
-    );
-  }, [subscriptionAccess]);
+  const hasCampaignAccess = Boolean(subscriptionAccess?.accessAllowed && subscriptionAccess.features.campaigns);
 
   const monthlyLimit =
     usage?.limit ?? 0;
@@ -335,7 +312,7 @@ export default function VendorCampaignsIndex() {
 
   const canCreateCampaign =
     Boolean(vendorId) &&
-    isGrowthOrPremium &&
+    hasCampaignAccess &&
     usage !== null &&
     usage.canCreate;
 
@@ -389,7 +366,7 @@ export default function VendorCampaignsIndex() {
       return;
     }
 
-    if (!isGrowthOrPremium) {
+    if (!hasCampaignAccess) {
       Alert.alert(
         "Upgrade Required",
         "Campaign Ads are available on Growth and Premium plans.",
@@ -736,7 +713,7 @@ export default function VendorCampaignsIndex() {
 
         {/* BASIC / LOCKED PLAN */}
 
-        {!isGrowthOrPremium ? (
+        {!hasCampaignAccess ? (
           <View style={styles.section}>
             <LinearGradient
               colors={[
@@ -865,9 +842,7 @@ export default function VendorCampaignsIndex() {
                 <View style={styles.planBadge}>
                   <Ionicons
                     name={
-                      subscriptionAccess
-                        ?.effectivePlan ===
-                      SubscriptionPlan.PREMIUM
+                      subscriptionAccess?.features.premiumBadge
                         ? "diamond"
                         : "rocket"
                     }
@@ -1200,7 +1175,7 @@ export default function VendorCampaignsIndex() {
               </Text>
 
               <Text style={styles.emptyText}>
-                {isGrowthOrPremium
+                {hasCampaignAccess
                   ? "Create your first campaign and promote an existing package to more clients."
                   : "Your campaign history will appear here when you start using Campaign Ads."}
               </Text>

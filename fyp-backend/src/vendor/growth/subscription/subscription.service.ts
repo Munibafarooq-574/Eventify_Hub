@@ -35,11 +35,7 @@ import {
   VENDOR_TRIAL_DURATION_DAYS,
 } from './subscription.types';
 
-import {
-  getAllPlanDefinitions,
-  getConfiguredPlanPrice,
-  getPlanDefinition,
-} from '../plan-config';
+import { PlanCatalogService, PLAN_KEY } from './plan-catalog.service';
 
 type VendorSubscriptionDocument =
   HydratedDocument<VendorSubscription>;
@@ -61,14 +57,19 @@ export class SubscriptionService {
 
     @InjectConnection()
     private readonly connection: Connection,
+    private readonly catalog: PlanCatalogService,
   ) {}
 
   // =========================================================
   // PLANS
   // =========================================================
 
-  getPlans() {
-    return getAllPlanDefinitions();
+  async getPlans() {
+    return (await this.catalog.list()).filter(plan => plan.isPurchasable);
+  }
+
+  async getPlanForAccess(key: string) {
+    return (await this.catalog.get(key)) ?? (await this.catalog.get(SubscriptionPlan.FREE))!;
   }
 
   getPaymentInstructions() {
@@ -228,14 +229,15 @@ export class SubscriptionService {
 
   async requestSubscriptionPayment(
     vendorId: string,
-    plan: SubscriptionPlan,
+    plan: string,
     paymentProvider: PaymentProvider,
      paymentReference: string,
     activationType: SubscriptionActivationType,
+    expectedAmount?: number,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
-    this.assertPurchasablePlan(plan);
+    const definition = await this.catalog.getPurchasable(plan);
 
     this.assertManualPaymentProvider(
       paymentProvider,
@@ -245,11 +247,7 @@ export class SubscriptionService {
       vendorId,
     );
 
-    const planRank: Record<string, number> = {
-      [SubscriptionPlan.BASIC]: 1,
-      [SubscriptionPlan.GROWTH]: 2,
-      [SubscriptionPlan.PREMIUM]: 3,
-    };
+    const currentRank = (await this.getPlanForAccess(current.plan)).rank;
 
     const hasValidCurrentAccess =
       current.endDate !== null &&
@@ -272,7 +270,7 @@ export class SubscriptionService {
     } else if (current.plan === plan) {
       planChangeType = SubscriptionPlanChangeType.RENEWAL;
       effectiveActivationType = SubscriptionActivationType.SCHEDULED;
-        } else if (planRank[plan] > planRank[current.plan]) {
+        } else if (definition.rank > currentRank) {
       if (
         activationType !== SubscriptionActivationType.IMMEDIATE &&
         activationType !== SubscriptionActivationType.SCHEDULED
@@ -306,7 +304,7 @@ export class SubscriptionService {
     }
 
     const amountDue =
-      getConfiguredPlanPrice(plan);
+      definition.monthlyPrice;
 
     /**
      * Backend is the source of truth.
@@ -319,8 +317,12 @@ export class SubscriptionService {
       amountDue <= 0
     ) {
       throw new BadRequestException(
-        `${getPlanDefinition(plan).name} subscription price has not been configured by Eventify Hub yet.`,
+        `${definition.name} subscription price has not been configured by Eventify Hub yet.`,
       );
+    }
+
+    if (expectedAmount !== undefined && expectedAmount !== amountDue) {
+      throw new BadRequestException('This plan price changed. Refresh the plans and contact support if you already paid.');
     }
 
     const normalizedReference =
@@ -484,14 +486,6 @@ export class SubscriptionService {
       );
 
     const query: Record<string, any> = {
-      plan: {
-        $in: [
-          SubscriptionPlan.BASIC,
-          SubscriptionPlan.GROWTH,
-          SubscriptionPlan.PREMIUM,
-        ],
-      },
-
       /**
        * Demo subscriptions are not real
        * subscription payments.
@@ -537,18 +531,8 @@ export class SubscriptionService {
       const normalizedPlan =
         plan.toLowerCase();
 
-      if (
-        ![
-          SubscriptionPlan.BASIC,
-          SubscriptionPlan.GROWTH,
-          SubscriptionPlan.PREMIUM,
-        ].includes(
-          normalizedPlan as SubscriptionPlan,
-        )
-      ) {
-        throw new BadRequestException(
-          'Invalid subscription plan.',
-        );
+      if (!PLAN_KEY.test(normalizedPlan)) {
+        throw new BadRequestException('Invalid subscription plan.');
       }
 
       query.plan =
@@ -887,9 +871,7 @@ export class SubscriptionService {
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
-    this.assertPurchasablePlan(plan);
-
-    getPlanDefinition(plan);
+    await this.catalog.getPurchasable(plan);
 
     const vendorObjectId =
       new Types.ObjectId(vendorId);
@@ -1130,13 +1112,7 @@ export class SubscriptionService {
         (subscription.status === SubscriptionStatus.CANCELLED && accessAllowed)) &&
       subscription.paymentStatus ===
         PaymentStatus.PAID &&
-      [
-        SubscriptionPlan.BASIC,
-        SubscriptionPlan.GROWTH,
-        SubscriptionPlan.PREMIUM,
-      ].includes(
-        subscription.plan,
-      );
+      subscription.plan !== SubscriptionPlan.FREE;
 
     /**
      * Payment request exists separately from
@@ -1173,10 +1149,7 @@ export class SubscriptionService {
     .sort({ scheduledActivationDate: 1 })
     .lean();
 
-    const planDefinition =
-  getPlanDefinition(
-    subscription.plan,
-  );
+    const planDefinition = await this.getPlanForAccess(subscription.plan);
 
 /**
  * Expired vendors keep their historical plan,
@@ -1232,6 +1205,9 @@ const entitlementLimits =
      
       effectivePlan:
   subscription.plan,
+      planName: planDefinition.name,
+      planRank: planDefinition.rank,
+      featureLabels: accessAllowed ? planDefinition.featureLabels : [],
 
 features:
   entitlementFeatures,
@@ -1584,22 +1560,6 @@ if (!vendorCreatedAt || !Number.isFinite(vendorCreatedAt.getTime())) {
   // =========================================================
   // VALIDATION
   // =========================================================
-
-  private assertPurchasablePlan(
-    plan: SubscriptionPlan,
-  ) {
-    if (
-      ![
-        SubscriptionPlan.BASIC,
-        SubscriptionPlan.GROWTH,
-        SubscriptionPlan.PREMIUM,
-      ].includes(plan)
-    ) {
-      throw new BadRequestException(
-        'Choose Basic, Growth, or Premium.',
-      );
-    }
-  }
 
   private assertManualPaymentProvider(
     provider: PaymentProvider,

@@ -9,6 +9,7 @@ import { PaymentStatus, VendorSubscription } from "@/types/subscription.types";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
 import {
     SubscriptionAccessState,
+    formatSubscriptionPlanName,
     SubscriptionPlan,
     SubscriptionStatus,
 } from "@/types/subscription.types";
@@ -1814,12 +1815,7 @@ const getSubscriptionBannerConfig = (
      * remain active while an upgrade/renewal payment is being reviewed.
      */
     if (access.hasPendingPayment && access.pendingPayment) {
-        const requestedPlan =
-            access.pendingPayment.plan === SubscriptionPlan.PREMIUM
-                ? "Premium"
-                : access.pendingPayment.plan === SubscriptionPlan.GROWTH
-                  ? "Growth"
-                  : "Basic";
+        const requestedPlan = formatSubscriptionPlanName(access.pendingPayment.plan);
 
         return {
             title: "Payment Under Review",
@@ -1912,7 +1908,7 @@ const getSubscriptionBannerConfig = (
     if (subscription.status === SubscriptionStatus.ACTIVE) {
         if (access.effectivePlan === SubscriptionPlan.PREMIUM) {
             return {
-                title: "Premium Plan Active",
+                title: `${access.planName || "Premium"} Plan Active`,
                 message: validUntil
                     ? `Maximum exposure benefits active • Valid until ${validUntil}.`
                     : "Maximum exposure benefits are active.",
@@ -1924,7 +1920,7 @@ const getSubscriptionBannerConfig = (
 
         if (access.effectivePlan === SubscriptionPlan.GROWTH) {
             return {
-                title: "Growth Plan Active",
+                title: `${access.planName || "Growth"} Plan Active`,
                 message: validUntil
                     ? `Growth benefits active • Valid until ${validUntil}.`
                     : "Your Growth benefits are active.",
@@ -1935,7 +1931,7 @@ const getSubscriptionBannerConfig = (
         }
 
         return {
-            title: "Basic Plan Active",
+            title: `${access.planName || formatSubscriptionPlanName(access.effectivePlan)} Plan Active`,
             message: validUntil
                 ? `Essential business features active • Valid until ${validUntil}.`
                 : "Essential business features are active.",

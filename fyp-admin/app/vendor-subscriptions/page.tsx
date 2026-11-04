@@ -191,13 +191,14 @@ export default async function VendorSubscriptionsPage({
       first(params.plan) || "",
     ).toLowerCase();
 
-  const plan = [
-    "basic",
-    "growth",
-    "premium",
-  ].includes(rawPlan)
-    ? rawPlan
-    : "";
+  const plan = /^[a-z][a-z0-9-]{0,63}$/.test(rawPlan) ? rawPlan : "";
+  const catalogResponse = await backendFetch("/admin/subscription-catalog", {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => null);
+  const catalog = catalogResponse?.ok ? await catalogResponse.json() : null;
+  const planOptions: { key: string; name: string }[] = catalog?.plans ?? [
+    { key: "basic", name: "Basic" }, { key: "growth", name: "Growth" }, { key: "premium", name: "Premium" },
+  ];
 
   const rawStatus =
     String(
@@ -425,15 +426,9 @@ export default async function VendorSubscriptionsPage({
                   <option value="">
                     All Plans
                   </option>
-                  <option value="basic">
-                    Basic
-                  </option>
-                  <option value="growth">
-                    Growth
-                  </option>
-                  <option value="premium">
-                    Premium
-                  </option>
+                  {planOptions.map(option => (
+                    <option key={option.key} value={option.key}>{option.name}</option>
+                  ))}
                 </select>
               </div>
 

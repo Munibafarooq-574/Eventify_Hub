@@ -29,6 +29,7 @@ const navigation = [
         label: "Subscription Payments",
         href: "/subscriptions",
       },
+      { label: "Subscription Plans", href: "/subscriptions/plans" },
       { label: "Finance Overview", href: "/finance" },
     ],
   },
