@@ -88,7 +88,7 @@ export class CityService {
     return city.timeZone;
   }
 
-  async requireActiveCity(cityId: string) {
+  async requireActiveCity(cityId: string, countryCode?: string) {
     if (!Types.ObjectId.isValid(cityId)) {
       throw new BadRequestException('Invalid city ID.');
     }
@@ -97,12 +97,13 @@ export class CityService {
       .findOne({
         _id: new Types.ObjectId(cityId),
         isActive: true,
+        ...(countryCode && { countryCode }),
       })
       .lean();
 
     if (!city) {
       throw new NotFoundException(
-        'Selected city does not exist or is inactive.',
+        countryCode ? 'Choose an active business city in your signup country.' : 'Selected city does not exist or is inactive.',
       );
     }
 
@@ -381,7 +382,7 @@ export class CityService {
     return city;
   }
   
-  async requireActiveCities(cityIds: string[]) {
+  async requireActiveCities(cityIds: string[], countryCode?: string) {
     if (!Array.isArray(cityIds) || cityIds.length === 0) {
       throw new BadRequestException(
         'At least one service location city is required.',
@@ -408,13 +409,14 @@ export class CityService {
           ),
         },
         isActive: true,
+        ...(countryCode && { countryCode }),
       })
       .select('_id')
       .lean();
 
     if (cities.length !== uniqueIds.length) {
       throw new BadRequestException(
-        'One or more service location cities do not exist or are inactive.',
+        countryCode ? 'Choose active service cities in your signup country.' : 'One or more service location cities do not exist or are inactive.',
       );
     }
 

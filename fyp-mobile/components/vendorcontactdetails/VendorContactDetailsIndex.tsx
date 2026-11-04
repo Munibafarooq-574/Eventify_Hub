@@ -4,7 +4,7 @@ import postContactDetails from "@/services/postContactDetails";
 import getActiveCities, {
   ActiveCity,
 } from "@/services/getActiveCities";
-import { getSecureData } from "@/store";
+import { getSecureData, getUserData } from "@/store";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -91,7 +91,8 @@ const [address, setAddress] = useState<string>("");
     try {
       setCitiesLoading(true);
 
-      const data = await getActiveCities();
+      const user = await getUserData();
+      const data = await getActiveCities(user?.marketplaceCountryCode);
 
       setCities(Array.isArray(data) ? data : []);
     } catch (error) {

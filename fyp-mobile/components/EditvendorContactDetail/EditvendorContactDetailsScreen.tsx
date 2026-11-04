@@ -146,7 +146,8 @@ const EditContactDetailsScreen = () => {
       try {
         setCitiesLoading(true);
 
-        const data = await getActiveCities();
+        const user = await getUserData();
+        const data = await getActiveCities(user?.marketplaceCountryCode);
 
         setCities(
           Array.isArray(data) ? data : [],

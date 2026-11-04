@@ -213,10 +213,12 @@ async createContactDetails(
 
  await this.cityService.requireActiveCity(
   createContactDetailsDto.businessCityId,
+  user.marketplaceCountryCode,
 );
 
 await this.cityService.requireActiveCities(
   createContactDetailsDto.serviceLocationCityIds,
+  user.marketplaceCountryCode,
 );
 
 const {
@@ -279,10 +281,12 @@ async updateContactDetails(
   }
   await this.cityService.requireActiveCity(
   dto.businessCityId,
+  user.marketplaceCountryCode,
 );
 
 await this.cityService.requireActiveCities(
   dto.serviceLocationCityIds,
+  user.marketplaceCountryCode,
 );
 
 const {

@@ -121,21 +121,16 @@ const validateEmail = (text: string) => {
   }
 };
 
-const isClient = role === "Client" || role === "Organizer";
-const isUSPhone = isClient && countryCode === "US";
-const phoneReady = !isClient || Boolean(countryCode);
+const isUSPhone = countryCode === "US";
+const phoneReady = Boolean(countryCode);
 const compactPhone = phone.replace(/[\s().-]/g, "");
 const validPhone = isUSPhone
   ? /^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)
-  : isClient
-    ? /^(?:0|\+?92)3\d{9}$/.test(compactPhone)
-    : /^\d{11}$/.test(phone);
+  : /^(?:0|\+?92)3\d{9}$/.test(compactPhone);
 const phoneError = phone && !validPhone
   ? isUSPhone
     ? "Enter a 10-digit US number, such as (415) 555-0123."
-    : isClient
-      ? "Enter a Pakistani mobile number starting with 03 or +92 3."
-      : "Phone number must be 11 digits."
+    : "Enter a Pakistani mobile number starting with 03 or +92 3."
   : "";
 
 // Password Strength
@@ -262,8 +257,8 @@ const handleRegister = async () => {
   name,
   role,
   categoryId,
-  isClient ? compactPhone : phone,
-  isClient ? countryCode : undefined,
+  compactPhone,
+  countryCode,
 );
 
     await startUserSession(response.token, response.user);
@@ -479,9 +474,7 @@ return (
         </Text>
       )}
 
-      {/* Client country */}
-{isClient && (
-  <>
+      {/* Country */}
     <Text style={styles.label}>Country</Text>
     <View style={{ flexDirection: "row", gap: 10 }}>
       {[["PK", "Pakistan"], ["US", "United States"]].map(([code, label]) => (
@@ -495,9 +488,6 @@ return (
         </TouchableOpacity>
       ))}
     </View>
-
-  </>
-)}
 
       {/* Phone */}
 
@@ -517,18 +507,16 @@ return (
           placeholder={isUSPhone ? "(415) 555-0123" : "03XXXXXXXXX"}
           placeholderTextColor="#999"
           keyboardType="phone-pad"
-          maxLength={isClient ? 24 : 11}
+          maxLength={24}
           editable={phoneReady}
           value={phone}
-          onChangeText={(value) => setPhone(isClient ? value : value.replace(/[^0-9]/g, ""))}
+          onChangeText={setPhone}
         />
       </View>
 
-      {isClient && (
         <Text style={{ color: "#666", marginTop: 6 }}>
           {phoneReady ? (isUSPhone ? "US country code +1" : "Pakistan country code +92") : "Select your country first."}
         </Text>
-      )}
 
       {phoneError !== "" && (
         <Text style={styles.errorText}>

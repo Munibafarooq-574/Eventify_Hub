@@ -210,8 +210,8 @@ private readonly availabilityService: VendorAvailabilityService,
 // CLIENT CITY VALIDATION
 // =====================================================
 
-    const marketplace = isClient
-      ? await this.validateMarketplaceLocation(registerDto.marketplaceCountryCode, registerDto.clientCityId)
+    const marketplace = isClient || isVendor
+      ? await this.validateMarketplaceLocation(registerDto.marketplaceCountryCode, isClient ? registerDto.clientCityId : undefined)
       : undefined;
 
     let phoneNumber = registerDto.mobileNumber;
@@ -284,7 +284,7 @@ private readonly availabilityService: VendorAvailabilityService,
     delete userPayload.marketplaceCountryCode;
     if (marketplace) {
       userPayload.marketplaceCountryCode = marketplace.countryCode;
-      userPayload.clientCityId = marketplace.cityId;
+      if (isClient) userPayload.clientCityId = marketplace.cityId;
     }
     /**
      * Only vendors should have
