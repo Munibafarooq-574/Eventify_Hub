@@ -17,9 +17,6 @@ export class CreateMehndiBusinessDetailsDto {
     @IsString({ each: true })
     staffGender: string[]; // e.g. ['MALE', 'FEMALE', 'TRANSGENDER']
 
-    @IsOptional()
-    @IsNumber()
-    minimumPrice?: number;
 
     @IsString()
     description: string;

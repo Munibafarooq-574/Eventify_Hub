@@ -32,13 +32,13 @@ const mockVendors = [
     _id: "1",
     name: "Beauty Salon",
     contactDetails: { city: "Karachi" },
-    BusinessDetails: { minimumPrice: "2000" },
+    packages: [{ price: 2000 }],
   },
   {
     _id: "2",
     name: "Spa Center",
     contactDetails: { city: "Lahore" },
-    BusinessDetails: { minimumPrice: "1500" },
+    packages: [{ price: 1500 }],
   },
 ];
 
@@ -130,7 +130,7 @@ describe("CategoryVendorListingIndex Component", () => {
         _id: "6",
         name: "Zero Price Vendor",
         contactDetails: { city: "Lahore" },
-        BusinessDetails: { minimumPrice: "0" },
+        packages: [{ price: 0 }],
       },
     ]);
     const { getByText } = await render(<App />);

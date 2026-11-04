@@ -117,8 +117,6 @@ const BDGenericIndex = () => {
     const [teamGenders, setTeamGenders] = useState<string[]>([]);
     const [yearsExperience, setYearsExperience] = useState("");
 
-    const [minimumPrice, setMinimumPrice] =
-        useState("");
 
     const [description, setDescription] =
         useState("");
@@ -192,10 +190,6 @@ const BDGenericIndex = () => {
                         data.description || ""
                     );
 
-                    setMinimumPrice(
-                        data.minimumPrice
-                            ?.toString() || ""
-                    );
 
                     setAdditionalInfo(
                         data.additionalInfo || ""
@@ -242,7 +236,6 @@ const BDGenericIndex = () => {
             teamGenders.length === 0 ||
             !yearsExperience.trim() ||
             !description.trim() ||
-            !minimumPrice ||
             travelsToClientHome === null ||
             !downPaymentType ||
             !downPayment ||
@@ -262,23 +255,8 @@ const BDGenericIndex = () => {
             return;
         }
 
-        const parsedMinimumPrice =
-            Number(minimumPrice);
-
         const parsedDownPayment =
             Number(downPayment);
-
-        if (
-            Number.isNaN(parsedMinimumPrice) ||
-            parsedMinimumPrice < 0
-        ) {
-            Alert.alert(
-                "Invalid Price",
-                "Please enter a valid starting price."
-            );
-
-            return;
-        }
 
         if (
             Number.isNaN(parsedDownPayment) ||
@@ -319,8 +297,6 @@ const BDGenericIndex = () => {
                     description:
                         description.trim(),
 
-                    minimumPrice:
-                        parsedMinimumPrice,
 
                     additionalInfo:
                         additionalInfo.trim() ||
@@ -648,46 +624,6 @@ router.replace("/vendorprofilepending");
                             );
                         }
                     )}
-                </View>
-            </View>
-
-            {/* Starting Price */}
-
-            <View style={styles.card}>
-                <SectionTitle
-                    icon="tag"
-                    title="Starting Price"
-                    required
-                />
-
-                <View
-                    style={styles.inputRow}
-                >
-                    <Text
-                        style={
-                            styles.currencyPrefix
-                        }
-                    >
-                        Rs.
-                    </Text>
-
-                    <TextInput
-                        style={
-                            styles.inputFlex
-                        }
-                        keyboardType="numeric"
-                        placeholder="Enter starting price"
-                        placeholderTextColor="#B99DAF"
-                        value={minimumPrice}
-                        onChangeText={(text) =>
-                            setMinimumPrice(
-                                text.replace(
-                                    /[^0-9]/g,
-                                    ""
-                                )
-                            )
-                        }
-                    />
                 </View>
             </View>
 

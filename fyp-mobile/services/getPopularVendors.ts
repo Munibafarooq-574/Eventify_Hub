@@ -14,7 +14,6 @@ export interface TopVendor {
         coverImage?: string;
         contactDetails?: { brandName?: string };
         BusinessDetails?: {
-            minimumPrice?: number;
             cityCovered?: string;
         };
         images?: string[];

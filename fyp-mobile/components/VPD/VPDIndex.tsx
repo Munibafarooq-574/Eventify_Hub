@@ -1,3 +1,4 @@
+import { vendorStartingPrice } from '@/services/vendorSearchPreferences';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -98,7 +99,8 @@ const openPackageImageViewer = (image: string) => {
       ? vendorData?.buisnessCategory?._id
       : vendorData?.buisnessCategory;
 
-  const category = categories.find(
+  const startingPrice = vendorStartingPrice(vendorData);
+const category = categories.find(
     (item: any) => item._id === categoryId
   );
 
@@ -478,20 +480,14 @@ const category =
       </View>
     )}
 </View>
-                            <View style={styles.priceBadge}>
-                                <Text testID="vendor-price" style={styles.price}>
-                                    Rs. {businessDetails?.minimumPrice || "N/A"}/-
-                                </Text>
-
-                                <Text
-                                  style={
-                                 styles.perHead
-                                     }
-                                >
-                                   Starting price
-                                 </Text>
-                                
-                            </View>
+                            {startingPrice !== undefined && (
+                                <View style={styles.priceBadge}>
+                                    <Text testID="vendor-price" style={styles.price}>
+                                        Rs. {startingPrice}{category === 'catering' ? ' per guest' : ''}
+                                    </Text>
+                                    <Text style={styles.perHead}>Starting price</Text>
+                                </View>
+                            )}
                         </View>
 
                         <View style={styles.addressRow}>

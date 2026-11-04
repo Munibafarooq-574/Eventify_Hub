@@ -43,24 +43,21 @@ export async function saveVendorFilters(filters: VendorSearchPreferences) {
   const key = await storageKey();
   if (key) await AsyncStorage.setItem(key, JSON.stringify(filters));
 }
-export function vendorStartingPrice(vendor: any): number | undefined {
-  const details = [vendor.cakeBusinessDetails, vendor.mehndiBusinessDetails,
-    vendor.cateringBusinessDetails, vendor.photographerBusinessDetails,
-    vendor.salonBusinessDetails, vendor.venueBusinessDetails, vendor.soundBusinessDetails,
-    vendor.genericBusinessDetails, vendor.BusinessDetails];
-  for (const detail of details) {
-    const raw = detail?.minimumPrice ?? detail?.minimumPricePerEvent;
-    if (raw !== undefined && raw !== null && raw !== '' && Number.isFinite(Number(raw)) && Number(raw) >= 0) return Number(raw);
-  }
-  return undefined;
+export function vendorStartingPrice(vendor: any, packages = vendor?.packages): number | undefined {
+  if (!Array.isArray(packages)) return undefined;
+  const prices = packages
+    .filter(pkg => pkg?.isActive !== false && pkg?.bookingType !== 'CUSTOM' && pkg?.price != null && pkg.price !== '')
+    .map(pkg => Number(pkg.price))
+    .filter(price => Number.isFinite(price) && price >= 0);
+  return prices.length ? Math.min(...prices) : undefined;
 }
-export function sortVendorResults(vendors: any[], sort: VendorSort, reviews: Record<string, any>) {
+export function sortVendorResults(vendors: any[], sort: VendorSort, reviews: Record<string, any>, packages: Record<string, any[]> = {}) {
   const name = (v: any) => String(v.contactDetails?.brandName || v.ContactDetails?.brandName || v.BusinessDetails?.brandName || v.name || '');
   const compareName = (a: any, b: any) => name(a).localeCompare(name(b), undefined, { sensitivity: 'base', numeric: true });
   return [...vendors].sort((a, b) => {
     if (sort === 'default') return 0;
     if (sort === 'priceAsc' || sort === 'priceDesc') {
-      const left = vendorStartingPrice(a), right = vendorStartingPrice(b);
+      const left = vendorStartingPrice(a, packages[a._id]), right = vendorStartingPrice(b, packages[b._id]);
       if (left === undefined || right === undefined) return left === right ? compareName(a,b) : left === undefined ? 1 : -1;
       return (sort === 'priceAsc' ? left - right : right - left) || compareName(a,b);
     }

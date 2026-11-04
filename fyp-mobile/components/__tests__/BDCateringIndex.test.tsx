@@ -53,7 +53,6 @@ describe("BusinessDetailsForm Component", () => {
       expect(getByText("Travels to Client Home*")).toBeTruthy();
       expect(getByText("City Covered*")).toBeTruthy();
       expect(getByText("Staff")).toBeTruthy();
-      expect(getByText("Minimum Price")).toBeTruthy();
       expect(getByText("Description *")).toBeTruthy();
       expect(getByText("Down Payment Type*")).toBeTruthy();
       expect(getByText("Down Payment *")).toBeTruthy();

@@ -169,11 +169,11 @@ describe("BusinessDetailsForm Component (Pakistan - Islamabad)", () => {
 
   test("FT-02: Does not allow non-numeric values in numeric fields", async () => {
     const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
-    const minimumPriceInput = getByPlaceholderText("Enter expertise");
+    const expertiseInput = getByPlaceholderText("Enter expertise");
 
-    await fireEvent.changeText(minimumPriceInput, "abc");
+    await fireEvent.changeText(expertiseInput, "abc");
 
-    expect(minimumPriceInput.props.value).not.toBe("abc");
+    expect(expertiseInput.props.value).not.toBe("abc");
   });
 
   test("FT-03: Prevents submission when no type is selected", async () => {
@@ -256,7 +256,7 @@ describe("BusinessDetailsForm Component (Pakistan - Islamabad)", () => {
     const soloOption = getByText("SOLO");
     await fireEvent.press(soloOption);
 
-    // Minimum Price field
+    // Description field
     const priceInput = getByPlaceholderText("Enter Description");
     await fireEvent.changeText(priceInput, "Professional salon services");
 
@@ -517,7 +517,6 @@ describe("BusinessDetailsForm Component (Pakistan - Islamabad)", () => {
     expect(getByText("Travels to Client Home*")).toBeTruthy();
     expect(getByText("City Covered*")).toBeTruthy();
     expect(getByText("Staff")).toBeTruthy();
-    expect(getByText("Minimum Price")).toBeTruthy();
     expect(getByText("Description *")).toBeTruthy();
     expect(getByText("Down Payment Type*")).toBeTruthy();
     expect(getByText("Down Payment *")).toBeTruthy();

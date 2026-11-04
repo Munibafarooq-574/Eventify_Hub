@@ -43,7 +43,6 @@ const BDSoundIndex = () => {
     const [equipmentProvided, setEquipmentProvided] = useState<string[]>([]);
     const [travelsToClientHome, setTravelsToClientHome] = useState<"YES" | "NO" | null>(null);
     const [staffGender, setStaffGender] = useState<string[]>([]);
-    const [minimumPrice, setMinimumPrice] = useState<string>("");
     const [description, setDescription] = useState<string>("");
     const [additionalInfo, setAdditionalInfo] = useState<string>("");
     const [downPaymentType, setDownPaymentType] = useState<"PERCENTAGE" | "FIXED" | null>(null);
@@ -66,7 +65,6 @@ const BDSoundIndex = () => {
       setEquipmentProvided(data.equipmentProvided || []);
       setTravelsToClientHome(data.travelsToClientHome ? "YES" : "NO");
       setStaffGender(data.staffGender || []);
-      setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
       setAdditionalInfo(data.additionalInfo || "");
       setDownPaymentType(data.downPaymentType || null);
@@ -105,7 +103,6 @@ const BDSoundIndex = () => {
             equipmentProvided.length === 0 ||
             travelsToClientHome === null ||
             staffGender.length === 0 ||
-            !minimumPrice ||
             !description ||
             !downPaymentType ||
             !downPayment ||
@@ -129,7 +126,6 @@ const BDSoundIndex = () => {
     equipmentProvided,
     travelsToClientHome: travel,
     staffGender,
-    minimumPrice: Number(minimumPrice),
     description,
     additionalInfo: additionalInfo || undefined,
     downPaymentType,
@@ -300,22 +296,6 @@ if (edit === "true") {
                             </TouchableOpacity>
                         );
                     })}
-                </View>
-            </View>
-
-            {/* Minimum Price */}
-            <View style={styles.card}>
-                <SectionTitle icon="tag" title="Minimum Price" />
-                <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
-                    <TextInput
-                        style={styles.inputFlex}
-                        keyboardType="numeric"
-                        placeholder="Enter price"
-                        placeholderTextColor="#B99DAF"
-                        value={minimumPrice}
-                        onChangeText={setMinimumPrice}
-                    />
                 </View>
             </View>
 

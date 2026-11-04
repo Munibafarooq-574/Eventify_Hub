@@ -76,13 +76,6 @@ export class CreatePhotographerBusinessDetailsDto  {
 @IsString()
 cityCovered?: string;
 
-  // ===============================
-  // Starting Price
-  // ===============================
-
-  @IsNumber()
-  @Min(0)
-  minimumPrice: number;
 
   // ===============================
   // Description

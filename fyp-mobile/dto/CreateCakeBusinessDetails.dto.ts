@@ -3,7 +3,6 @@
 export interface CreateCakeBusinessDetailsDto {
   cakeTypes: string[];
 
-  minimumPrice: number;
 
   expertise: string;
 

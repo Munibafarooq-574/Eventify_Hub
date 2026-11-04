@@ -19,9 +19,6 @@ export class CreateSalonBusinessDetailsDto {
     @IsString({ each: true })
     staffGender: string[]; // e.g. ['MALE', 'FEMALE', 'TRANSGENDER']
 
-    @IsOptional()
-    @IsNumber()
-    minimumPrice?: number;
 
     @IsString()
     description: string;

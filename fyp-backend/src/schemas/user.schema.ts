@@ -132,15 +132,6 @@ export class PhotographerBusinessDetails extends BusinessDetails {
 cityCovered?: string;
 
   // ===============================
-  // Starting Price
-  // ===============================
-
-  @Prop({
-    required: true,
-  })
-  minimumPrice: number;
-
-  // ===============================
   // Description
   // ===============================
 
@@ -230,9 +221,6 @@ export class SalonBusinessDetails extends BusinessDetails {
   })
   staffGender: string[];
 
-  @Prop()
-  minimumPrice: number;
-
   @Prop({ required: true })
   description: string;
 
@@ -307,9 +295,6 @@ export class CateringBusinessDetails extends BusinessDetails {
   @Prop({ default: false })
   provideCutleryAndPlates: boolean;
 
-  @Prop()
-  minimumPrice: number;
-
   @Prop({ required: true })
   description: string;
 
@@ -381,9 +366,6 @@ typeOfVenue: string[];
   })
   staff: string[];                  // <-- now multi-select
 
-  @Prop()
-  minimumPrice: number;
-
   @Prop({ required: true })
   description: string;
 
@@ -418,9 +400,6 @@ export class CakeBusinessDetails extends BusinessDetails {
     default: [],
   })
   cakeTypes: string[];
-
-  @Prop()
-  minimumPrice: number;
 
   @Prop()
   expertise: string;
@@ -484,9 +463,6 @@ export class MehndiBusinessDetails extends BusinessDetails {
   })
   staffGender: string[];
 
-  @Prop()
-  minimumPrice: number;
-
   @Prop({ required: true })
   description: string;
 
@@ -542,9 +518,6 @@ export class SoundBusinessDetails extends BusinessDetails {
   })
   staffGender: string[];
 
-  @Prop()
-  minimumPrice: number;
-
   @Prop({ required: true })
   description: string;
 
@@ -583,9 +556,6 @@ export class GenericBusinessDetails {
 
   @Prop({ trim: true })
   cityCovered?: string;
-
-  @Prop({ min: 0 })
-  minimumPrice?: number;
 
   @Prop({ trim: true })
   additionalInfo?: string;

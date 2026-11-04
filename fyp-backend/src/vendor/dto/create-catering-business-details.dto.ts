@@ -47,10 +47,6 @@ export class CreateCateringBusinessDetailsDto {
   @IsBoolean()
   provideCutleryAndPlates?: boolean;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumPrice?: number;
 
   @IsString()
   description: string;

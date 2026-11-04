@@ -699,30 +699,6 @@ exports[`SNAPSHOT-01: BusinessDetailsForm renders correctly 1`] = `
         }
       }
     >
-      Minimum Price
-    </Text>
-    <TextInput
-      keyboardType="numeric"
-      onChangeText={[Function]}
-      style={
-        {
-          "borderBottomColor": "#B3A3A3",
-          "borderBottomWidth": 1,
-          "fontSize": 14,
-          "marginBottom": 16,
-          "paddingVertical": 5,
-        }
-      }
-    />
-    <Text
-      style={
-        {
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "marginVertical": 8,
-        }
-      }
-    >
       Description *
     </Text>
     <TextInput
@@ -2039,30 +2015,6 @@ exports[`SNAPSHOT-02: BusinessDetailsForm displays error when submitting empty f
         </Text>
       </View>
     </View>
-    <Text
-      style={
-        {
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "marginVertical": 8,
-        }
-      }
-    >
-      Minimum Price
-    </Text>
-    <TextInput
-      keyboardType="numeric"
-      onChangeText={[Function]}
-      style={
-        {
-          "borderBottomColor": "#B3A3A3",
-          "borderBottomWidth": 1,
-          "fontSize": 14,
-          "marginBottom": 16,
-          "paddingVertical": 5,
-        }
-      }
-    />
     <Text
       style={
         {

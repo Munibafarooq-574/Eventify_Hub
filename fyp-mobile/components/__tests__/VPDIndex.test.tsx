@@ -24,7 +24,6 @@ const mockVendorData = {
   coverImage: "https://example.com/image.jpg",
   images: ["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
   BusinessDetails: {
-    minimumPrice: 15000,
     staff: "3 Members",
     covidRefundPolicy: "Flexible",
     cityCovered: "Karachi, Lahore",

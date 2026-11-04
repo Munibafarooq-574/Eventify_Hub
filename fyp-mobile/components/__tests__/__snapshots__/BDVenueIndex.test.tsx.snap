@@ -861,31 +861,6 @@ exports[`BusinessDetailsForm - Snapshot Tests matches snapshot after toggling Co
         }
       }
     >
-      Minimum Price
-    </Text>
-    <TextInput
-      keyboardType="numeric"
-      onChangeText={[Function]}
-      placeholder="Enter minimum price"
-      style={
-        {
-          "borderBottomWidth": 1,
-          "borderColor": "#ccc",
-          "marginBottom": 10,
-          "padding": 8,
-        }
-      }
-      value=""
-    />
-    <Text
-      style={
-        {
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "marginVertical": 8,
-        }
-      }
-    >
       Description *
     </Text>
     <TextInput
@@ -2407,31 +2382,6 @@ exports[`BusinessDetailsForm - Snapshot Tests matches snapshot after venue type 
         }
       }
     >
-      Minimum Price
-    </Text>
-    <TextInput
-      keyboardType="numeric"
-      onChangeText={[Function]}
-      placeholder="Enter minimum price"
-      style={
-        {
-          "borderBottomWidth": 1,
-          "borderColor": "#ccc",
-          "marginBottom": 10,
-          "padding": 8,
-        }
-      }
-      value=""
-    />
-    <Text
-      style={
-        {
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "marginVertical": 8,
-        }
-      }
-    >
       Description *
     </Text>
     <TextInput
@@ -3940,31 +3890,6 @@ exports[`BusinessDetailsForm - Snapshot Tests matches snapshot when entering inp
         </Text>
       </View>
     </View>
-    <Text
-      style={
-        {
-          "fontSize": 14,
-          "fontWeight": "bold",
-          "marginVertical": 8,
-        }
-      }
-    >
-      Minimum Price
-    </Text>
-    <TextInput
-      keyboardType="numeric"
-      onChangeText={[Function]}
-      placeholder="Enter minimum price"
-      style={
-        {
-          "borderBottomWidth": 1,
-          "borderColor": "#ccc",
-          "marginBottom": 10,
-          "padding": 8,
-        }
-      }
-      value=""
-    />
     <Text
       style={
         {

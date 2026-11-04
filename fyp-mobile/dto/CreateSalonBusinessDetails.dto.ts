@@ -6,7 +6,6 @@ export interface CreateSalonBusinessDetailsDto {
     travelsToClientHome: boolean;
     cityCovered?: string;
     staffGender: string[]; // e.g. ['MALE', 'FEMALE', 'TRANSGENDER']
-    minimumPrice?: number;
     description: string;
     additionalInfo?: string;
     downPaymentType: 'PERCENTAGE' | 'FIXED';

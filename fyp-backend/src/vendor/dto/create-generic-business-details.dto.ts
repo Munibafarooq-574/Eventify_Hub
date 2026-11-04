@@ -18,10 +18,6 @@ export class CreateGenericBusinessDetailsDto {
   @IsString()
   cityCovered?: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumPrice?: number;
 
   @IsOptional()
   @IsString()

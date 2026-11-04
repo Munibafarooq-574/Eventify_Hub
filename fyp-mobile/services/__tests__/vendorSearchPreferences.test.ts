@@ -10,9 +10,10 @@ jest.mock('@/store', () => ({ getUserData: jest.fn() }));
 
 beforeEach(() => { jest.clearAllMocks(); });
 it('keeps missing prices last in both price orders and preserves zero prices', () => {
-  const vendors = [{ _id: 'missing' }, { _id: 'paid', cakeBusinessDetails: { minimumPrice: 100 } }, { _id: 'zero', cakeBusinessDetails: { minimumPrice: 0 } }];
+  const vendors = [{ _id: 'missing' }, { _id: 'paid', packages: [{ price: 100 }, { price: 50, isActive: false }, { price: 200 }]  }, { _id: 'zero', packages: [{ price: 0 }] }];
   expect(sortVendorResults(vendors, 'priceAsc', {}).map(v => v._id)).toEqual(['zero', 'paid', 'missing']);
   expect(sortVendorResults(vendors, 'priceDesc', {}).map(v => v._id)).toEqual(['paid', 'zero', 'missing']);
+  expect(vendorStartingPrice(vendors[1])).toBe(100);
   expect(vendorStartingPrice(vendors[2])).toBe(0);
 });
 it('sorts the displayed brand name and the real review summaries', () => {

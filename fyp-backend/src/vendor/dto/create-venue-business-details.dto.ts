@@ -36,10 +36,6 @@ export class CreateVenueBusinessDetailsDto {
   @IsString({ each: true })
   staff: string[];
 
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  minimumPrice?: number;
 
   @IsString()
   description: string;

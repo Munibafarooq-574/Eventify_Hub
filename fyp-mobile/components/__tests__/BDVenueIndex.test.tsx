@@ -91,7 +91,6 @@ it("renders all required input fields", async () => {
   expect(getByPlaceholderText("Enter expertise")).toBeTruthy();
   expect(getByPlaceholderText("Enter amenities")).toBeTruthy();
   expect(getByPlaceholderText("Enter maximum people capacity")).toBeTruthy();
-  expect(getByPlaceholderText("Enter minimum price")).toBeTruthy();
   expect(getByPlaceholderText("Enter description")).toBeTruthy();
   expect(getByPlaceholderText("Enter Down Payment")).toBeTruthy();
 });
@@ -410,14 +409,6 @@ it("ensures input fields have consistent padding", async () => {
   });
 
   // Accuracy Testing
-  it("correctly preserves numeric input precision", async () => {
-    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
-    const priceInput = getByPlaceholderText("Enter minimum price");
-
-    await fireEvent.changeText(priceInput, "1000");
-    expect(priceInput.props.value).toBe("1000");
-  });
-
   it("accurately preserves text content length and format", async () => {
     const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const descriptionInput = getByPlaceholderText("Enter description");
@@ -495,17 +486,6 @@ it("ensures input fields have consistent padding", async () => {
   });
 
   // Additional Test Categories
-  it("handles validation of minimum price constraints", async () => {
-    const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
-    const priceInput = getByPlaceholderText("Enter minimum price");
-
-    // Test with negative price (should be handled gracefully)
-    await fireEvent.changeText(priceInput, "-100");
-
-    // Component should handle this without crashing
-    expect(priceInput).toBeTruthy();
-  });
-
   it("handles validation of maximum capacity constraints", async () => {
     const { getByPlaceholderText } = await render(<BusinessDetailsForm />);
     const capacityInput = getByPlaceholderText("Enter maximum people capacity");

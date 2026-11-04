@@ -7,7 +7,6 @@
     catering?: string; // ['INTERNAL', 'EXTERNAL'], Optional
     parking: boolean;
     staff: string; // ['MALE', 'FEMALE', 'TRANSGENDER']
-    minimumPrice?: number; // Optional
     description: string;
     additionalInfo?: string; // Optional
     downPaymentType: 'PERCENTAGE' | 'FIXED';
@@ -25,7 +24,6 @@ export interface CreateVenueBusinessDetailsDto {
     catering?: string[];
     parking: boolean;
     staff: string[];
-    minimumPrice?: number;
     description: string;
     additionalInfo?: string;
     downPaymentType: 'PERCENTAGE' | 'FIXED';

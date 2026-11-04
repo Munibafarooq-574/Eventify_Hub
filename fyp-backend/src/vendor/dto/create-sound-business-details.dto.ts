@@ -48,9 +48,6 @@ export class CreateSoundBusinessDetailsDto {
     @IsString({ each: true })
     staffGender: string[]; // e.g. MALE, FEMALE, TRANSGENDER
 
-    @IsNumber()
-    @Min(0)
-    minimumPrice: number;
 
     @IsString()
     description: string;

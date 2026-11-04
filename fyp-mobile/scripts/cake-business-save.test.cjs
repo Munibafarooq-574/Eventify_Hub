@@ -15,7 +15,7 @@ function screen({user={_id:'signed-in-vendor'},edit='true',failSave=false,failSt
  return{calls,alerts,navigation,async save(){find(tree).props.onPress();await new Promise(resolve=>setImmediate(resolve));}};
 }
 test('editing uses the signed-in AsyncStorage user and preserves the existing PATCH payload',async()=>{
- const s=screen();await s.save();assert.equal(s.calls.length,1);assert.equal(s.calls[0].name,'patch');assert.equal(s.calls[0].id,'signed-in-vendor');assert.equal(s.calls[0].dto.cancellationPolicy,'PARTIALLY REFUNDABLE');assert.equal(s.calls[0].dto.downPayment,50);assert.equal(s.calls[0].dto.minimumPrice,3000);assert.equal(s.calls[0].dto.deliveryToHome,true);assert.deepEqual(s.navigation,['back']);
+ const s=screen();await s.save();assert.equal(s.calls.length,1);assert.equal(s.calls[0].name,'patch');assert.equal(s.calls[0].id,'signed-in-vendor');assert.equal(s.calls[0].dto.cancellationPolicy,'PARTIALLY REFUNDABLE');assert.equal(s.calls[0].dto.downPayment,50);assert.equal(Object.hasOwn(s.calls[0].dto,"minimumPrice"),false);assert.equal(s.calls[0].dto.deliveryToHome,true);assert.deepEqual(s.navigation,['back']);
 });
 test('new setup still posts details then submits the vendor profile for review',async()=>{
  const create=screen({edit:'false'});await create.save();assert.deepEqual(create.calls.map(c=>c.name),['post','review']);assert.deepEqual(create.navigation,['/vendorprofilepending']);

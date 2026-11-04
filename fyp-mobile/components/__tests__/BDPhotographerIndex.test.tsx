@@ -58,7 +58,6 @@ describe("BusinessDetailsScreen Tests", () => {
 
     expect(getByText("Business Details")).toBeTruthy();
     expect(getByPlaceholderText("Select Cities")).toBeTruthy();
-    expect(getByPlaceholderText("Enter Minimum Price")).toBeTruthy();
     expect(getByPlaceholderText("Enter Description")).toBeTruthy();
     expect(getByPlaceholderText("Enter Additional Information")).toBeTruthy();
     expect(getByPlaceholderText("Enter Down Payment")).toBeTruthy();
@@ -113,7 +112,6 @@ describe("BusinessDetailsScreen Tests", () => {
 
     // Fill all required fields
     await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    await fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000"); // Added
     await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
     await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
@@ -155,7 +153,6 @@ describe("BusinessDetailsScreen Tests", () => {
 
     // Fill required fields first
     await fireEvent.changeText(getByPlaceholderText("Select Cities"), "Islamabad");
-    await fireEvent.changeText(getByPlaceholderText("Enter Minimum Price"), "10000");
     await fireEvent.changeText(getByPlaceholderText("Enter Down Payment"), "5000");
     await fireEvent.changeText(
       getByPlaceholderText("Enter Description"),
@@ -200,7 +197,6 @@ describe("BusinessDetailsScreen Tests", () => {
     const { getByPlaceholderText } = component;
 
     expect(getByPlaceholderText("Select Cities")).toBeTruthy();
-    expect(getByPlaceholderText("Enter Minimum Price")).toBeTruthy();
     expect(getByPlaceholderText("Enter Description")).toBeTruthy();
     expect(getByPlaceholderText("Enter Additional Information")).toBeTruthy();
     expect(getByPlaceholderText("Enter Down Payment")).toBeTruthy();

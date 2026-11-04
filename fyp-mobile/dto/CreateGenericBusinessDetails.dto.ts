@@ -5,7 +5,6 @@ export interface CreateGenericBusinessDetailsDto {
 
     cityCovered?: string;
 
-    minimumPrice?: number;
 
     additionalInfo?: string;
 

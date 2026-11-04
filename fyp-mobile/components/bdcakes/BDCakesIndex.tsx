@@ -43,7 +43,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
     const [downPayment, setDownPayment] = useState<string>("");
     const [covidCompliant, setCovidCompliant] = useState<"YES" | "NO" | null>(null);
     const [cancellationPolicy, setCancellationPolicy] = useState<"REFUNDABLE" | "NON-REFUNDABLE" | "PARTIALLY REFUNDABLE" | null>(null);
-    const [minimumPrice, setMinimumPrice] = useState("");
     const [description, setDescription] = useState("");
     const [additionalInfo, setAdditionalInfo] = useState("");
 
@@ -72,7 +71,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 const data = res.data.cakeBusinessDetails;
 
                 setSelectedCakeTypes(data.cakeTypes || []);
-                setMinimumPrice(data.minimumPrice?.toString() || "");
                 setDeliveryOptions(data.deliveryOptions || []);
                 setDeliveryToHome(data.deliveryToHome ? "YES" : "NO");
                 setExpertise(data.expertise || "");
@@ -96,7 +94,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
 
         if (
             selectedCakeTypes.length === 0 ||
-            !minimumPrice ||
             deliveryOptions.length === 0 ||
             deliveryToHome === null ||
             !expertise ||
@@ -119,7 +116,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
 
             const dto = {
                 cakeTypes: selectedCakeTypes,
-                minimumPrice: Number(minimumPrice),
                 deliveryOptions,
                 expertise,
                 deliveryToHome: deliveryToHome === "YES",
@@ -204,22 +200,6 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                             </TouchableOpacity>
                         );
                     })}
-                </View>
-            </View>
-
-            {/* Starting Price */}
-            <View style={styles.card}>
-                <SectionTitle icon="tag" title="Starting Price" required />
-                <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
-                    <TextInput
-                        style={styles.inputFlex}
-                        keyboardType="numeric"
-                        placeholder="Enter price"
-                        placeholderTextColor="#B99DAF"
-                        value={minimumPrice}
-                        onChangeText={setMinimumPrice}
-                    />
                 </View>
             </View>
 

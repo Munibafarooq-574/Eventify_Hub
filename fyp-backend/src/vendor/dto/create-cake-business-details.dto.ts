@@ -15,8 +15,6 @@ export class CreateCakeBusinessDetailsDto {
   @IsNotEmpty()
   cakeTypes: string[];
 
-  @IsNumber()
-  minimumPrice: number;
 
   @IsString()
   expertise: string;

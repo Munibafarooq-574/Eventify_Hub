@@ -388,7 +388,7 @@ const fetchVendorDetails = async (vendors: any[], currentRequest: number, sort: 
         catch (error) { reviewLoadFailed = true; console.error(`Failed to load reviews for vendor ${vendor._id}:`, error); reviewsMap[vendor._id] = { averageRating: 0, totalReviews: 0 }; }
 
         try { packagesMap[vendor._id] = (await getVendorPackagesList(vendor._id)) || []; }
-        catch (error) { console.error(`Failed to load packages for vendor ${vendor._id}:`, error); packagesMap[vendor._id] = []; }
+        catch (error) { console.error(`Failed to load packages for vendor ${vendor._id}:`, error); packagesMap[vendor._id] = vendor.packages || []; }
       })
     );
 
@@ -446,12 +446,7 @@ const { refreshing, refreshControl } = usePullToRefresh(() => latestFetchData.cu
     const rating = review?.averageRating ? Number(review.averageRating).toFixed(1) : "0.0";
     const reviewCount = review?.totalReviews || 0;
 
-    const packageBasePrices = (vendorPackages[item._id] || [])
-      .map((pkg: any) => Number(pkg?.price))
-      .filter((value: number) => Number.isFinite(value) && value >= 0);
-    const price = packageBasePrices.length > 0
-      ? Math.min(...packageBasePrices)
-      : vendorStartingPrice(item);
+    const price = vendorStartingPrice(item, vendorPackages[item._id]);
     const brandName = item?.contactDetails?.brandName || item?.ContactDetails?.brandName || item?.BusinessDetails?.brandName || "Vendor";
     const vendorName = item?.name || item?.vendorName || item?.ownerName || "Vendor";
     const categoryName = item?.buisnessCategory?.name || item?.buisnessCategory?.categoryName || item?.category?.name || item?.categoryName || item?.serviceName || categoryIdToName[item?._matchedCategoryId] || "Category";
@@ -554,8 +549,12 @@ router.push({
 
       <View style={styles.cardBottomRow}>
         <View style={styles.priceSection}>
-          <Text style={styles.priceText}>Starting from</Text>
-          <Text style={styles.price}>{price !== undefined ? `Rs ${price}` : "N/A"}</Text>
+          {price !== undefined && (
+            <>
+              <Text style={styles.priceText}>Starting from</Text>
+              <Text style={styles.price}>Rs {price}{item.cateringBusinessDetails || /^caterings?$/i.test(categoryName) ? ' per guest' : ''}</Text>
+            </>
+          )}
         </View>
 
         <TouchableOpacity style={styles.viewButton}
@@ -678,7 +677,7 @@ return (
       )}
 
       <FlatList
-        data={sortVendorResults(data, preferences.sort, vendorReviews)}
+        data={sortVendorResults(data, preferences.sort, vendorReviews, vendorPackages)}
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
         contentContainerStyle={[styles.list, data?.length === 0 && { flexGrow: 1 }]}

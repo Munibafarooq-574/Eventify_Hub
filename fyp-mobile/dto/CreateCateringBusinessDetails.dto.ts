@@ -11,7 +11,6 @@
     provideSeatingArrangement?: boolean; // Optional
     provideWaiters?: boolean; // Optional
     provideCutleryAndPlates?: boolean; // Optional
-    minimumPrice?: number; // Optional
     description: string;
     additionalInfo?: string; // Optional
     downPaymentType: 'PERCENTAGE' | 'FIXED';
@@ -39,7 +38,6 @@ export interface CreateCateringBusinessDetailsDto {
     provideWaiters?: boolean;
     provideCutleryAndPlates?: boolean;
 
-    minimumPrice?: number;
 
     description: string;
 

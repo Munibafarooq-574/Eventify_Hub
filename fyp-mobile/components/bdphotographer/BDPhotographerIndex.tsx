@@ -117,7 +117,6 @@ const BusinessDetailsScreen = () => {
   // ==========================
 
 
-  const [minimumPrice, setMinimumPrice] = useState("");
 
   const [description, setDescription] = useState("");
 
@@ -145,7 +144,6 @@ const BusinessDetailsScreen = () => {
         data.travelsToClientHome ? "YES" : "NO"
       );
       setDeliveryTime(data.deliveryTime || "");
-      setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
       setAdditionalInfo(data.additionalInfo || "");
       setDownPaymentType(data.downPaymentType || null);
@@ -217,7 +215,6 @@ const BusinessDetailsScreen = () => {
       photoStyle.length === 0 ||
       travelsToClientHome === null ||
       !deliveryTime ||
-      !minimumPrice ||
       !description ||
       !downPaymentType ||
       !downPayment ||
@@ -249,7 +246,6 @@ const BusinessDetailsScreen = () => {
   photoStyle,
   travelsToClientHome: travelsToClientHome === "YES",
   deliveryTime,
-  minimumPrice: Number(minimumPrice),
   description,
   additionalInfo,
   downPaymentType,
@@ -918,41 +914,6 @@ if (edit === "true") {
     </View>
 
 </View>
-{/* =========================
-      Minimum Price
-========================= */}
-
-<View style={styles.card}>
-
-    <SectionTitle
-        icon="tags"
-        title="Starting Price"
-        required
-    />
-
-    <Text style={styles.hint}>
-        Enter your starting package price
-    </Text>
-
-    <View style={styles.inputRow}>
-
-        <Text style={styles.currencyPrefix}>
-            Rs.
-        </Text>
-
-        <TextInput
-            style={styles.inputFlex}
-            keyboardType="numeric"
-            placeholder="e.g. 15000"
-            placeholderTextColor="#B99DAF"
-            value={minimumPrice}
-            onChangeText={setMinimumPrice}
-        />
-
-    </View>
-
-</View>
-
 {/* =========================
       Description
 ========================= */}

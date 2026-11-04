@@ -18,7 +18,6 @@ export interface PhotographyBusinessDetailsDto {
 
   cityCovered?: string;
 
-  minimumPrice: number;
 
   description: string;
 

@@ -48,7 +48,6 @@ const BusinessDetailsForm = () => {
     const [catering, setCatering] = useState<string[]>([]); // multi select
     const [parking, setParking] = useState<"YES" | "NO" | null>(null);
     const [staff, setStaff] = useState<string[]>([]); // multi select
-    const [minimumPrice, setMinimumPrice] = useState<string>("");
     const [description, setDescription] = useState<string>("");
     const [additionalInfo, setAdditionalInfo] = useState<string>("");
     const [downPaymentType, setDownPaymentType] = useState<"PERCENTAGE" | "FIXED" | null>(null);
@@ -97,7 +96,6 @@ const BusinessDetailsForm = () => {
             setCatering(data.catering || []);
             setParking(data.parking ? "YES" : "NO");
             setStaff(data.staff || []);
-            setMinimumPrice(data.minimumPrice?.toString() || "");
             setDescription(data.description || "");
             setAdditionalInfo(data.additionalInfo || "");
             setDownPaymentType(data.downPaymentType || null);
@@ -149,9 +147,6 @@ console.log("USER ID PARAM:", userId);
         catering,
         parking: parking === "YES",
         staff,
-        minimumPrice: minimumPrice
-            ? Number(minimumPrice)
-            : undefined,
         description,
         additionalInfo: additionalInfo || undefined,
         downPaymentType,
@@ -397,22 +392,6 @@ console.log("USER ID PARAM:", userId);
                             </TouchableOpacity>
                         );
                     })}
-                </View>
-            </View>
-
-            {/* Minimum Price */}
-            <View style={styles.card}>
-                <SectionTitle icon="tag" title="Minimum Price" />
-                <View style={styles.inputRow}>
-                    <Text style={styles.currencyPrefix}>Rs.</Text>
-                    <TextInput
-                        style={styles.inputFlex}
-                        keyboardType="numeric"
-                        placeholder="Enter price"
-                        placeholderTextColor="#B99DAF"
-                        value={minimumPrice}
-                        onChangeText={setMinimumPrice}
-                    />
                 </View>
             </View>
 

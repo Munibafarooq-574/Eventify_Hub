@@ -78,7 +78,6 @@ const [seatingArrangement, setSeatingArrangement] = useState(false);
 const [waiters, setWaiters] = useState(false);
 const [cutlery, setCutlery] = useState(false);
 
-const [minimumPrice, setMinimumPrice] = useState("");
 const [description, setDescription] = useState("");
 const [additionalInfo, setAdditionalInfo] = useState("");
 
@@ -117,7 +116,6 @@ const [covidCompliant, setCovidCompliant] =
       setSeatingArrangement(!!data.provideSeatingArrangement);
       setWaiters(!!data.provideWaiters);
       setCutlery(!!data.provideCutleryAndPlates);
-      setMinimumPrice(data.minimumPrice?.toString() || "");
       setDescription(data.description || "");
       setAdditionalInfo(data.additionalInfo || "");
       setDownPaymentType(data.downPaymentType || null);
@@ -179,7 +177,6 @@ const submit = async () => {
     if (
         expertise.length === 0 ||
         staffGender.length === 0 ||
-        !minimumPrice ||
         !description ||
         !downPaymentType ||
         !downPayment ||
@@ -212,7 +209,6 @@ const submit = async () => {
   provideSeatingArrangement: seatingArrangement,
   provideWaiters: waiters,
   provideCutleryAndPlates: cutlery,
-  minimumPrice: Number(minimumPrice),
   description,
   additionalInfo,
   downPaymentType,
@@ -536,32 +532,6 @@ i===2 && styles.dotAccent
                 </TouchableOpacity>
             );
         })}
-    </View>
-</View>
-
-{/* ============================
-        Minimum Price
-============================= */}
-
-<View style={styles.card}>
-    <SectionTitle
-        icon="tag"
-        title="Minimum Price"
-    />
-
-    <View style={styles.inputRow}>
-        <Text style={styles.currencyPrefix}>
-            Rs.
-        </Text>
-
-        <TextInput
-            style={styles.inputFlex}
-            keyboardType="numeric"
-            placeholder="Enter Minimum Price"
-            placeholderTextColor="#B8B8B8"
-            value={minimumPrice}
-            onChangeText={setMinimumPrice}
-        />
     </View>
 </View>
 

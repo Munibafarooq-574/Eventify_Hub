@@ -21,7 +21,6 @@ export interface CreateSoundBusinessDetailsDto {
     // e.g. MALE, FEMALE, TRANSGENDER
     staffGender: string[];
 
-    minimumPrice: number;
 
     description: string;
 
