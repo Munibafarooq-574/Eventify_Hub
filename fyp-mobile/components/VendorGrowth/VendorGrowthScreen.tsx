@@ -21,6 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Lock,
   Crown,
   Star,
@@ -158,6 +160,7 @@ export default function VendorGrowthScreen() {
   const [analytics, setAnalytics] =
     useState<VendorAnalyticsSummary | null>(null);
 
+  const [benefitsExpanded, setBenefitsExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -400,34 +403,41 @@ export default function VendorGrowthScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* Paid Subscription Feature Note */}
+        {/* Collapsible paid-plan benefits: keep the Growth page compact. */}
         {subscription && isPaidPlan && !!subscription.featureLabels?.length && (
           <View style={styles.featureNote}>
-            <View style={styles.featureNoteIcon}>
-              <Sparkles
-                size={18}
-                color={COLORS.primary}
-                strokeWidth={2.2}
-              />
-            </View>
-
-            <View style={styles.featureNoteContent}>
-              <Text style={styles.featureNoteTitle}>
-                {planName} Plan Benefits
-              </Text>
-
-              <Text style={styles.featureNoteText}>
-                Benefits included in your current plan:
-              </Text>
-
-              <View style={styles.featureList}>
-                {subscription.featureLabels?.map(label => (
-                  <View key={label} style={styles.featureItem}>
-                    <Text style={styles.featureItemText}>{label}</Text>
-                  </View>
-                ))}
+            <TouchableOpacity
+              style={styles.featureNoteHeader}
+              onPress={() => setBenefitsExpanded(expanded => !expanded)}
+              accessibilityRole="button"
+              accessibilityLabel={`${planName} plan benefits`}
+              accessibilityHint={benefitsExpanded ? 'Hide plan benefits' : 'Show plan benefits'}
+              accessibilityState={{ expanded: benefitsExpanded }}
+              activeOpacity={0.75}
+            >
+              <View style={styles.featureNoteIcon}>
+                <Sparkles size={18} color={COLORS.primary} strokeWidth={2.2} />
               </View>
-            </View>
+              <Text style={styles.featureNoteTitle}>{planName} Plan Benefits</Text>
+              {benefitsExpanded
+                ? <ChevronUp size={22} color={COLORS.primaryDark} strokeWidth={2.4} />
+                : <ChevronDown size={22} color={COLORS.primaryDark} strokeWidth={2.4} />}
+            </TouchableOpacity>
+
+            {benefitsExpanded && (
+              <View style={styles.featureNoteContent}>
+                <Text style={styles.featureNoteText}>
+                  Benefits included in your current plan:
+                </Text>
+                <View style={styles.featureList}>
+                  {subscription.featureLabels.map(label => (
+                    <View key={label} style={styles.featureItem}>
+                      <Text style={styles.featureItemText}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -895,13 +905,18 @@ const styles = StyleSheet.create({
    * Paid-plan feature note
    */
   featureNote: {
-    flexDirection: 'row',
     backgroundColor: COLORS.primaryLight,
     borderWidth: 1,
     borderColor: '#E5D5F8',
     borderRadius: 16,
     padding: 14,
     marginBottom: 14,
+  },
+
+  featureNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
   },
 
   featureNoteIcon: {
@@ -915,14 +930,15 @@ const styles = StyleSheet.create({
   },
 
   featureNoteContent: {
-    flex: 1,
+    paddingLeft: 47,
+    paddingTop: 5,
   },
 
   featureNoteTitle: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.primaryDark,
-    marginBottom: 3,
   },
 
   featureNoteText: {
