@@ -1,6 +1,7 @@
 //fpy-mobile/components/editprofile/EditProfileIndex.tsx
 // (Organizer Edit Profile Screen)
 
+import getActiveCities from '@/services/getActiveCities';
 import patchUpdateProfile from '@/services/patchUpdateProfile';
 import { getUserData, saveUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,7 +30,7 @@ const OrganizerEditProfileScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [address, setAddress] = useState('');
+  const [countryCode, setCountryCode] = useState<string>();
   const [avatar, setAvatar] = useState('');
   const [avatarChanged, setAvatarChanged] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,9 +47,16 @@ const OrganizerEditProfileScreen: React.FC = () => {
       setName(user.name || '');
       setEmail(user.email || '');
       setPhoneNumber(user.phone_number || user.phoneNumber || '');
-      setAddress(user.address || user?.contactDetails?.address || '');
       // Same shared field Vendor uses for its DP.
       setAvatar(user?.profileImage || '');
+      const savedCountry = user.marketplaceCountryCode || user.clientCityId?.countryCode;
+      if (savedCountry) {
+        setCountryCode(savedCountry);
+      } else if (user.clientCityId) {
+        const cities = await getActiveCities();
+        const cityId = user.clientCityId?._id || user.clientCityId;
+        setCountryCode(cities.find(city => city._id === cityId)?.countryCode);
+      }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
     }
@@ -95,7 +103,6 @@ const OrganizerEditProfileScreen: React.FC = () => {
       formData.append('name', name);
       formData.append('email', email);
       formData.append('phoneNumber', phoneNumber);
-      formData.append('address', address);
 
       // Only attach a file if a NEW local image was picked. Otherwise the
       // backend leaves the existing brandLogo untouched (see auth.service.ts).
@@ -187,14 +194,13 @@ const OrganizerEditProfileScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputContainer}>
-              <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/marketplace-location')}>
-                <Text style={styles.label}>Change marketplace country or city</Text>
+              <Text style={styles.label}>Country</Text>
+              <TouchableOpacity style={styles.inputRow} accessibilityRole="button"
+                accessibilityLabel="Change marketplace country or city" onPress={() => router.push('/marketplace-location')}>
+                <Ionicons name="flag-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                <Text style={styles.input}>{countryCode === 'US' ? 'United States' : countryCode === 'PK' ? 'Pakistan' : countryCode || 'Not set'}</Text>
+                <Ionicons name="chevron-forward" size={16} color={PRIMARY} />
               </TouchableOpacity>
-              <Text style={styles.label}>Address (Optional)</Text>
-              <View style={styles.inputRow}>
-                <Ionicons name="location-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
-                <TextInput testID="input-address" style={styles.input} placeholder="Enter your address" placeholderTextColor="#B0B0B0" value={address} onChangeText={setAddress} />
-              </View>
             </View>
           </View>
         </View>

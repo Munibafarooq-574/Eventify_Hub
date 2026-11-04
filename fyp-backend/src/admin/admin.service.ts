@@ -1252,7 +1252,6 @@ async reviewVendorProfile(
                         'name',
                         'email',
                         'phone_number',
-                        'address',
                         'role',
                         'isOnline',
                         'lastSeen',
@@ -1438,11 +1437,6 @@ async reviewVendorProfile(
                             ?.trim?.() ||
                         'N/A',
 
-                    address:
-                        client.address
-                            ?.trim?.() ||
-                        'N/A',
-
                     isOnline:
                         Boolean(
                             client.isOnline,
@@ -1536,7 +1530,6 @@ async reviewVendorProfile(
                         'name',
                         'email',
                         'phone_number',
-                        'address',
                         'role',
                         'isOnline',
                         'lastSeen',
@@ -1893,10 +1886,6 @@ async reviewVendorProfile(
             phoneNumber:
                 data.phone_number
                     ?.trim?.() ||
-                'N/A',
-
-            address:
-                data.address?.trim?.() ||
                 'N/A',
 
             isOnline:

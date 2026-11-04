@@ -274,12 +274,10 @@ private readonly availabilityService: VendorAvailabilityService,
 
       phone_number: phoneNumber,
 
-      address:
-        registerDto.address,
-
       role,
     };
     
+    delete userPayload.address;
     delete userPayload.clientCityId;
     delete userPayload.marketplaceCountryCode;
     if (marketplace) {
@@ -351,6 +349,7 @@ private readonly availabilityService: VendorAvailabilityService,
       password,
       providerId,
       pushToken,
+      address,
       ...safeUser
     } = rawUser;
 
@@ -595,9 +594,6 @@ return {
       email:
         updateDto.email,
 
-      address:
-        updateDto.address,
-
       phone_number:
         updateDto.phoneNumber,
     };
@@ -635,7 +631,7 @@ return {
       );
     }
 
-    return updatedUser;
+    return this.sanitizeAuthUser(updatedUser);
   }
 
   // =========================================================

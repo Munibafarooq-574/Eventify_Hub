@@ -43,10 +43,6 @@ export class RegisterDto {
   buisnessCategories?: string;
 
   @IsOptional()
-  @IsString()
-  address?: string;
-
-  @IsOptional()
 @IsMongoId()
 clientCityId?: string;
 

@@ -15,16 +15,6 @@ export class UpdateUserProfileDto {
     @IsString()
     phoneNumber?: string;
 
-    @IsOptional()
-    @IsString()
-    address?: string;
-
-    @IsOptional()
-    contactDetails?: {
-        brandLogo?: string;
-        address?: string;
-    };
-
     @IsString()
 userId!: string;
 }

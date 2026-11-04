@@ -3,25 +3,23 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import EditProfileScreen from "../vendoreditprofile/VendorEditProfileIndex";
 import * as store from '@/store';
 import patchUpdateProfile from '@/services/patchUpdateProfile';
-import getAllCategories from '@/services/getAllCategories';
 
 const mockBack = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: mockBack }),
+  useRouter: () => ({ back: mockBack, replace: jest.fn() }),
   useGlobalSearchParams: () => ({ id: '123' }),
 }));
 
 jest.mock('@/store');
 jest.mock('@/services/patchUpdateProfile');
-jest.mock('@/services/getAllCategories', () => jest.fn());
 
 const mockUser = {
   _id: 'u123',
   name: 'Ali',
   email: 'ali@example.com',
   phoneNumber: '3001234567',
-  contactDetails: { address: 'Lahore' },
+  marketplaceCountryCode: 'US',
   buisnessCategory: 'c1',
   photographerBusinessDetails: {
     staff: 'MALE',
@@ -31,10 +29,6 @@ const mockUser = {
   },
 };
 
-const mockCategories = [
-  { _id: 'c1', name: 'Photography' },
-];
-
 // ✅ Define global alert to avoid ReferenceError
 beforeAll(() => {
   global.alert = jest.fn();
@@ -43,8 +37,7 @@ beforeAll(() => {
 describe('EditProfileScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (store.getSecureData as jest.Mock).mockResolvedValue(JSON.stringify(mockUser));
-    (getAllCategories as jest.Mock).mockResolvedValue(mockCategories);
+    (store.getUserData as jest.Mock).mockResolvedValue(mockUser);
     (patchUpdateProfile as jest.Mock).mockResolvedValue(mockUser);
   });
 
@@ -89,11 +82,10 @@ describe('EditProfileScreen', () => {
     expect(phoneInput.props.value).toBe('3012345678');
   });
 
-  it('updates address input field', async () => {
-    const { getByTestId } = await render(<EditProfileScreen />);
-    const addressInput = await waitFor(() => getByTestId('input-address'));
-    await fireEvent.changeText(addressInput, 'New Address');
-    expect(addressInput.props.value).toBe('New Address');
+  it('does not show a personal address field', async () => {
+    const { queryByTestId, findByDisplayValue } = render(<EditProfileScreen />);
+    await findByDisplayValue('Ali');
+    expect(queryByTestId('input-address')).toBeNull();
   });
 
   it('triggers saveUserDetails on SAVE press', async () => {
@@ -109,26 +101,23 @@ describe('EditProfileScreen', () => {
       expect(getByDisplayValue('Ali')).toBeTruthy();
       expect(getByDisplayValue('ali@example.com')).toBeTruthy();
       expect(getByDisplayValue('3001234567')).toBeTruthy();
-      expect(getByDisplayValue('Lahore')).toBeTruthy();
     });
   });
 
-  it('shows default country as Pakistan (non-editable)', async () => {
-    const { getByPlaceholderText } = await render(<EditProfileScreen />);
-    await waitFor(() => expect(getByPlaceholderText('Pakistan')).toBeTruthy());
+  it('shows the vendor’s saved country as read-only', async () => {
+    const { findByDisplayValue } = render(<EditProfileScreen />);
+    expect((await findByDisplayValue('United States')).props.editable).toBe(false);
   });
 
   it('back button navigates correctly', async () => {
-    const { getByText } = await render(<EditProfileScreen />);
-    const backBtn = await waitFor(() => getByText('< Back'));
+    const { getByLabelText } = render(<EditProfileScreen />);
+    const backBtn = getByLabelText('Go back');
     await fireEvent.press(backBtn);
     expect(mockBack).toHaveBeenCalled();
   });
 
   it('renders avatar with correct fallback if name missing', async () => {
-    (store.getSecureData as jest.Mock).mockResolvedValue(
-      JSON.stringify({ ...mockUser, name: '' })
-    );
+    (store.getUserData as jest.Mock).mockResolvedValue({ ...mockUser, name: '' });
     const { getByText } = await render(<EditProfileScreen />);
     await waitFor(() => expect(getByText('N/A')).toBeTruthy());
   });

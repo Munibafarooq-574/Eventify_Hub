@@ -1,6 +1,6 @@
 //fyp-mobile/components/vendoreditprofile/VendorEditProfileIndex.tsx
 
-import getAllCategories from '@/services/getAllCategories';
+import getActiveCities from '@/services/getActiveCities';
 import patchUpdateProfile from '@/services/patchUpdateProfile'; // import your API function
 import { getUserData, saveUserData } from '@/store';
 //import Ionicons from '@expo/vector-icons';
@@ -32,7 +32,7 @@ const EditProfileScreen: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [avatar, setAvatar] = useState('');
   const [avatarChanged, setAvatarChanged] = useState(false);
-  const [address, setAddress] = useState('');
+  const [countryCode, setCountryCode] = useState<string>();
 
 
 
@@ -43,36 +43,19 @@ const EditProfileScreen: React.FC = () => {
   const fetchUserDetails = async () => {
     try {
       const user = await getUserData();
-      const categories = await getAllCategories();
+      if (!user) return;
+      setName(user.name || '');
+      setEmail(user.email || '');
+      setPhoneNumber(user.phone_number || user.phoneNumber || user.phone || '');
+      setAvatar(user.profileImage || user.contactDetails?.brandLogo || '');
 
-      if (user) {
-        const category = categories.find((x: any) => x._id === user.buisnessCategory);
-        let objectLiteral = "";
-        if (category) {
-          if (category.name === "Venues") {
-            objectLiteral = "venueBusinessDetails";
-          } else if (category.name === "Caterings") {
-            objectLiteral = "cateringBusinessDetails";
-          } else if (category.name === "Photography") {
-            objectLiteral = "photographerBusinessDetails";
-          } else if (category.name === "Makeup") {
-            objectLiteral = "salonBusinessDetails";
-          } else if (category.name === "Mehndi") {
-
-          } else if (category.name === "DJ & Sound") {
-
-          } else if (category.name === "Cakes") {
-
-          }
-        }
-
-        setName(user.name || '');
-        setEmail(user.email || '');
-        setPhoneNumber(user.phoneNumber || user.phone || user.phone_number || '');
-        setAddress(user.contactDetails.address || '');
-        setAvatar(user?.contactDetails?.brandLogo || '');
-      
-
+      const savedCountry = user.marketplaceCountryCode || user.businessCityId?.countryCode;
+      if (savedCountry) {
+        setCountryCode(savedCountry);
+      } else if (user.businessCityId) {
+        const cities = await getActiveCities();
+        const cityId = user.businessCityId?._id || user.businessCityId;
+        setCountryCode(cities.find(city => city._id === cityId)?.countryCode);
       }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
@@ -120,7 +103,6 @@ const EditProfileScreen: React.FC = () => {
       formData.append('name', name);
       formData.append('email', email);
       formData.append('phoneNumber', phoneNumber);
-      formData.append('address', address);
 
       // Only attach a file if the user actually picked a NEW local image.
       // If avatar is unchanged (already a remote https:// URL, or empty),
@@ -154,7 +136,7 @@ const EditProfileScreen: React.FC = () => {
 
       {/* Plain header, no colored bar */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" style={styles.headerIconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={PRIMARY} />
         </TouchableOpacity>
 
@@ -255,53 +237,24 @@ const EditProfileScreen: React.FC = () => {
                 <Ionicons name="flag-outline" size={16} color="#9B9B9B" style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.inputDisabled]}
-                  placeholder="Pakistan"
+                  value={countryCode === 'US' ? 'United States' : countryCode === 'PK' ? 'Pakistan' : countryCode || 'Not set'}
                   placeholderTextColor="#666"
                   editable={false}
                 />
               </View>
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, { flex: 0.32 }]}>
-                <Text style={styles.label}>Code</Text>
-                <View style={[styles.inputRow, styles.flagRow]}>
-                  <Image
-                    source={{
-                      uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Flag_of_Pakistan.svg/1024px-Flag_of_Pakistan.svg.png",
-                    }}
-                    style={styles.flagIcon}
-                  />
-                  <Text style={styles.codeText}>+92</Text>
-                </View>
-              </View>
-              <View style={[styles.inputContainer, { flex: 0.68, marginLeft: 10 }]}>
-                <Text style={styles.label}>Phone Number</Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="call-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter phone number"
-                    placeholderTextColor="#B0B0B0"
-                    keyboardType="phone-pad"
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
-                  />
-                </View>
-              </View>
-            </View>
-
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Address (Optional)</Text>
+              <Text style={styles.label}>Phone Number</Text>
               <View style={styles.inputRow}>
-                <Ionicons name="location-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
+                <Ionicons name="call-outline" size={16} color={PRIMARY} style={styles.inputIcon} />
                 <TextInput
-                  testID="input-address" //add test id
                   style={styles.input}
-                  placeholder="Enter your address"
+                  placeholder="Enter phone number"
                   placeholderTextColor="#B0B0B0"
-                  value={address}
-                  onChangeText={setAddress}
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
                 />
               </View>
             </View>
@@ -467,10 +420,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   inputContainer: {
     marginBottom: 14,
     flex: 1,
@@ -504,21 +453,6 @@ const styles = StyleSheet.create({
   },
   inputDisabled: {
     color: '#6E6E6E',
-  },
-  flagRow: {
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  flagIcon: {
-    width: 24,
-    height: 16,
-    resizeMode: 'contain',
-    marginRight: 6,
-  },
-  codeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1A1A1A',
   },
 
   bottomNavigation: {

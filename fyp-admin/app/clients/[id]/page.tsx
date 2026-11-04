@@ -45,7 +45,6 @@ type ClientDetail = {
   name: string;
   email: string;
   phoneNumber: string;
-  address: string;
   isOnline: boolean;
   lastSeen: string | null;
   totalEvents: number;
@@ -406,15 +405,6 @@ export default async function ClientDetailPage({
                 </dd>
               </div>
 
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Address
-                </dt>
-
-                <dd className="mt-1 text-sm font-medium">
-                  {client.address}
-                </dd>
-              </div>
             </dl>
           </div>
 
