@@ -174,9 +174,7 @@ const updateCustomDuration = (
   const totalMinutes =
     parsedHours * 60 + parsedMinutes;
 
-  if (totalMinutes > 0) {
-    setDurationMinutes(totalMinutes);
-  }
+  setDurationMinutes(totalMinutes);
 };
   // -------------------------------------------------------
   // STEP 6 — TOTAL GUESTS
@@ -225,7 +223,9 @@ const [citySearch, setCitySearch] = useState("");
   eventName: "",
   eventType: "",
   eventDate: "",
+  startTime: "",
   guests: "",
+  duration: "",
   eventCityId: "",
   eventAddress: "",
   selectedServices: "",
@@ -346,44 +346,21 @@ const selectedCity = useMemo(
   // VALIDATE FIELDS
   // -------------------------------------------------------
 
-  const validateFields = (): boolean => {
-    const newErrors = {
-      eventName: eventName.trim()
-        ? ""
-        : "Event name is required",
-
-      eventType: eventType.trim()
-        ? ""
-        : "Event type is required",
-
-      eventDate: eventDate
-        ? ""
-        : "Event date is required",
-
-      guests: guests.trim()
-  ? ""
-  : "Guest count is required",
-
-eventCityId: eventCityId
-  ? ""
-  : "Event city is required",
-
-eventAddress: eventAddress.trim()
-  ? ""
-  : "Event address is required",
-
-selectedServices:
-  selectedServices.length > 0
-    ? ""
-    : "Select at least one service",
-    };
-
-    setErrors(newErrors);
-
-    return Object.values(newErrors).every(
-      (error) => error === ""
-    );
+  const fieldErrors = {
+    eventName: eventName.trim() ? "" : "Event name is required",
+    eventType: /^\p{L}[\p{L}\p{M} ]*$/u.test(eventType.trim())
+      ? "" : "Enter an event type using letters only",
+    eventDate: eventDate && Number.isFinite(eventDate.getTime()) ? "" : "Event date is required",
+    startTime: Number.isFinite(startTime.getTime()) ? "" : "Select a valid start time",
+    guests: /^\d+$/.test(guests.trim()) && Number.isSafeInteger(Number(guests)) && Number(guests) > 0
+      ? "" : "Enter a valid guest count greater than zero",
+    duration: Number.isSafeInteger(durationMinutes) && durationMinutes > 0
+      ? "" : "Enter an event duration greater than zero",
+    eventCityId: eventCityId ? "" : "Event city is required",
+    eventAddress: eventAddress.trim() ? "" : "Event address is required",
+    selectedServices: selectedServices.length > 0 ? "" : "Select at least one service",
   };
+  const canContinue = Object.values(fieldErrors).every(error => !error);
 
   // -------------------------------------------------------
   // SERVICE SELECTION
@@ -478,9 +455,8 @@ selectedServices:
   // -------------------------------------------------------
 
   const saveEventDetails = async () => {
-    const valid = validateFields();
-
-    if (!valid) {
+    setErrors(fieldErrors);
+    if (!canContinue) {
       return false;
     }
 
@@ -536,7 +512,7 @@ const eventEndTime = timeToHHMM(eventEndDateTime);
     JSON.stringify({
   eventId,
   eventName,
-  eventType,
+  eventType: eventType.trim(),
   eventDate,
   startTime: eventStartTime,
   endTime: eventEndTime,
@@ -730,7 +706,7 @@ const handleContinue = async () => {
           placeholder="Wedding, Birthday, Corporate..."
           placeholderTextColor="#AAAAAA"
           value={eventType}
-          onChangeText={setEventType}
+          onChangeText={value => setEventType(value.replace(/[^\p{L}\p{M} ]/gu, ""))}
           testID="event-type-input"
         />
       </View>
@@ -972,9 +948,9 @@ const handleContinue = async () => {
       setIsCustomDuration(true);
 
       if (!customHours && !customMinutes) {
-        setCustomHours("1");
-        setCustomMinutes("0");
-        setDurationMinutes(60);
+        updateCustomDuration("1", "0");
+      } else {
+        updateCustomDuration(customHours, customMinutes);
       }
     }}
   >
@@ -1593,7 +1569,9 @@ const handleContinue = async () => {
       ================================================== */}
 
       <TouchableOpacity
-        style={styles.continueButton}
+        style={[styles.continueButton, !canContinue && { opacity: 0.45 }]}
+        disabled={!canContinue}
+        accessibilityState={{ disabled: !canContinue }}
         onPress={handleContinue}
         testID="continue-button"
       >

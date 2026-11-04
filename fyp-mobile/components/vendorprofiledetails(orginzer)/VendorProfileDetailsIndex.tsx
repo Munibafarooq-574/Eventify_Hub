@@ -21,8 +21,9 @@ import {
 } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { router, useGlobalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useGlobalSearchParams } from 'expo-router';
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -42,6 +43,7 @@ import { recordCampaignPackageVisit } from '@/services/campaignAnalytics';
 import { trackVendorView } from '@/services/trackVendorView';
 import  getActiveCities  from '@/services/getActiveCities';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
@@ -403,6 +405,48 @@ const VendorDetailsScreen: React.FC =
   replacementOrderId,
   replacementRequestId,
 } = useGlobalSearchParams();
+
+const cartEventId = String(Array.isArray(eventId) ? eventId[0] : eventId || '');
+const cartVendorId = String(Array.isArray(id) ? id[0] : id || '');
+const [addedPackages, setAddedPackages] = useState<string[]>([]);
+const [addingToCart, setAddingToCart] = useState(false);
+const addingToCartRef = useRef(false);
+const cartWriteVersion = useRef(0);
+const [cartNotice, setCartNotice] = useState<{ title: string; detail: string; duplicate: boolean } | null>(null);
+const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+useFocusEffect(useCallback(() => {
+  let active = true;
+  const version = cartWriteVersion.current;
+  setAddedPackages([]);
+  const loadCart = async () => {
+    try {
+      const cart = JSON.parse(await getSecureData('cartData') || '{}');
+      if (!active || addingToCartRef.current || version !== cartWriteVersion.current) return;
+      const vendor = cart.vendors?.find((item: any) =>
+        String(item.vendorId || item.vendor?._id || '') === cartVendorId,
+      );
+      setAddedPackages((vendor?.packages || [])
+        .filter((pkg: any) => !pkg.eventId || String(pkg.eventId) === cartEventId)
+        .map((pkg: any) => String(pkg.packageId || pkg._id)));
+    } catch (error) {
+      reportMarketplaceLoadError('Could not read cart:', error);
+    }
+  };
+  void loadCart();
+  return () => {
+    active = false;
+    clearTimeout(noticeTimer.current);
+    setCartNotice(null);
+  };
+}, [cartVendorId, cartEventId]));
+
+const showCartNotice = (title: string, detail: string, duplicate = false) => {
+  clearTimeout(noticeTimer.current);
+  setCartNotice({ title, detail, duplicate });
+  AccessibilityInfo.announceForAccessibility(`${title}. ${detail}`);
+  noticeTimer.current = setTimeout(() => setCartNotice(null), 2800);
+};
 
 const isPackageOnlyMode =
   (Array.isArray(packageOnly) ? packageOnly[0] : packageOnly) === "true";
@@ -1612,6 +1656,12 @@ Toast.show({
 
 
        const handleAddToCart = async (pkg: any) => {
+      if (addingToCartRef.current) return;
+      const currentPackageId = String(pkg._id);
+      if (addedPackages.includes(currentPackageId)) {
+        showCartNotice('Already added to cart', pkg.packageName, true);
+        return;
+      }
       // Normal browse mode:
       // Add to Cart should never be available.
       if (!isEventMode) {
@@ -1724,6 +1774,9 @@ Toast.show({
         return;
       }
 
+      addingToCartRef.current = true;
+      cartWriteVersion.current++;
+      setAddingToCart(true);
       try {
         const existingCartData = await getSecureData('cartData');
 
@@ -1820,22 +1873,18 @@ Toast.show({
             cart.vendors[vendorIndex].packages = [];
           }
 
-          const existingIdx = cart.vendors[vendorIndex].packages.findIndex(
+          const alreadyAdded = cart.vendors[vendorIndex].packages.some(
             (p: any) =>
-              p.packageId === cartPackageItem.packageId &&
-              p.eventId === cartPackageItem.eventId,
+              String(p.packageId || p._id) === cartPackageItem.packageId &&
+              (!p.eventId || String(p.eventId) === cartPackageItem.eventId),
           );
 
-          if (existingIdx !== -1) {
-            cart.vendors[vendorIndex].packages[existingIdx] = {
-              ...cart.vendors[vendorIndex].packages[existingIdx],
-              quantity:
-                (cart.vendors[vendorIndex].packages[existingIdx].quantity ||
-                  1) + 1,
-            };
-          } else {
-            cart.vendors[vendorIndex].packages.push(cartPackageItem);
+          if (alreadyAdded) {
+            setAddedPackages(current => [...current, currentPackageId]);
+            showCartNotice('Already added to cart', pkg.packageName, true);
+            return;
           }
+          cart.vendors[vendorIndex].packages.push(cartPackageItem);
 
           // Keep vendorId/vendorName fresh in case they were missing before.
           cart.vendors[vendorIndex].vendorId = resolvedVendorId;
@@ -1848,8 +1897,6 @@ Toast.show({
             packages: [cartPackageItem],
           });
         }
-
-        await saveSecureData('cartData', JSON.stringify(cart));
 
         // Keep replacement checkout context attached to the cart as well.
         // This does not alter normal bookings; it only gives downstream
@@ -1894,21 +1941,15 @@ Toast.show({
           );
         }
 
-        Toast.show({
-          type: 'success',
-          text1: 'Added to Cart',
-          text2: `${pkg.packageName} — Rs. ${resolvedPrice.toLocaleString()} added to your cart!`,
-          position: 'bottom',
-        });
+        await saveSecureData('cartData', JSON.stringify(cart));
+        setAddedPackages(current => [...current, currentPackageId]);
+        showCartNotice('Added to cart', `${pkg.packageName} · Rs. ${resolvedPrice.toLocaleString()}`);
       } catch (error) {
-        console.error('Error handling add to cart:', error);
-
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Failed to add to cart. Please try again.',
-          position: 'bottom',
-        });
+        reportMarketplaceLoadError('Could not add package to cart:', error);
+        showCartNotice('Could not add to cart', 'Please try again.', true);
+      } finally {
+        addingToCartRef.current = false;
+        setAddingToCart(false);
       }
     };
 
@@ -2253,6 +2294,7 @@ const serviceCityNamesFromIds =
     selectedPackage?.bookingType ||
       'DURATION_BASED',
   ).toUpperCase();
+    const packageInCart = !!selectedPackage && addedPackages.includes(String(selectedPackage._id));
     const cartDisabled = selectedDurationQuote?.price === null ||
       (selectedPackage?.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType
         ? !selectedDelivery?.available
@@ -5008,9 +5050,13 @@ const serviceCityNamesFromIds =
                         {isEventMode && availabilityCheck && (
                             <TouchableOpacity
                               testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={cartDisabled}
-                              accessibilityState={{ disabled: cartDisabled }}
-                              style={[styles.cartButton, cartDisabled && { opacity: 0.45 }]}
+                              disabled={addingToCart || (!packageInCart && cartDisabled)}
+                              accessibilityState={{ disabled: addingToCart || (!packageInCart && cartDisabled), busy: addingToCart }}
+                              style={[
+                                styles.cartButton,
+                                packageInCart && styles.cartButtonAdded,
+                                (addingToCart || (!packageInCart && cartDisabled)) && { opacity: 0.45 },
+                              ]}
                               onPress={() =>
                                 handleAddToCart(
                                   selectedPackage,
@@ -5021,17 +5067,17 @@ const serviceCityNamesFromIds =
                               }
                             >
                               <Ionicons
-                                name="cart-outline"
+                                name={packageInCart ? "checkmark" : "cart-outline"}
                                 size={14}
-                                color="#FFFFFF"
+                                color={packageInCart ? PRIMARY : "#FFFFFF"}
                               />
 
                               <Text
                                 style={
-                                  styles.cartButtonText
+                                  [styles.cartButtonText, packageInCart && { color: PRIMARY }]
                                 }
                               >
-                                {selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? selectedDelivery?.available ? 'Add to Cart' : 'Choose delivery time' : availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
+                                {addingToCart ? 'Adding…' : packageInCart ? 'Added to Cart' : selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? selectedDelivery?.available ? 'Add to Cart' : 'Choose delivery time' : availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
                               </Text>
                             </TouchableOpacity>
                           )}
@@ -5976,6 +6022,21 @@ const serviceCityNamesFromIds =
             }}
           />
         </ScrollView>
+        {cartNotice && (
+          <View pointerEvents="none" style={styles.cartNoticeOverlay}>
+            <View style={styles.cartNoticeCard} accessibilityLiveRegion="polite">
+              <Ionicons
+                name={cartNotice.duplicate ? 'information-circle' : 'checkmark-circle'}
+                size={28}
+                color={cartNotice.duplicate ? PRIMARY : '#24865A'}
+              />
+              <View style={styles.cartNoticeCopy}>
+                <Text style={styles.cartNoticeTitle}>{cartNotice.title}</Text>
+                <Text style={styles.cartNoticeDetail} numberOfLines={2}>{cartNotice.detail}</Text>
+              </View>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
     );
   };
@@ -6040,6 +6101,34 @@ const Field: React.FC<{
 // ---------------------------------------------------------
 
 const styles = StyleSheet.create({
+  cartButtonAdded: { backgroundColor: '#F0DCEC' },
+  cartNoticeOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+  },
+  cartNoticeCard: {
+    width: '84%',
+    maxWidth: 340,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+    shadowColor: '#2A1F27',
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  cartNoticeCopy: { flex: 1 },
+  cartNoticeTitle: { fontSize: 15, fontWeight: '800', color: '#2A1F27' },
+  cartNoticeDetail: { marginTop: 3, fontSize: 13, color: '#71636D' },
+
   keyboardContainer: {
     flex: 1,
   },
