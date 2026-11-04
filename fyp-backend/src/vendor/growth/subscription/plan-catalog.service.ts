@@ -11,21 +11,29 @@ type CatalogPlan = Omit<PlanDefinition, 'key' | 'priceLabel' | 'features'> & {
 
 type Feature = { key: string; name: string; controlsAccess: boolean };
 type PlanDocument = { _id: string; plan: CatalogPlan };
-type FeatureDocument = { _id: string; name: string };
 
 export const PLAN_KEY = /^[a-z][a-z0-9-]{0,63}$/;
-const LABELS: Record<string, string> = {
-  standardListing: 'Standard marketplace listing',
-  bookingTools: 'Bookings, messages & availability',
-  basicStats: 'Reviews and basic business stats',
-};
-const BASE_BENEFITS = Object.keys(LABELS);
+// The catalog is intentionally fixed to app capabilities. Admins can assign
+// these entitlements to any plan, but cannot invent a new functional feature.
+const FIXED_FEATURES: Feature[] = [
+  FeatureKey.FEATURED_VENDOR,
+  FeatureKey.FEATURED_PACKAGE,
+  FeatureKey.PROMOTIONAL_BADGES,
+  FeatureKey.COUPONS,
+  FeatureKey.DISCOUNT_CODES,
+  FeatureKey.CAMPAIGNS,
+  FeatureKey.GROWTH_ANALYTICS,
+  FeatureKey.ADVANCED_ANALYTICS,
+  FeatureKey.BUSINESS_INSIGHTS,
+  FeatureKey.CAMPAIGN_ANALYTICS,
+].map(key => ({
+  key,
+  name: key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase()),
+  controlsAccess: true,
+}));
+
 const DEFAULT_RANK: Record<string, number> = { basic: 1, growth: 2, premium: 3 };
 const humanize = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
-const BUILT_IN_FEATURES: Feature[] = [
-  ...Object.values(FeatureKey).map(key => ({ key, name: humanize(key), controlsAccess: true })),
-  ...BASE_BENEFITS.map(key => ({ key, name: LABELS[key], controlsAccess: false })),
-];
 
 @Injectable()
 export class PlanCatalogService {
@@ -35,20 +43,10 @@ export class PlanCatalogService {
     return this.connection.db!.collection<PlanDocument>('subscriptionplanconfigs');
   }
 
-  private get removedFeatures() {
-    return this.connection.db!.collection<{ _id: string }>('subscriptionremovedfeatures');
-  }
-
-  private get customFeatures() {
-    return this.connection.db!.collection<FeatureDocument>('subscriptionfeatureconfigs');
-  }
-
   async getFeatures(): Promise<Feature[]> {
-    const custom = await this.customFeatures.find().sort({ name: 1 }).toArray();
-    const removed = new Set((await this.removedFeatures.find().toArray()).map(row => row._id));
-    return [...BUILT_IN_FEATURES, ...custom.map(feature => ({
-      key: feature._id, name: feature.name, controlsAccess: false,
-    }))].filter(feature => !removed.has(feature.key));
+    // Old custom benefits and removed-feature tombstones are intentionally
+    // ignored. Neither should alter executable feature entitlements.
+    return FIXED_FEATURES;
   }
 
   private defaultPlan(plan: PlanDefinition): CatalogPlan {
@@ -60,10 +58,7 @@ export class PlanCatalogService {
       isPurchasable: plan.isPurchasable,
       limits: plan.limits,
       rank: DEFAULT_RANK[plan.key] ?? 0,
-      featureKeys: [
-        ...(plan.key === SubscriptionPlan.FREE ? [] : BASE_BENEFITS),
-        ...Object.values(FeatureKey).filter(key => plan.features[key]),
-      ],
+      featureKeys: FIXED_FEATURES.filter(feature => plan.features[feature.key as FeatureKey]).map(feature => feature.key),
     };
   }
 
@@ -84,7 +79,7 @@ export class PlanCatalogService {
           [LimitKey.MAX_PORTFOLIO_IMAGES, 'Up to', 'portfolio images'],
           [LimitKey.MAX_IMAGES_PER_PACKAGE, 'Up to', 'images per package'],
           [LimitKey.MONTHLY_CAMPAIGN_LIMIT, 'Up to', 'promotional campaigns per month'],
-        ] as const).filter(([limit]) => plan.limits[limit] > 0)
+        ] as const).filter(([limit]) => plan.limits[limit] > 0 && (limit !== LimitKey.MONTHLY_CAMPAIGN_LIMIT || enabled.has(FeatureKey.CAMPAIGNS)))
           .map(([limit, prefix, label]) => `${prefix} ${plan.limits[limit]} ${label}`),
         ...features.filter(feature => enabled.has(feature.key)).map(feature => feature.name),
       ])],
@@ -175,35 +170,4 @@ export class PlanCatalogService {
     return { key, isPurchasable: active };
   }
 
-  async deleteFeature(key: string) {
-    const feature = (await this.getFeatures()).find(item => item.key === key);
-    if (!feature) throw new NotFoundException('Feature not found.');
-    if (!key.startsWith('custom:')) {
-      await this.removedFeatures.updateOne({ _id: key }, { $set: { _id: key } }, { upsert: true });
-    }
-    await this.connection.db!.collection<PlanDocument>('subscriptionplanconfigs').updateMany(
-      { 'plan.featureKeys': key },
-      { $pull: { 'plan.featureKeys': key } } as any,
-    );
-    if (key.startsWith('custom:')) await this.customFeatures.deleteOne({ _id: key });
-    return { deleted: true, key };
-  }
-
-  async addFeature(name: unknown) {
-    if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) {
-      throw new BadRequestException('Enter a feature name of up to 100 characters.');
-    }
-    const cleanName = name.trim().replace(/\s+/g, ' ');
-    if (BUILT_IN_FEATURES.some(feature => feature.name.toLowerCase() === cleanName.toLowerCase())) {
-      throw new ConflictException('That feature already exists.');
-    }
-    const key = `custom:${cleanName.toLowerCase()}`;
-    try {
-      await this.customFeatures.insertOne({ _id: key, name: cleanName });
-    } catch (error) {
-      if ((error as { code?: number }).code === 11000) throw new ConflictException('That feature already exists.');
-      throw error;
-    }
-    return { key, name: cleanName, controlsAccess: false };
-  }
 }
