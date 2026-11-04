@@ -205,6 +205,25 @@ export class ReviewsService {
             },
         },
 
+        // Completed bookings also qualify vendors who have no public reviews yet.
+        {
+            $unionWith: {
+                coll: 'vendororders',
+                pipeline: [
+                    { $match: { status: 'completed' } },
+                    { $group: { _id: '$vendorId' } },
+                    { $set: { averageRating: 0, totalReviews: 0 } },
+                ],
+            },
+        },
+        {
+            $group: {
+                _id: '$_id',
+                averageRating: { $max: '$averageRating' },
+                totalReviews: { $sum: '$totalReviews' },
+            },
+        },
+
         // Get vendor's own VendorOrders
         {
             $lookup: {
