@@ -48,9 +48,13 @@ describe('Admin subscription catalog', () => {
     const defaults = await catalog.list();
     expect(defaults.map(plan => plan.key)).toEqual(['basic', 'growth', 'premium']);
     expect(defaults.find(plan => plan.key === 'growth')?.features.coupons).toBe(true);
+    expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Growth visibility & featured eligibility');
+    expect(defaults.find(plan => plan.key === 'premium')?.featureLabels).toContain('Premium Partner visibility');
     const features = await catalog.getFeatures();
     expect(features.map(feature => feature.key)).toContain(FeatureKey.COUPONS);
     expect(features.every(feature => feature.controlsAccess)).toBe(true);
+    expect(features.find(feature => feature.key === FeatureKey.FEATURED_VENDOR)?.name).toBe('Growth visibility & featured eligibility');
+    expect(features.find(feature => feature.key === FeatureKey.PREMIUM_BADGE)?.name).toBe('Premium Partner visibility');
     const input = { ...planInput };
     await catalog.savePlan('studio-plus', input, true);
     expect(await catalog.getPurchasable('studio-plus')).toMatchObject({
