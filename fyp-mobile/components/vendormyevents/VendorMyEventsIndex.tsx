@@ -872,6 +872,7 @@ renderItem={({ item }) => {
                     <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.vendorDetailCard}>
                       <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
                       <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
+                      {service.quantity != null && <Text style={styles.expandedText}>Quantity: {service.quantity}</Text>}
                       {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text></>}
                       <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>

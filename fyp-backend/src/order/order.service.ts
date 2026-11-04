@@ -1238,6 +1238,7 @@ export class OrderService {
                                                 promotionSnapshot
                                                     ?.promotionCode ??
                                                 null,
+                                            quantity: validatedService.quantity,
                                             delivery: validatedService.delivery,
                                             bookingType: validatedService.bookingType,
                                             bookingChatService: validatedService.bookingChatService,
@@ -1356,6 +1357,7 @@ export class OrderService {
                     _id: savedVendorOrderIds[index],
                     vendorId: booking.vendorId,
                     serviceName: booking.serviceName,
+                    quantity: booking.quantity,
                     bookingType: booking.bookingType,
                     bookingChatService: booking.bookingChatService,
                     bookingChatTimeZone: eventTimeZone,

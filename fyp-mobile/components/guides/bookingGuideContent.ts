@@ -63,7 +63,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     sections: [
       { id: 'start', title: 'Open and check your event', summary: 'Find the correct event and expand its vendor cards.', steps: [
         'Open My Events and expand the event. Check its date, time, city, address, guests and desired services.',
-        'Each vendor card shows the package and its category when available. Expand the card to review service timing, price, booking activity and payment status.',
+        'Each vendor card shows the package and its category when available. Expand the card to review quantity, service timing, price, booking activity and payment status.',
         'Pull down to refresh after a payment, vendor response or schedule decision. Check notifications for updates, then open the booking to see its latest state.',
       ] }, status, service, delivery,
       { id: 'pay', title: 'Pay the down payment and remaining balance', summary: 'Use only the payment action shown on that booking.', steps: [
@@ -106,7 +106,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     sections: [
       { id: 'calendar', title: 'Find a day and review bookings', summary: 'Use the calendar and the available views.', steps: [
         'Select the date you want to check. Read Working Hours, Booking Notice, available slots and booked slots for that date.',
-        'Use Selected Day, Upcoming, This Month or Past Bookings to find the relevant records. Expand a booking to read event, client, package and payment information.',
+        'Use Selected Day, Upcoming, This Month or Past Bookings to find the relevant records. Expand a booking to read event, client, package quantity and payment information.',
         'Only your vendor bookings are shown here. Another vendor’s acceptance or cancellation does not change your own assignment.',
       ] },
       { id: 'availability', title: 'Edit working hours and notice', summary: 'Save the settings for the intended working day.', steps: [
@@ -135,7 +135,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     quickSteps: ['Expand order → review package and service time', 'Accept in time → check payment status', 'Fulfil service → mark completed when allowed'],
     sections: [
       { id: 'orders', title: 'Find and check the right booking', summary: 'Use status cards, then expand the order.', steps: [
-        'Use All or a status card to filter your orders. Expand the booking and check the event, client, package, service timing, address and booking ID.',
+        'Use All or a status card to filter your orders. Expand the booking and check the event, client, package quantity, service timing, address and booking ID.',
         'Read Paid and Remaining to understand the actual payment position. A package total or earnings label is not proof that payment has been received.',
         'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
       ] }, status, service, delivery,

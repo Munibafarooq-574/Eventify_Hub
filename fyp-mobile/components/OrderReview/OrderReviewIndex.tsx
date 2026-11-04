@@ -59,6 +59,10 @@ function getCartPromotions(cart: any): Record<string, any> {
   return Object.fromEntries(entries.filter(([, promotion]: any[]) => !!promotion));
 }
 
+function countPackageUnits(packages: { quantity?: number }[]) {
+  return packages.reduce((total, pkg) => total + Math.max(1, Number(pkg.quantity || 1)), 0);
+}
+
 const OrderReviewScreen = () => {
   const [draft] = useState(createBookingDraftStore);
   const [cartData, setCartData] = useState<any>(null);
@@ -293,7 +297,7 @@ const finalTotal =
   const vendorCount = cartData?.vendors?.length || 0;
   const packageCount =
     cartData?.vendors?.reduce(
-      (total: number, vendor: any) => total + (vendor?.packages?.length || 0),
+      (total: number, vendor: any) => total + countPackageUnits(vendor?.packages || []),
       0,
     ) || 0;
 
@@ -1707,6 +1711,7 @@ const vendorOfficeAddress =
 
 const packages =
   vendor?.packages || [];
+const vendorPackageCount = countPackageUnits(packages);
 
  const vendorServiceWindows =
   packages
@@ -1921,8 +1926,8 @@ const packages =
       <Text
         style={styles.packageCountText}
       >
-        {packages.length}{' '}
-        {packages.length === 1
+        {vendorPackageCount}{' '}
+        {vendorPackageCount === 1
           ? 'Package'
           : 'Packages'}
       </Text>
@@ -2081,8 +2086,8 @@ const packages =
                       cateringCategory?._id &&
                       vendor?.vendor?.buisnessCategory === cateringCategory._id;
 
-                    const packagePrice = Number(pkg?.price || 0);
-                    const finalPrice = (isCatering ? packagePrice * Number(guests || 0) : packagePrice) + deliveryFee(pkg,Number(pkg.quantity || 1),Number(guests || 0),!!isCatering).totalFee;
+                    const quantity = Math.max(1, Number(pkg.quantity || 1));
+                    const finalPrice = getPackageAmount(vendor, pkg);
 
                     const vendorId = String(
                     vendor?.vendor?._id || '',
@@ -2126,8 +2131,9 @@ const packages =
                             </View>
                           )}
 
+                          <Text style={styles.guestTagText}>Quantity: {quantity}</Text>
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
-                          <DeliveryDetails pkg={pkg} quantity={Number(pkg.quantity || 1)} guests={Number(guests || 0)} isCatering={!!isCatering} />
+                          <DeliveryDetails pkg={pkg} quantity={quantity} guests={Number(guests || 0)} isCatering={!!isCatering} />
                           {String(
   pkg?.bookingType || 'DURATION_BASED',
 ).toUpperCase() !== 'DELIVERY_BASED' && (

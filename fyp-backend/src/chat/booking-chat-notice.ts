@@ -2,7 +2,7 @@ import type { Order } from '../schemas/order.schema';
 import type { VendorOrder } from '../schemas/vendor-order.schema';
 
 export type BookingChatOrder = Pick<Order, 'organizerId' | 'eventName' | 'eventDate' | 'eventStartDateTime'>;
-export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService'>;
+export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService' | 'quantity'>;
 export type BookingChatStage = 'requested' | 'confirmed' | 'completed' | 'cancelled';
 
 export type BookingChatPayment = { amount: number; remainingAmount: number };
@@ -35,6 +35,7 @@ export function formatBookingNotice(
         stage === 'cancelled' && 'The vendor has cancelled this booking. Your payment/refund information is available in the booking details.',
         booking.bookingChatService && `Service: ${booking.bookingChatService}`,
         `Package: ${booking.serviceName}`,
+        booking.quantity != null && `Quantity: ${booking.quantity}`,
         schedule,
     ].filter(Boolean).join('\n');
 }

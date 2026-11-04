@@ -94,6 +94,9 @@ export class VendorOrder extends Document {
     @Prop({ required: true })
     serviceName: string;
 
+    @Prop({ type: Number, min: 1 })
+    quantity?: number;
+
     @Prop({ required: true })
 price: number;
 

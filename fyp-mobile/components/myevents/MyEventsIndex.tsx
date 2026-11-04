@@ -1266,6 +1266,7 @@ const MyEventsScreen = () => {
                               </View>
 
                               <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
+                              {vendor.quantity != null && <DetailRow label="Quantity" value={String(vendor.quantity)} />}
                               <DeliveryDetails pkg={vendor} timeZone={event.eventCityId?.timeZone || "UTC"} />
 
                               {bookingType !== 'DELIVERY_BASED' && (
