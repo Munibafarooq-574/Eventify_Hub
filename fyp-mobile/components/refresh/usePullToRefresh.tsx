@@ -25,6 +25,7 @@ export function usePullToRefresh(reload: () => Promise<unknown>) {
 
   return {
     refreshing,
+    onRefresh,
     refreshControl: (
       <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PULL_TO_REFRESH_COLOR} colors={[PULL_TO_REFRESH_COLOR]} />
     ),
