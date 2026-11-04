@@ -462,7 +462,7 @@ export class OrderService {
 
                     // Claim and consume this cart revision inside the booking transaction.
                     // A failed booking rolls this write back along with the booking.
-                    const promotionMatch = bookingDraftRevision === undefined ? {} : Object.fromEntries(services.flatMap(service => {
+                    const promotionMatch = bookingDraftRevision === undefined ? {} : Object.fromEntries(services.flatMap<[string, string | null]>(service => {
                         const vendorId = String(service.vendorId);
                         const packageId = String(service.packageId);
                         if (!/^[a-f\d]{24}$/i.test(vendorId) || !/^[a-f\d]{24}$/i.test(packageId)) {
