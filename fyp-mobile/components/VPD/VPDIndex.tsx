@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 //vendor side detail section
@@ -253,7 +254,10 @@ useEffect(() => {
         );
 
         setVendorData(response.data);
-        setActivePackage(response.data.packages?.[0]?._id || null);
+        setActivePackage(current =>
+            response.data.packages?.some((pkg: any) => pkg._id === current)
+                ? current : response.data.packages?.[0]?._id || null,
+        );
     } catch (error) {
         console.error("Error fetching vendor data:", error);
     } finally {
@@ -274,6 +278,10 @@ useFocusEffect(
         }
     }, [id])
 );
+
+    const { refreshControl } = usePullToRefresh(async () => {
+        await Promise.all([fetchVendorDetails(), fetchReviewSummary(), fetchReviews(true)]);
+    });
 
     if (loading) {
         return (
@@ -309,17 +317,17 @@ const category =
     // add test id 
     if (!vendorData) {
         return (
-            <View testID="error-message" style={styles.errorContainer}>
+            <ScrollView testID="error-message" contentContainerStyle={[styles.errorContainer, { flex: undefined, flexGrow: 1 }]} refreshControl={refreshControl}>
                 <Ionicons name="alert-circle-outline" size={42} color="#D64545" style={{ marginBottom: 10 }} />
                 <Text style={styles.errorText}>
                     Failed to load vendor details. Please try again.
                 </Text>
-            </View>
+            </ScrollView>
         );
     }
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.container} refreshControl={refreshControl} showsVerticalScrollIndicator={false}>
             <Toast />
 
                               {/* Hero: Themed box with full DP + side tabs */}

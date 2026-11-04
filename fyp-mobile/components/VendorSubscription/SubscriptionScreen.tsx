@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
 // fyp-mobile/components/VendorSubscription/SubscriptionScreen.tsx
 
@@ -346,6 +347,8 @@ export default function SubscriptionScreen() {
         setLoading(false);
       }
     }, [vendorId]);
+
+  const { refreshControl } = usePullToRefresh(loadData);
 
   useEffect(() => {
     loadData();
@@ -713,10 +716,9 @@ export default function SubscriptionScreen() {
 
         <Header />
 
-        <View
-          style={
-            styles.centered
-          }
+        <ScrollView
+          refreshControl={refreshControl}
+          contentContainerStyle={[styles.centered, { flex: undefined, flexGrow: 1 }]}
         >
           <Text
             style={
@@ -743,7 +745,7 @@ export default function SubscriptionScreen() {
               Retry
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -779,6 +781,7 @@ export default function SubscriptionScreen() {
         }
       >
         <ScrollView
+          refreshControl={refreshControl}
           ref={
             scrollViewRef
           }

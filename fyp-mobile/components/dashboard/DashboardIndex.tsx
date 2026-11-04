@@ -1,7 +1,9 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
+import { DashboardRefreshContext } from "./DashboardRefreshContext";
 //fyp-mobile/components/dashboard/DashboardIndex.tsx
 //client Dashboard Screen
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import Header from './Header';
 import CategoryGrid from './CategoryGrid';
@@ -18,31 +20,39 @@ const COLORS = {
 };
 
 const DashboardIndex: React.FC = () => {
+  const [sections] = useState(() => new Set<() => Promise<unknown>>());
+  const { refreshControl } = usePullToRefresh(
+    () => Promise.allSettled(Array.from(sections, reload => reload())),
+  );
+
   return (
-    <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Header />
-        <View style={styles.content}>
-          <CategoryGrid />
-          
-          <PublicCouponOffers />
+    <DashboardRefreshContext.Provider value={sections}>
+      <View style={styles.container}>
+        <ScrollView
+          refreshControl={refreshControl}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <Header />
+          <View style={styles.content}>
+            <CategoryGrid />
 
-          <SponsoredForYou />
+            <PublicCouponOffers />
 
-        <RecommendedForYourEvent />
+            <SponsoredForYou />
 
-        <FeaturedVendorsSection />
+            <RecommendedForYourEvent />
 
-          <FeaturedPackagesSection />
+            <FeaturedVendorsSection />
 
-          <VenueList />
-        </View>
-      </ScrollView>
-      <BottomNavigationFinal />
-    </View>
+            <FeaturedPackagesSection />
+
+            <VenueList />
+          </View>
+        </ScrollView>
+        <BottomNavigationFinal />
+      </View>
+    </DashboardRefreshContext.Provider>
   );
 };
 

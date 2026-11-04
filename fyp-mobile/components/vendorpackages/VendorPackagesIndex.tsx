@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
 import deletePackage from "@/services/deletePackage";
@@ -10,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -71,6 +72,8 @@ const PackageScreen = () => {
   const [loadError, setLoadError] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [retry, setRetry] = useState(0);
+  const reloadPackage = useRef<(() => Promise<void>) | null>(null);
+  const { refreshControl } = usePullToRefresh(async () => { await reloadPackage.current?.(); });
 
   // Use the same current account as the dashboard; legacy SecureStore may hold a previous login.
   const readUser = getUserData;
@@ -97,16 +100,18 @@ const PackageScreen = () => {
         const packages = await getVendorPackagesList(String(vendorId));
         if (!active) return;
         const found = packages.find(pkg => String(pkg._id) === String(packageId));
-        if (found) setPackageDetails(found);
-        else setNotFound(true);
+        setPackageDetails(found ?? null);
+        setLoadError("");
+        setNotFound(!found);
       } catch {
         if (active) setLoadError("Unable to load this package right now. Please try again.");
       } finally {
         if (active) setLoading(false);
       }
     };
+    reloadPackage.current = load;
     void load();
-    return () => { active = false; };
+    return () => { active = false; reloadPackage.current = null; };
   }, [packageId, retry]));
 
   useEffect(() => {
@@ -435,6 +440,7 @@ const PackageScreen = () => {
       --------------------------------------------------- */}
 
       <ScrollView
+        refreshControl={refreshControl}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

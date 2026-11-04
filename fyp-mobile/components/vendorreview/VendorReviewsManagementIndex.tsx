@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -198,6 +199,10 @@ const VendorReviewsManagementIndex: React.FC = () => {
     if (vendorId) fetchReviews(true);
   }, [vendorId, activeFilter, activeSort]);
 
+  const { refreshControl } = usePullToRefresh(
+    () => Promise.all([fetchSummary(), fetchReviews(true)]),
+  );
+
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) fetchReviews(false);
   };
@@ -258,7 +263,7 @@ const VendorReviewsManagementIndex: React.FC = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={refreshControl}>
       <View style={styles.header}>
         <TouchableOpacity testID="back-button" onPress={() => router.back()}>
           <Text style={styles.backText}>{'<'} Back</Text>

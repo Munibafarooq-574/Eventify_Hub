@@ -5,9 +5,8 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 const source = fs.readFileSync('components/vendorprofiledetails(orginzer)/VendorProfileDetailsIndex.tsx', 'utf8');
-const start = source.indexOf('const resolvePackagePrice =');
-const end = source.indexOf('const handleAddToCart =', start);
-const code = ts.transpileModule(source.slice(start, end) + '\nresolvePackagePrice;', {}).outputText;
+const pricingSource = fs.readFileSync('utils/resolvePackagePrice.ts', 'utf8');
+const code = ts.transpileModule(pricingSource.replace('export const', 'const') + '\nresolvePackagePrice;', {}).outputText;
 const resolve = vm.runInNewContext(code);
 const pricing = {
   price: 15000, baseIncludedDurationMinutes: 120,

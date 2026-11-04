@@ -1,5 +1,5 @@
 const{test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
-function load(failure){const source=fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx','utf8');const start=source.indexOf('  const handleCheckout = async () => {');const end=source.indexOf('  // -----------------------------------------\n  // Loading',start);const code=ts.transpileModule(source.slice(start,end)+'\nmodule.exports=handleCheckout;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;const cleaned=[],alerts=[],errors=[],deleted=[],navigation=[],loading=[],toasts=[],requests=[];const context={clearExpiredReplacementCart:async(cart,event)=>cleaned.push({cart,event}),module:{exports:{}},placingOrder:false,checkoutLock:{current:false},bookingSubmitted:{current:false},navigation:{dispatch:s=>navigation.push(...s.payload.routes)},setCheckoutError:v=>errors.push(v),setPlacingOrder:v=>loading.push(v),getUserData:async()=>({_id:'client'}),getSecureData:async()=>JSON.stringify({replacementVendorOrderId:'cancelled',eventId:'event',eventDate:'2026-10-24',startTime:'14:30',eventName:'Deadline test',guests:15,eventCityId:'city',eventAddress:'Venue'}),cartData:{vendors:[{vendor:{_id:'vendor'},packages:[{_id:'package',packageName:'Package',price:1000,quantity:1}]}]},appliedPromotions:{},getPromotionKey:()=> 'key',getResolvedServiceWindow:()=>null,reportMarketplaceLoadError:()=>{},postPlaceOrder:async p=>{requests.push(p);if(failure)throw Error(failure);return{_id:'same-event'}},cancelCartReminder:async()=>{},deleteSecureData:async key=>deleted.push(key),router:{push:p=>navigation.push(p)},Toast:{show:p=>toasts.push(p)},Alert:{alert:(...args)=>alerts.push(args)}};vm.runInNewContext(code,context);return{cleaned,...context,run:context.module.exports,alerts,deleted,navigation,loading,toasts,requests,errors,context};}
+function load(failure){const source=fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx','utf8');const start=source.indexOf('  const handleCheckout = async () => {');const end=source.indexOf('  // -----------------------------------------\n  // Loading',start);const code=ts.transpileModule(source.slice(start,end)+'\nmodule.exports=handleCheckout;',{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;const cleaned=[],alerts=[],errors=[],deleted=[],navigation=[],loading=[],toasts=[],requests=[];const context={clearExpiredReplacementCart:async(cart,event)=>cleaned.push({cart,event}),module:{exports:{}},placingOrder:false,refreshing:false,refreshNotice:'',setRefreshNotice:v=>{context.refreshNotice=v},isConnectionError:error=>/connection interrupted/i.test(error.message),OFFLINE_NOTICE:'No internet connection. Reconnect and pull down to refresh.',checkoutLock:{current:false},bookingSubmitted:{current:false},navigation:{dispatch:s=>navigation.push(...s.payload.routes)},setCheckoutError:v=>errors.push(v),setPlacingOrder:v=>loading.push(v),getUserData:async()=>({_id:'client'}),getSecureData:async()=>JSON.stringify({replacementVendorOrderId:'cancelled',eventId:'event',eventDate:'2026-10-24',startTime:'14:30',eventName:'Deadline test',guests:15,eventCityId:'city',eventAddress:'Venue'}),cartData:{vendors:[{vendor:{_id:'vendor'},packages:[{_id:'package',packageName:'Package',price:1000,quantity:1}]}]},appliedPromotions:{},getPromotionKey:()=> 'key',getResolvedServiceWindow:()=>null,reportMarketplaceLoadError:()=>{},postPlaceOrder:async p=>{requests.push(p);if(failure)throw Error(failure);return{_id:'same-event'}},cancelCartReminder:async()=>{},deleteSecureData:async key=>deleted.push(key),router:{push:p=>navigation.push(p)},Toast:{show:p=>toasts.push(p)},Alert:{alert:(...args)=>alerts.push(args)}};vm.runInNewContext(code,context);return{cleaned,...context,run:context.module.exports,alerts,deleted,navigation,loading,toasts,requests,errors,context};}
 test('expired replacement cleans its cart, shows deadline message and unlocks button',async()=>{const message='Replacement vendors can only be selected before the event starts.';const f=load(message);await f.run();assert.equal(f.errors.at(-1),message);assert.equal(f.deleted.length,0);assert.equal(f.navigation.length,0);assert.deepEqual(f.loading,[true,false]);assert.equal(f.requests[0].replacementVendorOrderId,'cancelled');assert.equal(f.cleaned.length,1);assert.equal(f.cleaned[0].event.replacementVendorOrderId,'cancelled')});
 test('network failure also produces visible feedback without deleting checkout data',async()=>{const f=load('Booking could not be submitted right now. Your cart is saved. Please try again shortly.');await f.run();assert.match(f.errors.at(-1),/cart is saved/);assert.equal(f.alerts[0][0],'Booking not submitted');assert.equal(f.deleted.length,0);assert.equal(f.loading.at(-1),false)});
 test('successful checkout keeps existing success and cleanup behavior',async()=>{const f=load();await f.run();assert.equal(f.alerts.length,0);assert.deepEqual(f.deleted,['cartData','eventDetails']);assert.equal(f.navigation[0].name,'dashboard');assert.deepEqual(JSON.parse(f.navigation[1].params.chatVendors),[{id:'vendor',name:'Vendor',avatar:''}]);assert.equal(f.toasts[0].type,'success')});
@@ -59,4 +59,52 @@ test('cart reminder schedules once across repeated attempts and can be cancelled
  assert.equal(scheduled.length,1);
  assert.equal(scheduled[0].trigger.seconds,3600);
  assert.equal(cancelled[0],scheduled[0].identifier);
+});
+
+test('a connection failure shows the offline notice and preserves checkout data', async () => {
+ const f = load('Connection interrupted. Your cart is saved.');
+ await f.run();
+ assert.match(f.context.refreshNotice, /No internet connection/);
+ assert.equal(f.deleted.length, 0);
+ assert.equal(f.alerts.length, 0);
+ assert.equal(f.loading.at(-1), false);
+ await f.run();
+ assert.equal(f.requests.length, 1);
+});
+
+test('pull after reconnect rechecks the saved duration and updates price without changing the cart selection', async () => {
+ const source = fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx', 'utf8');
+ const start = source.indexOf('  const { refreshing, refreshControl } = usePullToRefresh');
+ const end = source.indexOf('  const handleCheckout', start);
+ const window = {startDateTime:'2026-11-09T10:00:00Z',endDateTime:'2026-11-09T11:00:00Z'};
+ const pkg = {_id:'package', packageName:'Photography', durationMinutes:60, quantity:2, price:1000, requiredServiceWindow:window};
+ const cartData = {vendors:[{vendor:{_id:'vendor'}, packages:[pkg]}]};
+ let reload, notice, updated, checkedDuration;
+ let offline = true;
+ const context = {
+  usePullToRefresh: fn => { reload = fn; return {}; },
+  PRIMARY:'#780C60', OFFLINE_NOTICE:'No internet connection.',
+  cartData, eventDetails:{eventDate:'2026-11-09',startTime:'15:00',eventDurationMinutes:120,eventCityId:'city',durationMinutes:120},
+  checkoutLock:{current:false}, applyingCouponId:null, applyingDiscountCodeKey:null, connectivityRequest:{current:0},
+  appliedPromotions:{}, replacementDeadlinePassed:false,
+  getVendorPackagesList:async () => { if (offline) throw new TypeError('Network request failed'); return [{_id:'package', price:1200}]; },
+  resolvePackagePrice: latest => ({price:latest.price}),
+  checkReviewPackageAvailability:async input => { checkedDuration = input.eventDurationMinutes; return true; },
+  getPromotionKey:()=> 'vendor:package', getPackageAmount:()=>2400,
+  setCartData:value=>{updated=value;}, setRefreshNotice:value=>{notice=value;},
+  setAppliedPromotions:()=>{}, setCheckoutError:()=>{}, reportMarketplaceLoadError:()=>{},
+  isConnectionError:error=>error instanceof TypeError,
+ };
+ vm.runInNewContext(ts.transpileModule(source.slice(start,end), {}).outputText,context);
+ await reload();
+ assert.match(notice,/No internet connection/);
+ assert.equal(updated,undefined);
+ offline = false;
+ await reload();
+ assert.equal(notice,'');
+ assert.equal(checkedDuration,60);
+ assert.equal(updated.vendors[0].packages[0].price,1200);
+ assert.equal(updated.vendors[0].packages[0].quantity,2);
+ assert.equal(updated.vendors[0].packages[0].requiredServiceWindow,window);
+ assert.equal(pkg.price,1000);
 });

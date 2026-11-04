@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -187,6 +188,13 @@ const OrderSummary = () => {
         setFullyPaidOrders((paid ?? ordersData ?? []).filter(isFullyPaidVendorOrder));
         setRescheduleRequests(Array.isArray(requests) ? requests : []);
     }, []);
+
+    const { refreshControl } = usePullToRefresh(
+        async () => {
+            const [ordersResult] = await Promise.allSettled([refreshScreenData(), loadRefunds()]);
+            if (ordersResult.status === "rejected") throw ordersResult.reason;
+        },
+    );
 
     useEffect(() => {
         const tab = Array.isArray(selectedTab) ? selectedTab[0] : selectedTab;
@@ -666,6 +674,7 @@ const OrderSummary = () => {
 
                 {/* Orders List */}
                 <FlatList
+                    refreshControl={refreshControl}
                     style={styles.ordersList}
                     contentContainerStyle={styles.ordersListContent}
                     data={filteredOrders}

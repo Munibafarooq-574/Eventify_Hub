@@ -1,7 +1,7 @@
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 import getUserNotifications from '@/services/getNotifications';
 import { getUserData } from '@/store';
@@ -18,7 +18,7 @@ const NotificationsScreen: React.FC = () => {
             if (!user?._id) throw new Error('Please sign in again.');
             const records = await getUserNotifications(user._id);
             if (request === generation.current) setNotifications(Array.isArray(records) ? records : []);
-        } catch { if (request === generation.current) setError('Unable to load updates. Please reopen this screen to retry.'); }
+        } catch { if (request === generation.current) setError('Unable to load updates. Pull down to try again.'); }
         finally { if (request === generation.current) setRefreshing(false); }
     }, []);
     useFocusEffect(useCallback(() => { setNotifications([]); void load(); return () => { ++generation.current; }; }, [load]));
@@ -85,27 +85,26 @@ const NotificationsScreen: React.FC = () => {
             </View>
 
             {/* Notifications List */}
-            {!!error && <Text>{error}</Text>}
-            {notifications.length === 0 ? (
-                <View style={styles.emptyState}>
-                    <View style={styles.emptyIconCircle}>
-                        <Ionicons name="notifications-off-outline" size={30} color="#780C60" />
+            <FlatList
+                data={notifications}
+                renderItem={renderNotification}
+                keyExtractor={(item) => item._id || item.id}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} tintColor="#7B2869" colors={["#7B2869"]} />}
+                contentContainerStyle={[styles.list, { flexGrow: 1 }]}
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={error ? <Text accessibilityRole="alert">{error}</Text> : undefined}
+                ListEmptyComponent={!refreshing && !error ? (
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIconCircle}>
+                            <Ionicons name="notifications-off-outline" size={30} color="#780C60" />
+                        </View>
+                        <Text style={styles.emptyTitle}>No notifications yet</Text>
+                        <Text style={styles.emptyText}>
+                            Booking and refund updates will appear here once they arrive.
+                        </Text>
                     </View>
-                    <Text style={styles.emptyTitle}>No notifications yet</Text>
-                    <Text style={styles.emptyText}>
-                        Booking and refund updates will appear here once they arrive.
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={notifications}
-                    renderItem={renderNotification}
-                    keyExtractor={(item) => item._id || item.id}
-                    refreshing={refreshing} onRefresh={() => void load()}
-                    contentContainerStyle={styles.list}
-                    showsVerticalScrollIndicator={false}
-                />
-            )}
+                ) : undefined}
+            />
 
             {/* Bottom Navigation */}
             <BottomNavigationFinal />

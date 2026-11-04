@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import {
   recordCampaignClick,
@@ -47,6 +48,7 @@ const SponsoredCampaignsViewAll = () => {
     useState(false);
 
   const loadingMoreRef = useRef(false);
+  const pageRequest = useRef(0);
 
   const getContext =
   useCallback(async () => {
@@ -67,6 +69,7 @@ return {
     async (
       targetPage: number,
       append: boolean,
+      refresh = false,
     ) => {
       if (
         append &&
@@ -75,11 +78,12 @@ return {
         return;
       }
 
+      const request = ++pageRequest.current;
       try {
         if (append) {
           loadingMoreRef.current = true;
           setLoadingMore(true);
-        } else {
+        } else if (!refresh) {
           setLoading(true);
         }
 
@@ -93,6 +97,7 @@ return {
             viewAll: true,
           })) as SponsoredCampaignsPage;
 
+        if (request !== pageRequest.current) return;
         setCampaigns((current) =>
           append
             ? [
@@ -117,9 +122,11 @@ return {
           error,
         );
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        loadingMoreRef.current = false;
+        if (request === pageRequest.current) {
+          setLoading(false);
+          setLoadingMore(false);
+          loadingMoreRef.current = false;
+        }
       }
     },
     [getContext],
@@ -128,6 +135,8 @@ return {
   useEffect(() => {
     loadPage(1, false);
   }, [loadPage]);
+
+  const { refreshing, refreshControl } = usePullToRefresh(() => loadPage(1, false, true));
 
   const openCampaign = (
     campaign: SponsoredCampaign,
@@ -234,6 +243,7 @@ return {
       </View>
 
       <FlatList
+        refreshControl={refreshControl}
         data={campaigns}
         keyExtractor={(item) => item._id}
         contentContainerStyle={
@@ -248,7 +258,7 @@ return {
         onEndReached={() => {
           if (
             hasMore &&
-            !loadingMoreRef.current
+            !refreshing && !loadingMoreRef.current
           ) {
             loadPage(page + 1, true);
           }

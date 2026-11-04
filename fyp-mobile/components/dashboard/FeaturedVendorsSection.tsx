@@ -1,7 +1,8 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedVendorsSection.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import {
   View,
@@ -43,10 +44,7 @@ export function FeaturedVendorsSection() {
   const [allVendors, setAllVendors] = useState<FeaturedVendorPublicEntry[]>([]);
   const [allLoading, setAllLoading] = useState(false);
 
-useEffect(() => {
-  let cancelled = false;
-
-  const loadFeaturedVendors = async () => {
+const loadFeaturedVendors = useCallback(async (signal: AbortSignal) => {
     try {
   const {
   discoveryCityId,
@@ -76,7 +74,7 @@ const featured =
         ? durationMinutes
         : undefined,
   });
-if (cancelled) {
+if (signal.aborted) {
   return;
 }
 
@@ -88,18 +86,12 @@ setVendors(featured);
         error,
       );
 
-      if (!cancelled) {
+      if (!signal.aborted) {
         setVendors([]);
       }
     }
-  };
-
-  void loadFeaturedVendors();
-
-  return () => {
-    cancelled = true;
-  };
 }, []);
+  useDashboardSectionLoad(loadFeaturedVendors);
    if (vendors.length === 0) {
     return null;
   }

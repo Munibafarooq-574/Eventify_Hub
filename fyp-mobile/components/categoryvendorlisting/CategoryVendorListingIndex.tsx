@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
 
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
@@ -19,7 +20,6 @@ import {
   FlatList,
   Image,
   Platform,
-  RefreshControl,
   StatusBar,
   StyleSheet,
   Text,
@@ -36,7 +36,6 @@ export default function App() {
   const [data, setData] = useState<any>([]);
   const [headerTitle, setHeaderTitle] = useState<string>("");
   const [checkingAvailability, setCheckingAvailability] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [vendorReviews, setVendorReviews] = useState<Record<string, any>>({});
   const [vendorPackages, setVendorPackages] = useState<Record<string, any[]>>({});
   const [loadingVendorDetails, setLoadingVendorDetails] = useState(false);
@@ -420,7 +419,7 @@ const fetchCategoryName = async () => {
   setHeaderTitle(categoryName);
 };
 
-const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData(); setRefreshing(false); }, [searchQuery, routeParamsKey]);
+const { refreshing, refreshControl } = usePullToRefresh(() => latestFetchData.current());
 
   const resultsLabel = useMemo(() => {
     const count = data?.length ?? 0;
@@ -671,7 +670,7 @@ return (
       </View>}
       {searchError && <TouchableOpacity onPress={() => fetchData()} style={{ padding: 12 }}><Text style={{ color: COLORS.primary }}>Could not load results. Tap to retry.</Text></TouchableOpacity>}
 
-      {checkingAvailability && (
+      {checkingAvailability && !refreshing && (
         <View style={styles.loadingBanner}>
           <ActivityIndicator size="small" color={COLORS.primary} />
           <Text style={styles.loadingText}>{eventTiming ? "Checking vendor availability..." : "Loading vendors..."}</Text>
@@ -684,7 +683,7 @@ return (
         keyExtractor={(item) => item._id}
         contentContainerStyle={[styles.list, data?.length === 0 && { flexGrow: 1 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+        refreshControl={refreshControl}
         ListEmptyComponent={renderEmptyState}
       />
     </View>

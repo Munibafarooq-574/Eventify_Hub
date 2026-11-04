@@ -1,3 +1,4 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 
 import getActiveCities from "@/services/getActiveCities";
@@ -7,7 +8,7 @@ import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -44,9 +45,9 @@ const RecommendedForYourEvent: React.FC = () => {
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
   const [cityNames, setCityNames] = useState<Record<string, string>>({});
 
-  const loadRecommended = useCallback(async () => {
+  const loadRecommended = useCallback(async (_signal?: AbortSignal, refreshing = false) => {
     try {
-      setLoading(true);
+      if (!refreshing) setLoading(true);
 
      const context =
   await getMarketplaceEventContext();
@@ -169,9 +170,7 @@ if (
     }
   }, []);
 
-  useEffect(() => {
-    loadRecommended();
-  }, [loadRecommended]);
+  useDashboardSectionLoad(loadRecommended);
 
   if (loading) {
     return (

@@ -1,8 +1,9 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import getPopularVendors, { TopVendor } from '@/services/getPopularVendors';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';import {
+import React, { useCallback, useState } from 'react';import {
   ActivityIndicator,
   FlatList,
   Image,
@@ -111,8 +112,8 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
 
-  const fetchVendors = useCallback(async () => {
-    setLoading(true);
+  const fetchVendors = useCallback(async (_signal?: AbortSignal, refreshing = false) => {
+    if (!refreshing) setLoading(true);
     setError(false);
     try {
       const data = await getPopularVendors(5);
@@ -126,9 +127,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchVendors();
-  }, [fetchVendors]);
+  useDashboardSectionLoad(fetchVendors);
 
 
   return (

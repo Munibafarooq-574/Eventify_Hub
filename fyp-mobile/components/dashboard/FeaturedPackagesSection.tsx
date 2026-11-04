@@ -1,7 +1,8 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -50,11 +51,7 @@ export function FeaturedPackagesSection() {
   >([]);
   const [allLoading, setAllLoading] = useState(false);
 
- useEffect(() => {
-  let cancelled = false;
-
-  const loadFeaturedPackages =
-  async () => {
+ const loadFeaturedPackages = useCallback(async (signal: AbortSignal) => {
     try {
       const {
         discoveryCityId,
@@ -86,7 +83,7 @@ export function FeaturedPackagesSection() {
               : undefined,
         });
 
-      if (cancelled) {
+      if (signal.aborted) {
         return;
       }
 
@@ -97,18 +94,12 @@ export function FeaturedPackagesSection() {
         error,
       );
 
-      if (!cancelled) {
+      if (!signal.aborted) {
         setPackages([]);
       }
     }
-  };
-
-  void loadFeaturedPackages();
-
-  return () => {
-    cancelled = true;
-  };
 }, []);
+  useDashboardSectionLoad(loadFeaturedPackages);
 
   if (packages.length === 0) {
     return null;

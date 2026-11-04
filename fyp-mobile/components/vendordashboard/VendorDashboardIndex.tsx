@@ -1,3 +1,4 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
@@ -396,6 +397,8 @@ const fetchSubscriptionAccess = React.useCallback(async () => {
         setInitialLoading(false);
     }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
 
+    const { refreshControl: subscriptionRefreshControl } = usePullToRefresh(fetchSubscriptionAccess);
+
     // Pull-to-refresh handler
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
@@ -616,16 +619,15 @@ const hasValidSubscription =
 
 if (!hasValidSubscription) {
     return (
-        <View
-            style={[
-                styles.container,
-                {
-                    flex: 1,
-                    justifyContent: "center",
-                    padding: 24,
-                    backgroundColor: "#FFFFFF",
-                },
-            ]}
+        <ScrollView
+            style={styles.container}
+            refreshControl={subscriptionRefreshControl}
+            contentContainerStyle={{
+                flexGrow: 1,
+                justifyContent: "center",
+                padding: 24,
+                backgroundColor: "#FFFFFF",
+            }}
         >
             <StatusBar barStyle="dark-content" />
 
@@ -788,7 +790,7 @@ if (!hasValidSubscription) {
                     Existing Client Chats
                 </Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     );
 }
     return (

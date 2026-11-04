@@ -1,3 +1,8 @@
+import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
+import { checkReviewPackageAvailability } from "@/services/checkReviewPackageAvailability";
+import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { API_BASE_URL } from "@/services/apiConfig";
+import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
 import { clearExpiredReplacementCart } from '@/services/clearExpiredReplacementCart';
@@ -36,6 +41,13 @@ const DISCOUNT_RED = '#C44D5C';
 
 const STEPS = ['Cart', 'Review', 'Payment', 'Confirm'];
 const CURRENT_STEP = 1; // Review is active
+const OFFLINE_NOTICE = "No internet connection. Reconnect and pull down to refresh.";
+
+function isConnectionError(error: unknown) {
+  return (axios.isAxiosError(error) && !error.response) ||
+    (error instanceof TypeError && /network|fetch/i.test(error.message)) ||
+    (error instanceof Error && /connection interrupted/i.test(error.message));
+}
 
 const OrderReviewScreen = () => {
   const [cartData, setCartData] = useState<any>(null);
@@ -43,6 +55,8 @@ const OrderReviewScreen = () => {
   const [guests, setGuests] = useState<number>(0);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [refreshNotice, setRefreshNotice] = useState('');
+  const connectivityRequest = useRef(0);
   const checkoutLock = useRef(false);
   const bookingSubmitted = useRef(false);
   const navigation = useNavigation();
@@ -153,10 +167,8 @@ try {
     selectedCity?.name || '',
   );
 } catch (error) {
-  console.error(
-    'Error loading cities:',
-    error,
-  );
+  if (isConnectionError(error) && connectivityRequest.current === 0) setRefreshNotice(OFFLINE_NOTICE);
+  reportMarketplaceLoadError('Could not load review cities:', error);
 
   setCityOptions([]);
   setEventCityName('');
@@ -701,6 +713,7 @@ const handleApplyPublicCoupon = async (
   pkg: any,
   coupon: any,
 ) => {
+  if (refreshing) return;
   const vendorId = String(
     vendor?.vendor?._id || '',
   );
@@ -861,6 +874,7 @@ const confirmPromotionReplacement = (
 const handleRemovePromotion = (
   promotionKey: string,
 ) => {
+  if (refreshing) return;
   setAppliedPromotions((current) => {
     const next = { ...current };
     delete next[promotionKey];
@@ -884,6 +898,7 @@ const handleApplyDiscountCode = async (
   vendor: any,
   pkg: any,
 ) => {
+  if (refreshing) return;
   const vendorId = String(
     vendor?.vendor?._id || '',
   );
@@ -1040,8 +1055,140 @@ const isInvalidCode =
   // Checkout
   // -----------------------------------------
 
+  useEffect(() => {
+    const checkConnection = async () => {
+      const request = ++connectivityRequest.current;
+      try {
+        await getActiveCities();
+      } catch (error) {
+        if (request === connectivityRequest.current && isConnectionError(error)) {
+          setRefreshNotice(OFFLINE_NOTICE);
+        }
+      }
+    };
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void checkConnection();
+    });
+    const focus = Platform.OS === 'android'
+      ? AppState.addEventListener('focus', checkConnection)
+      : undefined;
+    return () => {
+      connectivityRequest.current++;
+      subscription.remove();
+      focus?.remove();
+    };
+  }, []);
+
+  const { refreshing, refreshControl } = usePullToRefresh(async () => {
+    if (checkoutLock.current || applyingCouponId || applyingDiscountCodeKey) return;
+    ++connectivityRequest.current;
+
+    try {
+      const vendors: any[] = cartData?.vendors || [];
+      if (!vendors.length) {
+        await getActiveCities();
+        setRefreshNotice('');
+        return;
+      }
+
+      const eventDate = String(eventDetails?.eventDate || '').split('T')[0];
+      const eventStartTime = eventDetails?.startTime || eventDetails?.eventTime;
+      const eventDurationMinutes = Number(eventDetails?.durationMinutes);
+      const eventCityId = eventDetails?.eventCityId;
+      if (!eventDate || !eventStartTime || !eventCityId || !(eventDurationMinutes > 0)) {
+        setRefreshNotice('Your event details are incomplete. Go back and check the event details.');
+        return;
+      }
+
+      const promotions = { ...appliedPromotions };
+      const results = await Promise.all(vendors.map(async vendor => {
+        const vendorId = String(vendor.vendor?._id || '');
+        const latestPackages = await getVendorPackagesList(vendorId);
+
+        const packages = await Promise.all((vendor.packages || []).map(async (pkg: any) => {
+          const packageId = String(pkg.packageId || pkg._id || '');
+          const latest = latestPackages.find(item => String(item._id) === packageId);
+          const bookingType = pkg.bookingType || 'DURATION_BASED';
+          if (!latest || (latest.bookingType || 'DURATION_BASED') !== bookingType ||
+              (bookingType === 'DELIVERY_BASED' && !!latest.deliveryFeeType !== !!pkg.deliveryFeeType)) {
+            return { pkg, notice: `${pkg.packageName} has changed. Choose a package again in your cart.` };
+          }
+
+          const selectedDuration = Number(pkg.durationMinutes || eventDurationMinutes);
+          const price = bookingType === 'DURATION_BASED'
+            ? resolvePackagePrice(latest, selectedDuration).price
+            : Number(latest.price);
+          if (price === null || !Number.isFinite(price) || price <= 0) {
+            return { pkg, notice: `${pkg.packageName} no longer offers the selected price or duration.` };
+          }
+
+          const selectedWindow = bookingType === 'DURATION_BASED' ||
+            (bookingType === 'DELIVERY_BASED' && !latest.deliveryFeeType)
+            ? undefined : getResolvedServiceWindow(pkg) ?? undefined;
+          const available = bookingType === 'DELIVERY_BASED' && latest.deliveryFeeType && !selectedWindow
+            ? false
+            : await checkReviewPackageAvailability({
+                vendorId, packageId, eventDate, eventStartTime, eventCityId,
+                eventDurationMinutes: bookingType === 'DURATION_BASED' ? selectedDuration : eventDurationMinutes,
+                bookingType, window: selectedWindow, deliveryTimeZone: pkg.deliveryTimeZone,
+                replacementMode: !!eventDetails?.replacementVendorOrderId,
+              });
+          const updated = {
+            ...pkg,
+            price,
+            ...(bookingType === 'DELIVERY_BASED' && latest.deliveryFeeType
+              ? { deliveryFeeType: latest.deliveryFeeType, deliveryFee: latest.deliveryFee }
+              : {}),
+          };
+
+          const key = getPromotionKey(vendorId, packageId);
+          const promotion = promotions[key];
+          const originalAmount = getPackageAmount(vendor, updated);
+          if (promotion && originalAmount !== promotion.originalAmount) {
+            const user = await getUserData();
+            try {
+              const { data } = await axios.post(
+                `${API_BASE_URL}/vendor/growth/discount/coupon/validate?vendorId=${encodeURIComponent(vendorId)}`,
+                { code: promotion.promotionCode, orderAmount: originalAmount, clientId: user?._id, packageId },
+              );
+              promotions[key] = {
+                ...promotion,
+                promotionId: data.discountEntryId,
+                originalAmount,
+                discountAmount: Number(data.discountAmount || 0),
+                finalAmount: Number(data.finalAmount),
+              };
+            } catch (error) {
+              if (!axios.isAxiosError(error) || ![400, 404, 409, 422].includes(error.response?.status || 0)) throw error;
+              return { pkg, notice: `The offer on ${pkg.packageName} could not be applied to the latest price. Remove the offer and refresh.` };
+            }
+          }
+          return {
+            pkg: updated,
+            notice: available ? '' : `The selected time for ${pkg.packageName} is no longer available. Go back to choose another time.`,
+          };
+        }));
+        return {
+          vendor: { ...vendor, packages: packages.map(result => result.pkg) },
+          notice: packages.find(result => result.notice)?.notice,
+        };
+      }));
+
+      setCartData({ ...cartData, vendors: results.map(result => result.vendor) });
+      setAppliedPromotions(promotions);
+      const notice = results.find(result => result.notice)?.notice || '';
+      setRefreshNotice(notice);
+      if (!notice && !replacementDeadlinePassed) setCheckoutError('');
+    } catch (error) {
+      reportMarketplaceLoadError('Could not refresh Review Order:', error);
+      setRefreshNotice(isConnectionError(error)
+        ? OFFLINE_NOTICE
+        : 'Unable to check the latest price and availability. Pull down to try again.');
+    }
+  });
+
   const handleCheckout = async () => {
-    if (checkoutLock.current) return;
+    if (checkoutLock.current || refreshing || refreshNotice) return;
     checkoutLock.current = true;
     setCheckoutError('');
     setPlacingOrder(true);
@@ -1187,6 +1334,10 @@ const isInvalidCode =
       }
    } catch (error: any) {
   reportMarketplaceLoadError('Booking checkout unavailable', error);
+  if (isConnectionError(error)) {
+    setRefreshNotice(OFFLINE_NOTICE);
+    return;
+  }
   const message = error?.message || 'Failed to place order. Please try again.';
   if (submittedEvent?.replacementVendorOrderId && /replacement.*only.*before.*event.*starts/i.test(message)) {
     try {
@@ -1275,6 +1426,7 @@ const isInvalidCode =
 
       <ScrollView
         style={{ flex: 1 }}
+        refreshControl={refreshControl}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -2367,6 +2519,12 @@ const packages =
 </Text>
           </View>
 
+          {refreshNotice ? (
+            <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.refreshNotice}>
+              <Text style={styles.refreshNoticeText}>{refreshNotice}</Text>
+            </View>
+          ) : null}
+
           {checkoutError ? (
             <View accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ backgroundColor: '#FDEBEC', padding: 12, borderRadius: 12, marginBottom: 10 }}>
               <Text style={{ color: '#9B2335', fontWeight: '700', marginBottom: 4 }}>Booking not submitted</Text>
@@ -2375,9 +2533,9 @@ const packages =
           ) : null}
 
           <TouchableOpacity
-            style={[styles.bookButton, placingOrder && styles.bookButtonDisabled]}
+            style={[styles.bookButton, (placingOrder || refreshing || (!!refreshNotice && !replacementDeadlinePassed)) && styles.bookButtonDisabled]}
             onPress={replacementDeadlinePassed ? () => router.replace('/myevents') : handleCheckout}
-            disabled={placingOrder}
+            disabled={placingOrder || refreshing || (!!refreshNotice && !replacementDeadlinePassed)}
             activeOpacity={0.85}
           >
             {placingOrder ? (
@@ -2399,6 +2557,8 @@ export default OrderReviewScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PRIMARY_LIGHT },
+  refreshNotice: { backgroundColor: '#FDEBEC', padding: 12, borderRadius: 12, marginBottom: 10 },
+  refreshNoticeText: { color: '#74202C', lineHeight: 20 },
 
   loadingContainer: {
     flex: 1,

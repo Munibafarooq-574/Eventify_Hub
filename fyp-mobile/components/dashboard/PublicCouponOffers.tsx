@@ -1,3 +1,4 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { getPublicDashboardCoupons } from '@/services/getPublicDashboardCoupons';
 import { router } from 'expo-router';
@@ -249,8 +250,7 @@ const PublicCouponOffers: React.FC = () => {
     if (w > 0 && Math.abs(w - sectionW) > 0.5) setSectionW(w);
   };
 
-  useEffect(() => {
-    const loadCoupons = async () => {
+  const loadCoupons = useCallback(async () => {
       try {
         const result = await getPublicDashboardCoupons(HOME_LIMIT);
         setCoupons(Array.isArray(result) ? result : []);
@@ -260,10 +260,8 @@ const PublicCouponOffers: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    loadCoupons();
   }, []);
+  useDashboardSectionLoad(loadCoupons);
 
   const stopAutoScroll = useCallback(() => {
     if (intervalRef.current) {

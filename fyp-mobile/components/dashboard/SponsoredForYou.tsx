@@ -1,3 +1,4 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import type { ComponentRef } from 'react';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/dashboard/SponsoredForYou.tsx
@@ -150,9 +151,9 @@ const [allLoading, setAllLoading] = useState(false);
     Record<string, number>
   >({});
 
-  const loadCampaigns = useCallback(async () => {
+  const loadCampaigns = useCallback(async (_signal?: AbortSignal, refreshing = false) => {
   try {
-    setLoading(true);
+    if (!refreshing) setLoading(true);
 
    const {
   discoveryCityId,
@@ -184,9 +185,7 @@ const [allLoading, setAllLoading] = useState(false);
   }
 }, []);
 
-  useEffect(() => {
-    loadCampaigns();
-  }, [loadCampaigns]);
+  useDashboardSectionLoad(loadCampaigns);
 
 
   /*

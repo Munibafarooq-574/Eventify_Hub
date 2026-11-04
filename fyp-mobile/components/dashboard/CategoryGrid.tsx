@@ -1,7 +1,8 @@
+import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import getAllCategories from '@/services/getAllCategories';
 import { saveSecureData } from '@/store';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const COLORS = {
@@ -68,10 +69,7 @@ const CategoryItem: React.FC<{ item: ICategory }> = ({ item }) => (
 
 const CategoryGrid: React.FC = () => {
   const [categories, setCategories] = useState<ICategory[]>([]);
-  useEffect(() => {
-    getCategories();
-  }, []);
-  const getCategories = async () => {
+  const getCategories = useCallback(async () => {
     const response = await getAllCategories();
 
     // Show categories alphabetically (A → Z) by name.
@@ -81,7 +79,8 @@ const CategoryGrid: React.FC = () => {
 
     await saveSecureData("categories", JSON.stringify(sortedResponse));
     setCategories(sortedResponse);
-  }
+  }, []);
+  useDashboardSectionLoad(getCategories);
   return (
     <View style={styles.container}>
             <View style={styles.hdrRow}>
