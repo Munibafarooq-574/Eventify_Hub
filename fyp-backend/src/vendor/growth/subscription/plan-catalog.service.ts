@@ -18,8 +18,8 @@ export const PLAN_KEY = /^[a-z][a-z0-9-]{0,63}$/;
 // Use the same customer-facing wording in the admin catalog and vendor plans.
 // Only feature keys with existing app behavior are exposed.
 const FEATURE_LABELS: Partial<Record<FeatureKey, string>> = {
-  [FeatureKey.FEATURED_VENDOR]: 'Growth visibility & featured eligibility',
-  [FeatureKey.FEATURED_PACKAGE]: 'Featured packages',
+  [FeatureKey.FEATURED_VENDOR]: 'Featured vendor slots',
+  [FeatureKey.FEATURED_PACKAGE]: 'Featured package slots',
   [FeatureKey.PROMOTIONAL_BADGES]: 'Promotional badges',
   [FeatureKey.COUPONS]: 'Coupons',
   [FeatureKey.DISCOUNT_CODES]: 'Discount codes',
@@ -82,28 +82,36 @@ export class PlanCatalogService {
         ? 'Price not configured'
         : `Rs. ${plan.monthlyPrice.toLocaleString('en-PK')} / month`,
       features: Object.fromEntries(features.map(feature => [feature.key, enabled.has(feature.key)])),
-      featureLabels: [...new Set([
+      featureLabels: [
         ...(key === SubscriptionPlan.FREE ? [] : CORE_BENEFITS),
         ...([
-          [LimitKey.MAX_PACKAGES, 'Up to', 'packages'],
-          [LimitKey.MAX_PORTFOLIO_IMAGES, 'Up to', 'portfolio images'],
-          [LimitKey.MAX_IMAGES_PER_PACKAGE, 'Up to', 'images per package'],
-          [LimitKey.MONTHLY_CAMPAIGN_LIMIT, 'Up to', 'promotional campaigns per month'],
-        ] as const).filter(([limit]) => plan.limits[limit] > 0 && (limit !== LimitKey.MONTHLY_CAMPAIGN_LIMIT || enabled.has(FeatureKey.CAMPAIGNS)))
-          .map(([limit, prefix, label]) => `${prefix} ${plan.limits[limit]} ${label}`),
-        ...features.filter(feature => enabled.has(feature.key) &&
-          !(feature.key === FeatureKey.FEATURED_PACKAGE && enabled.has(FeatureKey.FEATURED_VENDOR)) &&
-          !(feature.key === FeatureKey.BUSINESS_INSIGHTS && enabled.has(FeatureKey.ADVANCED_ANALYTICS))
-        ).map(feature => {
-          if (feature.key === FeatureKey.FEATURED_VENDOR && !enabled.has(FeatureKey.FEATURED_PACKAGE)) {
-            return 'Featured vendor visibility';
-          }
-          if (feature.key === FeatureKey.ADVANCED_ANALYTICS && !enabled.has(FeatureKey.BUSINESS_INSIGHTS)) {
-            return 'Advanced analytics';
-          }
-          return feature.name;
-        }),
-      ])],
+          [LimitKey.MAX_PACKAGES, 'packages'],
+          [LimitKey.MAX_PORTFOLIO_IMAGES, 'portfolio images'],
+          [LimitKey.MAX_IMAGES_PER_PACKAGE, 'images per package'],
+        ] as const).filter(([limit]) => plan.limits[limit] > 0)
+          .map(([limit, label]) => `Up to ${plan.limits[limit]} ${label}`),
+        ...(enabled.has(FeatureKey.CAMPAIGNS) && plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.MONTHLY_CAMPAIGN_LIMIT]} promotional campaigns per month`] : []),
+        ...(enabled.has(FeatureKey.FEATURED_VENDOR) && plan.limits[LimitKey.FEATURED_VENDOR_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.FEATURED_VENDOR_LIMIT]} featured vendor ${plan.limits[LimitKey.FEATURED_VENDOR_LIMIT] === 1 ? 'slot' : 'slots'}`] : []),
+        ...(enabled.has(FeatureKey.FEATURED_PACKAGE) && plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT]} featured package ${plan.limits[LimitKey.FEATURED_PACKAGE_LIMIT] === 1 ? 'slot' : 'slots'}`] : []),
+        ...(enabled.has(FeatureKey.COUPONS) && plan.limits[LimitKey.COUPON_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.COUPON_LIMIT]} active coupons`] : []),
+        ...(enabled.has(FeatureKey.DISCOUNT_CODES) && plan.limits[LimitKey.DISCOUNT_CODE_LIMIT] > 0
+          ? [`Up to ${plan.limits[LimitKey.DISCOUNT_CODE_LIMIT]} active discount codes`] : []),
+        ...(enabled.has(FeatureKey.PROMOTIONAL_BADGES) ? ['Promotional badges'] : []),
+        ...(enabled.has(FeatureKey.GROWTH_ANALYTICS) && !enabled.has(FeatureKey.ADVANCED_ANALYTICS)
+          ? ['Growth analytics'] : []),
+        ...(enabled.has(FeatureKey.ADVANCED_ANALYTICS) && enabled.has(FeatureKey.BUSINESS_INSIGHTS)
+          ? ['Advanced analytics & business insights']
+          : enabled.has(FeatureKey.ADVANCED_ANALYTICS)
+            ? ['Advanced analytics']
+            : enabled.has(FeatureKey.BUSINESS_INSIGHTS) ? ['Business insights'] : []),
+        ...(enabled.has(FeatureKey.PREMIUM_BADGE) ? ['Premium Partner visibility'] : []),
+        // Campaign analytics stays available in feature access, but is not
+        // advertised as a second benefit alongside promotional campaigns.
+      ],
     };
   }
 
