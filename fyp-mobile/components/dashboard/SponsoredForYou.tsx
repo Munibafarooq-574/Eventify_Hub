@@ -11,7 +11,7 @@ import getSponsoredCampaigns, {
   SponsoredCampaign,
 } from "@/services/getSponsoredCampaigns";
 import { Ionicons } from "@expo/vector-icons";
-import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
+import getMarketplaceEventContext, { loadLocalMarketplaceItems } from "@/services/getMarketplaceEventContext";
 import { router } from "expo-router";
 import React, {
   useCallback,
@@ -88,6 +88,7 @@ const PAGE_BG = "#FDF0F7";
 const ALL_LIMIT = 100; // View All mein max kitne campaigns
 
 const SponsoredForYou: React.FC = () => {
+  const [fallbackLabel, setFallbackLabel] = useState('');
   const [campaigns, setCampaigns] = useState<
     SponsoredCampaign[]
   >([]);
@@ -155,24 +156,13 @@ const [allLoading, setAllLoading] = useState(false);
   try {
     if (!refreshing) setLoading(true);
 
-   const {
-  discoveryCityId,
-  categoryIds,
-} = await getMarketplaceEventContext();
-
-    const result =
-    await getSponsoredCampaigns({
-      eventCityId:
-      discoveryCityId,
-      categoryIds,
-      limit: 4,
+    const context = await getMarketplaceEventContext();
+    const { items, fallbackLabel: label } = await loadLocalMarketplaceItems(context, async eventCityId => {
+      const result = await getSponsoredCampaigns({ eventCityId, categoryIds: context.categoryIds, limit: 4 });
+      return Array.isArray(result) ? result : [];
     });
-
-    setCampaigns(
-      Array.isArray(result)
-        ? result.slice(0, 4)
-        : [],
-    );
+    setCampaigns(items.slice(0, 4));
+    setFallbackLabel(label);
   } catch (error) {
     reportMarketplaceLoadError(
       "Sponsored campaigns error:",
@@ -652,7 +642,7 @@ const openViewAll = async () => {
       await getMarketplaceEventContext();
 
     const result = await getSponsoredCampaigns({
-      eventCityId: discoveryCityId,
+      eventCityId: fallbackLabel ? undefined : discoveryCityId,
       categoryIds,
       limit: ALL_LIMIT,
     });
@@ -779,7 +769,7 @@ return (
     <View style={styles.sectionHeader}>
       <View style={styles.headerLeft}>
         <View style={styles.headerAccent} />
-        <Text style={styles.sectionTitle}>{SECTION_TITLE}</Text>
+        <Text style={styles.sectionTitle}>{fallbackLabel ? `${SECTION_TITLE} · ${fallbackLabel}` : SECTION_TITLE}</Text>
       </View>
 
       <TouchableOpacity activeOpacity={0.7} onPress={openViewAll}>

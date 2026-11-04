@@ -1941,12 +1941,16 @@ Toast.show({
           );
         }
 
+        await growthApi.post('/auth/marketplace-cart', {
+          eventCityId: String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || ''),
+          services: cart.vendors.map((entry: any) => ({ vendorId: entry.vendorId || entry.vendor?._id })),
+        });
         await saveSecureData('cartData', JSON.stringify(cart));
         setAddedPackages(current => [...current, currentPackageId]);
         showCartNotice('Added to cart', `${pkg.packageName} · Rs. ${resolvedPrice.toLocaleString()}`);
       } catch (error) {
         reportMarketplaceLoadError('Could not add package to cart:', error);
-        showCartNotice('Could not add to cart', 'Please try again.', true);
+        showCartNotice('Could not add to cart', error instanceof Error ? error.message : 'Please try again.', true);
       } finally {
         addingToCartRef.current = false;
         setAddingToCart(false);
@@ -1970,7 +1974,7 @@ Toast.show({
           }
 
           const vendor = await growthApi.get<any>(
-            `/vendor?userId=${encodeURIComponent(vendorId)}`,
+            `/vendor/marketplace-profile?marketplaceVendorId=${encodeURIComponent(vendorId)}`,
           );
 
           // Resolve the saved category for the shared client/owner profile.

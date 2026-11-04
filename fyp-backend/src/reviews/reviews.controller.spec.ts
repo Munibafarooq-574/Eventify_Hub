@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsController } from './reviews.controller';
@@ -19,7 +20,7 @@ describe('ReviewsController', () => {
                 { provide: ReviewsService, useValue: mockReviewsService },
                 { provide: FileUploadService, useValue: {} },
             ],
-        }).compile();
+        }).overrideGuard(MarketplaceGuard).useValue({ canActivate: () => true }).compile();
 
         controller = module.get<ReviewsController>(ReviewsController);
     });

@@ -1,10 +1,11 @@
 import getAllCategories from "@/services/getAllCategories";
-import { getSecureData } from "@/store";
+import { getSecureData, getUserData } from "@/store";
 
 export interface MarketplaceEventContext {
   eventId?: string;
   eventCityId?: string;
   discoveryCityId?: string;
+  marketplaceCountryCode?: string;
   eventAddress?: string;
 
   eventDate?: string;
@@ -105,30 +106,15 @@ export default async function getMarketplaceEventContext(): Promise<MarketplaceE
   const raw =
   await getSecureData("eventDetails");
 
-const rawUser =
-  await getSecureData("user");
+const user = await getUserData();
+const marketplaceCountryCode = cleanString(user?.marketplaceCountryCode);
 
-let clientCityId:
-  | string
-  | undefined;
-
-if (rawUser) {
-  try {
-    const parsedUser =
-      JSON.parse(rawUser);
-
-    clientCityId =
-      cleanString(
-        parsedUser?.clientCityId,
-      );
-  } catch {
-    clientCityId = undefined;
-  }
-}
+const clientCityId = cleanString(user?.clientCityId);
 
   if (!raw) {
   return {
     eventCityId: undefined,
+    marketplaceCountryCode,
     discoveryCityId:
       clientCityId,
     selectedServices: [],
@@ -265,6 +251,7 @@ if (
     return {
       eventId,
       eventCityId,
+      marketplaceCountryCode,
       discoveryCityId,
       eventAddress,
       eventDate,
@@ -294,4 +281,16 @@ if (
       hasAvailabilityContext: false,
     };
   }
+}
+export async function loadLocalMarketplaceItems<T>(
+  context: MarketplaceEventContext,
+  load: (cityId?: string) => Promise<T[]>,
+) {
+  const local = await load(context.discoveryCityId);
+  if (local.length || context.eventCityId || !context.discoveryCityId) {
+    return { items: local, fallbackLabel: '' };
+  }
+
+  const country = context.marketplaceCountryCode === 'US' ? 'the United States' : 'Pakistan';
+  return { items: await load(), fallbackLabel: `Other cities in ${country}` };
 }

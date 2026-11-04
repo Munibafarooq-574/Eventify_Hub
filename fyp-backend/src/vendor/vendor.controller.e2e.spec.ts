@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 import { VendorAnalyticsService } from './vendor-analytics.service';
 
 // import { Test, TestingModule } from '@nestjs/testing';
@@ -208,7 +209,7 @@ describe('VendorController - Unit Tests', () => {
         { provide: VendorAnalyticsService, useValue: {} },
         { provide: FileUploadService, useValue: {} },
       ],
-    }).compile();
+    }).overrideGuard(MarketplaceGuard).useValue({ canActivate: () => true }).compile();
 
     controller = moduleRef.get<VendorController>(VendorController);
   });

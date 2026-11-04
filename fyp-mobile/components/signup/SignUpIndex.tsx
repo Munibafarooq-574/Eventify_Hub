@@ -39,6 +39,7 @@ const [phone, setPhone] = useState("");
 const [password, setPassword] = useState("");
 const [confirmPassword, setConfirmPassword] = useState("");
 
+const [countryCode, setCountryCode] = useState("PK");
 const [role, setRole] = useState("");
 const [categoryId, setCategoryId] = useState("");
 const [cities, setCities] =
@@ -158,7 +159,7 @@ useEffect(() => {
 
 const filteredCities = cities.filter(
   (city) =>
-    city.name
+    city.countryCode === countryCode && city.name
       .toLowerCase()
       .includes(
         citySearch
@@ -306,6 +307,10 @@ const handleRegister = async () => {
         text1: "Category Required",
         text2: "Please select your business category first.",
       });
+      return;
+    }
+    if (role !== "Vendor" && !cities.some(city => city._id === clientCityId && city.countryCode === countryCode)) {
+      Toast.show({ type: "error", text1: "Choose your country and city" });
       return;
     }
     setIsLoading(true);
@@ -569,6 +574,20 @@ return (
       {/* Client City */}
 {(role === "Client" || role === "Organizer") && (
   <>
+    <Text style={styles.label}>Country</Text>
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      {[["PK", "Pakistan"], ["US", "United States"]].map(([code, label]) => (
+        <TouchableOpacity key={code} style={styles.inputCard} accessibilityRole="button"
+          accessibilityState={{ selected: countryCode === code }} onPress={() => {
+            if (code === countryCode) return;
+            setCountryCode(code);
+            setClientCityId("");
+            setCitySearch("");
+          }}>
+          <Text>{countryCode === code ? "✓ " : ""}{label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
     <Text style={styles.label}>
       City
     </Text>

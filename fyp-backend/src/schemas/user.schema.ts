@@ -907,6 +907,9 @@ export class User extends Document {
 })
 clientCityId?: Types.ObjectId | null;
 
+  @Prop({ enum: ['PK', 'US'] })
+  marketplaceCountryCode?: string;
+
   @Prop()
   role: string;
 

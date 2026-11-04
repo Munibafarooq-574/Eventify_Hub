@@ -49,7 +49,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
      */
     const user = await this.userModel
       .findById(payload.id)
-      .select('_id role')
+      .select('_id role clientCityId marketplaceCountryCode')
       .lean();
 
     if (!user) {
@@ -61,6 +61,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: String(user._id),
       role: user.role,
+      clientCityId: user.clientCityId?.toString(),
+      marketplaceCountryCode: user.marketplaceCountryCode,
     };
   }
 }

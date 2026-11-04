@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.service.ts
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -128,6 +129,7 @@ private readonly emailService: EmailService,
 
 async getPublicDashboardCoupons(
   limit = 10,
+  marketplace?: MarketplaceScope,
 ): Promise<VendorDiscount[]> {
   const safeLimit = Math.min(
     Math.max(Number(limit) || 10, 1),
@@ -136,8 +138,13 @@ async getPublicDashboardCoupons(
 
   const now = new Date();
 
+  const vendorsInMarket = marketplace
+    ? await this.userModel.distinct('_id', { role: 'Vendor', businessCityId: { $in: marketplace.businessCityIds } })
+    : undefined;
+
   const coupons = await this.discountModel
     .find({
+      ...(vendorsInMarket && { vendorId: { $in: vendorsInMarket } }),
       type: DiscountEntryType.COUPON,
       status: DiscountStatus.ACTIVE,
       startDate: { $lte: now },

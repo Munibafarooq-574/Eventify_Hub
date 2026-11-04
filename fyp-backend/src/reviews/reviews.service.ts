@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../city/marketplace.guard';
 // src/reviews/reviews.service.ts
 
 import {
@@ -178,7 +179,7 @@ export class ReviewsService {
         };
     }
 
-    async getTopVendorsByRating(limit = 5) {
+    async getTopVendorsByRating(limit = 5, marketplace?: MarketplaceScope) {
     const safeLimit = Math.min(
         Math.max(Number(limit) || 5, 1),
         20,
@@ -402,16 +403,6 @@ export class ReviewsService {
             },
         },
 
-        // Highest popularity first
-        {
-            $sort: {
-                popularityScore: -1,
-                averageRating: -1,
-                totalReviews: -1,
-                completedOrders: -1,
-            },
-        },
-
         // Vendor details
         {
             $lookup: {
@@ -432,9 +423,27 @@ export class ReviewsService {
         {
             $match: {
                 'vendor.role': 'Vendor',
+                ...(marketplace && { 'vendor.businessCityId': { $in: marketplace.businessCityIds } }),
             },
         },
 
+        ...(marketplace ? [{
+            $addFields: {
+                servesMarketplaceCity: {
+                    $in: [new Types.ObjectId(marketplace.cityId), { $ifNull: ['$vendor.serviceLocationCityIds', []] }],
+                },
+            },
+        }] : []),
+        {
+            $sort: {
+                ...(marketplace && { servesMarketplaceCity: -1 as const }),
+                popularityScore: -1,
+                averageRating: -1,
+                totalReviews: -1,
+                completedOrders: -1,
+                _id: 1,
+            },
+        },
         {
             $limit: safeLimit,
         },
@@ -454,6 +463,7 @@ export class ReviewsService {
                 _id: 0,
 
                 serviceCities: { $setUnion: ['$serviceCities.name', []] },
+                servesMarketplaceCity: 1,
 
                 vendorId: '$_id',
 

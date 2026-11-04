@@ -1,3 +1,6 @@
+import { Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
+import { MarketplaceGuard } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/promotion/promotion.controller.ts
 
 import {
@@ -71,6 +74,7 @@ export class PromotionController {
   //
   // Public Featured Vendor discovery.
   @Get('featured-vendor/active')
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
   getActiveFeaturedVendors(
     @Query('limit') limit?: string,
     @Query('eventCityId') eventCityId?: string,
@@ -78,7 +82,8 @@ export class PromotionController {
     @Query('eventDate') eventDate?: string,
     @Query('startTime') startTime?: string,
     @Query('durationMinutes') durationMinutes?: string,
-  ) {
+    @Req() request?: any,
+) {
     const parsedLimit = Number(limit);
 
     return this.promotionService.getActiveFeaturedVendors(
@@ -86,6 +91,7 @@ export class PromotionController {
         ? parsedLimit
         : 10,
       {
+        marketplace: request?.marketplace,
         eventCityId:
           typeof eventCityId === 'string' &&
           eventCityId.trim()
@@ -169,6 +175,7 @@ durationMinutes:
 // &eventCityId=<cityId>
 // &categoryIds=<categoryId1>,<categoryId2>
 @Get('featured-package/active')
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
 getActiveFeaturedPackages(
   @Query('limit') limit?: string,
   @Query('eventCityId')
@@ -181,6 +188,7 @@ getActiveFeaturedPackages(
   startTime?: string,
   @Query('durationMinutes')
   durationMinutes?: string,
+  @Req() request?: any,
 ) {
   const parsedLimit = Number(limit);
 
@@ -190,6 +198,7 @@ getActiveFeaturedPackages(
       ? parsedLimit
       : 20,
     {
+      marketplace: request?.marketplace,
       eventCityId:
         typeof eventCityId === 'string' &&
         eventCityId.trim()

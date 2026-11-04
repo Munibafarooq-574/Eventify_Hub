@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../city/marketplace.guard';
 import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -65,7 +66,7 @@ export class VendorService {
 private readonly cityService: CityService,
 ) { }
 
-    async getAllVendorsByCategoryId(categoryId: string): Promise<User[]> {
+    async getAllVendorsByCategoryId(categoryId: string, marketplace?: MarketplaceScope): Promise<User[]> {
         // Validate the categoryId
         if (!Types.ObjectId.isValid(categoryId)) {
             throw new Error('Invalid categoryId');
@@ -77,6 +78,7 @@ private readonly cityService: CityService,
                 // Match vendors with the specified category and required fields
                 $match: {
                     role: 'Vendor',
+                    ...(marketplace && { businessCityId: { $in: marketplace.businessCityIds } }),
                     vendorApprovalStatus: VendorApprovalStatus.APPROVED,
                     buisnessCategory: new Types.ObjectId(categoryId),
                     contactDetails: { $exists: true, $ne: null },
@@ -1101,7 +1103,7 @@ async assertCanUploadPackageImages(
 
     return user;
 }
-    async findAllVendorPackagesForService(service: string, guests: number) {
+    async findAllVendorPackagesForService(service: string, guests: number, marketplace?: MarketplaceScope) {
         // Find category by service name (case-insensitive exact match)
         const categoryObj = await this.categoryModel.findOne({
             name: { $regex: new RegExp(`^${service}$`, 'i') }
@@ -1118,6 +1120,7 @@ async assertCanUploadPackageImages(
             {
                      $match: {
                 role: 'Vendor',
+                ...(marketplace && { businessCityId: { $in: marketplace.businessCityIds } }),
                 vendorApprovalStatus:
                     VendorApprovalStatus.APPROVED,
                 packages: {

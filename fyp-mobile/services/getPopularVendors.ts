@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from "axios";
+import { growthApi } from "./growthApiClient";
 
 export interface TopVendor {
     vendorId: string;
@@ -6,6 +6,7 @@ export interface TopVendor {
     totalReviews: number;
     completedOrders: number;
     serviceCities?: string[];
+    servesMarketplaceCity?: boolean;
     reliabilityScore: number;
     popularityScore: number;
     vendor: {
@@ -22,21 +23,5 @@ export interface TopVendor {
 }
 
 export default async function getPopularVendors(limit: number = 5): Promise<TopVendor[]> {
-    const url = `https://eventify-hub.onrender.com/reviews/top-vendors`;
-    // const url = `http://192.168.100.15:3000/reviews/top-vendors`;
-    const params = { limit };
-
-    const config: AxiosRequestConfig = {
-        method: "GET",
-        url,
-        params,
-    };
-
-    try {
-        const response = await axios(config);
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching top vendors:", error);
-        throw error;
-    }
+    return growthApi.get<TopVendor[]>(`/reviews/top-vendors?limit=${limit}`);
 }

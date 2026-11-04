@@ -1,3 +1,6 @@
+import { Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
+import { MarketplaceGuard } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/campaign/campaign.controller.ts
 
 import {
@@ -31,6 +34,7 @@ export class CampaignController {
   // =========================================================
 
   @Get('public/active')
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
 async getActiveSponsoredCampaigns(
   @Query('eventCityId')
   eventCityId?: string,
@@ -46,8 +50,10 @@ async getActiveSponsoredCampaigns(
 
   @Query('viewAll')
   viewAll = 'false',
+  @Req() request?: any,
 ) {
   return this.campaignService.getActiveSponsoredCampaigns({
+    marketplace: request?.marketplace,
     eventCityId,
     categoryIds: categoryIds
       ? categoryIds

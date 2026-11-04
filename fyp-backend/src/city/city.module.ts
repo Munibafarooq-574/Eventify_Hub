@@ -1,3 +1,5 @@
+import { User, UserSchema } from '../schemas/user.schema';
+import { MarketplaceGuard } from './marketplace.guard';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -13,6 +15,7 @@ import { CityService } from './city.service';
 @Module({
   imports: [
     MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
       {
         name: City.name,
         schema: CitySchema,
@@ -25,10 +28,11 @@ import { CityService } from './city.service';
   AdminCityController,
 ],
 
-  providers: [CityService],
+  providers: [CityService, MarketplaceGuard],
 
   exports: [
     CityService,
+    MarketplaceGuard,
     MongooseModule,
   ],
 })

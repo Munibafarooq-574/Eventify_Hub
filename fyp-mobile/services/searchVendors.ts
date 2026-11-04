@@ -1,9 +1,14 @@
-import axios from "axios";
+import { growthApi } from "./growthApiClient";
+
+export type VendorSearchResult = {
+    _id: string;
+    name: string;
+    contactDetails?: { brandName?: string };
+};
 
 const searchVendors = async (query: string) => {
     try {
-        const response = await axios.get(`https://eventify-hub.onrender.com/auth/search?q=${encodeURIComponent(query)}`);
-        return response.data;
+        return await growthApi.get<VendorSearchResult[]>(`/auth/search?q=${encodeURIComponent(query)}`);
     } catch (error) {
         console.error("Error searching users:", error);
         return [];

@@ -1,22 +1,5 @@
-//fyp-mobile/services/getAllVendorsByCategoryId.ts
-import axios, { AxiosRequestConfig } from "axios";
+import { growthApi } from "./growthApiClient";
 
-export default async function getAllVendorsByCategoryId(categoryId: string) {
-    const url = `https://eventify-hub.onrender.com/vendor/getVendorsByCategoryId?categoryId=${categoryId}`;
-    const config: AxiosRequestConfig = {
-        maxBodyLength: Infinity,
-        method: "GET",
-        url,
-    };
-
-    try {
-        const response = await axios(config);
-        return response.data;
-    } catch (error) {
-        console.error(
-    "Error fetching vendors by category:",
-    error
-);
-        throw error;
-    }
+export default function getAllVendorsByCategoryId(categoryId: string) {
+  return growthApi.get<any[]>(`/vendor/getVendorsByCategoryId?categoryId=${encodeURIComponent(categoryId)}`);
 }

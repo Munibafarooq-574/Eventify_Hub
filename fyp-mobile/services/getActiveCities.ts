@@ -11,7 +11,7 @@ export interface ActiveCity {
   stateProvinceName: string;
 }
 
-export default async function getActiveCities(): Promise<ActiveCity[]> {
-  const response = await axios.get(`${API_BASE_URL}/cities`);
+export default async function getActiveCities(countryCode?: string): Promise<ActiveCity[]> {
+  const response = await axios.get(`${API_BASE_URL}/cities`, { params: { countryCode } });
   return response.data;
 }

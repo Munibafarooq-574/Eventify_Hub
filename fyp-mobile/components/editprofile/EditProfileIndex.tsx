@@ -187,6 +187,9 @@ const OrganizerEditProfileScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputContainer}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/marketplace-location')}>
+                <Text style={styles.label}>Change marketplace country or city</Text>
+              </TouchableOpacity>
               <Text style={styles.label}>Address (Optional)</Text>
               <View style={styles.inputRow}>
                 <Ionicons name="location-outline" size={16} color={PRIMARY} style={styles.inputIcon} />

@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ForbiddenException,
   Logger,
   NotFoundException,
   UnauthorizedException,
@@ -25,6 +26,7 @@ import { SearchVendorsDto } from './dto/search-vendors.dto';
 
 import { FileUploadService } from 'src/file-upload/file-upload.service';
 import { SubscriptionService } from '../vendor/growth/subscription/subscription.service';
+import { isClientRole, MarketplaceScope } from '../city/marketplace.guard';
 import { CityService } from '../city/city.service';
 import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { VendorAvailabilityService } from '../vendor-availability/vendor-availability.service';
@@ -208,14 +210,9 @@ private readonly availabilityService: VendorAvailabilityService,
 // CLIENT CITY VALIDATION
 // =====================================================
 
-if (
-  isClient &&
-  registerDto.clientCityId
-) {
-  await this.cityService.requireActiveCity(
-    registerDto.clientCityId,
-  );
-}
+    const marketplace = isClient
+      ? await this.requireMarketplaceCity(registerDto.clientCityId)
+      : undefined;
 
     // =====================================================
     // CHECK EXISTING USER
@@ -272,6 +269,7 @@ if (
       isClient &&
       registerDto.clientCityId
     ) {
+      userPayload.marketplaceCountryCode = marketplace?.countryCode;
       userPayload.clientCityId =
         new Types.ObjectId(
           registerDto.clientCityId,
@@ -346,6 +344,29 @@ if (
     } = rawUser;
 
     return safeUser;
+  }
+
+  private async requireMarketplaceCity(cityId?: string) {
+    if (typeof cityId !== 'string' || !cityId) throw new BadRequestException('Choose your country and city.');
+    const city = await this.cityService.requireActiveCity(cityId);
+    if (!['PK', 'US'].includes(city.countryCode)) {
+      throw new BadRequestException('Choose a city in Pakistan or the United States.');
+    }
+    return city;
+  }
+
+  async getMarketplaceLocation(actor: { role: string; clientCityId?: string; marketplaceCountryCode?: string }) {
+    const scope = isClientRole(actor.role) ? await this.cityService.getMarketplaceScope(actor) : null;
+    return { countryCode: scope?.countryCode ?? null, cityId: scope?.cityId ?? null };
+  }
+
+  async updateMarketplaceLocation(actor: { id: string; role: string }, cityId?: string) {
+    if (!isClientRole(actor.role)) throw new ForbiddenException('Only clients can change their marketplace.');
+    const city = await this.requireMarketplaceCity(cityId);
+    await this.userModel.updateOne({ _id: actor.id }, {
+      $set: { clientCityId: city._id, marketplaceCountryCode: city.countryCode },
+    });
+    return { cityId: String(city._id), countryCode: city.countryCode };
   }
 
   async login(
@@ -713,6 +734,7 @@ async searchUsers(
   async searchVendorsByFilters(
     filters:
       SearchVendorsDto,
+    marketplace?: MarketplaceScope,
   ): Promise<any[]> {
     console.log(
       'Filters',
@@ -738,6 +760,7 @@ async searchUsers(
         await this.userModel
           .find({
             role: 'Vendor',
+            ...(marketplace && { businessCityId: { $in: marketplace.businessCityIds } }),
           })
 
           /**
@@ -772,6 +795,7 @@ async searchUsers(
 
     const query: any = {
       role: 'Vendor',
+      ...(marketplace && { businessCityId: { $in: marketplace.businessCityIds } }),
     };
 
     // =====================================================

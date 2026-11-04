@@ -5,7 +5,7 @@ import getActiveCities from "@/services/getActiveCities";
 import getAllCategories from "@/services/getAllCategories";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import searchVendorsWithFilters from "@/services/searchVendorsWithFilters";
-import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
+import getMarketplaceEventContext, { loadLocalMarketplaceItems } from "@/services/getMarketplaceEventContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -37,6 +37,7 @@ const COLORS = {
 };
 
 const RecommendedForYourEvent: React.FC = () => {
+  const [fallbackLabel, setFallbackLabel] = useState('');
   const [vendors, setVendors] = useState<any[]>([]);
   const [reviews, setReviews] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -60,22 +61,18 @@ const {
   categoryIds,
 } = context;
 
-if (
-  !eventCityId ||
-  !eventDate ||
-  !startTime ||
-  !durationMinutes ||
-  categoryIds.length === 0
-) {
-  setVendors([]);
-  return;
-}
+const hasEventSchedule = !!(eventCityId && eventDate && startTime && durationMinutes && categoryIds.length);
+const fallback = hasEventSchedule ? null : await loadLocalMarketplaceItems(
+  context,
+  cityId => searchVendorsWithFilters({ eventCityId: cityId }),
+);
+setFallbackLabel(fallback?.fallbackLabel || '');
 
       /*
        * Reuse the existing backend marketplace discovery.
        * Do NOT create a frontend ranking algorithm.
        */
-      const resultsPerCategory = await Promise.all(
+      const resultsPerCategory = fallback ? [fallback.items] : await Promise.all(
         categoryIds.map((categoryId: string) =>
           searchVendorsWithFilters({
           categoryId,
@@ -291,7 +288,7 @@ if (
       <View style={styles.hdrRow}>
         <View style={styles.hdrLeft}>
           <View style={styles.hdrAccent} />
-          <Text style={styles.hdrTitle}>Recommended for Your Event</Text>
+          <Text style={styles.hdrTitle}> {fallbackLabel ? `Recommended for You · ${fallbackLabel}` : 'Recommended for You'}</Text>
         </View>
 
         <TouchableOpacity

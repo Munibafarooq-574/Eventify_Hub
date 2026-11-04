@@ -1,3 +1,4 @@
+import { growthApi } from '@/services/growthApiClient';
 //fyp-mobile/components/EventDetailsForm/EventDetailsFormIndex.tsx
 import getAllCategories from "@/services/getAllCategories";
 import { saveSecureData, getSecureData } from "@/store";
@@ -258,7 +259,8 @@ useEffect(() => {
     try {
       setCitiesLoading(true);
 
-      const response = await getActiveCities();
+      const location = await growthApi.get<{ countryCode: string | null }>('/auth/marketplace-location');
+      const response = location.countryCode ? await getActiveCities(location.countryCode) : [];
 
 setCities(
   Array.isArray(response)

@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 
 //fyp-backend/src/order/order.controller.ts
 import {
@@ -44,7 +45,7 @@ export class OrderController {
     }
 
       @Post()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
 async placeOrder(
   @Request() req: any,
   @Body() body: {

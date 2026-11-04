@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
 
 //fyp-backend/src/order/order.controller.spec.ts
@@ -27,7 +28,7 @@ describe('OrderController - Unit Tests', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrderController],
       providers: [{ provide: OrderService, useValue: service }],
-    }).compile();
+    }).overrideGuard(MarketplaceGuard).useValue({ canActivate: () => true }).compile();
 
     controller = module.get<OrderController>(OrderController);
   });

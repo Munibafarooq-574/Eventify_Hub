@@ -96,6 +96,7 @@ const ItemCard: React.FC<{
       {!!item.vendor.contactDetails?.brandName && (
         <Text style={styles.location} numberOfLines={1}>{item.vendor.contactDetails.brandName}</Text>
       )}
+      {item.servesMarketplaceCity === false && <Text style={styles.location}>Other cities in your country</Text>}
       {!!item.serviceCities?.length && (
         <Text style={styles.location} numberOfLines={fullWidth ? undefined : 2}>
           {item.serviceCities.join(', ')}

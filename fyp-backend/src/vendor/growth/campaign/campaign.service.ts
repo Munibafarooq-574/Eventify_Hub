@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../../../city/marketplace.guard';
 import {
   BadRequestException,
   ForbiddenException,
@@ -952,6 +953,7 @@ if (
   // =========================================================
 
     async getActiveSponsoredCampaigns(options?: {
+  marketplace?: MarketplaceScope;
   eventCityId?: string;
   categoryIds?: string[];
   page?: number;
@@ -1071,6 +1073,7 @@ if (
     },
 
     role: 'Vendor',
+    ...(options?.marketplace && { businessCityId: { $in: options.marketplace.businessCityIds } }),
   };
 
   /*

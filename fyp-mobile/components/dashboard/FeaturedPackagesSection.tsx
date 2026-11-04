@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { getActiveFeaturedPackages } from '../../services/getActiveFeaturedPackages';
 import { FeaturedPackagePublicEntry } from '../../types/promotion.types';
-import getMarketplaceEventContext from '../../services/getMarketplaceEventContext';
+import getMarketplaceEventContext, { loadLocalMarketplaceItems } from '../../services/getMarketplaceEventContext';
 
 const PAGE_BG = '#FDF0F7';
 const ALL_LIMIT = 50;
@@ -40,6 +40,7 @@ const COLORS = {
 
 export function FeaturedPackagesSection() {
   const router = useRouter();
+  const [fallbackLabel, setFallbackLabel] = useState('');
 
   const [packages, setPackages] = useState<
     FeaturedPackagePublicEntry[]
@@ -53,41 +54,25 @@ export function FeaturedPackagesSection() {
 
  const loadFeaturedPackages = useCallback(async (signal: AbortSignal) => {
     try {
-      const {
-        discoveryCityId,
-        categoryIds,
-        eventDate,
-        startTime,
-        durationMinutes,
-        hasAvailabilityContext,
-      } =
-        await getMarketplaceEventContext();
+      const context = await getMarketplaceEventContext();
+  const { categoryIds, eventDate, startTime, durationMinutes, hasAvailabilityContext } = context;
+  const { items, fallbackLabel: label } = await loadLocalMarketplaceItems(context, eventCityId =>
+    getActiveFeaturedPackages({
+      limit: 5,
+      eventCityId,
+      categoryIds,
+      eventDate: hasAvailabilityContext ? eventDate : undefined,
+      startTime: hasAvailabilityContext ? startTime : undefined,
+      durationMinutes: hasAvailabilityContext ? durationMinutes : undefined,
+    }),
+  );
 
-      const featured =
-        await getActiveFeaturedPackages({
-          limit: 5,
-          eventCityId:
-            discoveryCityId,
-          categoryIds,
-          eventDate:
-            hasAvailabilityContext
-              ? eventDate
-              : undefined,
-          startTime:
-            hasAvailabilityContext
-              ? startTime
-              : undefined,
-          durationMinutes:
-            hasAvailabilityContext
-              ? durationMinutes
-              : undefined,
-        });
-
-      if (signal.aborted) {
+  if (signal.aborted) {
         return;
       }
 
-      setPackages(featured);
+      setPackages(items);
+      setFallbackLabel(label);
     } catch (error) {
       reportMarketplaceLoadError(
         '[Featured Packages] Failed to load:',
@@ -137,7 +122,7 @@ export function FeaturedPackagesSection() {
 
       const result = await getActiveFeaturedPackages({
         limit: ALL_LIMIT,
-        eventCityId: discoveryCityId,
+        eventCityId: fallbackLabel ? undefined : discoveryCityId,
         categoryIds,
         eventDate: hasAvailabilityContext ? eventDate : undefined,
         startTime: hasAvailabilityContext ? startTime : undefined,
@@ -207,7 +192,7 @@ export function FeaturedPackagesSection() {
       <View style={styles.hdrRow}>
         <View style={styles.hdrLeft}>
           <View style={styles.hdrAccent} />
-          <Text style={styles.hdrTitle}>Featured Packages</Text>
+          <Text style={styles.hdrTitle}>{fallbackLabel ? `Featured Packages · ${fallbackLabel}` : 'Featured Packages'}</Text>
         </View>
 
         <TouchableOpacity activeOpacity={0.7} onPress={openViewAll}>
@@ -233,7 +218,7 @@ export function FeaturedPackagesSection() {
             <View style={styles.mSide} />
 
             <View style={styles.mTitleWrap}>
-              <Text style={styles.mTitle}>Featured Packages</Text>
+              <Text style={styles.mTitle}>{fallbackLabel ? `Featured Packages · ${fallbackLabel}` : 'Featured Packages'}</Text>
               <View style={styles.mUnderline} />
               <Text style={styles.mSubtitle}>
                 {allLoading

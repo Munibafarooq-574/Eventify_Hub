@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 //fyp-backend/src/reviews/reviews.controller.ts
 import {
     Body,
@@ -108,8 +109,10 @@ async uploadReviewMedia(
 
     // GET /reviews/top-vendors
   @Get('top-vendors')
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
 async getTopVendors(
     @Query('limit') limit?: string,
+  @Req() request?: any,
 ) {
     const parsedLimit = Number(limit);
 
@@ -117,6 +120,7 @@ async getTopVendors(
         Number.isFinite(parsedLimit) && parsedLimit > 0
             ? parsedLimit
             : 5,
+        request?.marketplace,
     );
 }
 

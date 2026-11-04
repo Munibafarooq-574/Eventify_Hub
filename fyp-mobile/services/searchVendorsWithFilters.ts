@@ -1,5 +1,5 @@
-import axios from "axios";
-import { API_BASE_URL } from "./apiConfig";
+import { growthApi } from "./growthApiClient";
+
 
 const searchVendorsWithFilters = async (filters: {
   cityIds?: string[];
@@ -84,11 +84,7 @@ if (filters.durationMinutes !== undefined) {
       );
     }
 
-    const response = await axios.get(
-      `${API_BASE_URL}/auth/vendor-search?${query.toString()}`,
-    );
-
-    return response.data;
+    return await growthApi.get<any[]>(`/auth/vendor-search?${query.toString()}`);
   } catch (error) {
     console.error(
       "Vendor search failed:",

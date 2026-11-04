@@ -44,6 +44,16 @@ export class CityService {
     .lean();
 }
 
+  async getMarketplaceScope(user: { clientCityId?: string; marketplaceCountryCode?: string }) {
+    if (!Types.ObjectId.isValid(user.clientCityId ?? '')) return null;
+    const city = await this.cityModel.findOne({ _id: user.clientCityId, isActive: true }).lean();
+    if (!city || !['PK', 'US'].includes(city.countryCode) ||
+        (user.marketplaceCountryCode && user.marketplaceCountryCode !== city.countryCode)) return null;
+
+    const businessCityIds = await this.cityModel.distinct('_id', { countryCode: city.countryCode, isActive: true });
+    return { countryCode: city.countryCode, cityId: String(city._id), businessCityIds };
+  }
+
   private validateCityTimeZone(value: string | undefined): string {
     if (typeof value !== 'string' || !value.trim()) {
       throw new BadRequestException('A valid IANA city timezone is required');

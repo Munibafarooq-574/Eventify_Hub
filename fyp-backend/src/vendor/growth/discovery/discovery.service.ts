@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discovery/discovery.service.ts
 //
 // Per spec section 4: "Do not make paid vendors completely replace
@@ -44,9 +45,9 @@ export class DiscoveryService {
    * stays the actual filter; this only reorders within it). Adds
    * `isFeatured` to each vendor so the UI can show a badge/tag.
    */
-  async getVendorsByCategory(categoryId: string) {
+  async getVendorsByCategory(categoryId: string, marketplace?: MarketplaceScope) {
     const [vendors, featuredIds] = await Promise.all([
-      this.vendorService.getAllVendorsByCategoryId(categoryId),
+      this.vendorService.getAllVendorsByCategoryId(categoryId, marketplace),
       this.promotionService.getActiveFeaturedVendorIds(),
     ]);
 
@@ -66,9 +67,9 @@ export class DiscoveryService {
    * stable-partition approach: featured packages first, original
    * relative order preserved otherwise. Adds `isFeatured` per package.
    */
-  async getPackagesByService(service: string, guests: number) {
+  async getPackagesByService(service: string, guests: number, marketplace?: MarketplaceScope) {
     const [packages, featuredPackageIds] = await Promise.all([
-      this.vendorService.findAllVendorPackagesForService(service, guests),
+      this.vendorService.findAllVendorPackagesForService(service, guests, marketplace),
       this.promotionService.getActiveFeaturedPackageIds(),
     ]);
 

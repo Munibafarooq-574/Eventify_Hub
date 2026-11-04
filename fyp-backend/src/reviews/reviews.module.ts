@@ -1,3 +1,4 @@
+import { CityModule } from '../city/city.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -10,6 +11,7 @@ import { FileUploadService } from 'src/file-upload/file-upload.service';
 
 @Module({
   imports: [
+    CityModule,
     MongooseModule.forFeature([
       { name: Review.name, schema: ReviewSchema },
     ]),

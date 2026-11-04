@@ -1,3 +1,4 @@
+import type { MarketplaceScope } from '../../../city/marketplace.guard';
 
 // fyp-backend/src/vendor/growth/promotion/promotion.service.ts
 
@@ -53,6 +54,7 @@ export interface FeaturedPackagePublicEntry {
 
 interface FeaturedVendorDiscoveryContext {
   eventCityId?: string;
+  marketplace?: MarketplaceScope;
   categoryIds?: string[];
   eventDate?: string;
   startTime?: string;
@@ -61,6 +63,7 @@ interface FeaturedVendorDiscoveryContext {
 
 interface FeaturedPackageDiscoveryContext {
   eventCityId?: string;
+  marketplace?: MarketplaceScope;
   categoryIds?: string[];
   eventDate?: string;
   startTime?: string;
@@ -527,6 +530,7 @@ if (hasAvailabilityContext) {
       .findOne({
         _id: new Types.ObjectId(vendorId),
         role: 'Vendor',
+        ...(context.marketplace && { businessCityId: { $in: context.marketplace.businessCityIds } }),
 
         ...(eventCityId
           ? {
@@ -818,6 +822,7 @@ if (hasAvailabilityContext) {
       },
 
       role: 'Vendor',
+        ...(context.marketplace && { businessCityId: { $in: context.marketplace.businessCityIds } }),
 
       ...(eventCityId
         ? {

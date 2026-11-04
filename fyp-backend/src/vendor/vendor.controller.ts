@@ -1,3 +1,4 @@
+import { MarketplaceGuard } from '../city/marketplace.guard';
 import {
   Controller,
   Post,
@@ -51,11 +52,12 @@ export class VendorController {
   ) {}
 
   @Get('getVendorsByCategoryId')
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
   getVendorsByCategoryId(
     @Request() req: any,
     @Query('categoryId') categoryId: string,
   ) {
-    return this.vendorService.getAllVendorsByCategoryId(categoryId);
+    return this.vendorService.getAllVendorsByCategoryId(categoryId, req.marketplace);
   }
 
   @Get('packages')
@@ -117,6 +119,12 @@ async getVendorApprovalStatus(
   @Get('business-details')
   async getBusinessDetails(@Query('userId') userId: string) {
     return this.vendorService.getBusinessDetails(userId);
+  }
+
+  @Get('marketplace-profile')
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
+  getMarketplaceProfile(@Query('marketplaceVendorId') vendorId: string) {
+    return this.vendorService.getVendor(vendorId);
   }
 
   @Get()

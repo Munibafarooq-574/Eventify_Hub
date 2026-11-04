@@ -1,5 +1,5 @@
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
-import searchVendors from '@/services/searchVendors';
+import searchVendors, { VendorSearchResult } from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
 import {
@@ -37,7 +37,7 @@ const Header: React.FC = () => {
   const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<VendorSearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [badgeMap, setBadgeMap] = useState<Record<string, VendorBadgeSummary>>({});
   const [cartPackageCount, setCartPackageCount] =
@@ -52,14 +52,13 @@ const Header: React.FC = () => {
     }
 
     const results = await searchVendors(text);
-    console.log(results);
 
     setResults(results);
     setShowDropdown(true);
 
     try {
       const ids = results
-        .map((item: any) => item._id)
+        .map(item => item._id)
         .filter(Boolean);
 
       if (ids.length === 0) {
@@ -266,7 +265,7 @@ const Header: React.FC = () => {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={true}
               >
-                {results.map((item: any) => (
+                {results.map(item => (
                   <TouchableOpacity
                     key={item._id}
                     style={styles.dropdownItem}

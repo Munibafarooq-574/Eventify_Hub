@@ -1,3 +1,6 @@
+import { Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
+import { MarketplaceGuard } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.controller.ts
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { DiscountService } from './discount.service';
@@ -44,11 +47,14 @@ getPublicCoupons(
 }
 
 @Get('coupon/public')
+@UseGuards(JwtAuthGuard, MarketplaceGuard)
 getPublicDashboardCoupons(
   @Query('limit') limit?: string,
+  @Req() request?: any,
 ) {
   return this.discountService.getPublicDashboardCoupons(
     Number(limit) || 10,
+    request?.marketplace,
   );
 }
 

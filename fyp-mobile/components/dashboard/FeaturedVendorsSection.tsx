@@ -20,7 +20,7 @@ import {
 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import getMarketplaceEventContext from '../../services/getMarketplaceEventContext';
+import getMarketplaceEventContext, { loadLocalMarketplaceItems } from '../../services/getMarketplaceEventContext';
 import { getActiveFeaturedVendors } from '../../services/getActiveFeaturedVendors';
 import { FeaturedVendorPublicEntry } from '../../types/promotion.types';
 
@@ -38,6 +38,7 @@ const COLORS = {
 
 export function FeaturedVendorsSection() {
   const router = useRouter();
+  const [fallbackLabel, setFallbackLabel] = useState('');
 
   const [vendors, setVendors] = useState<FeaturedVendorPublicEntry[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
@@ -46,39 +47,25 @@ export function FeaturedVendorsSection() {
 
 const loadFeaturedVendors = useCallback(async (signal: AbortSignal) => {
     try {
-  const {
-  discoveryCityId,
-  categoryIds,
-  eventDate,
-  startTime,
-  durationMinutes,
-  hasAvailabilityContext,
-} = await getMarketplaceEventContext();
+  const context = await getMarketplaceEventContext();
+  const { categoryIds, eventDate, startTime, durationMinutes, hasAvailabilityContext } = context;
+  const { items, fallbackLabel: label } = await loadLocalMarketplaceItems(context, eventCityId =>
+    getActiveFeaturedVendors({
+      limit: 5,
+      eventCityId,
+      categoryIds,
+      eventDate: hasAvailabilityContext ? eventDate : undefined,
+      startTime: hasAvailabilityContext ? startTime : undefined,
+      durationMinutes: hasAvailabilityContext ? durationMinutes : undefined,
+    }),
+  );
 
-const featured =
-  await getActiveFeaturedVendors({
-    limit: 5,
-    eventCityId:
-      discoveryCityId,
-    categoryIds,
-    eventDate:
-      hasAvailabilityContext
-        ? eventDate
-        : undefined,
-    startTime:
-      hasAvailabilityContext
-        ? startTime
-        : undefined,
-    durationMinutes:
-      hasAvailabilityContext
-        ? durationMinutes
-        : undefined,
-  });
-if (signal.aborted) {
+  if (signal.aborted) {
   return;
 }
 
-setVendors(featured);
+setVendors(items);
+      setFallbackLabel(label);
 
     } catch (error) {
       reportMarketplaceLoadError(
@@ -126,7 +113,7 @@ setVendors(featured);
 
       const result = await getActiveFeaturedVendors({
         limit: ALL_LIMIT,
-        eventCityId: discoveryCityId,
+        eventCityId: fallbackLabel ? undefined : discoveryCityId,
         categoryIds,
         eventDate: hasAvailabilityContext ? eventDate : undefined,
         startTime: hasAvailabilityContext ? startTime : undefined,
@@ -210,7 +197,7 @@ setVendors(featured);
       <View style={styles.hdrRow}>
         <View style={styles.hdrLeft}>
           <View style={styles.hdrAccent} />
-          <Text style={styles.hdrTitle}>Featured Vendors</Text>
+          <Text style={styles.hdrTitle}>{fallbackLabel ? `Featured Vendors · ${fallbackLabel}` : 'Featured Vendors'}</Text>
         </View>
 
         <TouchableOpacity activeOpacity={0.7} onPress={openViewAll}>
@@ -236,7 +223,7 @@ setVendors(featured);
             <View style={styles.mSide} />
 
             <View style={styles.mTitleWrap}>
-              <Text style={styles.mTitle}>Featured Vendors</Text>
+              <Text style={styles.mTitle}>{fallbackLabel ? `Featured Vendors · ${fallbackLabel}` : 'Featured Vendors'}</Text>
               <View style={styles.mUnderline} />
               <Text style={styles.mSubtitle}>
                 {allLoading

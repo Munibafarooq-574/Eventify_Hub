@@ -1,3 +1,5 @@
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { MarketplaceGuard } from '../city/marketplace.guard';
 import { Controller, Post, Body, Get, UseGuards, Req, Patch, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
@@ -48,14 +50,33 @@ async searchOrganizers(@Query('q') query: string) {
   }
 
   @Get('search')
-  async searchUsers(@Query('q') query: string) {
-    const users = await this.authService.searchUsers(query);
-    return users;
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
+  async searchUsers(@Query('q') query: string, @Req() request: any) {
+    return this.authService.searchVendorsByFilters({ name: query }, request.marketplace);
+  }
+
+  @Get('marketplace-location')
+  @UseGuards(JwtAuthGuard)
+  getMarketplaceLocation(@Req() request: any) {
+    return this.authService.getMarketplaceLocation(request.user);
+  }
+
+  @Patch('marketplace-location')
+  @UseGuards(JwtAuthGuard)
+  updateMarketplaceLocation(@Req() request: any, @Body('cityId') cityId?: string) {
+    return this.authService.updateMarketplaceLocation(request.user, cityId);
+  }
+
+  @Post('marketplace-cart')
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
+  verifyMarketplaceCart() {
+    return { allowed: true };
   }
 
   @Get('vendor-search')
-  async searchVendors(@Query() filters: SearchVendorsDto) {
-    return this.authService.searchVendorsByFilters(filters);
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
+  async searchVendors(@Query() filters: SearchVendorsDto, @Req() request?: any) {
+    return this.authService.searchVendorsByFilters(filters, request?.marketplace);
   }
 
   // @Get('google')
