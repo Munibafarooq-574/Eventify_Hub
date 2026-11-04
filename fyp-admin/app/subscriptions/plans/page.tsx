@@ -53,17 +53,6 @@ async function submitCatalog(path: string, method: string, payload: unknown) {
   redirect(`${pagePath}?${failed ? "error" : "notice"}=${encodeURIComponent(message)}`);
 }
 
-async function addFeature(form: FormData) {
-  "use server";
-  await submitCatalog("/features", "POST", { name: form.get("name") });
-}
-
-async function deleteFeature(form: FormData) {
-  "use server";
-  const key = String(form.get("key") ?? "");
-  await submitCatalog(`/features/${encodeURIComponent(key)}`, "DELETE", {});
-}
-
 async function togglePlan(form: FormData) {
   "use server";
   const key = String(form.get("key") ?? "");
@@ -118,21 +107,19 @@ function PlanForm({ plan, features }: { plan?: Plan; features: Feature[] }) {
         <label><input name="isMostPopular" type="checkbox" defaultChecked={plan?.isMostPopular ?? false} /> Show Most Popular badge</label>
       </div>
       <fieldset className="rounded-lg border border-slate-200 p-4">
-        <legend className="px-2 font-semibold">Features</legend>
+        <legend className="px-2 font-semibold">Include / exclude app features</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {features.map(feature => (
             <label key={feature.key} className="flex items-start gap-2">
               <input type="checkbox" name="featureKeys" value={feature.key}
                 defaultChecked={plan?.featureKeys.includes(feature.key)} className="mt-1" />
-              <span>{feature.name}
-                {!feature.controlsAccess && <span className="ml-1 text-xs text-slate-500">(display benefit)</span>}
-              </span>
+              <span>{feature.name}</span>
             </label>
           ))}
         </div>
       </fieldset>
       <fieldset className="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2">
-        <legend className="px-2 font-semibold">Limits</legend>
+        <legend className="px-2 font-semibold">Numeric limits</legend>
         {Object.entries(limits).map(([key, label]) => (
           <label key={key}>{label}
             <input type="number" min={0} step={1} name={key} required className={input}
@@ -157,32 +144,17 @@ export default async function SubscriptionPlansPage({ searchParams }: {
       <main className="mx-auto max-w-5xl space-y-6 p-6">
         <Link href="/subscriptions" className="text-sm text-violet-700 underline">Subscription payments</Link>
         <h1 className="text-2xl font-bold">Subscription plans</h1>
-        <p className="text-sm text-slate-600">Manage plan pricing, limits and benefits. Removing a plan from sale preserves its existing subscribers and payment history.</p>
+        <p className="text-sm text-slate-600">Create any number of plans, choose their existing app features and limits, and activate or deactivate sales. Existing subscriptions and payments are preserved.</p>
         {params.error && <p role="alert" className="rounded-md bg-red-50 p-3 text-red-900">{params.error}</p>}
         {params.notice && <p role="status" className="rounded-md bg-green-50 p-3 text-green-900">{params.notice}</p>}
         {!catalog ? <p role="alert">Unable to load the subscription catalog.</p> : (
           <>
             <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-2 font-bold">Add a feature to the list</h2>
-              <p className="mb-3 text-sm text-slate-600">Custom features appear as benefits on selected plans. Features that control app access are marked separately.</p>
-              <form action={addFeature} className="flex flex-wrap items-end gap-3">
-                <label className="grow">Feature name<input className={input} name="name" required maxLength={100} /></label>
-                <button className={button} type="submit">Add feature</button>
-              </form>
-            </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-5">
-              <h2 className="mb-2 font-bold">Manage custom features</h2>
-              <p className="mb-3 text-sm text-slate-600">Delete removes a custom display benefit from all plans. Deleting a built-in feature removes it from the catalog and every plan, and disables its subscription entitlement. Existing booking and payment records are preserved.</p>
-              <div className="grid gap-2">
-                {catalog.features.map(feature => (
-                  <form key={feature.key} action={deleteFeature} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 p-3">
-                    <span>{feature.name} {feature.controlsAccess ? "(app feature)" : "(display benefit)"}</span>
-                    <input type="hidden" name="key" value={feature.key} />
-                    <button type="submit" className="rounded-md border border-red-300 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-50">Delete</button>
-                  </form>
-                ))}
-
-              </div>
+              <h2 className="font-bold">Fixed app features</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Select only existing app capabilities in each plan. Features cannot be created or permanently deleted here.
+                Package, image, coupon and campaign quantities are configured separately under Limits.
+              </p>
             </section>
             <details className="rounded-xl border border-slate-200 bg-white p-5">
               <summary className="mb-4 cursor-pointer font-bold">Create a plan</summary>
