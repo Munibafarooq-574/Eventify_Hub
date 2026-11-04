@@ -28,6 +28,7 @@ import {
   Check,
   Clock3,
   Crown,
+  RefreshCw,
   Star,
   WalletCards,
 } from 'lucide-react-native';
@@ -300,7 +301,7 @@ export default function SubscriptionScreen() {
       }
     }, [vendorId]);
 
-  const { refreshControl } = usePullToRefresh(loadData);
+  const { refreshing, onRefresh, refreshControl } = usePullToRefresh(loadData);
 
   useEffect(() => {
     loadData();
@@ -618,11 +619,19 @@ export default function SubscriptionScreen() {
         </Text>
       </View>
 
-      <View
-        style={
-          styles.headerPlaceholder
-        }
-      />
+      <TouchableOpacity
+        style={styles.headerIcon}
+        onPress={onRefresh}
+        disabled={refreshing || loading}
+        accessibilityRole="button"
+        accessibilityLabel={refreshing ? 'Refreshing subscription plans' : 'Refresh subscription plans'}
+      >
+        {refreshing ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <RefreshCw size={19} color="#FFFFFF" strokeWidth={2.3} />
+        )}
+      </TouchableOpacity>
     </View>
   );
 
