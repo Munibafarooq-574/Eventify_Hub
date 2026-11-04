@@ -424,6 +424,10 @@ export default function CityManagement() {
                 </th>
 
                 <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Timezone
+                </th>
+
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
                 </th>
 
@@ -437,7 +441,7 @@ export default function CityManagement() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-sm text-slate-500"
                   >
                     Loading cities...
@@ -446,7 +450,7 @@ export default function CityManagement() {
               ) : cities.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-12 text-center"
                   >
                     <p className="font-semibold text-slate-900">
@@ -485,6 +489,10 @@ export default function CityManagement() {
                       {city.countryCode
                         ? ` (${city.countryCode})`
                         : ""}
+                    </td>
+
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+                      {city.timeZone?.trim() || "Not configured"}
                     </td>
 
                     <td className="px-5 py-4">
