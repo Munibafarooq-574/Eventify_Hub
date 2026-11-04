@@ -84,6 +84,7 @@ const bookingTypeOptions: {
 ];
 
 import { EMPTY_OFFSET, OFFSET_UNITS, offsetUnitLabel, offsetToMinutes, minutesToOffset, serviceWindowError, type FriendlyOffset, type OffsetDirection } from "@/utils/serviceWindowInput";
+import { compactUnitLabels, iosTimingStyles } from "@/components/packageTiming/iosTimingStyles";
 type DurationInputUnit = "MINUTES" | "HOURS" | "DAYS";
 
 interface FriendlyDuration {
@@ -233,6 +234,8 @@ const [serviceDuration, setServiceDuration] = useState<FriendlyDuration>({ ...EM
 const [windowStart, setWindowStart] = useState<FriendlyOffset>({ ...EMPTY_OFFSET, direction: "BEFORE" });
 const [windowEnd, setWindowEnd] = useState<FriendlyOffset>({ ...EMPTY_OFFSET, direction: "AFTER" });
 const requiredServiceDurationMinutesValue = useMemo(() => durationInputToMinutes(serviceDuration), [serviceDuration]);
+const useCompactTiming = Platform.OS === "ios" &&
+  (bookingType === "SETUP_BASED" || bookingType === "DELIVERY_BASED");
 const serviceWindowStartOffsetMinutesValue = useMemo(() => offsetToMinutes(windowStart), [windowStart]);
 const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowEnd), [windowEnd]);
 
@@ -2268,16 +2271,16 @@ Alert.alert(
 
     {(bookingType === "TIME_SLOT_BASED" ||
       bookingType === "SETUP_BASED") && (
-      <View style={{ marginTop: 18 }}>
+      <View style={[{ marginTop: 18 }, useCompactTiming && iosTimingStyles.field]}>
         <Text style={styles.smallLabel}>
           {bookingType === "TIME_SLOT_BASED"
             ? "Time needed per booking"
             : "Time needed to set up"}
         </Text>
 
-        <View style={styles.friendlyRow}>
+        <View style={[styles.friendlyRow, useCompactTiming && iosTimingStyles.amountRow]}>
           <TextInput
-            style={[styles.input, styles.friendlyValueInput]}
+            style={[styles.input, styles.friendlyValueInput, useCompactTiming && iosTimingStyles.amount]}
             value={serviceDuration.value}
             onChangeText={(value) =>
               setServiceDuration((prev) => ({
@@ -2294,7 +2297,7 @@ Alert.alert(
             placeholderTextColor="#9C9CA3"
           />
 
-          <View style={styles.friendlyToggleRow}>
+          <View style={[styles.friendlyToggleRow, useCompactTiming && iosTimingStyles.segments]}>
             {((bookingType === "SETUP_BASED" ? ["MINUTES", "HOURS", "DAYS"] : ["MINUTES", "HOURS"]) as DurationInputUnit[]).map(
               (unit) => {
                 const active = serviceDuration.unit === unit;
@@ -2305,6 +2308,8 @@ Alert.alert(
                     style={[
                       styles.friendlyToggleButton,
                       active && styles.friendlyToggleButtonActive,
+                      useCompactTiming && iosTimingStyles.segment,
+                      useCompactTiming && active && iosTimingStyles.selectedSegment,
                     ]}
                     onPress={() =>
                       setServiceDuration((prev) => ({
@@ -2320,7 +2325,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {unit === "MINUTES" ? "Minutes" : unit === "HOURS" ? "Hours" : "Days"}
+                      {useCompactTiming ? compactUnitLabels[unit] : unit === "MINUTES" ? "Minutes" : unit === "HOURS" ? "Hours" : "Days"}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2337,16 +2342,16 @@ Alert.alert(
 
     {bookingType !== "TIME_SLOT_BASED" && (
       <>
-        <View style={{ marginTop: 22 }}>
+        <View style={[{ marginTop: 22 }, useCompactTiming && iosTimingStyles.field]}>
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
               ? "Earliest delivery time"
               : "Earliest setup start"}
           </Text>
 
-          <View style={styles.friendlyRow}>
+          <View style={[styles.friendlyRow, useCompactTiming && iosTimingStyles.amountRow]}>
             <TextInput
-              style={[styles.input, styles.friendlyValueInput]}
+              style={[styles.input, styles.friendlyValueInput, useCompactTiming && iosTimingStyles.amount]}
               value={windowStart.value}
               onChangeText={(value) =>
                 setWindowStart((prev) => ({
@@ -2359,7 +2364,7 @@ Alert.alert(
               placeholderTextColor="#9C9CA3"
             />
 
-            <View style={styles.friendlyToggleRow}>
+            <View style={[styles.friendlyToggleRow, useCompactTiming && iosTimingStyles.segments]}>
               {OFFSET_UNITS.map((unit) => {
                 const active = windowStart.unit === unit;
 
@@ -2369,6 +2374,8 @@ Alert.alert(
                     style={[
                       styles.friendlyToggleButton,
                       active && styles.friendlyToggleButtonActive,
+                      useCompactTiming && iosTimingStyles.segment,
+                      useCompactTiming && active && iosTimingStyles.selectedSegment,
                     ]}
                     onPress={() =>
                       setWindowStart((prev) => ({ ...prev, unit }))
@@ -2381,7 +2388,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {offsetUnitLabel(unit)}
+                      {useCompactTiming ? compactUnitLabels[unit] : offsetUnitLabel(unit)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2394,11 +2401,30 @@ Alert.alert(
               Before event start
             </Text>
           ) : (
-            <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
-              {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowStart({...windowStart,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
+            <View style={[styles.friendlyToggleRow, { marginTop: 8 }, useCompactTiming && iosTimingStyles.segments]}>
+              {bookingType === "DELIVERY_BASED" && (
+                <TouchableOpacity
+                  onPress={() => setWindowStart((prev) => ({ ...prev, value: "0" }))}
+                  style={useCompactTiming ? [
+                    styles.friendlyDirectionButton,
+                    iosTimingStyles.segment,
+                    serviceWindowStartOffsetMinutesValue === 0 && iosTimingStyles.selectedSegment,
+                  ] : { padding: 10 }}
+                  accessibilityRole="button"
+                  accessibilityState={useCompactTiming ? { selected: serviceWindowStartOffsetMinutesValue === 0 } : undefined}
+                >
+                  <Text style={useCompactTiming ? [
+                    styles.friendlyToggleText,
+                    serviceWindowStartOffsetMinutesValue === 0 && styles.friendlyToggleTextActive,
+                  ] : { color: "#7B2869", fontWeight: "600" }}>
+                    {useCompactTiming ? "At start" : "At event start"}
+                  </Text>
+                </TouchableOpacity>
+              )}
               {(["BEFORE", "AFTER"] as OffsetDirection[]).map(
                 (direction) => {
-                  const active = windowStart.direction === direction;
+                  const active = windowStart.direction === direction &&
+                    !(useCompactTiming && bookingType === "DELIVERY_BASED" && serviceWindowStartOffsetMinutesValue === 0);
   
                   return (
                     <TouchableOpacity
@@ -2406,6 +2432,8 @@ Alert.alert(
                       style={[
                         styles.friendlyDirectionButton,
                         active && styles.friendlyDirectionButtonActive,
+                        useCompactTiming && iosTimingStyles.segment,
+                        useCompactTiming && active && iosTimingStyles.selectedSegment,
                       ]}
                       onPress={() =>
                         setWindowStart((prev) => ({ ...prev, direction }))
@@ -2418,7 +2446,9 @@ Alert.alert(
                           active && styles.friendlyToggleTextActive,
                         ]}
                       >
-                        {direction === "BEFORE"
+                        {useCompactTiming
+                          ? (direction === "BEFORE" ? "Before" : "After")
+                          : direction === "BEFORE"
                           ? "Before the event"
                           : "After event starts"}
                       </Text>
@@ -2434,7 +2464,7 @@ Alert.alert(
             Latest it can happen (window end)
         -------------------------------------------------- */}
 
-        <View style={{ marginTop: 22 }}>
+        <View style={[{ marginTop: 22 }, useCompactTiming && iosTimingStyles.field]}>
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
               ? "Latest delivery time"
@@ -2443,9 +2473,9 @@ Alert.alert(
               : "Service completion deadline"}
           </Text>
 
-          <View style={styles.friendlyRow}>
+          <View style={[styles.friendlyRow, useCompactTiming && iosTimingStyles.amountRow]}>
             <TextInput
-              style={[styles.input, styles.friendlyValueInput]}
+              style={[styles.input, styles.friendlyValueInput, useCompactTiming && iosTimingStyles.amount]}
               value={windowEnd.value}
               onChangeText={(value) =>
                 setWindowEnd((prev) => ({
@@ -2458,7 +2488,7 @@ Alert.alert(
               placeholderTextColor="#9C9CA3"
             />
 
-            <View style={styles.friendlyToggleRow}>
+            <View style={[styles.friendlyToggleRow, useCompactTiming && iosTimingStyles.segments]}>
               {OFFSET_UNITS.map((unit) => {
                 const active = windowEnd.unit === unit;
 
@@ -2468,6 +2498,8 @@ Alert.alert(
                     style={[
                       styles.friendlyToggleButton,
                       active && styles.friendlyToggleButtonActive,
+                      useCompactTiming && iosTimingStyles.segment,
+                      useCompactTiming && active && iosTimingStyles.selectedSegment,
                     ]}
                     onPress={() =>
                       setWindowEnd((prev) => ({ ...prev, unit }))
@@ -2480,7 +2512,7 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {offsetUnitLabel(unit)}
+                      {useCompactTiming ? compactUnitLabels[unit] : offsetUnitLabel(unit)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -2488,11 +2520,30 @@ Alert.alert(
             </View>
           </View>
 
-          <View style={[styles.friendlyToggleRow, { marginTop: 8 }]}>
-            {bookingType === "DELIVERY_BASED" && <TouchableOpacity onPress={() => setWindowEnd({...windowEnd,value:"0"})} style={{padding:10}}><Text style={{color:'#7B2869',fontWeight:'600'}}>At event start</Text></TouchableOpacity>}
+          <View style={[styles.friendlyToggleRow, { marginTop: 8 }, useCompactTiming && iosTimingStyles.segments]}>
+            {bookingType === "DELIVERY_BASED" && (
+              <TouchableOpacity
+                onPress={() => setWindowEnd((prev) => ({ ...prev, value: "0" }))}
+                style={useCompactTiming ? [
+                  styles.friendlyDirectionButton,
+                  iosTimingStyles.segment,
+                  serviceWindowEndOffsetMinutesValue === 0 && iosTimingStyles.selectedSegment,
+                ] : { padding: 10 }}
+                accessibilityRole="button"
+                accessibilityState={useCompactTiming ? { selected: serviceWindowEndOffsetMinutesValue === 0 } : undefined}
+              >
+                <Text style={useCompactTiming ? [
+                  styles.friendlyToggleText,
+                  serviceWindowEndOffsetMinutesValue === 0 && styles.friendlyToggleTextActive,
+                ] : { color: "#7B2869", fontWeight: "600" }}>
+                  {useCompactTiming ? "At start" : "At event start"}
+                </Text>
+              </TouchableOpacity>
+            )}
             {((bookingType === "SETUP_BASED" ? ["BEFORE", "AFTER"] : ["BEFORE", "AFTER"]) as OffsetDirection[]).map(
               (direction) => {
-                const active = windowEnd.direction === direction;
+                const active = windowEnd.direction === direction &&
+                    !(useCompactTiming && bookingType === "DELIVERY_BASED" && serviceWindowEndOffsetMinutesValue === 0);
 
                 return (
                   <TouchableOpacity
@@ -2500,6 +2551,8 @@ Alert.alert(
                     style={[
                       styles.friendlyDirectionButton,
                       active && styles.friendlyDirectionButtonActive,
+                      useCompactTiming && iosTimingStyles.segment,
+                      useCompactTiming && active && iosTimingStyles.selectedSegment,
                     ]}
                     onPress={() =>
                       setWindowEnd((prev) => bookingType === "SETUP_BASED" && direction === "AFTER" ? { ...prev, value: "0", direction: "AFTER" } : { ...prev, direction })
@@ -2512,7 +2565,9 @@ Alert.alert(
                         active && styles.friendlyToggleTextActive,
                       ]}
                     >
-                      {direction === "BEFORE"
+                      {useCompactTiming
+                          ? (direction === "BEFORE" ? "Before" : bookingType === "SETUP_BASED" ? "At start" : "After")
+                          : direction === "BEFORE"
                         ? "Before the event"
                         : bookingType === "SETUP_BASED" ? "At event start" : "At / after event starts"}
                     </Text>
