@@ -6,7 +6,6 @@ export interface TopVendor {
     totalReviews: number;
     completedOrders: number;
     serviceCities?: string[];
-    servesMarketplaceCity?: boolean;
     reliabilityScore: number;
     popularityScore: number;
     vendor: {

@@ -427,16 +427,8 @@ export class ReviewsService {
             },
         },
 
-        ...(marketplace?.cityId ? [{
-            $addFields: {
-                servesMarketplaceCity: {
-                    $in: [new Types.ObjectId(marketplace.cityId), { $ifNull: ['$vendor.serviceLocationCityIds', []] }],
-                },
-            },
-        }] : []),
         {
             $sort: {
-                ...(marketplace?.cityId && { servesMarketplaceCity: -1 as const }),
                 popularityScore: -1,
                 averageRating: -1,
                 totalReviews: -1,
@@ -463,7 +455,6 @@ export class ReviewsService {
                 _id: 0,
 
                 serviceCities: { $setUnion: ['$serviceCities.name', []] },
-                servesMarketplaceCity: 1,
 
                 vendorId: '$_id',
 
