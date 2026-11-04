@@ -1,6 +1,6 @@
 import Login from '@/services/login';
 import { getSubscriptionAccessState } from '@/services/getSubscriptionAccessState';
-import { saveSecureData, saveUserData } from '@/store';
+import { startUserSession } from '@/store';
 import { connectSocket, registerUser } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
@@ -41,8 +41,7 @@ export default function LoginScreen() {
     const response = await Login(email, password);
 
     // Save authenticated session first
-    await saveSecureData("token", response.token);
-    await saveUserData(response.user);
+    await startUserSession(response.token, response.user);
 
     // Register authenticated user for app-level realtime presence.
     // User should become Online immediately after login,

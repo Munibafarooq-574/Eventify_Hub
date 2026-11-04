@@ -1,5 +1,5 @@
 //vendor account index page
-import { deleteSecureData, deleteUserData, getUserData } from '@/store';
+import { deleteUserData, getUserData } from '@/store';
 import { disconnectSocket } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -111,19 +111,14 @@ const confirmLogout = async () => {
     disconnectSocket();
 
     // Token is stored in SecureStore
-    await deleteSecureData("token");
-
-    // User data is stored in AsyncStorage
     await deleteUserData();
-
-    // Cart data is also stored in SecureStore
-    await deleteSecureData("cartData");
 
     console.log("Logout data deleted successfully");
   } catch (error) {
     console.error("Failed to clear logout data:", error);
   }
 
+  if (router.canDismiss()) router.dismissAll();
   router.replace('/intro');
 };
 

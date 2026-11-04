@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-import { getSecureData, saveSecureData } from '@/store';
+import { createBookingDraftStore, getSecureData } from '@/store';
 import getActiveCities from '@/services/getActiveCities';
 import getAllCategories from '@/services/getAllCategories';
 
@@ -49,6 +49,7 @@ const cartCategory = (pkg: any, entry: any) => {
 };
 
 const CartManagementIndexScreen: React.FC = () => {
+  const [draft] = useState(createBookingDraftStore);
 const router = useRouter();
 const navigation = useNavigation();
 
@@ -69,9 +70,9 @@ const [eventDetails, setEventDetails] = useState<any>(null);
 
         const fetchCartData = async () => {
             try {
-                const storedCart = await getSecureData('cartData');
+                const storedCart = await draft.get('cartData');
 
-                 const eventDetailsRaw = await getSecureData('eventDetails');
+                 const eventDetailsRaw = await draft.get('eventDetails');
 
 if (eventDetailsRaw) {
     const eventDetails = JSON.parse(eventDetailsRaw);
@@ -190,7 +191,7 @@ if (eventDetailsRaw) {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await saveSecureData(
+                            await draft.save(
                                 'cartData',
                                 JSON.stringify({ vendors: [] })
                             );
@@ -248,10 +249,7 @@ if (eventDetailsRaw) {
             updatedCart.vendors.splice(vendorIndex, 1);
         }
 
-        saveSecureData(
-            'cartData',
-            JSON.stringify(updatedCart)
-        );
+        void draft.save('cartData', JSON.stringify(updatedCart)).catch(console.error);
 
         setCartData(updatedCart);
 
@@ -294,10 +292,7 @@ if (eventDetailsRaw) {
         vendor.packages[packageIndex] = pkg;
         updatedCart.vendors[vendorIndex] = vendor;
 
-        saveSecureData(
-            'cartData',
-            JSON.stringify(updatedCart)
-        );
+        void draft.save('cartData', JSON.stringify(updatedCart)).catch(console.error);
 
         setCartData(updatedCart);
     };

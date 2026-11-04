@@ -1,3 +1,4 @@
+import { getSecureData } from '@/store';
 // fyp-mobile/services/getVendorOrderStats.ts
 
 import axios, { AxiosRequestConfig } from "axios";
@@ -24,7 +25,9 @@ export default async function getVendorOrderStats(
     userId,
   };
 
+  const token = await getSecureData("token");
   const config: AxiosRequestConfig = {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     method: "GET",
     url,
     params,

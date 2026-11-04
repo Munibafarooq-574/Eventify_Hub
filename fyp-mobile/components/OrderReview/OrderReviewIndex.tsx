@@ -10,7 +10,7 @@ import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadErro
 // fyp-mobile/components/orderreview/OrderReviewIndex.tsx
 import postPlaceOrder from '@/services/postPlaceOrder';
 import axios from 'axios';
-import { deleteSecureData, getSecureData, getUserData } from '@/store';
+import { createBookingDraftStore, getSecureData, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { cancelCartReminder, scheduleCartReminder } from '@/services/cartReminder';
@@ -50,6 +50,7 @@ function isConnectionError(error: unknown) {
 }
 
 const OrderReviewScreen = () => {
+  const [draft] = useState(createBookingDraftStore);
   const [cartData, setCartData] = useState<any>(null);
   const [cateringCategory, setCateringCategory] = useState<any>(null);
   const [guests, setGuests] = useState<number>(0);
@@ -88,7 +89,7 @@ const [applyingDiscountCodeKey, setApplyingDiscountCodeKey] =
       if (!user?._id) return;
       await scheduleCartReminder(user._id, eventId, async () => {
         const [cart, event, currentUser] = await Promise.all([
-          getSecureData('cartData'), getSecureData('eventDetails'), getUserData(),
+          draft.get('cartData'), draft.get('eventDetails'), getUserData(),
         ]);
         return !checkoutLock.current && !bookingSubmitted.current && currentUser?._id === user._id &&
           JSON.parse(event || '{}')?.eventId === eventId && !!JSON.parse(cart || '{}')?.vendors?.length;
@@ -119,10 +120,10 @@ const [cityOptions, setCityOptions] =
   useEffect(() => {
     const fetchCartData = async () => {
       try {
-        const storedCart = await getSecureData('cartData');
+        const storedCart = await draft.get('cartData');
 
         const eventDetailsRaw =
-  await getSecureData('eventDetails');
+  await draft.get('eventDetails');
 
 const savedEventDetails =
   eventDetailsRaw
@@ -1194,16 +1195,16 @@ const isInvalidCode =
     let submittedEvent: any = null;
 
     try {
-      const user = await getUserData();
+      const session = await draft.getSession();
 
-      if (!user?._id) throw new Error('Your session is unavailable. Please sign in again.');
+      if (!session) throw new Error('Your session is unavailable. Please sign in again.');
       if (!cartData?.vendors?.length) throw new Error('Your cart is empty. Please add a package before booking.');
       if (cartData.vendors.some((vendor: any) =>
         vendor.packages?.some((pkg: any) => pkg.bookingType === 'CUSTOM')
       )) throw new Error('Remove the package with a retired booking type from your cart before booking.');
 
 
-      const eventDetailsRaw = await getSecureData('eventDetails');
+      const eventDetailsRaw = await draft.get('eventDetails');
       const eventDetails = eventDetailsRaw ? JSON.parse(eventDetailsRaw) : null;
       submittedEvent = eventDetails;
 
@@ -1266,8 +1267,9 @@ const isInvalidCode =
     }),
 );
 
+    if (!draft.isCurrent() || !eventDetails) throw new Error("Your session or event draft is unavailable.");
     const response = await postPlaceOrder({
-      organizerId: user._id,
+      organizerId: session.userId,
       eventId: eventDetails?.eventId,
 
       eventDate: eventDetails?.eventDate,
@@ -1298,7 +1300,8 @@ const isInvalidCode =
       replacementRescheduleRequestId:
         eventDetails?.replacementRescheduleRequestId,
       replacementVendorOrderId: eventDetails?.replacementVendorOrderId,
-    });
+    }, session.token);
+    if (!draft.isCurrent()) return;
 
       if (!response) throw new Error('Booking confirmation was not received. Refresh My Events before trying again.');
       if (response) {
@@ -1311,8 +1314,9 @@ const isInvalidCode =
         });
 
         await Promise.allSettled([
-          cancelCartReminder(), deleteSecureData('cartData'), deleteSecureData('eventDetails'),
+          cancelCartReminder(), draft.delete('cartData'), draft.delete('eventDetails'),
         ]);
+        if (!draft.isCurrent()) return;
 
         const chatVendors = new Map<string, { id: string; name: string; avatar: string }>();
         for (const { vendor, vendorName } of cartData.vendors) {
@@ -1329,6 +1333,7 @@ const isInvalidCode =
         });
       }
    } catch (error: any) {
+  if (!draft.isCurrent()) return;
   reportMarketplaceLoadError('Booking checkout unavailable', error);
   if (isConnectionError(error)) {
     setRefreshNotice(OFFLINE_NOTICE);
@@ -1337,7 +1342,7 @@ const isInvalidCode =
   const message = error?.message || 'Failed to place order. Please try again.';
   if (submittedEvent?.replacementVendorOrderId && /replacement.*only.*before.*event.*starts/i.test(message)) {
     try {
-      await clearExpiredReplacementCart(cartData, submittedEvent);
+      await clearExpiredReplacementCart(draft, cartData, submittedEvent);
     } catch {
       const cleanupMessage = `${message} Cart cleanup could not finish. Please remove the expired package from My Cart.`;
       setCheckoutError(cleanupMessage);

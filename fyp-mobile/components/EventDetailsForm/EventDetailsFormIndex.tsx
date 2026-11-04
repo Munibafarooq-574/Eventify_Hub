@@ -1,7 +1,7 @@
 import { growthApi } from '@/services/growthApiClient';
 //fyp-mobile/components/EventDetailsForm/EventDetailsFormIndex.tsx
 import getAllCategories from "@/services/getAllCategories";
-import { saveSecureData, getSecureData } from "@/store";
+import { createBookingDraftStore } from '@/store';
 import { useVendorsAvailability } from "@/hooks/useVendorsAvailability";
 import getActiveCities, {
   ActiveCity,
@@ -71,6 +71,7 @@ const formatDuration = (minutes: number) => {
 
 
 const PersonalizedExperienceScreen: React.FC = () => {
+  const [draft] = useState(createBookingDraftStore);
   const routeParams = useLocalSearchParams();
   const editDateTimeOnly = (Array.isArray(routeParams.editDateTime) ? routeParams.editDateTime[0] : routeParams.editDateTime) === "true";
   const [editLoading, setEditLoading] = useState(editDateTimeOnly);
@@ -81,7 +82,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
     let active = true;
     (async () => {
       try {
-        const raw = await getSecureData("eventDetails");
+        const raw = await draft.get("eventDetails");
         const saved = raw ? JSON.parse(raw) : null;
         if (!active) return;
         if (!saved?.eventDate || !saved?.startTime) {
@@ -116,7 +117,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       const duration = Number(savedEditEvent.durationMinutes) || 60;
       const end = new Date(startTime);
       end.setMinutes(end.getMinutes() + duration);
-      await saveSecureData("eventDetails", JSON.stringify({
+      await draft.save("eventDetails", JSON.stringify({
         ...savedEditEvent,
         eventDate,
         startTime: timeToHHMM(startTime),
@@ -481,7 +482,7 @@ const selectedCity = useMemo(
   let eventId: string | undefined;
 
   try {
-    const existingRaw = await getSecureData("eventDetails");
+    const existingRaw = await draft.get("eventDetails");
 
     if (existingRaw) {
       eventId = JSON.parse(existingRaw)?.eventId;
@@ -509,7 +510,7 @@ eventEndDateTime.setMinutes(
 
 const eventEndTime = timeToHHMM(eventEndDateTime);
 
-  await saveSecureData(
+  await draft.save(
     "eventDetails",
     JSON.stringify({
   eventId,

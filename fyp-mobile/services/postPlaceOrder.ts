@@ -5,7 +5,6 @@
 import axios, { AxiosRequestConfig } from "axios";
 import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
 import getVendorOrders from "./getVendorOrders";
-import { getSecureData } from "../store";
 
 /**
  * Single vendor/service item
@@ -50,10 +49,10 @@ export interface PlaceOrderPayload {
   replacementVendorOrderId?: string;
 }
 
-async function findSubmittedBooking(payload: PlaceOrderPayload) {
+async function findSubmittedBooking(payload: PlaceOrderPayload, token: string) {
   const pageSize = 10;
   for (let offset = 0; ; offset += pageSize) {
-    const orders = await getVendorOrders('Organizer', payload.organizerId, undefined, pageSize, offset);
+    const orders = await getVendorOrders('Organizer', payload.organizerId, undefined, pageSize, offset, token);
     const order = orders.find(item => item.eventId === payload.eventId);
     if (order) {
       const bookings = order.vendorOrders.filter(booking =>
@@ -74,7 +73,8 @@ async function findSubmittedBooking(payload: PlaceOrderPayload) {
  * Place Order API
  */
 export default async function postPlaceOrder(
-  orderData: PlaceOrderPayload
+  orderData: PlaceOrderPayload,
+  token: string,
 ) {
   // Render production backend
   const url = "https://eventify-hub.onrender.com/orders";
@@ -140,25 +140,6 @@ if (!orderData.eventAddress?.trim()) {
       throw new Error(`Invalid price for service ${index + 1}.`);
     }
   });
-
-  // -------------------------------------------------------
-  // Get authentication token
-  // -------------------------------------------------------
-
-  let token: string | null = null;
-
-  try {
-    const storedToken = await getSecureData("token");
-
-    if (storedToken) {
-      token = storedToken;
-    }
-  } catch (tokenError) {
-    console.warn(
-      "Unable to read authentication token:",
-      tokenError
-    );
-  }
 
   // -------------------------------------------------------
   // Prepare request config
@@ -275,7 +256,7 @@ if (!orderData.eventAddress?.trim()) {
         ? data.message?.message : data?.message;
       const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : rawMessage;
       if (!status || status >= 500 || (status === 409 && /already been booked|replacement/i.test(String(message)))) {
-        const existing = await findSubmittedBooking(orderData).catch(() => undefined);
+        const existing = await findSubmittedBooking(orderData, token).catch(() => undefined);
         if (existing) return existing;
         if (!status) throw new Error('Connection interrupted. Your cart is saved. Please check your connection and try again.');
         if (status >= 500) throw new Error('Booking confirmation is unavailable. Your cart is saved. Please try again shortly.');

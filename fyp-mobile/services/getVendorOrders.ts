@@ -1,3 +1,4 @@
+import { getSecureData } from '@/store';
 //fyp-mobile/services/getVendorOrders.ts
 import axios, { AxiosRequestConfig } from "axios";
 import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
@@ -46,7 +47,7 @@ export interface GetOrdersResponse {
     updatedAt?: string;
 }
 
-export default async function getVendorOrders(type: string, userId: string, status?: string, limit = 10, skip = 0): Promise<GetOrdersResponse[]> {
+export default async function getVendorOrders(type: string, userId: string, status?: string, limit = 10, skip = 0, sessionToken?: string): Promise<GetOrdersResponse[]> {
     const url = `https://eventify-hub.onrender.com/orders`;
     // const url = `http://192.168.100.15:3000/orders`;
     const params = {
@@ -57,7 +58,9 @@ export default async function getVendorOrders(type: string, userId: string, stat
         skip,
     };
 
+    const token = sessionToken ?? await getSecureData("token");
     const config: AxiosRequestConfig = {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         method: "GET",
         timeout: 10000,
         url,

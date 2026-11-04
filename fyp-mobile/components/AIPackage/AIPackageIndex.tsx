@@ -1,8 +1,4 @@
-import {
-    deleteSecureData,
-    getSecureData,
-    saveSecureData,
-} from '@/store';
+import { createBookingDraftStore } from '@/store';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -18,12 +14,13 @@ import {
 } from 'react-native';
 
 const AIPackageScreen = () => {
+  const [draft] = useState(createBookingDraftStore);
     const [aiPackage, setAiPackage] = useState<any>(null);
 
     useEffect(() => {
         const fetchPackageData = async () => {
             try {
-                const data = (await getSecureData('aiPackage')) || '';
+                const data = (await draft.get('aiPackage')) || '';
                 const parsedData = JSON.parse(data);
                 setAiPackage(parsedData);
             } catch (error) {
@@ -36,7 +33,7 @@ const AIPackageScreen = () => {
 
     const handleAddToCart = async (pkg: any) => {
         try {
-            const existingCartData = await getSecureData('cartData');
+            const existingCartData = await draft.get('cartData');
 
             let cart = existingCartData
                 ? JSON.parse(existingCartData)
@@ -60,7 +57,7 @@ const AIPackageScreen = () => {
                 cart.vendors.push(vendorPackageData);
             }
 
-            await saveSecureData('cartData', JSON.stringify(cart));
+            await draft.save('cartData', JSON.stringify(cart));
         } catch (error) {
             console.error('Error handling add to cart:', error);
         }
@@ -235,7 +232,7 @@ const AIPackageScreen = () => {
                             style={styles.proceedButton}
                             activeOpacity={0.85}
                             onPress={async () => {
-                                await deleteSecureData('cartData');
+                                await draft.delete('cartData');
                                 await proceed();
                                 router.push('/OrderReview');
                             }}

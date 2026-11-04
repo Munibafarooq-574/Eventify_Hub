@@ -1,7 +1,7 @@
 //fpy-mobile/components/account/AccountIndex.tsx
 //(Organizer Account Screen)
 
-import { deleteSecureData, deleteUserData, getUserData } from '@/store';
+import { deleteUserData, getUserData } from '@/store';
 import { disconnectSocket } from '@/utils/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -87,15 +87,14 @@ const AccountScreen: React.FC = () => {
     // when this is their last active socket.
     disconnectSocket();
 
-    await deleteSecureData("token");
     await deleteUserData();
-    await deleteSecureData("cartData");
 
     console.log("Logout data deleted successfully");
   } catch (error) {
     console.error("Failed to clear logout data:", error);
   }
 
+  if (router.canDismiss()) router.dismissAll();
   router.replace('/intro');
 };
 

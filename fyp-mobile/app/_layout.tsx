@@ -1,11 +1,11 @@
 //import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { useFonts } from 'expo-font';
-import { Stack, useNavigationContainerRef } from 'expo-router';
+import { Stack, router, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { CART_REMINDER } from '@/services/cartReminder';
-import { getSecureData, getUserData } from '@/store';
+import { createBookingDraftStore } from '@/store';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
@@ -14,7 +14,10 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 Notifications.setNotificationHandler({
   handleNotification: async ({ request }) => {
-    const isReminder = request.content.data?.type === CART_REMINDER;
+    const draft = createBookingDraftStore();
+    const data = request.content.data;
+    const session = data?.type === CART_REMINDER ? await draft.getSession() : null;
+    const isReminder = !!session && session.userId === data.userId && draft.isCurrent();
     return { shouldShowBanner: isReminder, shouldShowList: isReminder, shouldPlaySound: isReminder, shouldSetBadge: false };
   },
 });
@@ -40,16 +43,14 @@ export default function RootLayout() {
     const openCart = async (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data;
       if (data?.type !== CART_REMINDER) return;
+      const draft = createBookingDraftStore();
       await Notifications.clearLastNotificationResponseAsync();
-      const [user, event, cart] = await Promise.all([
-        getUserData(), getSecureData('eventDetails'), getSecureData('cartData'),
+      const [session, event, cart] = await Promise.all([
+        draft.getSession(), draft.get('eventDetails'), draft.get('cartData'),
       ]);
-      if (user?._id === data.userId && JSON.parse(event || '{}')?.eventId === data.eventId &&
-          JSON.parse(cart || '{}')?.vendors?.length && navigation.isReady()) {
-        navigation.dispatch({ type: 'RESET', payload: {
-          index: 1,
-          routes: [{ name: 'dashboard' }, { name: 'cartmanagement' }],
-        } });
+      if (session?.userId === data.userId && JSON.parse(event || '{}')?.eventId === data.eventId &&
+          JSON.parse(cart || '{}')?.vendors?.length && navigation.isReady() && draft.isCurrent()) {
+        router.navigate('/cartmanagement');
       }
     };
     const handle = (response: Notifications.NotificationResponse) => {

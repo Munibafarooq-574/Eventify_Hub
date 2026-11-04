@@ -12,7 +12,12 @@ function serialize(action: () => Promise<void>) {
 
 export function cancelCartReminder() {
   if (Platform.OS === 'web') return Promise.resolve();
-  return serialize(() => Notifications.cancelScheduledNotificationAsync(CART_REMINDER));
+  return serialize(async () => {
+    await Promise.all([
+      Notifications.cancelScheduledNotificationAsync(CART_REMINDER),
+      Notifications.dismissNotificationAsync(CART_REMINDER),
+    ]);
+  });
 }
 
 export function scheduleCartReminder(userId: string, eventId: string, isCurrent: () => Promise<boolean>) {
@@ -28,6 +33,7 @@ export function scheduleCartReminder(userId: string, eventId: string, isCurrent:
         sound: 'default',
       });
     }
+    if (!await isCurrent()) return;
     await Notifications.scheduleNotificationAsync({
       identifier: CART_REMINDER,
       content: {

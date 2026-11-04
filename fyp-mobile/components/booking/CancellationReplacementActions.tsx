@@ -3,11 +3,12 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { bookingActionError } from '@/services/bookingActionError';
 import { formatBookingActivityTime } from '@/utils/bookingActivity';
-import { getSecureData, saveSecureData } from '@/store';
+import { createBookingDraftStore } from '@/store';
 import { continueWithoutCancelledVendor, getCancellationReplacement } from '@/services/cancellationReplacement';
 
 type Props = { event: any; booking: any; onUpdated: () => Promise<void>; canReschedule?: boolean };
 export default function CancellationReplacementActions({ event, booking, onUpdated, canReschedule = false }: Props) {
+  const [draft] = useState(createBookingDraftStore);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const lock = useRef(false);
@@ -45,13 +46,14 @@ export default function CancellationReplacementActions({ event, booking, onUpdat
         await onUpdated();
         return;
       }
-      const rawCart = await getSecureData('cartData');
+      const rawCart = await draft.get('cartData');
       let cart: any = null;
       try { cart = rawCart ? JSON.parse(rawCart) : null; } catch { throw new Error('Please clear your current cart before finding a replacement.'); }
       if (cart?.vendors?.length) throw new Error('Complete or clear your current cart before finding a replacement.');
       const context = await getCancellationReplacement(String(booking._id));
       if (context.canReplace === false) { setReplacementState('unavailable'); throw new Error('No replacement is available for this time. Please choose a later time or continue without this vendor.'); }
-      await saveSecureData('eventDetails', JSON.stringify(context.eventDetails));
+      await draft.save('eventDetails', JSON.stringify(context.eventDetails));
+      if (!draft.isCurrent()) return;
       router.push({ pathname: '/categoryvendorlisting', params: {
         categoryIds: JSON.stringify([context.categoryId]), categoryNames: JSON.stringify([context.categoryName]),
         eventCityId: context.eventDetails.eventCityId, eventDate: context.eventDetails.eventDate,

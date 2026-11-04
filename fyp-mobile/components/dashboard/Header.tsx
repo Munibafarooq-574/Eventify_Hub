@@ -2,10 +2,7 @@ import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadErro
 import searchVendors, { VendorSearchResult } from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
-import {
-  getSecureData,
-  getUserData,
-} from '@/store';
+import { createBookingDraftStore, getUserData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -33,6 +30,7 @@ const COLORS = {
 };
 
 const Header: React.FC = () => {
+  const [draft] = useState(createBookingDraftStore);
   const [username, setUsername] = useState(""); // State for username
   const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
 
@@ -118,7 +116,8 @@ const Header: React.FC = () => {
   const fetchCartPackageCount = async () => {
   try {
     const storedCart =
-      await getSecureData('cartData');
+      await draft.get('cartData');
+    if (!draft.isCurrent()) return;
 
     if (!storedCart) {
       setCartPackageCount(0);

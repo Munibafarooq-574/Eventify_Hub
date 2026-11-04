@@ -14,11 +14,7 @@ import getVendorReviews from '@/services/getAllReviewsForVendor';
 import getVendorReviewSummary from '@/services/getVendorReviewSummary';
 import postVendorReview from '@/services/postVendorReview';
 import { uploadReviewMedia } from '@/services/uploadReviewMedia';
-import {
-  getUserData,
-  saveSecureData,
-  getSecureData,
-} from '@/store';
+import { createBookingDraftStore, getUserData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { router, useFocusEffect, useGlobalSearchParams } from 'expo-router';
@@ -386,6 +382,7 @@ const getRelevantVendorSlots = (
 
 const VendorDetailsScreen: React.FC =
   () => {
+  const [draft] = useState(createBookingDraftStore);
     const {
   id,
   packageId,
@@ -421,7 +418,7 @@ useFocusEffect(useCallback(() => {
   setAddedPackages([]);
   const loadCart = async () => {
     try {
-      const cart = JSON.parse(await getSecureData('cartData') || '{}');
+      const cart = JSON.parse(await draft.get('cartData') || '{}');
       if (!active || addingToCartRef.current || version !== cartWriteVersion.current) return;
       const vendor = cart.vendors?.find((item: any) =>
         String(item.vendorId || item.vendor?._id || '') === cartVendorId,
@@ -680,7 +677,7 @@ const [availabilityCheck, setAvailabilityCheck] =
           }
 
           setDeliveryCity(resolvedEventCityId);
-          const savedDeliveryEvent = await getSecureData("eventDetails");
+          const savedDeliveryEvent = await draft.get("eventDetails");
           if (savedDeliveryEvent) setDeliveryGuests(Number(JSON.parse(savedDeliveryEvent).guests || 1));
           const checkResult =
   await checkVendorsAvailability({
@@ -1778,7 +1775,7 @@ Toast.show({
       cartWriteVersion.current++;
       setAddingToCart(true);
       try {
-        const existingCartData = await getSecureData('cartData');
+        const existingCartData = await draft.get('cartData');
 
         let cart = existingCartData
           ? JSON.parse(existingCartData)
@@ -1905,7 +1902,7 @@ Toast.show({
           String(Array.isArray(replacementMode) ? replacementMode[0] : replacementMode || '') === 'true';
 
         if (isReplacementBooking) {
-          const existingEventDetailsRaw = await getSecureData('eventDetails');
+          const existingEventDetailsRaw = await draft.get('eventDetails');
           let existingEventDetails: any = null;
           try {
             existingEventDetails = existingEventDetailsRaw
@@ -1915,7 +1912,7 @@ Toast.show({
             existingEventDetails = null;
           }
 
-          await saveSecureData(
+          await draft.save(
             'eventDetails',
             JSON.stringify({
               ...(existingEventDetails || {}),
@@ -1945,7 +1942,7 @@ Toast.show({
           eventCityId: String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || ''),
           services: cart.vendors.map((entry: any) => ({ vendorId: entry.vendorId || entry.vendor?._id })),
         });
-        await saveSecureData('cartData', JSON.stringify(cart));
+        await draft.save('cartData', JSON.stringify(cart));
         setAddedPackages(current => [...current, currentPackageId]);
         showCartNotice('Added to cart', `${pkg.packageName} · Rs. ${resolvedPrice.toLocaleString()}`);
       } catch (error) {

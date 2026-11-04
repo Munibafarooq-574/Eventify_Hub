@@ -14,7 +14,7 @@ import getVendorById from '@/services/getVendorById';
 import getAllCategories from '@/services/getAllCategories';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { getRescheduleRequests, resolvePartialReschedule } from '@/services/rescheduleBooking';
-import { getUserData, getSecureData, saveSecureData } from '@/store';
+import { createBookingDraftStore, getUserData, getSecureData, saveSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -216,6 +216,7 @@ const DetailRow = ({ label, value }: { label: string; value: string }) => (
 );
 
 const MyEventsScreen = () => {
+  const [draft] = useState(createBookingDraftStore);
   const insets = useSafeAreaInsets();
   const [cancellingBooking, setCancellingBooking] = useState<{ id: string; name: string } | null>(null);
   const [events, setEvents] = useState<any[]>([]);
@@ -1024,7 +1025,7 @@ const MyEventsScreen = () => {
                                     ? []
                                     : desiredServices.split(',').map((service: string) => service.trim()).filter(Boolean);
 
-                                  await saveSecureData(
+                                  await draft.save(
                                     'eventDetails',
                                     JSON.stringify({
                                       eventId: String(event._id),

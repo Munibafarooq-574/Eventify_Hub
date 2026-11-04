@@ -10,14 +10,16 @@ describe('OrderController - Unit Tests', () => {
   let controller: OrderController;
   let service: any;
   const validObjectId = '507f191e810c19729de860ea';
+  const client = { user: { id: validObjectId, role: 'Client' } };
+  const vendor = { user: { id: validObjectId, role: 'Vendor' } };
 
   beforeEach(async () => {
     service = {
       createOrder: jest.fn().mockResolvedValue({ _id: 'order123' }),
       updateVendorResponse: jest.fn().mockResolvedValue({ status: 'accepted' }),
       assertVendorBookingOwner: jest.fn().mockResolvedValue(undefined),
-      completeVendorOrder: jest.fn().mockResolvedValue({ status: 'completed' }),
       confirmOrderCompletion: jest.fn().mockResolvedValue({ status: 'completed' }),
+      completeVendorOrder: jest.fn().mockResolvedValue({ status: 'completed' }),
       updateStatus: jest.fn().mockResolvedValue({ status: 'completed' }),
       getOrders: jest.fn().mockResolvedValue([]),
       getOrderStats: jest.fn().mockResolvedValue({ totalOrders: 5 }),
@@ -86,7 +88,7 @@ describe('OrderController - Unit Tests', () => {
   });
 
   it('should complete full order', async () => {
-    const res = await controller.completeOrder('o123');
+    const res = await controller.completeOrder('o123', client);
     expect(res).toBeDefined();
     if (res) {
       expect(res.status).toBe('completed');
@@ -100,22 +102,33 @@ describe('OrderController - Unit Tests', () => {
   });
 
   it('should get orders', async () => {
-    const res = await controller.getOrders('Organizer', validObjectId);
+    const res = await controller.getOrders(client, 'Organizer', validObjectId);
     expect(res).toEqual([]);
   });
 
+  it('rejects reads for another account or a mismatched role', async () => {
+    const other = '507f191e810c19729de860eb';
+    await expect(controller.getOrders(client, 'Organizer', other)).rejects.toThrow('own account');
+    await expect(controller.getOrders(client, 'Vendor', validObjectId)).rejects.toThrow('own account');
+    await expect(controller.getOrderStats(client, 'Organizer', other)).rejects.toThrow('own account');
+    await expect(controller.getMonthlyOrderStats(vendor, other)).rejects.toThrow('own account');
+    expect(service.getOrders).not.toHaveBeenCalled();
+    expect(service.getOrderStats).not.toHaveBeenCalled();
+    expect(service.getOrderStatsForVendor).not.toHaveBeenCalled();
+  });
+
   it('should get stats', async () => {
-    const res = await controller.getOrderStats('Vendor', validObjectId);
+    const res = await controller.getOrderStats(vendor, 'Vendor', validObjectId);
     expect(res.totalOrders).toBe(5);
   });
 
   it('should get monthly stats', async () => {
-    const res = await controller.getMonthlyOrderStats(validObjectId);
+    const res = await controller.getMonthlyOrderStats(vendor, validObjectId);
     expect(Array.isArray(res)).toBe(true);
   });
 
   it('should delete an order', async () => {
-    const res = await controller.deleteOrder('o123');
+    const res = await controller.deleteOrder('o123', client);
     expect(res).toEqual({});
   });
   it('rejects completion when vendor ownership fails', async () => {

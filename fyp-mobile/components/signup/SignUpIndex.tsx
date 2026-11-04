@@ -1,5 +1,5 @@
 import Register from "@/services/register";
-import { getSecureData, saveSecureData, saveUserData } from "@/store";
+import { getSecureData, saveSecureData, saveUserData, startUserSession } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
@@ -266,7 +266,7 @@ const handleRegister = async () => {
   isClient ? countryCode : undefined,
 );
 
-    await saveSecureData("token", response.token);
+    await startUserSession(response.token, response.user);
 
     let finalUser = response.user;
 

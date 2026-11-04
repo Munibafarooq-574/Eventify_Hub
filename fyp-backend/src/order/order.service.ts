@@ -2510,8 +2510,8 @@ async completeVendorOrder(vendorOrderId: string) {
 }
 
     // Delete an order from the database
-    async deleteOrder(orderId: string): Promise<any> {
-        const order = await this.orderModel.findById(orderId);
+    async deleteOrder(orderId: string, organizerId: string): Promise<any> {
+        const order = await this.orderModel.findOne({ _id: orderId, organizerId });
         if (!order) {
             throw new NotFoundException(`Order with ID ${orderId} not found`);
         }
@@ -2519,11 +2519,15 @@ async completeVendorOrder(vendorOrderId: string) {
         // Delete associated vendor orders
         await this.vendorOrderModel.deleteMany({ orderId });
 
-        return this.orderModel.deleteOne({ _id: orderId });
+        return this.orderModel.deleteOne({ _id: orderId, organizerId });
     }
 
-    async confirmOrderCompletion(orderId: string) {
-        return this.orderModel.findByIdAndUpdate(orderId, { status: 'completed' }, { new: true });
+    async confirmOrderCompletion(orderId: string, organizerId: string) {
+        const order = await this.orderModel.findOneAndUpdate(
+            { _id: orderId, organizerId }, { status: 'completed' }, { new: true },
+        );
+        if (!order) throw new NotFoundException('Order not found');
+        return order;
     }
 
     async getOrderStatsForVendor(vendorId: string) {

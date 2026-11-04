@@ -91,7 +91,7 @@ export default AIPackageScreen; */
 
 
 import postGenerateAiPackage from '@/services/postGenerateAiPackage';
-import { getSecureData, saveSecureData } from '@/store';
+import { createBookingDraftStore } from '@/store';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -107,6 +107,7 @@ import {
 } from 'react-native';
 
 const AIPackageScreen: React.FC = () => {
+    const [draft] = useState(createBookingDraftStore);
     const [stage, setStage] = useState(0);
     const [proceed, setProceed] = useState<boolean>(false);
 
@@ -159,9 +160,9 @@ const AIPackageScreen: React.FC = () => {
         rotateLoop.start();
 
         const run = async () => {
-            const eventDetailsObj = JSON.parse(
-                (await getSecureData('eventDetails')) || ''
-            );
+            const rawEvent = await draft.get('eventDetails');
+            if (!rawEvent || !draft.isCurrent()) return;
+            const eventDetailsObj = JSON.parse(rawEvent);
 
             const response = await postGenerateAiPackage({
                 eventDate: eventDetailsObj.eventDate || new Date(),
@@ -173,8 +174,8 @@ const AIPackageScreen: React.FC = () => {
 
             console.log('AI Response', response);
 
-            await saveSecureData('aiPackage', JSON.stringify(response));
-            setProceed(true);
+            await draft.save('aiPackage', JSON.stringify(response));
+            if (draft.isCurrent()) setProceed(true);
         };
 
         run();

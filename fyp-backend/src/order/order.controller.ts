@@ -198,8 +198,9 @@ async updateVendorOrderStatus(
     }
 
     @Patch('complete-order/:id')
-    async completeOrder(@Param('id') orderId: string) {
-        return this.orderService.confirmOrderCompletion(orderId);
+    @UseGuards(JwtAuthGuard)
+    async completeOrder(@Param('id') orderId: string, @Request() req: any) {
+        return this.orderService.confirmOrderCompletion(orderId, this.requireOrderAccount(req, undefined, 'Organizer'));
     }
 
     @Patch(':id/status')
@@ -216,43 +217,41 @@ async updateVendorOrderStatus(
     async expireStaleHolds() {
         return this.orderService.expireStaleHolds();
     }
-    // Get all orders with status filtering and userId
+    private requireOrderAccount(req: any, requestedId: string | undefined, type: string) {
+        const userId = req.user?.id?.toString();
+        const role = req.user?.role?.trim().toLowerCase();
+        const accountType = role === 'vendor' ? 'Vendor'
+            : ['client', 'organizer'].includes(role) ? 'Organizer' : null;
+        if (!userId || !accountType || type !== accountType || (requestedId && requestedId !== userId)) {
+            throw new ForbiddenException('You can only access orders for your own account.');
+        }
+        return userId;
+    }
+
     @Get()
+    @UseGuards(JwtAuthGuard)
     async getOrders(
+        @Request() req: any,
         @Query('type') type: string,
-        @Query('userId') userId: string,  // Add userId parameter
+        @Query('userId') userId?: string,
         @Query('status') status?: string,
         @Query('limit') limit = 10,
         @Query('skip') skip = 0,
     ) {
-        const orders = await this.orderService.getOrders(type, userId, status, limit, skip);  // Pass userId to service
-        console.log(orders);
-        return orders;
+        return this.orderService.getOrders(type, this.requireOrderAccount(req, userId, type), status, limit, skip);
     }
 
-
-    // Get order stats (pending, processing, completed)
     @Get('stats')
-async getOrderStats(
-  @Query('type') type: string,
-  @Query('userId') userId: string,
-) {
-  if (!type) {
-    throw new BadRequestException('type is required');
-  }
-
-  if (!userId) {
-    throw new BadRequestException('userId is required');
-  }
-
-  return this.orderService.getOrderStats(type, userId);
-}
+    @UseGuards(JwtAuthGuard)
+    async getOrderStats(@Request() req: any, @Query('type') type: string, @Query('userId') userId?: string) {
+        return this.orderService.getOrderStats(type, this.requireOrderAccount(req, userId, type));
+    }
 
     @Get('stats/monthly')
-    async getMonthlyOrderStats(@Query('vendorId') vendorId: string) {
-        return this.orderService.getOrderStatsForVendor(vendorId);
+    @UseGuards(JwtAuthGuard)
+    async getMonthlyOrderStats(@Request() req: any, @Query('vendorId') vendorId?: string) {
+        return this.orderService.getOrderStatsForVendor(this.requireOrderAccount(req, vendorId, 'Vendor'));
     }
-
 
     // Phase 13B — Client requests a date/time change.
     @Get(':id/delivery-context')
@@ -331,7 +330,8 @@ async getOrderStats(
 
     // Delete an order
     @Delete(':id')
-    async deleteOrder(@Param('id') orderId: string) {
-        return this.orderService.deleteOrder(orderId);
+    @UseGuards(JwtAuthGuard)
+    async deleteOrder(@Param('id') orderId: string, @Request() req: any) {
+        return this.orderService.deleteOrder(orderId, this.requireOrderAccount(req, undefined, 'Organizer'));
     }
 }

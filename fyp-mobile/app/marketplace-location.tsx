@@ -3,11 +3,12 @@ import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } fr
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import getActiveCities, { ActiveCity } from '@/services/getActiveCities';
 import { growthApi } from '@/services/growthApiClient';
-import { deleteSecureData, getUserData, saveSecureData, saveUserData } from '@/store';
+import { createBookingDraftStore, getUserData, saveSecureData, saveUserData } from '@/store';
 
 type Location = { countryCode: string | null; cityId: string | null };
 
 export default function MarketplaceLocation() {
+  const [draft] = useState(createBookingDraftStore);
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [current, setCurrent] = useState<Location>();
   const [country, setCountry] = useState('PK');
@@ -44,10 +45,12 @@ export default function MarketplaceLocation() {
     setSaving(true);
     try {
       const location = await growthApi.patch<Location>('/auth/marketplace-location', { countryCode: country, cityId: cityId || null });
+      if (!draft.isCurrent()) return;
       if (switching) {
-        await Promise.all([deleteSecureData('cartData'), deleteSecureData('eventDetails')]);
+        await Promise.all([draft.delete('cartData'), draft.delete('eventDetails')]);
       }
       const user = await getUserData();
+      if (!draft.isCurrent()) return;
       if (user) {
         const updated = { ...user, clientCityId: location.cityId, marketplaceCountryCode: location.countryCode };
         await Promise.all([saveUserData(updated), saveSecureData('user', JSON.stringify(updated))]);

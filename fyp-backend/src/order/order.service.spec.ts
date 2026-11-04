@@ -227,19 +227,20 @@ describe('OrderService - Unit Tests', () => {
     });
 
     it('should delete order', async () => {
-        orderModel.findById = jest.fn().mockResolvedValue({});
-        const result = await service.deleteOrder('o123');
+        orderModel.findOne = jest.fn().mockResolvedValue({});
+        const result = await service.deleteOrder('o123', validObjectId);
         expect(result).toEqual({});
     });
 
     it('should confirm order completion', async () => {
-        const result = await service.confirmOrderCompletion('o123');
+        orderModel.findOneAndUpdate = jest.fn().mockResolvedValue({ organizerId: validObjectId });
+        const result = await service.confirmOrderCompletion('o123', validObjectId);
         expect(result).toHaveProperty('organizerId');
     });
 
     it('should throw if order not found for completion', async () => {
-        orderModel.findById = jest.fn().mockResolvedValue(null);
-        await expect(service.completeOrder('invalid')).rejects.toThrow();
+        orderModel.findOneAndUpdate = jest.fn().mockResolvedValue(null);
+        await expect(service.confirmOrderCompletion('invalid', validObjectId)).rejects.toThrow();
     });
 
     it('should return monthly stats (empty case)', async () => {
