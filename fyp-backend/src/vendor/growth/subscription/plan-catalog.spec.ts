@@ -53,6 +53,14 @@ describe('Admin subscription catalog', () => {
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 5 active coupons');
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 5 active discount codes');
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Up to 2 promotional campaigns per month');
+    const growthBenefits = defaults.find(plan => plan.key === 'growth')!.featureLabels;
+    expect(growthBenefits.indexOf('Up to 10 packages')).toBeLessThan(growthBenefits.indexOf('Up to 30 portfolio images'));
+    expect(growthBenefits.indexOf('Up to 30 portfolio images')).toBeLessThan(growthBenefits.indexOf('Up to 20 images per package'));
+    expect(growthBenefits.indexOf('Up to 20 images per package')).toBeLessThan(growthBenefits.indexOf('Up to 1 featured vendor slot'));
+    expect(growthBenefits.indexOf('Up to 1 featured vendor slot')).toBeLessThan(growthBenefits.indexOf('Up to 1 featured package slot'));
+    expect(growthBenefits.indexOf('Up to 1 featured package slot')).toBeLessThan(growthBenefits.indexOf('Up to 2 promotional campaigns per month'));
+    expect(growthBenefits.indexOf('Up to 2 promotional campaigns per month')).toBeLessThan(growthBenefits.indexOf('Up to 5 active coupons'));
+    expect(growthBenefits.indexOf('Up to 5 active coupons')).toBeLessThan(growthBenefits.indexOf('Up to 5 active discount codes'));
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).toContain('Advanced analytics & business insights');
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Promotional campaigns');
     expect(defaults.find(plan => plan.key === 'growth')?.featureLabels).not.toContain('Growth visibility & featured eligibility');
