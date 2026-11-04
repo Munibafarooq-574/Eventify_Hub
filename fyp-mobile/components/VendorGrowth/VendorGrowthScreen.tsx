@@ -1,3 +1,4 @@
+import { reportMarketplaceLoadError } from "@/services/reportMarketplaceLoadError";
 
 // fyp-mobile/components/VendorGrowth/VendorGrowthScreen.tsx
 
@@ -190,10 +191,7 @@ export default function VendorGrowthScreen() {
       setSubscription(sub);
       setAnalytics(analyticsSummary);
     } catch (e: any) {
-      console.error(
-        '[Vendor Growth] Subscription failed:',
-        e,
-      );
+      reportMarketplaceLoadError('[Vendor Growth] Subscription failed:', e);
 
       setError(
         e?.message ||

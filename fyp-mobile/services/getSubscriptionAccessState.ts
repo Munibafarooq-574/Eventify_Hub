@@ -14,10 +14,17 @@ export async function getSubscriptionAccessState(
       `/vendor/growth/subscription/access/${vendorId}`,
     );
 
-  console.log(
-    "[SUBSCRIPTION ACCESS SERVICE]",
-    JSON.stringify(access, null, 2),
-  );
+  // A successful HTTP response can still contain an incompatible payload.
+  const isObject = (value: unknown) =>
+    !!value && typeof value === "object" && !Array.isArray(value);
+  if (
+    !isObject(access?.subscription) ||
+    !isObject(access?.features) ||
+    !isObject(access?.limits) ||
+    typeof access?.accessAllowed !== "boolean"
+  ) {
+    throw new Error("Could not verify subscription details. Please try again.");
+  }
 
   return access;
 }
