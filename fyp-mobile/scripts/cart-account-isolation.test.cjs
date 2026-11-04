@@ -44,8 +44,8 @@ function device(server, platform = 'android') {
       const previous = server.get(owner) ?? { revision: 0, eventDetails: null, cartData: null };
       if (options.method === 'GET') return { ok: true, json: async () => previous };
       const { revision, key, value } = JSON.parse(options.body);
-      if (revision !== previous.revision) return { ok: false, json: async () => ({ message: 'Draft changed' }) };
-      const next = { ...previous, revision: revision + 1, [key]: value };
+      if (revision !== previous.revision) return { ok: false, status: 409, json: async () => ({ message: 'Draft changed' }) };
+      const next = { ...previous, revision: revision + 1, ...(key === 'legacyDraft' ? value : { [key]: value }) };
       server.set(owner, next);
       return { ok: true, json: async () => next };
     } });
@@ -105,4 +105,35 @@ test('a draft write paused before logout cannot resume under another account', a
   assert.equal(await store.getSecureData('eventDetails'), null);
   await store.startUserSession('alice-token', alice);
   assert.equal(await store.getSecureData('eventDetails'), null);
+});
+
+
+test('the original phone uploads an account-bound old cart once and a second phone receives it', async () => {
+  const server = new Map();
+  const first = device(server);
+  const second = device(server);
+  const a = first.load(), b = second.load();
+  const cartKey = `booking-draft.${alice._id}.cartData`;
+  const eventKey = `booking-draft.${alice._id}.eventDetails`;
+  first.secure.set(cartKey, JSON.stringify(cart));
+  first.secure.set(eventKey, JSON.stringify(event));
+  await b.startUserSession('alice-token', alice);
+  assert.equal(await b.getSecureData('cartData'), null);
+  await a.startUserSession('alice-token', alice);
+  assert.equal(await a.getSecureData('cartData'), JSON.stringify(cart));
+  assert.equal(await b.getSecureData('cartData'), JSON.stringify(cart));
+  assert.equal(await b.getSecureData('eventDetails'), JSON.stringify(event));
+  assert.equal(server.get('Bearer alice-token').revision, 1);
+  assert.ok(!first.secure.has(cartKey) && !first.secure.has(eventKey));
+});
+
+test('an old phone cart never replaces an existing server cart', async () => {
+  const server = new Map([['Bearer alice-token', { revision: 5, cartData: null, eventDetails: null }]]);
+  const first = device(server);
+  first.secure.set(`booking-draft.${alice._id}.cartData`, JSON.stringify(cart));
+  first.secure.set(`booking-draft.${alice._id}.eventDetails`, JSON.stringify(event));
+  const store = first.load();
+  await store.startUserSession('alice-token', alice);
+  assert.equal(await store.getSecureData('cartData'), null);
+  assert.equal(server.get('Bearer alice-token').revision, 5);
 });

@@ -1,5 +1,5 @@
 import {
-    BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Patch, Req, UseGuards,
+    BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Header, Patch, Req, UseGuards,
 } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Types } from 'mongoose';
@@ -31,6 +31,7 @@ export class BookingDraftController {
     }
 
     @Get()
+    @Header('Cache-Control', 'private, no-store')
     async getDraft(@Req() request: ActorRequest) {
         const { countryCode } = this.scope(request);
         const draft = await this.connection.db!.collection<BookingDraft>(BOOKING_DRAFT_COLLECTION)
@@ -45,8 +46,11 @@ export class BookingDraftController {
     ) {
         const { countryCode, businessCityIds } = this.scope(request);
         const { key, value, revision } = body ?? {};
-        if ((key !== 'cartData' && key !== 'eventDetails') || !Number.isSafeInteger(revision) ||
-            revision! < 0 || (value !== null && (!value || typeof value !== 'object' || Array.isArray(value)))) {
+        const importing = key === 'legacyDraft';
+        const isObject = (entry: unknown): entry is Record<string, unknown> =>
+            !!entry && typeof entry === 'object' && !Array.isArray(entry);
+        if ((key !== 'cartData' && key !== 'eventDetails' && !importing) || !Number.isSafeInteger(revision) ||
+            revision! < 0 || (value !== null && !isObject(value))) {
             throw new BadRequestException('Invalid booking draft update.');
         }
         if (Buffer.byteLength(JSON.stringify(value)) > 256 * 1024) {
@@ -58,10 +62,20 @@ export class BookingDraftController {
         const current = await drafts.findOne({ _id: owner });
         const prior = this.snapshot(current, countryCode);
         if (prior.revision !== revision) this.conflict();
-        const next = { ...prior, [key]: value as Record<string, unknown> | null };
+        const next = { ...prior };
+        if (importing) {
+            if (prior.revision !== 0) this.conflict();
+            if (!isObject(value) || !isObject(value.eventDetails) || !isObject(value.cartData)) {
+                throw new BadRequestException('Invalid saved cart.');
+            }
+            next.eventDetails = value.eventDetails;
+            next.cartData = value.cartData;
+        } else if (key === 'eventDetails' || key === 'cartData') {
+            next[key] = value as Record<string, unknown> | null;
+        }
 
-        if (key === 'eventDetails') {
-            if (value !== null) {
+        if (key === 'eventDetails' || importing) {
+            if (next.eventDetails !== null) {
                 const event = next.eventDetails!;
                 if (typeof event.eventId !== 'string' || !event.eventId.trim() ||
                     !businessCityIds.some(cityId => String(cityId) === event.eventCityId)) {
@@ -74,8 +88,9 @@ export class BookingDraftController {
                     throw new ConflictException('This event has already been booked.');
                 }
             }
-            if (prior.eventDetails?.eventId !== next.eventDetails?.eventId) next.cartData = null;
-        } else if (value !== null) {
+            if (!importing && prior.eventDetails?.eventId !== next.eventDetails?.eventId) next.cartData = null;
+        }
+        if ((key === 'cartData' || importing) && next.cartData !== null) {
             const entries = next.cartData!.vendors;
             if (!Array.isArray(entries) || (entries.length && !businessCityIds.some(cityId =>
                 String(cityId) === next.eventDetails?.eventCityId))) {
@@ -93,7 +108,7 @@ export class BookingDraftController {
             }
             for (const entry of entries) {
                 if (!Array.isArray(entry.packages) || entry.packages.some((pkg: any) =>
-                    pkg?.eventId && pkg.eventId !== next.eventDetails?.eventId)) {
+                    !pkg || typeof pkg !== 'object' || (pkg.eventId && pkg.eventId !== next.eventDetails?.eventId))) {
                     throw new BadRequestException('The selected packages belong to a different event.');
                 }
             }

@@ -12,7 +12,11 @@ type DraftSnapshot = {
   eventDetails: Record<string, unknown> | null;
 };
 
-async function requestDraft(token: string, update?: { key: ServerDraftKey; value: unknown; revision: number }) {
+class DraftRequestError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
+async function requestDraft(token: string, update?: { key: ServerDraftKey | 'legacyDraft'; value: unknown; revision: number }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {
@@ -24,7 +28,10 @@ async function requestDraft(token: string, update?: { key: ServerDraftKey; value
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body || !Number.isInteger(body.revision)) {
-      throw new Error(typeof body?.message === 'string' ? body.message : 'Unable to sync your booking draft. Please try again.');
+      throw new DraftRequestError(
+        typeof body?.message === 'string' ? body.message : 'Unable to sync your booking draft. Please try again.',
+        response.status,
+      );
     }
     return body as DraftSnapshot;
   } finally {
@@ -74,9 +81,40 @@ export function createBookingDraftStore() {
   let snapshot: DraftSnapshot | undefined;
   let reading: Promise<DraftSnapshot> | undefined;
 
-  async function load(token: string) {
+  async function load(session: { userId: string; token: string }) {
     if (!reading) {
-      reading = requestDraft(token).finally(() => { reading = undefined; });
+      reading = (async () => {
+        const latest = await requestDraft(session.token);
+        if (latest.revision !== 0 || !isCurrent()) return latest;
+
+        // Only import drafts that the previous app already stored under this account.
+        const cartKey = `booking-draft.${session.userId}.cartData`;
+        const eventKey = `booking-draft.${session.userId}.eventDetails`;
+        try {
+          const [cart, event] = await Promise.all([read(cartKey), read(eventKey)]);
+          if (!cart || !event || !isCurrent()) return latest;
+          let cartData, eventDetails;
+          try {
+            cartData = JSON.parse(cart);
+            eventDetails = JSON.parse(event);
+          } catch {
+            return latest;
+          }
+          if (!cartData?.vendors?.length || !eventDetails?.eventId) return latest;
+
+          const imported = await requestDraft(session.token, {
+            key: 'legacyDraft', value: { cartData, eventDetails }, revision: 0,
+          });
+          await Promise.allSettled([remove(cartKey), remove(eventKey)]);
+          return imported;
+        } catch (error) {
+          // Another device may have saved first. Keep its version and leave the old copy intact.
+          if (!isCurrent()) return latest;
+          const current = await requestDraft(session.token);
+          if (current.revision > 0 || (error instanceof DraftRequestError && [400, 403, 409].includes(error.status))) return current;
+          throw error;
+        }
+      })().finally(() => { reading = undefined; });
     }
     snapshot = await reading;
     return snapshot;
@@ -91,7 +129,7 @@ export function createBookingDraftStore() {
         else await write(aiKey(session.userId), value);
         return;
       }
-      const previous = snapshot ?? await load(session.token);
+      const previous = snapshot ?? await load(session);
       if (!isCurrent()) return;
       snapshot = await requestDraft(session.token, {
         key, value: value === null ? null : JSON.parse(value), revision: previous.revision,
@@ -111,7 +149,7 @@ export function createBookingDraftStore() {
     async get(key: DraftKey) {
       const session = await getSession();
       if (!session) return null;
-      const value = key === 'aiPackage' ? await read(aiKey(session.userId)) : (await load(session.token))[key];
+      const value = key === 'aiPackage' ? await read(aiKey(session.userId)) : (await load(session))[key];
       return !isCurrent() || value == null ? null : typeof value === 'string' ? value : JSON.stringify(value);
     },
     save(key: DraftKey, value: string) {

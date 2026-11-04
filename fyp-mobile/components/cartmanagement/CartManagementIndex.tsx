@@ -169,7 +169,7 @@ if (eventDetailsRaw) {
                 Toast.show({
                     type: 'error',
                     text1: 'Error',
-                    text2: 'Failed to load cart data. Please try again.',
+                    text2: error instanceof Error ? error.message : 'Failed to load cart data. Please try again.',
                     position: 'bottom',
                 });
             }
