@@ -35,15 +35,20 @@ export class PlanCatalogService {
     return this.connection.db!.collection<PlanDocument>('subscriptionplanconfigs');
   }
 
+  private get removedFeatures() {
+    return this.connection.db!.collection<{ _id: string }>('subscriptionremovedfeatures');
+  }
+
   private get customFeatures() {
     return this.connection.db!.collection<FeatureDocument>('subscriptionfeatureconfigs');
   }
 
   async getFeatures(): Promise<Feature[]> {
     const custom = await this.customFeatures.find().sort({ name: 1 }).toArray();
+    const removed = new Set((await this.removedFeatures.find().toArray()).map(row => row._id));
     return [...BUILT_IN_FEATURES, ...custom.map(feature => ({
       key: feature._id, name: feature.name, controlsAccess: false,
-    }))];
+    }))].filter(feature => !removed.has(feature.key));
   }
 
   private defaultPlan(plan: PlanDefinition): CatalogPlan {
@@ -63,9 +68,11 @@ export class PlanCatalogService {
   }
 
   private definition(key: string, plan: CatalogPlan, features: Feature[]) {
-    const enabled = new Set(plan.featureKeys);
+    const available = new Set(features.map(feature => feature.key));
+    const enabled = new Set(plan.featureKeys.filter(key => available.has(key)));
     return {
       ...plan,
+      featureKeys: [...enabled],
       key,
       priceLabel: plan.monthlyPrice === null
         ? 'Price not configured'
@@ -97,7 +104,7 @@ export class PlanCatalogService {
     const stored = await this.plans.findOne({ _id: key });
     if (stored) return this.definition(key, stored.plan, await this.getFeatures());
     if (Object.values(SubscriptionPlan).includes(key as SubscriptionPlan)) {
-      return this.definition(key, this.defaultPlan(getPlanDefinition(key as SubscriptionPlan)), BUILT_IN_FEATURES);
+      return this.definition(key, this.defaultPlan(getPlanDefinition(key as SubscriptionPlan)), await this.getFeatures());
     }
     return null;
   }
@@ -157,17 +164,28 @@ export class PlanCatalogService {
     return this.definition(key, plan, features);
   }
 
+  async setPlanActive(key: string, active: unknown) {
+    if (typeof active !== 'boolean') throw new BadRequestException('Active must be true or false.');
+    const existing = await this.get(key);
+    if (!existing) throw new NotFoundException('Plan not found.');
+    if (key === SubscriptionPlan.FREE) throw new BadRequestException('The legacy free plan cannot be sold.');
+    const stored = await this.plans.findOne({ _id: key });
+    const plan = stored?.plan ?? this.defaultPlan(getPlanDefinition(key as SubscriptionPlan));
+    await this.plans.updateOne({ _id: key }, { $set: { plan: { ...plan, isPurchasable: active } } }, { upsert: true });
+    return { key, isPurchasable: active };
+  }
+
   async deleteFeature(key: string) {
-    if (!key.startsWith('custom:')) {
-      throw new BadRequestException('Built-in features cannot be deleted. Uncheck them in individual plans instead.');
-    }
-    const feature = await this.customFeatures.findOne({ _id: key });
+    const feature = (await this.getFeatures()).find(item => item.key === key);
     if (!feature) throw new NotFoundException('Feature not found.');
+    if (!key.startsWith('custom:')) {
+      await this.removedFeatures.updateOne({ _id: key }, { $set: { _id: key } }, { upsert: true });
+    }
     await this.connection.db!.collection<PlanDocument>('subscriptionplanconfigs').updateMany(
       { 'plan.featureKeys': key },
       { $pull: { 'plan.featureKeys': key } } as any,
     );
-    await this.customFeatures.deleteOne({ _id: key });
+    if (key.startsWith('custom:')) await this.customFeatures.deleteOne({ _id: key });
     return { deleted: true, key };
   }
 
