@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
 import { AdminRoleGuard } from '../../../auth/admin-role.guard';
 import { PlanCatalogService } from './plan-catalog.service';
@@ -29,13 +29,4 @@ export class PlanCatalogController {
     return this.catalog.setPlanActive(key, active);
   }
 
-  @Delete('features/:key')
-  deleteFeature(@Param('key') key: string) {
-    return this.catalog.deleteFeature(key);
-  }
-
-  @Post('features')
-  addFeature(@Body('name') name: unknown) {
-    return this.catalog.addFeature(name);
-  }
 }
