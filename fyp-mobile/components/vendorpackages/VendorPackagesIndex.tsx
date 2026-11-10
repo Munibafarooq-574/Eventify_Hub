@@ -377,7 +377,6 @@ const PackageScreen = () => {
 
         <Text
           style={styles.headerTitle}
-          numberOfLines={1}
         >
           {packageDetails
             ? packageDetails.packageName
@@ -1341,8 +1340,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     flex: 1,
+    flexShrink: 1,
     textAlign: "center",
     marginHorizontal: 10,
+    lineHeight: 25,
   },
 
   buttonContainer: {
