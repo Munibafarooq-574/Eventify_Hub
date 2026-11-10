@@ -438,7 +438,7 @@ const MyEventsScreen = () => {
     );
   };
 
-  const handleMessage = async (vendor: any, historyOnly = false) => {
+  const handleMessage = async (vendor: any, historyOnly = false, timeZone = 'UTC') => {
     try {
       const user = await resolveUser();
       if (!user || !user._id) {
@@ -456,7 +456,7 @@ const MyEventsScreen = () => {
       await saveSecureData('receiverName', displayName);
       await saveSecureData('receiverAvatar', vendor?.vendorId?.contactDetails?.brandLogo || '');
 
-      router.push(historyOnly ? `/message?history=true&bookingId=${vendor._id}` : `/message`);
+      router.push({ pathname: "/message", params: { eventTimeZone: timeZone, ...(historyOnly ? {history: "true", bookingId: vendor._id} : {}) } });
     } catch (error) {
       reportMarketplaceLoadError('Booking chat unavailable', error);
       Alert.alert('Conversation unavailable', 'Please refresh this booking and try again.');
@@ -1318,7 +1318,7 @@ const MyEventsScreen = () => {
                             <TouchableOpacity
                               style={styles.messageButton}
                               activeOpacity={0.85}
-                              onPress={() => handleMessage(vendor)}
+                              onPress={() => handleMessage(vendor, false, timeZone)}
                             >
                               <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
                               <Text style={styles.messageButtonText}>Message</Text>
@@ -1560,7 +1560,7 @@ const MyEventsScreen = () => {
                                 ? 'The vendor accepted, but the required down payment was not confirmed before the deadline. This booking is now closed.'
                                 : 'The vendor did not accept before the service started. This request is now closed.'}</Text>}
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 12 }}>
-                                <TouchableOpacity style={styles.messageButton} onPress={() => handleMessage(vendor, true)}>
+                                <TouchableOpacity style={styles.messageButton} onPress={() => handleMessage(vendor, true, timeZone)}>
                                   <Text style={styles.messageButtonText}>View chat history</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
@@ -1568,7 +1568,7 @@ const MyEventsScreen = () => {
                                 </TouchableOpacity>
                               </View>
                               <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
-                              <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
+                              <BookingCancellationDetails timeZone={timeZone} booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
                             </View>
                           );

@@ -74,3 +74,37 @@ test('actual cart and review resolvers use the current event-city schedule after
     assert.equal(new Date(appointment.start || appointment.startDateTime).getTime(), Date.parse(pkg.requiredServiceWindow.startDateTime));
   }
 });
+
+test('requested, payment, cancellation and refund timestamps use the event-city date and 12-hour time', () => {
+  assert.equal(api.formatBookingDateTime('2026-11-10T09:57:00Z','America/Los_Angeles'), '10 Nov 2026 · 1:57 AM');
+  assert.equal(api.formatBookingDateTime('2026-11-10T03:30:00Z','America/Los_Angeles'), '9 Nov 2026 · 7:30 PM');
+  assert.equal(api.formatBookingDateTime('2026-11-10T09:57:00Z','Asia/Karachi'), '10 Nov 2026 · 2:57 PM');
+  const cancellation = {};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync('utils/bookingCancellation.ts','utf8'), {
+    compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020},
+  }).outputText, {exports:cancellation,require:()=>api});
+  assert.equal(cancellation.bookingCancellation({status:'cancelled',cancelledAt:'2026-11-10T03:30:00Z'},'America/Los_Angeles').cancelledAt,'9 Nov 2026 · 7:30 PM');
+  assert.equal(cancellation.bookingCancellation({status:'cancelled'},'America/Los_Angeles').cancelledAt,'Not recorded');
+});
+
+test('chat separators and message times follow the opened booking and each automatic notice timezone', () => {
+  const file='components/message/MessageIndex.tsx';
+  const source=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  const names=new Set(['formatTime','messageZone','dateLabel','buildDisplayData']);
+  const declarations=[];
+  const visit=node=>{
+    if(ts.isVariableDeclaration(node) && names.has(node.name.getText(source))) declarations.push(`const ${node.name.getText(source)} = ${node.initializer.getText(source)};`);
+    ts.forEachChild(node,visit);
+  };
+  visit(source);
+  const exports={};
+  vm.runInNewContext(ts.transpileModule(declarations.join('\n')+'\nexports.build=buildDisplayData; exports.time=formatTime; exports.zone=messageZone;',{}).outputText,{
+    exports,...api,getMsgTime:m=>m.timestamp,getMsgText:m=>m.message,
+  });
+  const ordinary={_id:'ordinary',timestamp:'2026-11-10T03:30:00Z',message:'Hello'};
+  const notice={_id:'notice',timestamp:'2026-11-10T03:30:00Z',message:'Times shown in Asia/Karachi',bookingNoticeKey:'booking:confirmed'};
+  const separators=exports.build([ordinary,notice],'America/Los_Angeles').filter(row=>row.__type==='separator');
+  assert.ok(separators.some(row=>row._id==='sep-America/Los_Angeles:2026-11-09'));
+  assert.ok(separators.some(row=>row._id==='sep-Asia/Karachi:2026-11-10'));
+  assert.equal(exports.time(ordinary.timestamp,exports.zone(ordinary,'America/Los_Angeles')),'7:30 PM');
+});

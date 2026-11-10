@@ -1,3 +1,4 @@
+import { bookingTimeZone, formatBookingDateTime } from '@/utils/bookingTimezone';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { VendorCancellationPreview } from '@/services/getVendorCancellationPreview';
@@ -7,15 +8,8 @@ export default function VendorCancellationSummary({ order, booking, preview }: {
 }) {
   const pkg = booking?.vendorId?.packages?.find((item: any) => String(item._id) === String(booking.packageId));
   const client = order?.organizerId;
-  const zone = order?.eventCityId?.timeZone;
-  const date = (value: unknown) => {
-    if (!value) return 'Not recorded';
-    const parsed = new Date(value as string);
-    return Number.isFinite(parsed.getTime()) ? parsed.toLocaleString('en-GB', {
-      day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
-      ...(zone ? { timeZone: zone } : {}),
-    }) : 'Not recorded';
-  };
+  const zone = bookingTimeZone(order);
+  const date = (value: any) => formatBookingDateTime(value, zone, 'Not recorded');
   const money = (value: number) => Number.isFinite(value) ? `Rs. ${value.toLocaleString('en-PK')}` : 'Not recorded';
   const delivery = pkg?.bookingType === 'DELIVERY_BASED';
   const sections: { title: string; rows: [string, any][] }[] = [
@@ -33,7 +27,7 @@ export default function VendorCancellationSummary({ order, booking, preview }: {
       ['Guests', order?.guests], ['City', order?.eventCityId?.name || order?.eventCity], ['Address', order?.eventAddress],
       [delivery ? 'Delivery at' : 'Service starts', date(booking?.eventStartDateTime)],
       ...(!delivery ? [['Service ends', date(booking?.eventEndDateTime)] as [string, any]] : []),
-      ['Timezone', zone || 'Device local time'],
+      ['Timezone', zone],
     ] },
     { title: 'Client details', rows: [
       ['Name', client?.name], ['Email', client?.email], ['Phone', client?.phone || client?.phone_number],

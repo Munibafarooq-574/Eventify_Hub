@@ -1,3 +1,4 @@
+import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -58,10 +59,10 @@ const NotificationsScreen: React.FC = () => {
                 <View style={styles.textContainer}>
                     <Text style={styles.notificationType}>{item.title || item.type}</Text>
                     <Text style={styles.notificationDescription}>{item.body}</Text>
-                </View>
                 <Text style={styles.notificationTime}>
-                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {item.orderId ? `${formatBookingDateTime(item.createdAt, item.eventTimeZone)} (${validTimeZone(item.eventTimeZone)})` : new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </Text>
+                </View>
             </TouchableOpacity>
         );
     };

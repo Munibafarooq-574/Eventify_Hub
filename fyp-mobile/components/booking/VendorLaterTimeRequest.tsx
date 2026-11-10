@@ -1,3 +1,4 @@
+import { bookingTimeZone } from '@/utils/bookingTimezone';
 import React, { useRef, useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,14 +48,14 @@ export default function VendorLaterTimeRequest({ booking, event, available, onUp
     {request ? <>
       <Text style={styles.text}>{labels[request.status] || 'Request closed'}</Text>
       <Text style={styles.text}>{request.reason}</Text>
-      <Text style={styles.text}>Requested: {formatBookingActivityTime(request.requestedAt, event.eventCityId?.timeZone)}</Text>
-      {!!request.suggestedEventStart && <Text style={styles.text}>Suggested event time: {formatBookingActivityTime(request.suggestedEventStart, event.eventCityId?.timeZone)}</Text>}
-      {!!request.resolvedAt && <Text style={styles.text}>Client decision: {formatBookingActivityTime(request.resolvedAt, event.eventCityId?.timeZone)}</Text>}
+      <Text style={styles.text}>Requested: {formatBookingActivityTime(request.requestedAt, bookingTimeZone(event))}</Text>
+      {!!request.suggestedEventStart && <Text style={styles.text}>Suggested event time: {formatBookingActivityTime(request.suggestedEventStart, bookingTimeZone(event))}</Text>}
+      {!!request.resolvedAt && <Text style={styles.text}>Client decision: {formatBookingActivityTime(request.resolvedAt, bookingTimeZone(event))}</Text>}
     </> : !open ? <TouchableOpacity accessibilityRole="button" style={styles.button} onPress={() => setOpen(true)}><Text style={styles.buttonText}>Request later service time</Text></TouchableOpacity> : <>
       <Text style={styles.text}>The client chooses whether to reschedule, replace your booking or continue without you. Sending this request does not change the event time.</Text>
       <Text style={styles.title}>Reason <Text style={{ color: '#B12A48' }}>*</Text></Text>
       <TextInput accessibilityLabel="Reason for later service time" placeholderTextColor="#896F81" placeholder="Explain why a later time is needed" value={reason} onChangeText={setReason} maxLength={500} multiline style={styles.input} />
-      <Text style={styles.text}>Optional suggested event date/time, in {event.eventCityId?.timeZone || 'the event city timezone'}. Availability will be checked when rescheduling.</Text>
+      <Text style={styles.text}>Optional suggested event date/time, in {bookingTimeZone(event) || 'the event city timezone'}. Availability will be checked when rescheduling.</Text>
       <Text style={styles.title}>Suggested event time · optional</Text>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select suggested date" disabled={busy} style={styles.input} onPress={() => setPicker('date')}><Text style={styles.text}><Ionicons name="calendar-outline" size={16} />  {date || 'Select date'}</Text></TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Select suggested time" disabled={busy} style={styles.input} onPress={() => setPicker('time')}><Text style={styles.text}><Ionicons name="time-outline" size={16} />  {time ? `${Number(time.slice(0, 2)) % 12 || 12}:${time.slice(3)} ${Number(time.slice(0, 2)) >= 12 ? 'PM' : 'AM'}` : 'Select time'}</Text></TouchableOpacity>

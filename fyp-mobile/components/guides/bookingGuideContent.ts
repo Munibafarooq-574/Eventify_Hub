@@ -27,7 +27,7 @@ const status: GuideSection = {
 const service: GuideSection = {
   id: 'service-time', title: 'Event time and service time', summary: 'Check when this particular package is needed.',
   steps: [
-    'Event dates, service times and booking activity use the event city timezone shown on the booking, even when your phone is in another country.',
+    'Event dates, service times, requests, cancellation/refund updates and payment timestamps use the event city timezone shown on the booking, even when your phone is in another country.',
     'Event time is when the event starts. Service time is the booked work or delivery window for this package; these can differ.',
     'Duration-based packages have a booked start and end. Delivery-based packages use delivery timing. Setup-based packages include setup timing and the time needed to set up. Custom packages follow their saved timing details.',
     'Read the package name, inclusions, price, duration or delivery/setup window, address and service city before acting.',

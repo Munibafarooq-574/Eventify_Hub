@@ -1,3 +1,4 @@
+import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
@@ -61,10 +62,10 @@ const NotificationsScreen: React.FC = () => {
                     <Text style={styles.notificationDescription} numberOfLines={item.type === 'REFUND_UPDATE' ? undefined : 2}>
                         {item.body}
                     </Text>
-                </View>
                 <Text style={styles.notificationTime}>
-                    {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {item.orderId ? `${formatBookingDateTime(item.createdAt, item.eventTimeZone)} (${validTimeZone(item.eventTimeZone)})` : new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </Text>
+                </View>
             </TouchableOpacity>
         );
     };

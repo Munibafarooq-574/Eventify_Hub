@@ -1,14 +1,15 @@
 // notification.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
-import { Model } from 'mongoose';
+import { Order } from '../schemas/order.schema';
+import { Model, Types } from 'mongoose';
 import { User } from 'src/schemas/user.schema';
 import { Notification } from 'src/schemas/notification.schema';
 
 @Injectable()
 export class NotificationService {
-    constructor(@InjectModel(User.name) private userModel: Model<User>, @InjectModel(Notification.name) private notificationModel: Model<Notification>) {
+    constructor(@InjectModel(User.name) private userModel: Model<User>, @InjectModel(Notification.name) private notificationModel: Model<Notification>, @Optional() @InjectModel(Order.name) private orderModel?: Model<Order>) {
 
     }
     async sendExpoPush(token: string, title: string, body: string) {
@@ -78,8 +79,12 @@ export class NotificationService {
     }
 
     async getNotificationsByUserId(userId: string) {
-        return await this.notificationModel
-            .find({ userId })
-            .sort({ createdAt: -1 }); // Most recent first
+        const records = await this.notificationModel.find({ userId }).sort({ createdAt: -1 });
+        const ids = [...new Set(records.map(record => record.orderId).filter((id): id is string => !!id && Types.ObjectId.isValid(id)))];
+        if (!ids.length || !this.orderModel) return records;
+        const orders = await this.orderModel.find({ _id: { $in: ids } })
+            .select('eventCityId').populate({ path: 'eventCityId', select: 'timeZone' }).lean();
+        const zones = new Map(orders.map(order => [String(order._id), (order.eventCityId as any)?.timeZone || 'UTC']));
+        return records.map(record => ({ ...record.toObject(), eventTimeZone: zones.get(String(record.orderId)) || 'UTC' }));
     }
 }

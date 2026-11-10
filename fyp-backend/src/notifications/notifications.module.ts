@@ -1,3 +1,5 @@
+import { Order, OrderSchema } from '../schemas/order.schema';
+import { City, CitySchema } from '../schemas/city.schema';
 // src/reviews/reviews.module.ts
 import { Module } from '@nestjs/common';
 import { NotificationController } from './notifications.controller';
@@ -8,7 +10,7 @@ import { Notification, NotificationSchema } from 'src/schemas/notification.schem
 
 @Module({
     imports: [MongooseModule.forFeature([
-        { name: User.name, schema: UserSchema }, { name: Notification.name, schema: NotificationSchema },])],
+        { name: Order.name, schema: OrderSchema }, { name: City.name, schema: CitySchema }, { name: User.name, schema: UserSchema }, { name: Notification.name, schema: NotificationSchema },])],
     controllers: [NotificationController],
     providers: [NotificationService],
     exports: [NotificationService]

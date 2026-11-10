@@ -1,3 +1,4 @@
+import { bookingDateKey, formatBookingTime, formatBookingDate, validTimeZone } from '@/utils/bookingTimezone';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import createConversation from "@/services/createConversation";
 import getConversationMessages from "@/services/getConversationMessages";
@@ -117,15 +118,8 @@ const deriveStatus = (m: any): "sent" | "delivered" | "seen" => {
   if (m?.deliveredAt) return "delivered";
   return "sent";
 };
-const formatTime = (iso: string) => {
-  const d = new Date(iso);
-  let h = d.getHours();
-  const m = d.getMinutes().toString().padStart(2, "0");
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12;
-  if (h === 0) h = 12;
-  return `${h}:${m} ${ampm}`;
-};
+const formatTime = (iso: string, timeZone = 'UTC') => formatBookingTime(iso, timeZone);
+const messageZone = (message: any, fallback: string) => validTimeZone(String(message?.bookingNoticeKey ? getMsgText(message) : '').match(/Times shown in ([A-Za-z_+\-/]+)/)?.[1] || fallback);
 
 const formatPinRemaining = (
   pinExpiresAt: string | null | undefined
@@ -146,24 +140,14 @@ const formatPinRemaining = (
   return `Expires in ${days}d`;
 };
 
-const dateLabel = (iso: string) => {
-  const d = new Date(iso);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-
-  if (sameDay(d, today)) return "Today";
-  if (sameDay(d, yesterday)) return "Yesterday";
-  return d.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-    year: d.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
-  });
+const dateLabel = (iso: string, timeZone = 'UTC') => {
+  const key = bookingDateKey(iso, timeZone);
+  const today = bookingDateKey(new Date(), timeZone);
+  const yesterday = new Date(`${today}T12:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  if (key === today) return 'Today';
+  if (key === yesterday.toISOString().slice(0, 10)) return 'Yesterday';
+  return formatBookingDate(iso, timeZone);
 };
 const formatPresence = (isOnline: boolean, lastSeen: string | null): string => {
   if (isOnline) return "Online";
@@ -178,7 +162,7 @@ const formatPresence = (isOnline: boolean, lastSeen: string | null): string => {
   const yesterday = new Date();
   yesterday.setDate(now.getDate() - 1);
 
-  const time = formatTime(lastSeen);
+  const time = formatTime(lastSeen, Intl.DateTimeFormat().resolvedOptions().timeZone);
   if (sameDay(d, now)) return `Last seen today at ${time}`;
   if (sameDay(d, yesterday)) return `Last seen yesterday at ${time}`;
   return `Last seen ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
@@ -194,14 +178,15 @@ const getReplyPreviewText = (r: any) => {
   const text = getMsgText(r);
   return text ? text : "Message";
 };
-const buildDisplayData = (messagesDesc: any[]) => {
+const buildDisplayData = (messagesDesc: any[], timeZone = 'UTC') => {
   const asc = [...messagesDesc].reverse(); // oldest -> newest
   const out: any[] = [];
   let lastDateKey = "";
   for (const msg of asc) {
-    const key = new Date(getMsgTime(msg)).toDateString();
+    const zone = messageZone(msg, timeZone);
+    const key = `${zone}:${bookingDateKey(getMsgTime(msg), zone)}`;
     if (key !== lastDateKey) {
-      out.push({ _id: `sep-${key}`, __type: "separator", label: dateLabel(getMsgTime(msg)) });
+      out.push({ _id: `sep-${key}`, __type: "separator", label: `${dateLabel(getMsgTime(msg), zone)} · ${zone.replace(/_/g, " ")}` });
       lastDateKey = key;
     }
     out.push({ ...msg, __type: "message" });
@@ -320,7 +305,8 @@ useEffect(() => {
   const pendingTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const seenMessageIdsRef = useRef<Set<string>>(new Set()); // avoid re-emitting messageSeen for the same id
   const router = useRouter();
-  const { history, bookingId } = useLocalSearchParams<{ history?: string; bookingId?: string }>();
+  const { history, bookingId, eventTimeZone } = useLocalSearchParams<{ history?: string; bookingId?: string; eventTimeZone?: string }>();
+  const chatTimeZone = validTimeZone(eventTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [readOnly, setReadOnly] = useState(true);
   const readOnlyRef = useRef(true);
   readOnlyRef.current = readOnly;
@@ -332,9 +318,9 @@ useEffect(() => {
   const pendingAttachActionRef = useRef<null | (() => void)>(null);
 
   const findMessageIndex = useCallback((messageId: string) => {
-    const displayList = buildDisplayData(messagesRef.current);
+    const displayList = buildDisplayData(messagesRef.current, chatTimeZone);
     return displayList.findIndex((m) => m._id === messageId);
-  }, []);
+  }, [chatTimeZone]);
 
   const scrollToMessage = useCallback(
     (messageId: string) => {
@@ -1327,7 +1313,7 @@ const handleMessageOption = (
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   };
 
-  const displayData = buildDisplayData(messages);
+  const displayData = buildDisplayData(messages, chatTimeZone);
 
   const renderTicks = (item: any) => {
     switch (item.status) {
@@ -1494,7 +1480,7 @@ const handleMessageOption = (
                   />
                 )}
                 <Text style={[styles.metaText, isSender ? styles.metaTextSender : styles.metaTextReceiver]}>
-                  {formatTime(getMsgTime(item))}
+                  {formatTime(getMsgTime(item), messageZone(item, chatTimeZone))}
                 </Text>
                 {isSender && <View style={styles.tickWrap}>{renderTicks(item)}</View>}
               </>
@@ -1629,7 +1615,7 @@ const handleMessageOption = (
                   <Text style={styles.searchResultText} numberOfLines={2}>
                     {getMsgText(item)}
                   </Text>
-                  <Text style={styles.searchResultTime}>{formatTime(getMsgTime(item))}</Text>
+                  <Text style={styles.searchResultTime}>{formatTime(getMsgTime(item), messageZone(item, chatTimeZone))}</Text>
                 </View>
               </TouchableOpacity>
             )}

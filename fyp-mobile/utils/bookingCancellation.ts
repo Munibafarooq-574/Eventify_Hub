@@ -1,3 +1,4 @@
+import { formatBookingDateTime } from './bookingTimezone';
 export type CancellationRecord = {
   status?: string | null;
   cancelledBy?: string | null;
@@ -6,7 +7,7 @@ export type CancellationRecord = {
 };
 
 // Present only persisted facts. Legacy records must not invent a cancelling actor.
-export function bookingCancellation(record: CancellationRecord) {
+export function bookingCancellation(record: CancellationRecord, timeZone = 'UTC') {
   const status = String(record.status || '').toLowerCase();
   if (!['cancelled', 'cancelled_by_vendor'].includes(status)) return null;
   const actor = String(record.cancelledBy || '').trim().toLowerCase();
@@ -14,10 +15,7 @@ export function bookingCancellation(record: CancellationRecord) {
     : actor === 'vendor' || (!actor && status === 'cancelled_by_vendor') ? 'Vendor'
     : actor === 'admin' ? 'Admin' : 'Not recorded';
   const reason = record.cancellationReason?.trim() || 'No reason provided';
-  const date = record.cancelledAt ? new Date(record.cancelledAt) : null;
-  const cancelledAt = date && Number.isFinite(date.getTime())
-    ? date.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })
-    : 'Not recorded';
+  const cancelledAt = formatBookingDateTime(record.cancelledAt, timeZone, 'Not recorded');
   return { cancelledBy, reason, cancelledAt };
 }
 

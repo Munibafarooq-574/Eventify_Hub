@@ -1,3 +1,4 @@
+import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 // fyp-mobile/components/paymentmethod/PaymentMethodIndex.tsx
 import getBookingFinancials from '@/services/getBookingFinancials';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +70,7 @@ const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocale
 // Adjust these field names if your backend response uses different keys.
 type BookingFinancials = {
   vendorOrderId: string;
+  eventTimeZone?: string;
   totalAmount: number;
 
   downPaymentType?: string | null;
@@ -287,7 +289,7 @@ const PaymentMethodScreen = () => {
       : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(normalizedPaymentStatus) ? financials?.paymentDeadline : null;
     if (!deadline) return null;
     const d = new Date(deadline);
-    return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
+    return Number.isNaN(d.getTime()) ? null : `${formatBookingDateTime(d, financials?.eventTimeZone)} (${validTimeZone(financials?.eventTimeZone)})`;
   })();
 
   const handlePayNow = () => {

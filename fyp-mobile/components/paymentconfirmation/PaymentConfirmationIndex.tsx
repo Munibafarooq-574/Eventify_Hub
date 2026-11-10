@@ -1,3 +1,4 @@
+import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import { deliveryDateTime, displayDeliveryWeight } from '@/utils/deliveryBooking';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,18 +108,7 @@ const PaymentConfirmationScreen = () => {
     [successfulPayment?.paidAt],
   );
 
-  const dateTimeLabel =
-    paidAt && !Number.isNaN(paidAt.getTime())
-      ? `${paidAt.toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })} · ${paidAt.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })}`
-      : 'N/A';
+  const dateTimeLabel = `${formatBookingDateTime(paidAt, paymentData?.eventTimeZone)} (${validTimeZone(paymentData?.eventTimeZone)})`;
 
   const paymentTypeLabel =
     paymentType === 'DOWN_PAYMENT'

@@ -1,3 +1,4 @@
+import { formatBookingDateTime } from './bookingTimezone';
 export type BookingActivityRecord = {
   status?: string; paymentStatus?: string; replacementOutcome?: string;
   createdAt?: string | null; acceptedAt?: string | null; confirmationTime?: string | null;
@@ -24,10 +25,5 @@ export function bookingActivity(booking: BookingActivityRecord, cancellationDeta
   return rows;
 }
 export function formatBookingActivityTime(value: string | null, timeZone?: string): string {
-  if (!value || !Number.isFinite(new Date(value).getTime())) return 'Time not recorded';
-  const options: Intl.DateTimeFormatOptions = {
-    day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
-  };
-  try { return new Date(value).toLocaleString('en-GB', { ...options, timeZone: timeZone || 'UTC' }); }
-  catch { return new Date(value).toLocaleString('en-GB', { ...options, timeZone: 'UTC' }); }
+  return formatBookingDateTime(value, timeZone, 'Time not recorded');
 }

@@ -489,7 +489,7 @@ const OrderSummary = () => {
     };
 
     // Create or get existing conversation/chat
-    const handleMessageButtonClick = async (client: any, historyBookingId?: string) => {
+    const handleMessageButtonClick = async (client: any, historyBookingId?: string, timeZone = 'UTC') => {
         const vendorId = client?._id;
         try {
             const user = await getUserData();
@@ -503,7 +503,7 @@ const OrderSummary = () => {
             await saveSecureData("receiverId", vendorId);
             await saveSecureData("receiverAvatar", client?.profileImage || "");
             await saveSecureData("receiverName", client?.name || "Conversation");
-            router.push(historyBookingId ? `/message?history=true&bookingId=${historyBookingId}` : `/message`);
+            router.push({ pathname: "/message", params: { eventTimeZone: timeZone, ...(historyBookingId ? {history: "true", bookingId: historyBookingId} : {}) } });
             // Navigate to the conversation screen
             // router.push(`/conversation/${chatId}`);
         } catch (error) {
@@ -753,7 +753,7 @@ const OrderSummary = () => {
                                         </View>
 
                                         {(item.vendorOrders || []).map((booking: any) => (
-                                            <BookingCancellationDetails key={booking._id} booking={booking} audience="vendor" refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
+                                            <BookingCancellationDetails key={booking._id} booking={booking} timeZone={bookingTimeZone(item)} audience="vendor" refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
                                         ))}
 
                                         {/* Expanded order details - shown only when the card is tapped */}
@@ -826,8 +826,8 @@ const OrderSummary = () => {
                                                             <Text style={styles.rescheduleLine}>You’re no longer assigned to this event.</Text>
                                                             {!!request && (
                                                                 <>
-                                                                    <Text style={styles.rescheduleLine}>Original: {formatCalendarDate(request.oldEventDate)} · {request.oldStartTime}</Text>
-                                                                    <Text style={styles.rescheduleLine}>Requested: {formatCalendarDate(request.newEventDate)} · {request.newStartTime}</Text>
+                                                                    <Text style={styles.rescheduleLine}>Original: {formatCalendarDate(request.oldEventDate)} · {formatBookingTime(request.oldStartTime, bookingTimeZone(item))}</Text>
+                                                                    <Text style={styles.rescheduleLine}>Requested: {formatCalendarDate(request.newEventDate)} · {formatBookingTime(request.newStartTime, bookingTimeZone(item))}</Text>
                                                                     <Text style={styles.rescheduleResolved}>Your response: Unable to accommodate</Text>
                                                                 </>
                                                             )}
@@ -971,7 +971,7 @@ const OrderSummary = () => {
                                         <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={isAcceptanceDisabled(booking, lateAcceptanceId)} onUpdated={refreshScreenData} />
                                     ))}
                                     {(isClosedVendorStatus(getVendorStatus(item)) || getVendorStatus(item) === 'cancelled') && <View style={styles.actionButtons}>
-                                        <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId, item.vendorOrders?.[0]?._id)}>
+                                        <TouchableOpacity style={styles.messageButton} onPress={() => handleMessageButtonClick(item.organizerId, item.vendorOrders?.[0]?._id, bookingTimeZone(item))}>
                                             <Text style={styles.messageButtonText}>View chat history</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity style={styles.messageButton} onPress={() => router.push('/contactus')}>
@@ -1050,7 +1050,7 @@ const OrderSummary = () => {
                                                 <TouchableOpacity
                                                     accessibilityRole="button"
                                                     style={styles.messageButton}
-                                                    onPress={() => handleMessageButtonClick(item.organizerId)}
+                                                    onPress={() => handleMessageButtonClick(item.organizerId, undefined, bookingTimeZone(item))}
                                                 >
                                                     <Ionicons name="chatbubble-ellipses-outline" size={16} color={PRIMARY} />
                                                     <Text style={styles.messageButtonText}>Message</Text>

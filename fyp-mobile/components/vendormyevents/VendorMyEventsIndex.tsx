@@ -437,7 +437,7 @@ const totalWorkingMinutes = useMemo(() => {
 
 const toggleExpand = (id: string) => { setExpandedId((previous) => (previous === id ? null : id)); };
 
-const listTitle = viewMode === "day" ? `${formatCalendarDate(selectedDate)} · ${daySnapshot?.timeZone || "UTC"}` : viewMode === "upcoming" ? "Upcoming Bookings" : viewMode === "month" ? `Bookings in ${monthLabel}` : "Past Bookings";
+const listTitle = viewMode === "day" ? formatCalendarDate(selectedDate) : viewMode === "upcoming" ? "Upcoming Bookings" : viewMode === "month" ? `Bookings in ${monthLabel}` : "Past Bookings";
 
 const availabilityState = dayAvailability.isBlocked ? "Blocked" : !dayAvailability.isWorking ? "Not Working" : dayAvailability.slots.length === 0 ? "No Slots" : "Available";
 
@@ -699,8 +699,9 @@ return (
 
        {/* ================================================= SECTION TITLE ================================================== */}
 <View style={styles.sectionRow}>
-  <View>
+  <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
     <Text style={styles.sectionTitle}>{listTitle}</Text>
+        <Text style={{fontSize: 11, color: "#777", marginTop: 4}}>Times shown in {(daySnapshot?.timeZone || "UTC").replace(/_/g, " ")}</Text>
     {viewMode === "day" && <Text style={styles.sectionSubtitle}>{monthLabel}</Text>}
   </View>
 
@@ -764,7 +765,7 @@ renderItem={({ item }) => {
           {!!item?.eventTime && (
             <View style={styles.eventMeta}>
               <Ionicons name="time-outline" size={15} color={PRIMARY} />
-              <Text style={styles.eventText}>{item.eventTime}</Text>
+              <Text style={styles.eventText}>{formatBookingTime(item.eventStartDateTime || item.eventTime, bookingTimeZone(item))}</Text>
             </View>
           )}
         </View>

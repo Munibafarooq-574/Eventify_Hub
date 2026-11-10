@@ -11,6 +11,10 @@ export function formatBookingDate(value?: string | Date, timeZone = 'UTC'): stri
   if (!value || !Number.isFinite(new Date(value).getTime())) return 'N/A';
   return new Date(value).toLocaleDateString('en-GB', { timeZone: validTimeZone(timeZone), day: 'numeric', month: 'short', year: 'numeric' });
 }
+export function formatBookingDateTime(value?: string | Date | null, timeZone = 'UTC', missing = 'N/A'): string {
+  if (!value || !Number.isFinite(new Date(value).getTime())) return missing;
+  return `${formatBookingDate(value, timeZone)} · ${formatBookingTime(value, timeZone)}`;
+}
 export function formatCalendarDate(value?: string | Date): string { return formatBookingDate(value, 'UTC'); }
 export function formatBookingTime(value?: string | Date, timeZone = 'UTC'): string {
   if (typeof value === 'string' && /^([01]?\d|2[0-3]):[0-5]\d$/.test(value)) {

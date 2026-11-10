@@ -1,25 +1,27 @@
+import { formatBookingDateTime } from '@/utils/bookingTimezone';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { ClientRefund } from '@/services/getClientRefunds';
 import { bookingCancellation, type CancellationRecord } from '@/utils/bookingCancellation';
 
-export default function BookingCancellationDetails({ booking, refundState, audience = 'client' }: {
-  booking: CancellationRecord;
+export default function BookingCancellationDetails({ booking, refundState, audience = 'client', timeZone = 'UTC' }: {
+  booking: CancellationRecord; timeZone?: string;
   audience?: 'client' | 'vendor';
   refundState?: { record?: ClientRefund; loading: boolean; error: boolean };
 }) {
-  const details = bookingCancellation(booking);
+  const details = bookingCancellation(booking, timeZone);
   if (!details) return null;
   return <><View style={styles.box}>
     <Text style={styles.title}>Cancellation details</Text>
     <Text style={styles.text}><Text style={styles.label}>Cancelled by: </Text>{details.cancelledBy}</Text>
     <Text style={styles.text}><Text style={styles.label}>Reason: </Text>{details.reason}</Text>
     <Text style={styles.text}><Text style={styles.label}>Cancelled at: </Text>{details.cancelledAt}</Text>
+  <Text style={styles.text}>Times shown in {timeZone.replace(/_/g, ' ')}</Text>
   </View>
-  {refundState && <RefundDetails {...refundState} audience={audience} />}
+  {refundState && <RefundDetails {...refundState} audience={audience} timeZone={timeZone} />}
   </>;
 }
-function RefundDetails({ record, loading, error, audience }: { record?: ClientRefund; loading: boolean; error: boolean; audience: 'client' | 'vendor' }) {
+function RefundDetails({ record, loading, error, audience, timeZone }: { record?: ClientRefund; loading: boolean; error: boolean; audience: 'client' | 'vendor'; timeZone: string }) {
   const status = record?.status;
   const noRefund = record?.refundAmount === 0 && !['REFUNDED', 'REJECTED'].includes(status || '');
   const labels: Record<string, string> = { PENDING: 'Pending review', PROCESSING: 'Processing', REFUNDED: 'Refund confirmed', REJECTED: 'Rejected', NO_REFUND_DUE: 'No refund due' };
@@ -33,10 +35,7 @@ function RefundDetails({ record, loading, error, audience }: { record?: ClientRe
   const money = (value: number) => Number.isFinite(value) ? `Rs. ${value.toLocaleString('en-PK')}` : 'Not available';
   const timestamp = status === 'REFUNDED' ? record?.refundedAt || record?.paidAt
     : status === 'REJECTED' ? record?.rejectedAt : status === 'NO_REFUND_DUE' ? record?.closedAt : record?.updatedAt;
-  const date = timestamp ? new Date(timestamp) : null;
-  const dateLabel = date && Number.isFinite(date.getTime()) ? date.toLocaleString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
-  }) : null;
+  const dateLabel = timestamp ? formatBookingDateTime(timestamp, timeZone) : null;
   return <View style={styles.refundBox} accessibilityLiveRegion="polite">
     <Text style={styles.refundTitle}>Refund update</Text>
     {!record ? <Text style={styles.text}>{loading ? 'Loading refund details…' : error ? 'Unable to load refund details. Reopen this screen to retry.' : 'No refund record is available for this booking.'}</Text> : <>
