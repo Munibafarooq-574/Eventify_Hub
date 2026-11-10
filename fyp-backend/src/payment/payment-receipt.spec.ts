@@ -19,6 +19,21 @@ describe('Payment receipt display',()=>{
         expect(content).not.toMatch(/Service Start:|Service End:|Service: Vendor11/);
         expect(content).toMatch(/Remaining Balance: Rs. 1,500/);
     });
+    it('shows booked people and pricing independently of event guest count', () => {
+        const content=text(service().buildPaymentReceiptEmail({...base,guests:100,pricingMethod:'PER_PERSON',personCount:10,quantity:1}));
+        expect(content).toContain('Pricing: Per Person');
+        expect(content).toContain('People: 10');
+        expect(content).toContain('Quantity: 1');
+    });
+    it('shows group serving capacity and fixed pricing without inventing a people count', () => {
+        const group=text(service().buildPaymentReceiptEmail({...base,pricingMethod:'GROUP',groupSize:10,quantity:2}));
+        expect(group).toContain('Pricing: Group Package');
+        expect(group).toContain('People per group: 10');
+        expect(group).toContain('People included: 20');
+        const fixed=text(service().buildPaymentReceiptEmail({...base,pricingMethod:'FIXED',quantity:2}));
+        expect(fixed).toContain('Pricing: Fixed Package');
+        expect(fixed).not.toContain('People:');
+    });
     it.each(['DURATION_BASED','SETUP_BASED','CUSTOM','TIME_SLOT_BASED',null])('keeps actual stored start/end for %s',bookingType=>{
         const content=text(service().buildPaymentReceiptEmail({...base,bookingType}));
         expect(content).toMatch(/Service Start: .*12:00 pm/i);expect(content).toMatch(/Service End: .*2:00 pm/i);
@@ -49,7 +64,7 @@ describe('Payment receipt display',()=>{
         s.userModel={findById:(id:string)=>id==='client'?query({email:'test@example.invalid'}):vendorQuery};
         s.orderModel={findById:()=>order};
         s.paymentModel={findById:async()=>({status:'PENDING',sendReceipt,organizerId:'client',vendorOrderId:'booking',amount:1500,save:async()=>{}}),find:()=>query([{amount:1500}])};
-        s.vendorOrderModel={findById:async()=>({_id:'booking',orderId:'event',vendorId:'vendor',packageId:'cake',price:3000,status:'accepted',eventStartDateTime:base.serviceStart,eventEndDateTime:base.serviceEnd,save:async()=>{}})};
+        s.vendorOrderModel={findById:async()=>({_id:'booking',orderId:'event',vendorId:'vendor',packageId:'cake',pricingMethod:'PER_PERSON',personCount:10,quantity:1,price:3000,status:'accepted',eventStartDateTime:base.serviceStart,eventEndDateTime:base.serviceEnd,save:async()=>{}})};
         s.emailService={sendTransactionalEmail:jest.fn(async()=>{})};
         sessionQueries(s.paymentModel);sessionQueries(s.vendorOrderModel);
         await s.confirmPayment('payment');
@@ -60,5 +75,6 @@ describe('Payment receipt display',()=>{
         const content=text(s.emailService.sendTransactionalEmail.mock.calls[0][0].html);
         expect(content).toMatch(/Category: Cakes/);expect(content).toMatch(/Package: Cake package/);expect(content).toMatch(/Delivery at: .*12:00 pm/i);
         expect(content).not.toContain('Package: Wrong');
+        expect(content).toContain('Pricing: Per Person');expect(content).toContain('People: 10');
     });
 });

@@ -1,4 +1,4 @@
-import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
+import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -858,7 +858,7 @@ const MyEventsScreen = () => {
                             <View style={styles.rescheduleMetaPill}>
                               <Ionicons name="time-outline" size={13} color={COLORS.primary} />
                               <Text style={styles.rescheduleMetaText}>
-                                {firstRequest?.createdAt ? new Date(firstRequest.createdAt).toLocaleString('en-GB', { timeZone }) : 'N/A'}
+                                {formatBookingDateTime(firstRequest?.createdAt, timeZone)}
                               </Text>
                             </View>
                           </View>

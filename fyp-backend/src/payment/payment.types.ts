@@ -1,5 +1,6 @@
 // fyp-backend/src/payment/payment.types.ts
 export interface PaymentBreakdown {
+  eventTimeZone: string;
   delivery?: any;
   deliveryStartDateTime?: Date;
     vendorOrderId: string;

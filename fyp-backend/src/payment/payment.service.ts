@@ -1,3 +1,4 @@
+import type { City } from '../schemas/city.schema';
 import { ChatGateway } from '../chat/chat.gateway';
 import { displayDeliveryWeight } from '../common/utils/delivery-booking';
 import { effectiveDownPaymentDeadline, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue, servicePaymentCutoff } from '../common/utils/booking-payment-window';
@@ -409,7 +410,7 @@ if (
             throw new NotFoundException('Vendor order not found');
         }
 
-await this.assertOrganizerOwnsVendorOrder(
+const order = await this.assertOrganizerOwnsVendorOrder(
     vendorOrderId,
     organizerId,
 );
@@ -467,9 +468,19 @@ const vendor = vendorOrder.vendorId
         .select('name email contactDetails.brandName contactDetails.bookingEmail').lean()
     : null;
 
+// The mobile receipt reads this endpoint, rather than /financials. Carry the
+// booked timezone here too; old bookings can resolve it from their event city.
+let eventTimeZone = vendorOrder.bookingChatTimeZone || (order.eventCityId as any)?.timeZone || 'UTC';
+if (!vendorOrder.bookingChatTimeZone && order.eventCityId && !(order.eventCityId as any)?.timeZone) {
+    const city = await this.vendorOrderModel.db.model<City>('City')
+        .findById(order.eventCityId).select('timeZone').lean();
+    eventTimeZone = city?.timeZone || 'UTC';
+}
+
 return {
     vendorOrderId,
     organizerId,
+    eventTimeZone,
     delivery: vendorOrder.delivery,
     deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
     vendor: {
@@ -739,6 +750,10 @@ private buildPaymentReceiptEmail(
         bookingType?: string | null;
         eventTimeZone?: string | null;
         packageName?: string | null;
+        pricingMethod?: string | null;
+        quantity?: number | null;
+        personCount?: number | null;
+        groupSize?: number | null;
 
         serviceStart?: Date | null;
         serviceEnd?: Date | null;
@@ -1053,6 +1068,10 @@ private buildPaymentReceiptEmail(
           )}
         </div>
 
+        ${data.pricingMethod ? `<div style="margin-top:8px;"><strong>Pricing:</strong> ${this.escapeHtml(({ FIXED: 'Fixed Package', PER_PERSON: 'Per Person', GROUP: 'Group Package' } as Record<string, string>)[data.pricingMethod] || data.pricingMethod)}</div>` : ''}
+        ${data.quantity != null ? `<div style="margin-top:8px;"><strong>Quantity:</strong> ${this.escapeHtml(data.quantity)}</div>` : ''}
+        ${data.pricingMethod === 'PER_PERSON' && data.personCount != null ? `<div style="margin-top:8px;"><strong>People:</strong> ${this.escapeHtml(data.personCount)}</div>` : ''}
+        ${data.pricingMethod === 'GROUP' && data.groupSize != null ? `<div style="margin-top:8px;"><strong>People per group:</strong> ${this.escapeHtml(data.groupSize)}</div><div style="margin-top:8px;"><strong>People included:</strong> ${this.escapeHtml(data.groupSize * (data.quantity || 1))}</div>` : ''}
         ${data.delivery ? `<div style="margin-top:8px;">Delivery: ${data.delivery.deliveryFeeType === 'FREE' ? 'Free' : `Rs. ${money(data.delivery.baseFee)} + extra weight Rs. ${money(data.delivery.extraFee)}`}</div>` : ''}
         ${data.delivery?.deliveryFeeType === 'PAID' && data.delivery.deliveryExtraWeightEnabled ? `<div style="margin-top:8px;">Delivery weight: ${displayDeliveryWeight(data.delivery.weightKg, data.delivery.deliveryWeightUnit)} ${data.delivery.deliveryWeightUnit || 'kg'}</div>` : ''}
         ${serviceTimes.map(row => `<div style="margin-top:8px;">
@@ -1459,6 +1478,10 @@ try {
 
                 categoryName: (vendor.buisnessCategory as any)?.name || null,
                 delivery: (vendorOrder as any).delivery,
+                pricingMethod: vendorOrder.pricingMethod,
+                quantity: vendorOrder.quantity,
+                personCount: vendorOrder.personCount,
+                groupSize: vendorOrder.groupSize,
                 bookingType: (vendorOrder as any).bookingType || packageData?.bookingType || null,
                 eventTimeZone: (order.eventCityId as any)?.timeZone || null,
 
