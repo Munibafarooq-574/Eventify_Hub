@@ -4,6 +4,7 @@ on:
     branches:
       - 'fix/**'
       - 'feat/usa-subscription-demo-card'
+      - 'feat/vendor-subscription-payment-receipt-email'
 concurrency:
   group: currency-subscriptions-${{ github.ref }}
   cancel-in-progress: true
