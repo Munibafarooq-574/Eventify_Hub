@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 // fyp-mobile/components/CustomerFeatures/CouponInputField.tsx
 //
 // Drop-in component for your Checkout/BookingScreen (spec section 27:
@@ -85,7 +86,7 @@ export function CouponInputField({
           {isStale ? (
             <Text style={styles.staleText}>Your order total changed — tap Remove and re-apply.</Text>
           ) : (
-            <Text style={styles.appliedDiscount}>- Rs. {applied.discountAmount.toLocaleString()}</Text>
+            <Text style={styles.appliedDiscount}>- {currencySymbol(currencyOf(applied))} {applied.discountAmount.toLocaleString()}</Text>
           )}
         </View>
         <TouchableOpacity onPress={handleRemove}>

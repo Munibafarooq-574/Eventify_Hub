@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { getPublicDashboardCoupons } from '@/services/getPublicDashboardCoupons';
@@ -128,7 +129,7 @@ const CouponCard: React.FC<CouponCardProps> = ({
 
   const discountLabel = isPercentage
     ? `${coupon.discountValue}%`
-    : `Rs.${coupon.discountValue}`;
+    : `${currencySymbol(currencyOf(coupon))}${coupon.discountValue}`;
 
   const openVendor = () => {
     if (!coupon.vendorId) return;

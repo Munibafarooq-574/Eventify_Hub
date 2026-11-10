@@ -1,3 +1,4 @@
+import { formatMoney, currencyOf } from '@/utils/currency';
 import type { ComponentRef } from 'react';
 import getPaymentStatus from '@/services/getPaymentStatus';
 import { getCardOwnerId, assertCardOwner, listDemoCards, rememberDemoCard, removeDemoCard, type SavedDemoCard } from '@/services/demoSavedCards';
@@ -34,7 +35,7 @@ const PRIMARY_LIGHT = '#F8E9F0';
 const ACCENT = '#B84B9A';
 const PRIMARY_DEEP = '#5A0848';
 
-const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
+
 
 // ───────────────────────── UI helpers ─────────────────────────
 
@@ -169,6 +170,8 @@ const CreditCardPaymentScreen = () => {
   const cardNumberFont = Math.max(15, Math.min(22, cardWidth * 0.058));
 
   const paymentKind = paymentType || 'DOWN_PAYMENT';
+  const [paymentCurrency, setPaymentCurrency] = useState<'PKR' | 'USD'>('PKR');
+  const formatCurrency = (value: number) => formatMoney(value, paymentCurrency);
   const [amountPayable, setAmountPayable] = useState<number | null>(null);
 
   const [cardholderName, setCardholderName] = useState('');
@@ -196,6 +199,7 @@ const CreditCardPaymentScreen = () => {
       if (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId)) throw new Error('Open card payment from your booking.');
       const id = await getCardOwnerId();
       const financials = await getPaymentStatus(vendorOrderId);
+      if (request === generation.current) setPaymentCurrency(currencyOf(financials));
       const payable = cardPaymentAmount(financials, paymentKind, id);
       const cards = await listDemoCards(id);
       await assertCardOwner(id);

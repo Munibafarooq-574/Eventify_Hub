@@ -1,3 +1,4 @@
+import { currencyMatch } from '../common/utils/currency';
 jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { createConnection, Connection, Schema, Types } from 'mongoose';
@@ -10,7 +11,7 @@ describe('acceptance waits for final event schedule', () => {
   beforeAll(async () => {
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, args: ['--nounixsocket'] } });
     db = await createConnection(mongo.getUri()).asPromise();
-    bookings = db.model('AcceptanceBooking', new Schema({ status: String, orderId: Schema.Types.ObjectId, vendorId: Schema.Types.ObjectId, eventStartDateTime: Date }, { strict: false }));
+    bookings = db.model('AcceptanceBooking', new Schema({ currency: String, price: Number, downPaymentAmount: Number, remainingAmount: Number, downPaymentType: String, downPaymentPercentage: Number, paymentStatus: String, paymentDeadline: Date, status: String, orderId: Schema.Types.ObjectId, vendorId: Schema.Types.ObjectId, eventStartDateTime: Date }, { strict: false }));
     requests = db.model('AcceptanceRequest', new Schema({ orderId: Schema.Types.ObjectId, status: String, resolutionStatus: String }, { strict: false }));
     db.model('Payment', new Schema({ vendorOrderId: Schema.Types.ObjectId, status: String }));
     await Promise.all([bookings.init(), requests.init()]);
@@ -77,4 +78,32 @@ describe('acceptance waits for final event schedule', () => {
     expect(await acceptance).toBeInstanceOf(ConflictException);
     expect((await bookings.findById(booking._id)).status).toBe('pending');
   });
+  it('preserves USD cents when calculating the advance and keeps old PKR bookings unchanged', async () => {
+    const { booking, service } = await fixture();
+    await bookings.updateOne({ _id: booking._id }, { $set: { currency: 'USD', price: 200.25 } });
+    service.userModel = { findById: () => ({ lean: async () => ({ cakeBusinessDetails: { downPaymentType: 'PERCENTAGE', downPayment: 20 } }) }) };
+    service.orderModel.findById = () => ({ lean: async () => null });
+    await service.updateVendorResponse(String(booking._id), 'accepted', undefined);
+    const saved = await bookings.findById(booking._id).lean();
+    expect(saved.currency).toBe('USD');
+    expect(saved.downPaymentAmount).toBe(40.05);
+    expect(saved.remainingAmount).toBe(160.2);
+  });
+  it('does not treat an old PKR fixed advance as a USD amount', async () => {
+    const { booking, service } = await fixture();
+    await bookings.updateOne({ _id: booking._id }, { $set: { currency: 'USD', price: 200 } });
+    service.userModel = { findById: () => ({ lean: async () => ({ cakeBusinessDetails: { downPaymentType: 'FIXED', downPayment: 50 } }) }) };
+    await expect(service.updateVendorResponse(String(booking._id), 'accepted', undefined)).rejects.toThrow('Update the fixed down payment');
+    expect((await bookings.findById(booking._id)).status).toBe('pending');
+  });
+
+  it('keeps USD earnings separate from legacy PKR documents in database aggregation', async () => {
+    const vendorId = new Types.ObjectId();
+    await bookings.collection.insertMany([{vendorId,price:20000},{vendorId,price:200.25,currency:'USD'}]);
+    const sum = async (currency: 'PKR' | 'USD') => (await bookings.aggregate([
+      {$match:{vendorId}}, {$match:currencyMatch(currency)}, {$group:{_id:null,total:{$sum:'$price'}}},
+    ]))[0].total;
+    expect(await sum('PKR')).toBe(20000);expect(await sum('USD')).toBe(200.25);
+  });
+
 });

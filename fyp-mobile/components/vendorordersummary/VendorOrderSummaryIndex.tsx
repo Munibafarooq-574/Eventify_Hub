@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -777,7 +778,7 @@ const OrderSummary = () => {
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>Rs. {vendorTotal}</Text>
+                                            <Text style={styles.detailText}>{currencySymbol(currencyOf(item))} {vendorTotal}</Text>
                                         </View>
 
                                         {(item.vendorOrders || []).map((booking: any) => (
@@ -946,7 +947,7 @@ const OrderSummary = () => {
                                                 <Text style={styles.expandedSubTitle}>Booking Details</Text>
                                                 <View style={styles.detailRow}>
                                                     <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                    <Text style={styles.detailText}>Your Earnings: Rs. {vendorTotal}</Text>
+                                                    <Text style={styles.detailText}>Your Earnings: {currencySymbol(currencyOf(item))} {vendorTotal}</Text>
                                                 </View>
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
@@ -982,9 +983,9 @@ const OrderSummary = () => {
                         {service.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                                                                 {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatBookingTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
                                                                 <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatBookingTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
-                                                                <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
-                                                                <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
-                                                                <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>
+                                                                <Text style={styles.serviceDetailText}>Booking Amount: {currencySymbol(currencyOf(service))} {total}</Text>
+                                                                <Text style={styles.serviceDetailText}>Paid: {currencySymbol(currencyOf(service))} {paid}</Text>
+                                                                <Text style={styles.serviceDetailText}>Remaining: {currencySymbol(currencyOf(service))} {remaining}</Text>
                                                                 <Text style={styles.serviceDetailText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
                                                               </View>
                                                             );

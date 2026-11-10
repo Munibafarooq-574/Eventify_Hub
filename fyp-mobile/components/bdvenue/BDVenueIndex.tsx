@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 import postVenueBusinessDetails from "@/services/postVenueBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
@@ -458,7 +459,7 @@ console.log("USER ID PARAM:", userId);
 
     <View style={styles.inputRow}>
         {downPaymentType === "FIXED" && (
-            <Text style={styles.currencyPrefix}>Rs.</Text>
+            <Text style={styles.currencyPrefix}>{currencySymbol()}</Text>
         )}
 
         <TextInput

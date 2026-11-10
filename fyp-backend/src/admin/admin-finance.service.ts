@@ -1,3 +1,4 @@
+import { Currency, currencyOf, currencyMatch, currencySymbol } from '../common/utils/currency';
 import { NotificationService } from '../notifications/notifications.service';
 // fyp-backend/src/admin/admin-finance.service.ts
 
@@ -122,6 +123,7 @@ export class AdminFinanceService {
 
   private async getDailyFinanceChart(
   range: { start: Date; end: Date } | null,
+  currency: Currency = 'PKR',
 ) {
   const dateFilter = (field: string) =>
     range
@@ -135,6 +137,7 @@ export class AdminFinanceService {
 
   const [bookings, subscriptions, refunds] = await Promise.all([
     this.paymentModel.aggregate([
+      { $match: currencyMatch(currency) },
       {
         $match: {
           status: 'SUCCESS',
@@ -156,6 +159,7 @@ export class AdminFinanceService {
     ]),
 
     this.subscriptionModel.aggregate([
+      { $match: currencyMatch(currency) },
       {
         $match: {
           paymentStatus: 'paid',
@@ -183,6 +187,7 @@ export class AdminFinanceService {
     ]),
 
     this.refundModel.aggregate([
+      { $match: currencyMatch(currency) },
       {
         $match: {
           status: 'REFUNDED',
@@ -279,8 +284,10 @@ return result;
 
   private async getCollectedCommission(
     range: { start: Date; end: Date } | null,
+  currency: Currency = 'PKR',
   ): Promise<number> {
     const results = await this.paymentModel.aggregate([
+      { $match: currencyMatch(currency) },
       {
         $match: {
           status: 'SUCCESS',
@@ -359,7 +366,8 @@ return result;
     return Number(results[0]?.total ?? 0);
   }
 
-    async getFinanceOverview(from?: string, to?: string) {
+    async getFinanceOverview(from?: string, to?: string, selectedCurrency?: string) {
+    const currency = currencyOf(selectedCurrency);
     const range = this.getFinanceDateRange(from, to);
 
   const bookingDateMatch = range
@@ -391,6 +399,7 @@ return result;
   subscriptionRevenueByPlan,
 ] = await Promise.all([
         this.paymentModel.aggregate([
+      { $match: currencyMatch(currency) },
       {
         $match: bookingDateMatch,
       },
@@ -404,6 +413,7 @@ return result;
     ]),
 
         this.subscriptionModel.aggregate([
+      { $match: currencyMatch(currency) },
             {
         $match: range
           ? {
@@ -484,6 +494,7 @@ return result;
 ]),
 
           this.refundModel.aggregate([
+      { $match: currencyMatch(currency) },
   {
     $match: range
       ? {
@@ -515,10 +526,11 @@ return result;
         },
       ]),
 
-   this.getCollectedCommission(range),
-this.getDailyFinanceChart(range),
+   this.getCollectedCommission(range, currency),
+this.getDailyFinanceChart(range, currency),
 
 this.subscriptionModel.aggregate([
+      { $match: currencyMatch(currency) },
   {
     $match: {
       paymentStatus: 'paid',
@@ -632,7 +644,7 @@ this.subscriptionModel.aggregate([
 };
 
 return {
-  currency: 'PKR',
+  currency,
 
   dailyChart,
 
@@ -827,6 +839,7 @@ if (status !== 'ALL') {
     {
       $project: {
         _id: 1,
+        currency: { $ifNull: ['$currency', 'PKR'] },
         transactionId: { $toString: '$_id' },
         transactionDate: {
           $ifNull: ['$paidAt', '$createdAt'],
@@ -850,6 +863,7 @@ if (status !== 'ALL') {
     {
       $project: {
         _id: 1,
+        currency: { $ifNull: ['$currency', 'PKR'] },
         transactionId: { $toString: '$_id' },
         transactionDate: {
           $ifNull: ['$verifiedAt', '$createdAt'],
@@ -946,6 +960,7 @@ if (status !== 'ALL') {
           {
             $project: {
               _id: 0,
+              currency: 1,
               transactionId: 1,
               transactionDate: 1,
               transactionType: 1,
@@ -1126,6 +1141,7 @@ if (status !== 'ALL') {
           );
 
         return {
+          currency: currencyOf(payment),
           paymentId:
             String(
               payment._id,
@@ -1340,6 +1356,7 @@ if (status !== 'ALL') {
 
     return refunds.map(
       (refund: any) => ({
+        currency: currencyOf(refund),
         refundId:
           String(
             refund._id,
@@ -1595,7 +1612,7 @@ if (status !== 'ALL') {
         : messages[status];
       try {
         await this.notifications.notifyUser(recipient, 'Refund update',
-          `${reference}: ${message} ${amountLabel}: Rs. ${amount.toLocaleString('en-PK')}. Open booking history for details.`, 'REFUND_UPDATE',
+          `${reference}: ${message} ${amountLabel}: ${currencySymbol(updated.currency)} ${amount.toLocaleString('en-PK')}. Open booking history for details.`, 'REFUND_UPDATE',
           { orderId: updated.orderId ? String(updated.orderId) : undefined, vendorOrderId: String(updated.vendorOrderId) });
       } catch { /* A notification failure cannot undo the decision or block the other recipient. */ }
     }

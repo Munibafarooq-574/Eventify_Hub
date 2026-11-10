@@ -85,7 +85,7 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
     const snapshots: any[] = [];
     const user = { updateOne: async () => ({ matchedCount: 1 }), find: () => query(vendors.slice(0, replacement ? 1 : 2)) };
     const order: any = { _id: id(), organizerId, save: jest.fn().mockResolvedValue(undefined) };
-    const orders = { findOne: () => query(null), create: jest.fn().mockResolvedValue([order]) };
+    const orders = { findById: () => query({ currency: 'PKR' }), findOne: () => query(null), create: jest.fn().mockResolvedValue([order]) };
     const vendorOrders = { create: jest.fn().mockImplementation(async ([data], options) => {
         const saved = new VendorModel(data); snapshots.push(saved.toObject()); return [saved];
     }) };
@@ -101,7 +101,7 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
         { find: () => query([{ _id: categoryId, name: 'Cake' }]) } as any,
         { startSession: async () => session, db: { collection: () => ({ updateOne: updateDraft }) } } as any, availability as any, {} as any,
         { hasActiveSubscription: async () => true } as any,
-        { requireActiveCity: async () => ({}), requireCityTimeZone: async () => 'UTC' } as any,
+        { requireActiveCity: async () => ({countryCode: pricing.currency === 'USD' ? 'US' : 'PK'}), requireCityTimeZone: async () => 'UTC' } as any,
         {} as any, {} as any, policy, { sendBookingNotice } as any);
     jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'attachReplacementOrder').mockResolvedValue(undefined);
@@ -139,6 +139,11 @@ describe('Snapshot in existing checkout transaction', () => {
             { $set: { cartData: null, eventDetails: null }, $inc: { revision: 1 } },
             { session: fixture.session },
         );
+    });
+    it('snapshots USD from the event country, not the client-supplied amount', async () => {
+        const f = checkout(false, {currency:'USD',price:200.25}); await f.run();
+        expect(f.orders.create.mock.calls[0][0][0].currency).toBe('USD');
+        expect(f.snapshots.every(snapshot => snapshot.currency === 'USD' && snapshot.price === 200.25)).toBe(true);
     });
     it('covers replacement bookings without copying the replaced vendor policy', async () => {
         const fixture = checkout(true); await fixture.run();

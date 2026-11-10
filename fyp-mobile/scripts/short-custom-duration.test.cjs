@@ -6,8 +6,8 @@ const ts = require('typescript');
 
 const source = fs.readFileSync('components/vendorprofiledetails(orginzer)/VendorProfileDetailsIndex.tsx', 'utf8');
 const pricingSource = fs.readFileSync('utils/resolvePackagePrice.ts', 'utf8');
-const code = ts.transpileModule(pricingSource.replace('export const', 'const') + '\nresolvePackagePrice;', {}).outputText;
-const resolve = vm.runInNewContext(code);
+const code = ts.transpileModule(pricingSource.replace('export const', 'const') + '\nresolvePackagePrice;', {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const resolve = vm.runInNewContext(code,{exports:{},require:()=>require('./test-currency.cjs')});
 const pricing = {
   price: 15000, baseIncludedDurationMinutes: 120,
   durations: [{ value: 3, unit: 'HOURS', price: 20000 }],
@@ -34,4 +34,10 @@ test('package cards and the Add to Cart footer show the same selected-duration q
   assert.match(source, /const selectedDurationQuote = getEventDurationQuote\(selectedPackage\)/);
   assert.match(source, /selectedDurationQuote\?\.price \?\? selectedPackage\.price/);
   assert.match(source, /const cartDisabled = selectedDurationQuote\?\.price === null/);
+});
+
+test('USD custom duration prices retain cents in the actual quote resolver', () => {
+  const pkg={currency:'USD',price:100.25,baseIncludedDurationMinutes:120,durations:[],allowCustomDuration:true,customDurationUnit:'HOURS',customDurationRate:20.25};
+  assert.equal(resolve(pkg,60).price,20.25);
+  assert.equal(resolve(pkg,240).price,140.75);
 });

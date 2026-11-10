@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿import postMehndiBusinessDetails from '@/services/Postmehndibusinessdetails';
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getUserData } from "@/store";
@@ -317,14 +318,14 @@ if (edit === "true") {
                 <SectionTitle icon="wallet" title="Down Payment" required />
                 <View style={styles.inputRow}>
                     <Text style={styles.currencyPrefix}>
-  {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+  {downPaymentType === "PERCENTAGE" ? "%" : `${currencySymbol()}`}
 </Text>
                     <TextInput
                         style={styles.inputFlex}
                         placeholder={
   downPaymentType === "PERCENTAGE"
     ? "Example: 20%"
-    : "Example: Rs. 3000"
+    : `Example: ${currencySymbol()} 3000`
 }
                         placeholderTextColor="#B99DAF"
                         keyboardType="numeric"

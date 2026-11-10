@@ -1,3 +1,4 @@
+import { countryCurrency, currencyOf, currencySymbol } from '../../../common/utils/currency';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.service.ts
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
@@ -426,7 +427,7 @@ async notifySelectedClients(
     discountCode.discountType ===
     DiscountKind.PERCENTAGE
       ? `${discountCode.discountValue}% OFF`
-      : `Rs. ${Number(
+      : `${currencySymbol(discountCode.currency)} ${Number(
           discountCode.discountValue,
         ).toLocaleString()} OFF`;
 
@@ -544,7 +545,7 @@ private async sendDiscountOfferEmail(
   const discountText =
     discountCode.discountType === DiscountKind.PERCENTAGE
       ? `${discountCode.discountValue}% OFF`
-      : `Rs. ${Number(
+      : `${currencySymbol(discountCode.currency)} ${Number(
           discountCode.discountValue,
         ).toLocaleString()} OFF`;
 
@@ -562,6 +563,7 @@ private async sendDiscountOfferEmail(
   vendorBrandName: vendorName,
   code: discountCode.code,
   discountText,
+  currency: currencyOf(discountCode),
   minimumOrder,
   startDate,
   endDate,
@@ -757,7 +759,7 @@ async validateCoupon(
 
   if (orderAmount < entry.minimumOrderAmount) {
     throw new BadRequestException(
-      `This code requires a minimum order of Rs. ${entry.minimumOrderAmount}`,
+      `This code requires a minimum order of ${currencySymbol(entry.currency)} ${entry.minimumOrderAmount}`,
     );
   }
 
@@ -769,6 +771,7 @@ async validateCoupon(
 
   return {
     valid: true,
+    currency: currencyOf(entry),
     discountEntryId: entry._id.toString(),
     code: entry.code,
     discountType: entry.discountType,
@@ -880,7 +883,7 @@ async validateCoupon(
   const discountText =
     entry.discountType === DiscountKind.PERCENTAGE
       ? `${entry.discountValue}% OFF`
-      : `Rs. ${Number(entry.discountValue).toLocaleString()} OFF`;
+      : `${currencySymbol(entry.currency)} ${Number(entry.discountValue).toLocaleString()} OFF`;
 
   const minimumOrder = Number(entry.minimumOrderAmount || 0);
 
@@ -898,7 +901,7 @@ async validateCoupon(
       : `Get ${discountText} on your next booking on Eventify Hub.`;
 
   const minimumText =
-  minimumOrder > 0 ? `Rs ${minimumOrder.toLocaleString()}` : 'No minimum';
+  minimumOrder > 0 ? `${currencySymbol(entry.currency)} ${minimumOrder.toLocaleString()}` : 'No minimum';
 
 const validText = `${startDate} to ${endDate}`;
 
@@ -908,6 +911,7 @@ return {
   code: entry.code,
   vendorName,
   discountText,
+  currency: currencyOf(entry),
   firstLine,
   minimumText,
   validText,
@@ -985,7 +989,9 @@ return {
       );
     }
 
+    const currency = countryCurrency((await this.userModel.findById(vendorId).select('marketplaceCountryCode').lean())?.marketplaceCountryCode);
     return this.discountModel.create({
+      currency,
       vendorId: new Types.ObjectId(vendorId),
       type,
       code,
@@ -1194,7 +1200,7 @@ return {
 
   private validatePayload(dto: DiscountEntryPayload) {
     if (!Number.isFinite(dto.minimumOrderAmount) || dto.minimumOrderAmount < 0) {
-      throw new BadRequestException('Enter a valid minimum order amount of Rs. 0 or more.');
+      throw new BadRequestException('Enter a valid minimum order amount of zero or more.');
     }
     if (dto.discountType === DiscountKind.PERCENTAGE && dto.discountValue > 100) {
       throw new BadRequestException('Percentage discount cannot exceed 100');

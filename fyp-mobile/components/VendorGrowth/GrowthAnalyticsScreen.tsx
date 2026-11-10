@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 // fyp-mobile/components/vendorGrowth/GrowthAnalyticsScreen.tsx
 //
 // Growth vendors see sales/customers/packages/promotions. Premium vendors
@@ -284,9 +285,9 @@ export default function GrowthAnalyticsScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Sales</Text>
           <View style={styles.statsGrid}>
-            <Stat icon={Wallet} label="Total Revenue" value={`Rs. ${fmt(data.sales.totalRevenue)}`} />
-            <Stat icon={TrendingUp} label="This Month" value={`Rs. ${fmt(data.sales.monthlyRevenue)}`} change={data.sales.monthlyRevenueChangePct} />
-            <Stat icon={Receipt} label="Avg Order Value" value={data.sales.averageOrderValue != null ? `Rs. ${fmt(data.sales.averageOrderValue)}` : '—'} />
+            <Stat icon={Wallet} label="Total Revenue" value={`${currencySymbol(currencyOf(data))} ${fmt(data.sales.totalRevenue)}`} />
+            <Stat icon={TrendingUp} label="This Month" value={`${currencySymbol(currencyOf(data))} ${fmt(data.sales.monthlyRevenue)}`} change={data.sales.monthlyRevenueChangePct} />
+            <Stat icon={Receipt} label="Avg Order Value" value={data.sales.averageOrderValue != null ? `${currencySymbol(currencyOf(data))} ${fmt(data.sales.averageOrderValue)}` : '—'} />
           </View>
         </View>
 
@@ -387,7 +388,7 @@ export default function GrowthAnalyticsScreen() {
                   <Text style={styles.sectionLabel}>Top Performing Packages</Text>
                 </View>
                 {premium.topPerformingPackages.map((pkg) => (
-                  <InfoRow key={pkg.packageId} label={pkg.packageName} value={`Rs. ${fmt(pkg.revenue)} · ${pkg.bookingCount} bookings`} />
+                  <InfoRow key={pkg.packageId} label={pkg.packageName} value={`${currencySymbol(currencyOf(data))} ${fmt(pkg.revenue)} · ${pkg.bookingCount} bookings`} />
                 ))}
               </View>
             )}

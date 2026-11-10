@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 // fyp-mobile/components/vendorCoupons/CouponsScreen.tsx
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -73,7 +74,7 @@ function formatDate(dateStr: string): string {
 function discountSummary(entry: VendorDiscount): string {
   return entry.discountType === DiscountKind.PERCENTAGE
     ? `${entry.discountValue}% OFF`
-    : `Rs. ${entry.discountValue.toLocaleString()} OFF`;
+    : `${currencySymbol(currencyOf(entry))} ${entry.discountValue.toLocaleString()} OFF`;
 }
 
 function audienceLabel(
@@ -459,8 +460,8 @@ const Header = () => (
               </Text>
             )}
                 <Text style={styles.entryMeta}>
-                  Min order: Rs. {entry.minimumOrderAmount.toLocaleString()}
-                  {entry.maximumDiscountAmount != null && ` · Max discount: Rs. ${entry.maximumDiscountAmount.toLocaleString()}`}
+                  Min order: {currencySymbol(currencyOf(entry))} {entry.minimumOrderAmount.toLocaleString()}
+                  {entry.maximumDiscountAmount != null && ` · Max discount: ${currencySymbol(currencyOf(entry))} ${entry.maximumDiscountAmount.toLocaleString()}`}
                 </Text>
                 <Text style={styles.entryMeta}>
                   {formatDate(entry.startDate)} – {formatDate(entry.endDate)}

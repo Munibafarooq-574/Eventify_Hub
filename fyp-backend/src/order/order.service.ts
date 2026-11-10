@@ -1,3 +1,4 @@
+import { countryCurrency, currencyOf, roundForCurrency, roundMoney } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
 import { ChatGateway } from '../chat/chat.gateway';
@@ -222,7 +223,11 @@ export class OrderService {
     }
 
     // Final backend authority for city validity.
-    await this.cityService.requireActiveCity(eventCityId);
+    const bookingCity = await this.cityService.requireActiveCity(eventCityId);
+    const originalCurrencyOrder = cancellationReplacement?.order || (replacementRequest
+        ? await this.orderModel.findById(replacementRequest.orderId).select('currency').lean()
+        : null);
+    const currency = originalCurrencyOrder ? currencyOf(originalCurrencyOrder) : countryCurrency(bookingCity?.countryCode);
 
     const normalizedEventAddress =
         eventAddress.trim();
@@ -667,6 +672,10 @@ export class OrderService {
                             );
                         }
 
+                        if (currencyOf(packageDoc) !== currency) {
+                            throw new ConflictException('This package uses a different currency. Ask the vendor to create a package in the event country currency.');
+                        }
+
                         if (
                             packageDoc.isActive ===
                             false
@@ -858,7 +867,7 @@ export class OrderService {
                                     if (selectedDurationMinutes % unitMinutes !== 0) {
                                         throw new BadRequestException('Select a duration in whole units of the vendor’s custom rate.');
                                     }
-                                    unitPrice = Math.round(Math.min(basePrice, rate * selectedDurationMinutes / unitMinutes));
+                                    unitPrice = roundForCurrency(Math.min(basePrice, rate * selectedDurationMinutes / unitMinutes), currency);
                                 } else if (hasIncluded) {
                                     const sortedTiers = [{ minutes: included, price: basePrice }, ...tiers]
                                         .sort((a, b) => a.minutes - b.minutes);
@@ -870,8 +879,8 @@ export class OrderService {
                                     }
                                     const calculated = basePrice + rate *
                                         (selectedDurationMinutes - included) / unitMinutes;
-                                    unitPrice = Math.round(Math.max(lower.price,
-                                        upper ? Math.min(calculated, upper.price) : calculated));
+                                    unitPrice = roundForCurrency(Math.max(lower.price,
+                                        upper ? Math.min(calculated, upper.price) : calculated), currency);
                                 } else {
                                     // Legacy packages: their custom rate covers the full duration.
                                     if (selectedDurationMinutes % unitMinutes !== 0) {
@@ -1022,6 +1031,7 @@ export class OrderService {
                                     );
 
                             if (
+                                currencyOf(validation) !== currency ||
                                 validation.discountEntryId !==
                                 service.promotion
                                     .promotionId
@@ -1167,6 +1177,7 @@ export class OrderService {
                                     eventTime,
                                     eventName:
                                         eventName.trim(),
+                                    currency,
                                     eventType,
                                     guests:
                                         Number(
@@ -1211,6 +1222,7 @@ export class OrderService {
                                 .create(
                                     [
                                         {
+                                            currency,
                                             policySnapshot: validatedService.policySnapshot,
                                             orderId:
                                                 order._id,
@@ -1362,6 +1374,7 @@ export class OrderService {
             for (const [index, booking] of savedDeliveryServices.entries()) {
                 await this.chatGateway?.sendBookingNotice(savedOrder, {
                     _id: savedVendorOrderIds[index],
+                    currency,
                     vendorId: booking.vendorId,
                     serviceName: booking.serviceName,
                     quantity: booking.quantity,
@@ -1383,7 +1396,7 @@ export class OrderService {
             ) {
                 await this.sendPushNotification(
                     'Order',
-                    deliveryDescription(savedDeliveryServices[index]) || 'A new order has been placed',
+                    deliveryDescription({...savedDeliveryServices[index], currency}) || 'A new order has been placed',
                     service.vendorId,
                     'CREATE_ORDER',
                 );
@@ -2195,6 +2208,10 @@ if (
 }
 
 if (downPaymentConfig) {
+    if (downPaymentConfig.type === 'FIXED' && Number(downPaymentConfig.value) > 0 && currencyOf(downPaymentConfig) !== currencyOf(vendorOrder)) {
+        throw new ConflictException('Update the fixed down payment in this booking currency before accepting.');
+    }
+
         const configValue =
     Number(downPaymentConfig.value);
 
@@ -2223,10 +2240,10 @@ if (
 const downPaymentAmount =
     downPaymentConfig.type ===
     'PERCENTAGE'
-        ? Math.round(
+        ? roundForCurrency(
               (bookingAmount *
                   configValue) /
-                  100,
+                  100, vendorOrder,
           )
         : configValue;
 
@@ -2250,8 +2267,8 @@ vendorOrder.downPaymentAmount =
 
 vendorOrder.remainingAmount =
     Math.max(
-        bookingAmount -
-            downPaymentAmount,
+        roundMoney(bookingAmount -
+            downPaymentAmount),
         0,
     );
 
@@ -2295,12 +2312,12 @@ const commissionPercentage =
 
 vendorOrder.commissionPercentageAtBooking = commissionPercentage;
 
-vendorOrder.commissionAmount = Math.round(
-    (vendorOrder.price * commissionPercentage) / 100,
+vendorOrder.commissionAmount = roundForCurrency(
+    (vendorOrder.price * commissionPercentage) / 100, vendorOrder,
 );
 
 vendorOrder.vendorNetAmount =
-    vendorOrder.price - vendorOrder.commissionAmount;
+    roundMoney(vendorOrder.price - vendorOrder.commissionAmount);
 }
 
         if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' }, __v: acceptanceVersion == null ? { $exists: false } : acceptanceVersion };
@@ -2508,7 +2525,7 @@ vendorOrder.vendorNetAmount =
         }
     }
 
-    private getDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
+    private getDownPaymentConfig(vendorUser: any): { type: string; value: number; currency?: string } | null {
         return getVendorDownPaymentConfig(vendorUser);
     }
 
@@ -2957,7 +2974,7 @@ async completeVendorOrder(vendorOrderId: string) {
             try {
                 await this.sendPushNotification(
                     'Schedule update request',
-                    vendorOrder.delivery ? `Your client would like to update the event schedule. ${deliveryDescription({delivery:vendorOrder.delivery,startDateTime:availability.requiredServiceWindow?.startDateTime})} Please review the request.` : 'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
+                    vendorOrder.delivery ? `Your client would like to update the event schedule. ${deliveryDescription({currency:vendorOrder.currency,delivery:vendorOrder.delivery,startDateTime:availability.requiredServiceWindow?.startDateTime})} Please review the request.` : 'Your client would like to update the event schedule. Please review the new date and time and let them know if it works for you.',
                     String(vendorOrder.vendorId),
                     'RESCHEDULE_REQUESTED',
                 );

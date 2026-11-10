@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getSecureData } from '../store';
 import { API_BASE_URL } from './apiConfig';
 export type VendorCancellationPreview = {
+  currency?: 'PKR' | 'USD';
   payments?: { amount: number; type: string; method?: string; paidAt?: string }[];
   vendorOrderId: string; calculatedAt: string; policyRevision: number;
   bookingAmount: number; amountPaid: number; remainingAmount: number;

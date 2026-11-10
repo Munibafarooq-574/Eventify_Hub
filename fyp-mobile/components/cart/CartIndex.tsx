@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 //fyp-mobile/components/cart/cart.index
 import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
@@ -35,7 +36,7 @@ const CartScreen: React.FC = () => {
                 renderItem={({ item }) => (
                     <View style={styles.cartItem}>
                         <Text style={styles.packageName}>{item.packageName}</Text>
-                        <Text style={styles.packagePrice}>Rs. {item.price}/-</Text>
+                        <Text style={styles.packagePrice}>{currencySymbol(currencyOf(item))} {item.price}/-</Text>
                     </View>
                 )}
                 ListEmptyComponent={
@@ -45,7 +46,7 @@ const CartScreen: React.FC = () => {
 
             <View style={styles.summary}>
                 <Text style={styles.totalLabel}>Total:</Text>
-                <Text style={styles.totalPrice}>Rs. {total}/-</Text>
+                <Text style={styles.totalPrice}>{currencySymbol()} {total}/-</Text>
             </View>
 
             <TouchableOpacity style={styles.proceedButton} onPress={handleProceed}>

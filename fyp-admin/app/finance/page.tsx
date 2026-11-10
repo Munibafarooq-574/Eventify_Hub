@@ -59,24 +59,26 @@ type FinanceOverview = {
   };
 };
 
-function formatAmount(amount: number) {
-  return `Rs ${Number(amount || 0).toLocaleString("en-PK")}`;
+function formatAmount(amount: number, currency = 'PKR') {
+  return `${currency === "USD" ? "$" : "Rs."} ${Number(amount || 0).toLocaleString("en-US", {maximumFractionDigits: 2})}`;
 }
 
 function StatCard({
   title,
   amount,
   description,
+  currency,
 }: {
   title: string;
   amount: number;
   description: string;
+  currency?: string;
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-sm text-slate-500">{title}</p>
       <p className="mt-2 text-2xl font-bold text-slate-900">
-        {formatAmount(amount)}
+        {formatAmount(amount, currency)}
       </p>
       <p className="mt-2 text-xs text-slate-500">
         {description}
@@ -96,11 +98,13 @@ const sidebarItemClass = (active = false) =>
   searchParams,
 }: {
   searchParams: Promise<{
+    currency?: string;
     from?: string;
     to?: string;
   }>;
 }) {
-  const { from, to } = await searchParams;
+  const { from, to, currency: requestedCurrency } = await searchParams;
+  const currency = requestedCurrency === 'USD' ? 'USD' : 'PKR';
 
   const token = await getAdminToken();
 
@@ -108,7 +112,7 @@ const sidebarItemClass = (active = false) =>
     redirect("/login");
   }
 
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({currency});
 
 if (from) params.set("from", from);
 if (to) params.set("to", to);
@@ -157,6 +161,8 @@ const response = await backendFetch(
 }
 
   const data: FinanceOverview = await response.json();
+  const formatAmount = (amount: number) => `${currency === 'USD' ? '$' : 'Rs.'} ${Number(amount || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+
 
   const today = new Date();
 
@@ -191,6 +197,16 @@ const thisYearUrl =
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <form method="GET" className="mb-4 flex items-center gap-3 p-4">
+        <label htmlFor="finance-currency">Currency</label>
+        <select id="finance-currency" name="currency" defaultValue={currency} className="rounded border p-2">
+          <option value="PKR">Pakistan · PKR</option><option value="USD">USA · USD</option>
+        </select>
+        {from && <input type="hidden" name="from" value={from} />}
+        {to && <input type="hidden" name="to" value={to} />}
+        <button type="submit" className="rounded bg-purple-800 px-4 py-2 text-white">Apply</button>
+      </form>
+
         <div className="flex min-h-screen flex-col lg:flex-row">
            <div className="lg:flex lg:w-72 lg:shrink-0 lg:flex-col lg:border-r lg:border-slate-200 lg:bg-white">
           <AdminSidebar />
@@ -336,7 +352,7 @@ const thisYearUrl =
 
 {/* FINANCIAL ACTIVITY CHART */}
 
-<FinanceRevenueChart data={data.dailyChart} />
+<FinanceRevenueChart currency={currency} data={data.dailyChart} />
 
             {/* PLATFORM REVENUE */}
 
@@ -346,13 +362,13 @@ const thisYearUrl =
               </h2>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+                <StatCard currency={currency}
                   title="Verified Subscription Revenue"
                   amount={data.summary.subscriptionRevenue}
                   description={`${data.subscriptionPayments.paid.count} verified paid subscription records`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Platform Revenue"
                   amount={data.summary.platformRevenue}
                   description="Currently includes verified subscription payments only."
@@ -373,19 +389,19 @@ const thisYearUrl =
               </p>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+                <StatCard currency={currency}
                   title="Successful Collections"
                   amount={data.bookingPayments.successful.amount}
                   description={`${data.bookingPayments.successful.count} successful payments`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Pending Payments"
                   amount={data.bookingPayments.pending.amount}
                   description={`${data.bookingPayments.pending.count} pending payments`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Failed Payments"
                   amount={data.bookingPayments.failed.amount}
                   description={`${data.bookingPayments.failed.count} failed payments`}
@@ -401,19 +417,19 @@ const thisYearUrl =
               </h2>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+                <StatCard currency={currency}
                   title="Verified Paid"
                   amount={data.subscriptionPayments.paid.amount}
                   description={`${data.subscriptionPayments.paid.count} verified records`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Pending (Uncollected)"
                   amount={data.subscriptionPayments.pending.amount}
                   description={`${data.subscriptionPayments.pending.count} pending records`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Failed (Not Collected)"
                   amount={data.subscriptionPayments.failed.amount}
                   description={`${data.subscriptionPayments.failed.count} failed records`}
@@ -505,19 +521,19 @@ const thisYearUrl =
               </h2>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <StatCard
+                <StatCard currency={currency}
                   title="Completed Refunds"
                   amount={data.refunds.completed.amount}
                   description={`${data.refunds.completed.count} completed refunds`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Pending Refunds"
                   amount={data.refunds.pending.amount}
                   description={`${data.refunds.pending.count} pending refunds`}
                 />
 
-                <StatCard
+                <StatCard currency={currency}
                   title="Processing Refunds"
                   amount={data.refunds.processing.amount}
                   description={`${data.refunds.processing.count} processing refunds`}

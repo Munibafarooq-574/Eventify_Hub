@@ -1,3 +1,4 @@
+import { setProfileCurrency } from '../utils/currency';
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { cancelCartReminder } from "../services/cartReminder";
@@ -206,6 +207,7 @@ export async function saveUserData(user: any) {
     const current = await getUserData();
     if (current?._id && String(current._id) === String(user?._id) && version === sessionVersion) {
       await AsyncStorage.setItem("user", JSON.stringify(user));
+      setProfileCurrency(user?.marketplaceCountryCode);
     }
   });
 }
@@ -214,10 +216,13 @@ export async function getUserData() {
   const version = sessionVersion;
   if (!sessionAvailable) return null;
   const user = await AsyncStorage.getItem("user");
-  return sessionAvailable && version === sessionVersion && user ? JSON.parse(user) : null;
+  const data = sessionAvailable && version === sessionVersion && user ? JSON.parse(user) : null;
+  setProfileCurrency(data?.marketplaceCountryCode);
+  return data;
 }
 
 export async function deleteUserData() {
+  setProfileCurrency(null);
   sessionVersion++;
   sessionAvailable = false;
   await serialize(async () => {

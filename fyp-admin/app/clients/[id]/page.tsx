@@ -1,3 +1,4 @@
+import { currencyOf, formatMoney } from '@/lib/currency';
 import Link from "next/link";
 import {
   notFound,
@@ -50,6 +51,7 @@ type ClientDetail = {
   totalEvents: number;
   totalVendorBookings: number;
   totalSpent: number;
+  totalSpentUSD?: number;
   pendingEvents: number;
   confirmedEvents: number;
   completedEvents: number;
@@ -125,13 +127,14 @@ function formatDateTime(
 
 function formatCurrency(
   value?: number,
+  currency?: unknown,
 ) {
   return new Intl.NumberFormat(
     "en-PK",
     {
       style: "currency",
-      currency: "PKR",
-      maximumFractionDigits: 0,
+      currency: currencyOf(currency),
+      maximumFractionDigits: 2,
     },
   ).format(
     Number(value || 0),
@@ -344,7 +347,7 @@ export default async function ClientDetailPage({
             <p className="mt-2 text-2xl font-bold">
               {formatCurrency(
                 client.totalSpent,
-              )}
+              )}{client.totalSpentUSD ? ' · ' + formatMoney(client.totalSpentUSD, 'USD') : ''}
             </p>
 
             <p className="mt-1 text-xs text-slate-400">
@@ -550,7 +553,7 @@ export default async function ClientDetailPage({
 
                         <p className="mt-1 text-xl font-bold">
                           {formatCurrency(
-                            event.finalAmount,
+                            event.finalAmount, currencyOf(event),
                           )}
                         </p>
                       </div>
@@ -667,14 +670,14 @@ export default async function ClientDetailPage({
 
                                 <p className="mt-1 text-lg font-bold">
                                   {formatCurrency(
-                                    booking.amount,
+                                    booking.amount, currencyOf(event),
                                   )}
                                 </p>
 
                                 <p className="mt-1 text-xs text-slate-500">
                                   Remaining:{" "}
                                   {formatCurrency(
-                                    booking.remaining,
+                                    booking.remaining, currencyOf(event),
                                   )}
                                 </p>
                               </div>

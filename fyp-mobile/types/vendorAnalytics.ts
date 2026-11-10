@@ -1,6 +1,9 @@
 // fyp-mobile/types/vendorAnalytics.ts
 
 export interface VendorAnalytics {
+    currency?: 'PKR' | 'USD';
+    revenueByCurrency?: { PKR: number; USD: number };
+
     cancelledOrders: number;
     cancellationRate: number | null;
 

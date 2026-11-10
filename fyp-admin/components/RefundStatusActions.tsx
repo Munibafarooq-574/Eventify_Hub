@@ -37,7 +37,7 @@ export default function RefundStatusActions({
     let message = "";
 
     if (status === "NO_REFUND_DUE") {
-      message = "Close this case as No refund due? The refund is Rs. 0. No money will be marked as returned; the cancellation and retained amount stay unchanged.";
+      message = "Close this case as No refund due? The refund amount is zero. No money will be marked as returned; the cancellation and retained amount stay unchanged.";
     }
 
     if (status === "PROCESSING") {
@@ -118,7 +118,7 @@ export default function RefundStatusActions({
 
   if (currentStatus === "NO_REFUND_DUE") return <p className="text-xs font-semibold text-slate-700">Closed — No refund due. No money returned.</p>;
   if (refundAmount === 0 && currentStatus !== "REFUNDED") return <div className="flex min-w-[190px] flex-col gap-2">
-    <p className="text-xs text-slate-600">Refund is Rs. 0 under the recorded rules.</p>
+    <p className="text-xs text-slate-600">No money is refundable under the recorded rules.</p>
     <button type="button" disabled={disabled} onClick={() => updateStatus("NO_REFUND_DUE")} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{loadingStatus ? "Closing…" : "Close case — No refund due"}</button>
   </div>;
 

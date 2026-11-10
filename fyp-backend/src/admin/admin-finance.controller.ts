@@ -84,10 +84,11 @@ export class AdminFinanceController {
 
    @Get('overview')
 getFinanceOverview(
+  @Query('currency') currency?: string,
   @Query('from') from?: string,
   @Query('to') to?: string,
 ) {
-  return this.service.getFinanceOverview(from, to);
+  return this.service.getFinanceOverview(from, to, currency);
 }
 
 @Get('transactions')

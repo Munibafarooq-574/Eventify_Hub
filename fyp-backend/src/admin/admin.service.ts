@@ -1,3 +1,4 @@
+import { currencyOf } from '../common/utils/currency';
 // fyp-backend/src/admin/admin.service.ts
 
 import {
@@ -1310,12 +1311,10 @@ async reviewVendorProfile(
                         },
 
                         totalSpent: {
-                            $sum: {
-                                $ifNull: [
-                                    '$finalAmount',
-                                    0,
-                                ],
-                            },
+                            $sum: { $cond: [{ $eq: [{ $ifNull: ['$currency', 'PKR'] }, 'PKR'] }, { $ifNull: ['$finalAmount', 0] }, 0] },
+                        },
+                        totalSpentUSD: {
+                            $sum: { $cond: [{ $eq: ['$currency', 'USD'] }, { $ifNull: ['$finalAmount', 0] }, 0] },
                         },
 
                         pendingEvents: {
@@ -1459,6 +1458,7 @@ async reviewVendorProfile(
                                 0,
                         ),
 
+                    totalSpentUSD: Number(stats?.totalSpentUSD || 0),
                     totalSpent:
                         Number(
                             stats?.totalSpent ||
@@ -1567,6 +1567,7 @@ async reviewVendorProfile(
                         'eventStartDateTime',
                         'eventEndDateTime',
                         'eventDurationMinutes',
+                        'currency',
                         'totalAmount',
                         'discount',
                         'finalAmount',
@@ -1729,6 +1730,7 @@ async reviewVendorProfile(
                             );
 
                     return {
+                        currency: currencyOf(order),
                         orderId:
                             order._id.toString(),
 
@@ -1829,8 +1831,9 @@ async reviewVendorProfile(
                 0,
             );
 
+        const totalSpentUSD = events.filter((event: any) => currencyOf(event) === 'USD').reduce((total: number, event: any) => total + Number(event.finalAmount || 0), 0);
         const totalSpent =
-            events.reduce(
+            events.filter((event: any) => currencyOf(event) === 'PKR').reduce(
                 (
                     total: number,
                     event: any,
@@ -1902,6 +1905,7 @@ async reviewVendorProfile(
             totalVendorBookings,
 
             totalSpent,
+            totalSpentUSD,
 
             pendingEvents,
 

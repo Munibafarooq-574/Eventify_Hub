@@ -4,7 +4,7 @@ export const PRICING_OPTIONS = [
   { value: 'GROUP', label: 'Group Package' },
 ] as const;
 export type PricingMethod = typeof PRICING_OPTIONS[number]['value'];
-export type PackagePricing = { pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null };
+export type PackagePricing = { currency?: 'PKR' | 'USD'; pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null };
 
 export function pricingMethod(pkg: PackagePricing, legacyPerPerson = false): PricingMethod {
   return pkg.pricingMethod ?? (legacyPerPerson ? 'PER_PERSON' : 'FIXED');
@@ -12,8 +12,8 @@ export function pricingMethod(pkg: PackagePricing, legacyPerPerson = false): Pri
 
 export function packageAmount(pkg: PackagePricing & { price?: number; quantity?: number }, guests: number, legacyPerPerson = false) {
   const persons = Number(pkg.personCount ?? guests);
-  return Number(pkg.price || 0) * Math.max(1, Number(pkg.quantity || 1)) *
-    (pricingMethod(pkg, legacyPerPerson) === 'PER_PERSON' ? persons : 1);
+  return Number((Number(pkg.price || 0) * Math.max(1, Number(pkg.quantity || 1)) *
+    (pricingMethod(pkg, legacyPerPerson) === 'PER_PERSON' ? persons : 1)).toFixed(2));
 }
 
 export function pricingUnit(pkg: PackagePricing, legacyPerPerson = false) {

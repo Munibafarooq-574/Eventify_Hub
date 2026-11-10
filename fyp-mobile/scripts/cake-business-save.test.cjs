@@ -9,7 +9,7 @@ function screen({user={_id:'signed-in-vendor'},edit='true',failSave=false,failSt
  '@/store':{getUserData:async()=>{if(failStorage)throw Error('Invalid stored data');return user;},getSecureData:()=>{throw Error('Must not read user from SecureStore');}},
  '@/services/postCakeBusinessDetails':api('post'),'@/services/patchBusinessDetails':api('patch'),'@/services/submitVendorProfileForReview':api('review'),axios:{get:()=>{throw Error('No request expected while rendering');}}};
  const mod={exports:{}};const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../components/bdcakes/BDCakesIndex.tsx'),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.React,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});assert.equal(code.diagnostics.length,0);
- vm.runInNewContext(code.outputText,{module:mod,exports:mod.exports,console:{log(){}},require:name=>{if(!(name in imports))throw Error(name);return imports[name];}});
+ vm.runInNewContext(code.outputText,{module:mod,exports:mod.exports,console:{log(){}},require:name=>{if (/currency/.test(name)) return require('./test-currency.cjs');if(!(name in imports))throw Error(name);return imports[name];}});
  const tree=mod.exports.default();
  function find(node){if(!node||typeof node!=='object')return; if(node.type==='TouchableOpacity'&&node.props.children.flat(Infinity).some(c=>c?.type==='Text'&&['Update Details','Save & Continue'].includes(c.props.children[0])))return node;for(const child of node.props?.children?.flat(Infinity)||[]){const found=find(child);if(found)return found;}}
  return{calls,alerts,navigation,async save(){find(tree).props.onPress();await new Promise(resolve=>setImmediate(resolve));}};

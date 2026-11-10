@@ -43,6 +43,6 @@ export function quotePackage(pkg: PackagePricing, unitPrice: number, quantity: n
     pricingMethod: method,
     groupSize: method === 'GROUP' ? pkg.groupSize! : null,
     personCount: method === 'PER_PERSON' ? persons : null,
-    packageAmount: unitPrice * quantity * (method === 'PER_PERSON' ? persons : 1),
+    packageAmount: Number((unitPrice * quantity * (method === 'PER_PERSON' ? persons : 1)).toFixed(2)),
   };
 }

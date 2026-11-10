@@ -15,10 +15,11 @@ const timing: GuideSection = {
 const status: GuideSection = {
   id: 'statuses', title: 'What each booking status means', summary: 'Each vendor has their own booking and payment status.',
   steps: [
+    'New Pakistan packages use PKR and new USA packages use USD. Existing PKR packages and bookings keep their recorded currency. No automatic currency conversion is applied.',
     'Pending: the vendor has not accepted. Processing / Accepted: the vendor accepted, but any required advance payment still needs to be secured.',
     'Confirmed: the required advance is secured, or no advance is required. Check Paid and Remaining for the actual money received; a zero advance does not mean the whole package is paid.',
     'Completed: the vendor has marked the booked service as provided. Any outstanding balance is handled separately.',
-    'Fully Paid: the service is complete and the remaining balance is Rs. 0.',
+    'Fully Paid: the service is complete and the remaining balance is zero.',
     'Cancelled or Rejected: this vendor booking will not proceed. Read the reason, cancellation details and any refund status.',
     'Request Expired / Payment Expired: the request or unpaid payment window ended. Closed bookings stay in history and cannot be accepted or paid through their old buttons.',
     'No longer assigned: this vendor was removed from the active assignment, for example after a replacement. The history remains.',
@@ -70,6 +71,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] }, status, service, delivery,
       { id: 'pay', title: 'Pay the down payment and remaining balance', summary: 'Use only the payment action shown on that booking.', steps: [
         'While a vendor is Pending, wait for their response. Once accepted, use Pay Down Payment if an advance is required. Check the amount and exact due date before proceeding.',
+        'USD bookings use card payment. PKR bookings show the available card and local wallet methods.',
         'Choose the available payment method, enter the requested details, review and submit once. Awaiting confirmation means the payment is still pending; do not submit another payment.',
         'A successful advance shows Partially Paid. View Receipt opens recorded payment details. A failed payment can be retried only while the payment window remains open and no payment is pending.',
         'A zero down payment has no advance-payment button or deadline. Paid may still be zero, with the full booking amount remaining.',
@@ -122,6 +124,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
         'Tap a booking in My Events to open and expand that order in Order Summary. Use the arrow to show or hide details in My Events.',
         'Open My Orders / Order Summary to accept, review schedule changes, request a later time, cancel or mark a service completed when those actions are available.',
+        'Prices use the saved booking currency: PKR for Pakistan or USD for USA. Older PKR bookings keep their currency.',
         'Check the client, package and booked service window before responding. If acceptance is blocked for insufficient time, use Request later service time rather than treating the booking as accepted.',
         'For completion and payment status, see Complete service and contact the client below.',
       ] },

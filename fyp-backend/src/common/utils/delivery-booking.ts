@@ -1,3 +1,4 @@
+import { currencySymbol } from './currency';
 import { BadRequestException } from '@nestjs/common';
 
 export interface DeliveryConfiguration {
@@ -75,5 +76,5 @@ export function deliveryDescription(booking: any): string {
   if (!booking?.delivery) return '';
   const d = booking.delivery;
   const time = new Date(booking.startDateTime).toLocaleString('en-GB', {timeZone:d.timeZone || 'UTC',day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
-  return `Delivery: ${time} (${d.timeZone || 'UTC'}). Delivery fee: ${d.deliveryFeeType === 'FREE' ? 'Free' : `Rs. ${Number(d.totalFee).toLocaleString()}`}.`;
+  return `Delivery: ${time} (${d.timeZone || 'UTC'}). Delivery fee: ${d.deliveryFeeType === 'FREE' ? 'Free' : `${currencySymbol(booking.currency)} ${Number(d.totalFee).toLocaleString()}`}.`;
 }

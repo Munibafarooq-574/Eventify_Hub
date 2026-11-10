@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { formatBookingDateTime } from '@/utils/bookingTimezone';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -32,7 +33,7 @@ function RefundDetails({ record, loading, error, audience, timeZone }: { record?
     REJECTED: 'The client refund request was rejected.',
     NO_REFUND_DUE: 'This case is closed. No money is refundable under the recorded cancellation policy.',
   };
-  const money = (value: number) => Number.isFinite(value) ? `Rs. ${value.toLocaleString('en-PK')}` : 'Not available';
+  const money = (value: number) => Number.isFinite(value) ? `${currencySymbol(currencyOf(record))} ${value.toLocaleString('en-PK')}` : 'Not available';
   const timestamp = status === 'REFUNDED' ? record?.refundedAt || record?.paidAt
     : status === 'REJECTED' ? record?.rejectedAt : status === 'NO_REFUND_DUE' ? record?.closedAt : record?.updatedAt;
   const dateLabel = timestamp ? formatBookingDateTime(timestamp, timeZone) : null;

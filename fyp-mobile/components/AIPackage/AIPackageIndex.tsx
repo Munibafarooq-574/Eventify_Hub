@@ -1,3 +1,4 @@
+import { assertSingleCurrency, currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { createBookingDraftStore } from '@/store';
@@ -59,6 +60,7 @@ const AIPackageScreen = () => {
                 cart.vendors.push(vendorPackageData);
             }
 
+            assertSingleCurrency(cart);
             await draft.save('cartData', JSON.stringify(cart));
         } catch (error) {
             console.error('Error handling add to cart:', error);
@@ -118,7 +120,7 @@ const AIPackageScreen = () => {
                 </Text>
 
                 <View style={styles.priceRow}>
-                    <Text style={styles.price}>Rs. {item.price}<PackagePriceBasis pkg={item} /></Text>
+                    <Text style={styles.price}>{currencySymbol(currencyOf(item))} {item.price}<PackagePriceBasis pkg={item} /></Text>
                 </View>
 
                 <View style={styles.divider} />
@@ -205,12 +207,12 @@ const AIPackageScreen = () => {
                                 </Text>
 
                                 <Text style={styles.budgetText}>
-                                    Your budget: Rs. {aiPackage.budget}/-
+                                    Your budget: {currencySymbol()} {aiPackage.budget}/-
                                 </Text>
                             </View>
 
                             <Text style={styles.totalValue}>
-                                Rs. {aiPackage.totalCost}/-
+                                {currencySymbol()} {aiPackage.totalCost}/-
                             </Text>
                         </View>
 

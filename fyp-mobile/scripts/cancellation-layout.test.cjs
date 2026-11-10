@@ -16,7 +16,7 @@ function screen({width=390,height=844,fontScale=1,os='android',reason='Typing a 
   const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../components/cancellation/ClientCancellationReview.tsx'),'utf8'),{compilerOptions:{jsx:ts.JsxEmit.React,module:ts.ModuleKind.CommonJS,esModuleInterop:true,target:ts.ScriptTarget.ES2022},reportDiagnostics:true});
   assert.equal(code.diagnostics.length,0);
   const module={exports:{}};
-  vm.runInNewContext(code.outputText,{module,exports:module.exports,requestAnimationFrame:fn=>{fn();return ++frameId;},cancelAnimationFrame(){},require:name=>{
+  vm.runInNewContext(code.outputText,{module,exports:module.exports,requestAnimationFrame:fn=>{fn();return ++frameId;},cancelAnimationFrame(){},require:name=>{if (/currency/.test(name)) return require('./test-currency.cjs');
     if(name==='react')return React;
     if(name==='react-native')return native;
     if(name==='react-native-safe-area-context')return{useSafeAreaInsets:()=>({top:44,bottom:34,left:0,right:0})};

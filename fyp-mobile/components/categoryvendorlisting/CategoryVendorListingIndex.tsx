@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
@@ -553,7 +554,7 @@ router.push({
           {price !== undefined && (
             <>
               <Text style={styles.priceText}>Starting from</Text>
-              <Text style={styles.price}>Rs {price}{' ' + pricingLabel(vendorStartingPackage(item, vendorPackages[item._id]) || {}, /^caterings?$/i.test(categoryName))}</Text>
+              <Text style={styles.price}>{currencySymbol(currencyOf(vendorStartingPackage(item, vendorPackages[item._id])))} {price}{' ' + pricingLabel(vendorStartingPackage(item, vendorPackages[item._id]) || {}, /^caterings?$/i.test(categoryName))}</Text>
             </>
           )}
         </View>

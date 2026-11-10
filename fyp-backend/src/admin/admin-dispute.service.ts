@@ -1,4 +1,5 @@
 // fyp-backend/src/admin/admin-dispute.service.ts
+import { currencyOf } from '../common/utils/currency';
 import {
   BadRequestException,
   ConflictException,
@@ -38,6 +39,7 @@ export class AdminDisputeService {
         if (!order) throw new NotFoundException('Parent order not found');
 
         return this.disputeModel.create({
+            currency: currencyOf(vendorOrder),
             vendorOrderId: vendorOrder._id,
             orderId: order._id,
             organizerId: order.organizerId,
@@ -238,6 +240,7 @@ export class AdminDisputeService {
                         await this.refundModel.create(
                             [
                                 {
+                                    currency: currencyOf(dispute),
                                     vendorOrderId: dispute.vendorOrderId,
                                     orderId: dispute.orderId,
                                     organizerId: dispute.organizerId,

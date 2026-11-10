@@ -3,6 +3,7 @@ import { getSecureData } from '../store';
 import { API_BASE_URL } from './apiConfig';
 
 export type ClientRefund = {
+  currency?: 'PKR' | 'USD';
   _id: string; vendorOrderId: string;
   amountPaid: number; refundAmount: number; withheldAmount: number;
   vendorPenalty?: { amount: number; percentage: number }[];

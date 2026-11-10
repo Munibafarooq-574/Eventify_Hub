@@ -1,3 +1,4 @@
+import { formatMoney, currencyOf } from '@/utils/currency';
 import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 // fyp-mobile/components/paymentmethod/PaymentMethodIndex.tsx
 import getBookingFinancials from '@/services/getBookingFinancials';
@@ -64,11 +65,12 @@ const METHODS: Method[] = [
   },
 ];
 
-const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
+
 
 // Shape returned by /payment/vendor-order/:id/financials.
 // Adjust these field names if your backend response uses different keys.
 type BookingFinancials = {
+  currency?: 'PKR' | 'USD';
   vendorOrderId: string;
   eventTimeZone?: string;
   totalAmount: number;
@@ -209,6 +211,7 @@ const PaymentMethodScreen = () => {
   const contentMaxWidth = isWide ? 1000 : isTablet ? 640 : 9999;
   const amountFontSize = width < 340 ? 32 : isTablet ? 52 : 40;
 
+  const formatCurrency = (value: number) => formatMoney(value, currencyOf(financials));
   const [selectedMethod, setSelectedMethod] = useState<number | null>(null);
   const [financials, setFinancials] = useState<BookingFinancials | null>(null);
   const [loading, setLoading] = useState(true);
@@ -420,7 +423,7 @@ const PaymentMethodScreen = () => {
         Your payment is processed securely. We never store your card details.
       </Text>
 
-      {METHODS.map((method) => (
+      {METHODS.filter(method => currencyOf(financials) === "PKR" || method.route === "/creditcard").map((method) => (
         <MethodCard
           key={method.id}
           method={method}

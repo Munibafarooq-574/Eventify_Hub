@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿import postCakeBusinessDetails from "@/services/postCakeBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
@@ -340,7 +341,7 @@ const CakeBusinessDetailsScreen: React.FC = () => {
                 <SectionTitle icon="wallet" title="Down Payment" required />
                 <View style={styles.inputRow}>
                     <Text style={styles.currencyPrefix}>
-                  {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+                  {downPaymentType === "PERCENTAGE" ? "%" : `${currencySymbol()}`}
                 </Text>
                     <TextInput
                         style={styles.inputFlex}

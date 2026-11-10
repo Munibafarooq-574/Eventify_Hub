@@ -1,4 +1,6 @@
  "use client";
+import { currencySymbol, currencyOf } from '@/lib/currency';
+
 
 import { useEffect, useState } from "react";
 
@@ -257,7 +259,7 @@ export default function RecentFinancialTransactions({
                     </td>
 
                     <td className="whitespace-nowrap px-3 py-4 font-semibold">
-                    Rs {Number(transaction.amount).toLocaleString("en-PK")}
+                    {currencySymbol(currencyOf(transaction))} {Number(transaction.amount).toLocaleString("en-PK")}
 
                     {transaction.status !== "PAID" &&
                         transaction.status !== "SUCCESS" && (

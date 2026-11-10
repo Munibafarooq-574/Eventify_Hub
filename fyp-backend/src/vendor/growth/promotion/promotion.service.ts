@@ -44,6 +44,7 @@ export interface FeaturedPackagePublicEntry {
   vendorName: string;
   coverImage: string | null;
   packageId: string;
+  currency?: 'PKR' | 'USD';
   packageName: string;
   pricingMethod?: 'FIXED' | 'PER_PERSON' | 'GROUP';
   groupSize?: number | null;
@@ -1032,6 +1033,7 @@ const featuredScore =
 
       pricingMethod: pkg.pricingMethod ?? legacyPricingMethod({ businessDetailsType: vendor.cateringBusinessDetails ? 'CATERING' : undefined }),
       groupSize: pkg.groupSize,
+      currency: pkg.currency || 'PKR',
       packageName:
         pkg.packageName,
 

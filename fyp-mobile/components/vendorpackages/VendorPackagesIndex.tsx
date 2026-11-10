@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { PackagePricing, } from '@/utils/packagePricing';
@@ -471,7 +472,7 @@ const PackageScreen = () => {
               </Text>
 
               <Text style={styles.priceHeroValue}>
-                Rs.{" "}
+                {currencySymbol(currencyOf(packageDetails))}{" "}
                 {packageDetails.price !==
                 undefined
                   ? packageDetails.price.toLocaleString()
@@ -803,7 +804,7 @@ const PackageScreen = () => {
                                   styles.durationPrice
                                 }
                               >
-                                Rs.{" "}
+                                {currencySymbol(currencyOf(packageDetails))}{" "}
                                 {Number(
                                   duration.price || 0
                                 ).toLocaleString()} <PackagePriceBasis pkg={packageDetails} />
@@ -933,7 +934,7 @@ const PackageScreen = () => {
                                 styles.customRateValue
                               }
                             >
-                              Rs.{" "}
+                              {currencySymbol(currencyOf(packageDetails))}{" "}
                               {Number(
                                 packageDetails.customDurationRate ||
                                   0

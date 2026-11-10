@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { bookingTimeZone, formatBookingDateTime } from '@/utils/bookingTimezone';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -10,7 +11,7 @@ export default function VendorCancellationSummary({ order, booking, preview }: {
   const client = order?.organizerId;
   const zone = bookingTimeZone(order);
   const date = (value: any) => formatBookingDateTime(value, zone, 'Not recorded');
-  const money = (value: number) => Number.isFinite(value) ? `Rs. ${value.toLocaleString('en-PK')}` : 'Not recorded';
+  const money = (value: number) => Number.isFinite(value) ? `${currencySymbol(currencyOf(preview))} ${value.toLocaleString('en-PK')}` : 'Not recorded';
   const delivery = pkg?.bookingType === 'DELIVERY_BASED';
   const sections: { title: string; rows: [string, any][] }[] = [
     { title: 'Booking & package', rows: [

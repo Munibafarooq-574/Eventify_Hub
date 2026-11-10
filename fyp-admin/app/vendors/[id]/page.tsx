@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/lib/currency';
 // fyp-admin/app/vendors/[id]/page.tsx
 
 import Link from "next/link";
@@ -110,8 +111,9 @@ function formatDateTime(
 
 function money(
   value?: number,
+  currency?: unknown,
 ) {
-  return `Rs ${Number(
+  return `${currencySymbol(currency)} ${Number(
     value || 0,
   ).toLocaleString(
     "en-PK",
@@ -760,7 +762,7 @@ export default async function VendorDetailPage({
 
                             <p className="mt-2 text-lg font-bold">
                               {money(
-                                pkg.price,
+                                pkg.price, currencyOf(pkg),
                               )}
                             </p>
                           </div>

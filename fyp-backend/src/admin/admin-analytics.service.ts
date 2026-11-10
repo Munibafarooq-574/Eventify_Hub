@@ -1,3 +1,4 @@
+import { currencyMatch } from '../common/utils/currency';
 ﻿// fyp-backend/src/admin/admin-analytics.service.ts
 
 import { Injectable } from '@nestjs/common';
@@ -42,6 +43,7 @@ export class AdminAnalyticsService {
         );
 
         const payments = await this.paymentModel.aggregate([
+            { $match: currencyMatch('PKR') },
             {
                 $match: {
                     status: 'SUCCESS',
@@ -74,6 +76,7 @@ export class AdminAnalyticsService {
         ]);
 
         const payouts = await this.payoutModel.aggregate([
+            { $match: currencyMatch('PKR') },
             {
                 $match: {
                     createdAt: {
@@ -218,7 +221,10 @@ export class AdminAnalyticsService {
                     },
 
                     revenue: {
-                        $sum: '$price',
+                        $sum: { $cond: [{ $eq: [{ $ifNull: ['$currency', 'PKR'] }, 'PKR'] }, '$price', 0] },
+                    },
+                    revenueUSD: {
+                        $sum: { $cond: [{ $eq: ['$currency', 'USD'] }, '$price', 0] },
                     },
                 },
             },
@@ -321,6 +327,7 @@ export class AdminAnalyticsService {
 
                 revenue:
                     Number(group.revenue || 0),
+                revenueUSD: Number(group.revenueUSD || 0),
             };
         });
     }

@@ -1,4 +1,5 @@
 // fyp-backend/src/payout/payout.service.ts
+import { currencyOf } from '../common/utils/currency';
 import {
     ConflictException,
     Injectable,
@@ -78,6 +79,7 @@ const payoutAmount =
           );
 
 const payout = await this.payoutModel.create({
+    currency: currencyOf(vendorOrder),
     vendorOrderId: vendorOrder._id,
     orderId: order._id,
     vendorId: vendorOrder.vendorId,

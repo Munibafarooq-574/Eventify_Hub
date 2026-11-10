@@ -11,6 +11,7 @@ export interface RefundCalculationResult {
 export interface CancellationActor { id: string; role: string; }
 
 export interface ClientCancellationPreview {
+    currency?: 'PKR' | 'USD';
     vendorOrderId: string;
     eligible: boolean;
     restrictionCode?: string;

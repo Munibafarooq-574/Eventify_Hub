@@ -14,6 +14,9 @@ import {
 
 @Schema({ timestamps: true })
 export class VendorDiscount extends Document {
+  @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR', immutable: true })
+  currency?: 'PKR' | 'USD';
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
   vendorId: MongooseSchema.Types.ObjectId;
 

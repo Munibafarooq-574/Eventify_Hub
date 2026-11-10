@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿// fyp-mobile/components/vendorCoupons/CreateDiscountCodeScreen.tsx
 //
 // TODO â€” UI-only redesign, no service/data or validation logic changes:
@@ -198,7 +199,7 @@ useEffect(() => {
 
     const minimumAmount = Number(minimumOrderAmount);
     if (!minimumOrderAmount.trim() || !Number.isFinite(minimumAmount) || minimumAmount < 0) {
-      Alert.alert('Minimum order amount required', 'Enter a valid minimum order amount of Rs. 0 or more.');
+      Alert.alert('Minimum order amount required', `Enter a valid minimum order amount of ${currencySymbol()} 0 or more.`);
       return;
     }
 
@@ -389,7 +390,7 @@ useEffect(() => {
                 onPress={() => setDiscountType(kind)}
               >
                 <Text style={[styles.typeChipText, discountType === kind && styles.typeChipTextSelected]}>
-                  {kind === DiscountKind.PERCENTAGE ? 'Percentage (%)' : 'Fixed Amount (Rs.)'}
+                  {kind === DiscountKind.PERCENTAGE ? 'Percentage (%)' : `Fixed Amount (${currencySymbol()})`}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -400,7 +401,7 @@ useEffect(() => {
             Discount Value
         ================================= */}
 
-        <Field label={discountType === DiscountKind.PERCENTAGE ? 'Discount (%)' : 'Discount Amount (Rs.)'}>
+        <Field label={discountType === DiscountKind.PERCENTAGE ? 'Discount (%)' : `Discount Amount (${currencySymbol()})`}>
           <TextInput
             style={styles.input}
             placeholder={discountType === DiscountKind.PERCENTAGE ? 'e.g. 15' : 'e.g. 5000'}
@@ -414,7 +415,7 @@ useEffect(() => {
             Minimum Order
         ================================= */}
 
-        <Field label="Minimum Order Amount (Rs.) - required">
+        <Field label={`Minimum Order Amount (${currencySymbol()}) - required`}>
           <TextInput style={styles.input} placeholder="e.g. 75000" keyboardType="numeric" value={minimumOrderAmount} onChangeText={setMinimumOrderAmount} />
         </Field>
 
@@ -423,7 +424,7 @@ useEffect(() => {
         ================================= */}
 
         {discountType === DiscountKind.PERCENTAGE && (
-          <Field label="Maximum Discount (Rs.) - optional">
+          <Field label={`Maximum Discount (${currencySymbol()}) - optional`}>
             <TextInput style={styles.input} placeholder="e.g. 10000" keyboardType="numeric" value={maximumDiscountAmount} onChangeText={setMaximumDiscountAmount} />
           </Field>
         )}

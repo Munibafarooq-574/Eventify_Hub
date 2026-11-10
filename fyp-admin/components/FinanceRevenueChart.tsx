@@ -20,8 +20,10 @@ type DailyFinance = {
 
 export default function FinanceRevenueChart({
   data,
+  currency = "PKR",
 }: {
   data: DailyFinance[];
+  currency?: string;
 }) {
   if (!data.length) {
     return (
@@ -66,7 +68,7 @@ export default function FinanceRevenueChart({
 
             <Tooltip
               formatter={(value, name) => [
-                `Rs ${Number(value ?? 0).toLocaleString("en-PK")}`,
+                `${currency === "USD" ? "$" : "Rs."} ${Number(value ?? 0).toLocaleString("en-PK")}`,
                 String(name),
               ]}
             />

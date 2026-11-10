@@ -1,8 +1,9 @@
+import { currencySymbol } from '../common/utils/currency';
 import type { Order } from '../schemas/order.schema';
 import type { VendorOrder } from '../schemas/vendor-order.schema';
 
 export type BookingChatOrder = Pick<Order, 'organizerId' | 'eventName' | 'eventDate' | 'eventStartDateTime'>;
-export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService' | 'quantity' | 'pricingMethod' | 'personCount' | 'groupSize'>;
+export type BookingChatLine = { currency?: string } & Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService' | 'quantity' | 'pricingMethod' | 'personCount' | 'groupSize'>;
 export type BookingChatStage = 'requested' | 'confirmed' | 'completed' | 'cancelled';
 
 export type BookingChatPayment = { amount: number; remainingAmount: number };
@@ -30,8 +31,8 @@ export function formatBookingNotice(
     return [
         `Booking ${stage === 'requested' ? 'request sent' : stage} for ${order.eventName} on ${eventDate}.`,
         payment && `Down payment received for ${order.eventName}.`,
-        payment && `Amount: Rs. ${payment.amount.toLocaleString('en-PK')}`,
-        payment && `Remaining: Rs. ${payment.remainingAmount.toLocaleString('en-PK')}`,
+        payment && `Amount: ${currencySymbol(booking.currency)} ${payment.amount.toLocaleString('en-PK')}`,
+        payment && `Remaining: ${currencySymbol(booking.currency)} ${payment.remainingAmount.toLocaleString('en-PK')}`,
         stage === 'cancelled' && 'The vendor has cancelled this booking. Your payment/refund information is available in the booking details.',
         booking.bookingChatService && `Service: ${booking.bookingChatService}`,
         `Package: ${booking.serviceName}`,

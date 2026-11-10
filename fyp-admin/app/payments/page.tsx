@@ -1,3 +1,4 @@
+import { formatMoneyTotals, currencySymbol, currencyOf } from '@/lib/currency';
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -54,8 +55,8 @@ type SearchParams = Promise<{
   status?: string | string[];
 }>;
 
-const money = (value?: number | null) =>
-  `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+const money = (value?: number | null, currency?: unknown) =>
+  `${currencySymbol(currency)} ${Number(value || 0).toLocaleString("en-PK")}`;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) return "—";
@@ -293,7 +294,7 @@ export default async function PaymentsPage({
                 </p>
 
                 <p className="mt-3 text-3xl font-bold text-emerald-700">
-                  {money(successfulAmount)}
+                  {formatMoneyTotals(payments.filter(payment => payment.status === "SUCCESS"), payment => payment.amount)}
                 </p>
               </div>
 
@@ -303,7 +304,7 @@ export default async function PaymentsPage({
                 </p>
 
                 <p className="mt-3 text-3xl font-bold text-amber-700">
-                  {money(pendingAmount)}
+                  {formatMoneyTotals(payments.filter(payment => payment.status === "PENDING"), payment => payment.amount)}
                 </p>
               </div>
 
@@ -488,26 +489,26 @@ export default async function PaymentsPage({
 
                             <td className="whitespace-nowrap px-5 py-4 text-right font-bold text-slate-900">
                               {money(
-                                payment.amount,
+                                payment.amount, currencyOf(payment)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold text-slate-700">
                               {money(
                                 payment.booking
-                                  ?.totalAmount,
+                                  ?.totalAmount, currencyOf(payment)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold text-emerald-700">
                               {money(
-                                payment.paidSoFar,
+                                payment.paidSoFar, currencyOf(payment)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold text-amber-700">
                               {money(
-                                payment.outstandingAmount,
+                                payment.outstandingAmount, currencyOf(payment)
                               )}
                             </td>
 

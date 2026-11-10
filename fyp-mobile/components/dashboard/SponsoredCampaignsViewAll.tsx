@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -342,7 +343,7 @@ return {
                 <PackagePricingLabel pkg={item.package || {}} />
                 <Text style={styles.price}>
                   {price > 0
-                    ? `Rs ${price.toLocaleString()}`
+                    ? `${currencySymbol(currencyOf(item))} ${price.toLocaleString()}`
                     : item.package
                         ?.packageName ||
                       "Package"}

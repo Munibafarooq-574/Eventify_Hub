@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import InfoHelp from './InfoHelp';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -15,7 +16,7 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
   if (showConfiguration) {
     const paid = d.deliveryFeeType === 'PAID';
     const rows = [
-      ...(paid ? [['Base delivery fee',`Rs. ${Number(fees.baseFee).toLocaleString()}`]] : []),
+      ...(paid ? [['Base delivery fee',`${currencySymbol(currencyOf(pkg))} ${Number(fees.baseFee).toLocaleString()}`]] : []),
       ['Time reserved',`${formatDeliveryReserve(d.deliveryReserveMinutes)} per delivery`],
     ];
     return <View style={s.card}>
@@ -24,9 +25,9 @@ export default function DeliveryDetails({ pkg, quantity = 1, guests = 1, isCater
     </View>;
   }
   return <View style={{marginVertical:8,gap:4}}>
-    {!!(pkg.delivery && typeof pkg.delivery === 'object') && <Text style={{color:'#68225D'}}>Package amount: Rs. {Number(d.packageAmount || 0).toLocaleString()}</Text>}
+    {!!(pkg.delivery && typeof pkg.delivery === 'object') && <Text style={{color:'#68225D'}}>Package amount: {currencySymbol(currencyOf(pkg))} {Number(d.packageAmount || 0).toLocaleString()}</Text>}
     {d.deliveryFeeType === 'FREE' ? <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',alignSelf:'flex-start',borderRadius:8,paddingHorizontal:10,paddingVertical:5,fontWeight:'700'}}>Free Delivery</Text> : <>
-      <Text style={{color:'#68225D'}}>Delivery: Rs. {Number(fees.baseFee).toLocaleString()}</Text>
+      <Text style={{color:'#68225D'}}>Delivery: {currencySymbol(currencyOf(pkg))} {Number(fees.baseFee).toLocaleString()}</Text>
     </>}
     {!!selected && <Text style={{color:'#68225D'}}>Delivery date &amp; time: {deliveryDateTime(selected, d.timeZone || pkg.deliveryTimeZone || timeZone)}</Text>}
   </View>;

@@ -1,5 +1,6 @@
 // fyp-backend/src/payment/payment.types.ts
 export interface PaymentBreakdown {
+    currency?: 'PKR' | 'USD';
   eventTimeZone: string;
   delivery?: any;
   deliveryStartDateTime?: Date;

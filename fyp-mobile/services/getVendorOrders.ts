@@ -4,6 +4,7 @@ import axios, { AxiosRequestConfig } from "axios";
 import { reportMarketplaceLoadError } from "./reportMarketplaceLoadError";
 
 export interface GetOrdersResponse {
+    currency?: 'PKR' | 'USD';
     _id: string;
     organizerId: {
         _id: string;

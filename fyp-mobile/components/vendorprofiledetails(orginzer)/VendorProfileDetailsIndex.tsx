@@ -1,3 +1,4 @@
+import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -1796,6 +1797,7 @@ Toast.show({
           eventTimeZone,
           deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
+          currency: currencyOf(pkg),
           packageName: pkg.packageName,
           pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
           groupSize: pkg.groupSize,
@@ -1874,6 +1876,10 @@ Toast.show({
             String(v.vendorId || v.vendor?._id || '') === resolvedVendorId,
         );
 
+        if (cartCurrencies(cart).some(code => code !== currencyOf(pkg))) {
+          showCartNotice('Different currency', 'Remove packages in the other currency before adding this package.');
+          return;
+        }
         if (vendorIndex !== -1) {
           if (!Array.isArray(cart.vendors[vendorIndex].packages)) {
             cart.vendors[vendorIndex].packages = [];
@@ -1953,7 +1959,7 @@ Toast.show({
         });
         await draft.save('cartData', JSON.stringify(cart));
         setAddedPackages(current => [...current, currentPackageId]);
-        showCartNotice('Added to cart', `${pkg.packageName} · Rs. ${resolvedPrice.toLocaleString()}`);
+        showCartNotice('Added to cart', `${pkg.packageName} · ${currencySymbol(currencyOf(pkg))} ${resolvedPrice.toLocaleString()}`);
       } catch (error) {
         reportMarketplaceLoadError('Could not add package to cart:', error);
         showCartNotice('Could not add to cart', error instanceof Error ? error.message : 'Please try again.', true);
@@ -2683,7 +2689,7 @@ const serviceCityNamesFromIds =
                         styles.price
                       }
                     >
-                      Rs.{' '}
+                      {currencySymbol(currencyOf(selectedPackage))}{' '}
                       {lowestPackageBasePrice !== null ? lowestPackageBasePrice.toLocaleString() : 'N/A'}
                       /-
                     </Text>
@@ -2783,7 +2789,7 @@ const serviceCityNamesFromIds =
     ? `${Number(
         coupon.discountValue || 0,
       )}% OFF`
-    : `Rs. ${Number(
+    : `${currencySymbol(currencyOf(selectedPackage))} ${Number(
         coupon.discountValue || 0,
       ).toLocaleString()} OFF`;
 
@@ -2856,7 +2862,7 @@ const serviceCityNamesFromIds =
                   styles.specialOfferDetailText
                 }
               >
-                Min Rs.{' '}
+                Min {currencySymbol(currencyOf(selectedPackage))}{' '}
                 {Number(
                   coupon.minimumOrderAmount,
                 ).toLocaleString()}
@@ -2871,7 +2877,7 @@ const serviceCityNamesFromIds =
                   styles.specialOfferDetailText
                 }
               >
-                Max Rs.{' '}
+                Max {currencySymbol(currencyOf(selectedPackage))}{' '}
                 {Number(
                   coupon.maximumDiscountAmount,
                 ).toLocaleString()}{' '}
@@ -4375,7 +4381,7 @@ const serviceCityNamesFromIds =
     ? String(applicableCoupon.discountType).toUpperCase() ===
       'PERCENTAGE'
       ? `${Number(applicableCoupon.discountValue || 0)}% OFF`
-      : `Rs. ${Number(
+      : `${currencySymbol(currencyOf(pkg))} ${Number(
           applicableCoupon.discountValue || 0,
         ).toLocaleString()} OFF`
     : null;
@@ -4457,7 +4463,7 @@ const serviceCityNamesFromIds =
               isActive && styles.packageCardPriceActive,
             ]}
           >
-            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}{durationQuote?.price !== null && <PackagePriceBasis pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
+            {durationQuote?.price === null ? '—' : `${currencySymbol(currencyOf(pkg))} ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}{durationQuote?.price !== null && <PackagePriceBasis pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
           </Text>
           {!durationQuote && pkg.bookingType === 'DURATION_BASED' &&
             Number(pkg.baseIncludedDurationMinutes) > 0 && (
@@ -4797,7 +4803,7 @@ const serviceCityNamesFromIds =
               </View>
 
               <Text style={styles.durationPrice}>
-                Rs.{' '}
+                {currencySymbol(currencyOf(selectedPackage))}{' '}
                 {Number(
                   duration.price || 0,
                 ).toLocaleString()} <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
@@ -4828,7 +4834,7 @@ const serviceCityNamesFromIds =
         </View>
 
         <Text style={styles.customDurationText}>
-          Rs.{' '}
+          {currencySymbol(currencyOf(selectedPackage))}{' '}
           {Number(
             selectedPackage.customDurationRate,
           ).toLocaleString()}{' '}
@@ -5045,7 +5051,7 @@ const serviceCityNamesFromIds =
                           >
                             {selectedDurationQuote?.price === null
                               ? '—'
-                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}`}{selectedDurationQuote?.price !== null && <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
+                              : `${currencySymbol(currencyOf(selectedPackage))} ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}`}{selectedDurationQuote?.price !== null && <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
                           </Text>
                            {selectedDurationQuote?.reason && (
                              <Text style={styles.priceFooterLabel}>{selectedDurationQuote.reason}</Text>

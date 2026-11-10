@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
@@ -735,7 +736,7 @@ const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
         <PackagePricingLabel pkg={item.package || {}} />
         <View style={styles.bottomRow}>
           <Text style={styles.price}>
-            {price > 0 ? `Rs ${price.toLocaleString()}` : packageName}{price > 0 && <PackagePriceBasis pkg={item.package || {}} />}
+            {price > 0 ? `${currencySymbol(currencyOf(item))} ${price.toLocaleString()}` : packageName}{price > 0 && <PackagePriceBasis pkg={item.package || {}} />}
           </Text>
 
           <View style={styles.viewButton}>

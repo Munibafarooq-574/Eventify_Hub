@@ -11,6 +11,13 @@ const base = {
 const service = () => Object.create(PaymentService.prototype) as any;
 const text = (html: string) => html.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ');
 describe('Payment receipt display',()=>{
+    it('renders USD receipt amounts without relabelling the legacy PKR receipt', () => {
+        const usd = text(service().buildPaymentReceiptEmail({...base,currency:'USD',amount:40.05,bookingTotal:200.25,totalPaid:40.05,remainingBalance:160.20}));
+        expect(usd).toContain('Amount Paid: $ 40.05');
+        expect(usd).toContain('Remaining Balance: $ 160.2');
+        expect(usd).not.toContain('Rs.');
+        expect(text(service().buildPaymentReceiptEmail(base))).toContain('Amount Paid: Rs. 1,500');
+    });
     it('shows twelve-hour event time, real category and one delivery timestamp in the event timezone',()=>{
         const html=service().buildPaymentReceiptEmail(base);const content=text(html);
         expect(content).toMatch(/Event Time: 1:00 PM/);

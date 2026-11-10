@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 // fyp-mobile/components/easypaisa/EasyPaisaIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,7 +20,7 @@ import {
 const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8E9F0';
 
-const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
+const formatCurrency = (value: number) => `${currencySymbol()} ${Math.round(value || 0).toLocaleString('en-PK')}`;
 
 // Formats to "03XX-XXXXXXX" as the user types.
 const formatPhone = (raw: string) => {

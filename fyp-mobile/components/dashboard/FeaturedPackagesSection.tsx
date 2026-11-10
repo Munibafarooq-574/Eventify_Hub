@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
@@ -175,7 +176,7 @@ export function FeaturedPackagesSection() {
       </Text>
 
       <Text style={styles.price}>
-        Rs. {Number(pkg.price || 0).toLocaleString()} <PackagePriceBasis pkg={pkg} />
+        {currencySymbol(currencyOf(pkg))} {Number(pkg.price || 0).toLocaleString()} <PackagePriceBasis pkg={pkg} />
       </Text>
 
       <Text style={styles.rating}>

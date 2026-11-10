@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { bookingTimeZone, formatBookingTime, formatCalendarDate, eventLocalDateTime, bookingDateKey } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -848,7 +849,7 @@ renderItem={({ item }) => {
             <Text style={styles.expandedSubTitle}>Booking & Payment Details</Text>
             <View style={styles.eventMeta}>
               <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-              <Text style={styles.expandedText}>Your Earnings: Rs. {vendorTotal}</Text>
+              <Text style={styles.expandedText}>Your Earnings: {currencySymbol(currencyOf(item))} {vendorTotal}</Text>
             </View>
             {!!vendorStatus && (
               <View style={styles.eventMeta}>
@@ -878,9 +879,9 @@ renderItem={({ item }) => {
                         {service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                       {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
-                      <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>
-                      <Text style={styles.expandedText}>Paid: Rs. {paid}</Text>
-                      <Text style={styles.expandedText}>Remaining: Rs. {remaining}</Text>
+                      <Text style={styles.expandedText}>Booking Amount: {currencySymbol(currencyOf(service))} {total}</Text>
+                      <Text style={styles.expandedText}>Paid: {currencySymbol(currencyOf(service))} {paid}</Text>
+                      <Text style={styles.expandedText}>Remaining: {currencySymbol(currencyOf(service))} {remaining}</Text>
                       <Text style={styles.expandedText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
                     </View>
                   );

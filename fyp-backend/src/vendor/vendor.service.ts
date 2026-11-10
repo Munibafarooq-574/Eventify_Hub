@@ -1,3 +1,4 @@
+import { countryCurrency, currencyOf } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage, validatePackagePricing } from '../common/utils/package-pricing';
 import type { MarketplaceScope } from '../city/marketplace.guard';
 import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
@@ -483,42 +484,49 @@ user.vendorApprovalStatus =
     case BusinessDetailsType.VENUE:
       user.venueBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as VenueBusinessDetails;
       break;
 
     case BusinessDetailsType.CATERING:
       user.cateringBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as CateringBusinessDetails;
       break;
 
     case BusinessDetailsType.PHOTOGRAPHY:
       user.photographerBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as PhotographerBusinessDetails;
       break;
 
     case BusinessDetailsType.MAKEUP:
       user.salonBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as SalonBusinessDetails;
       break;
 
     case BusinessDetailsType.MEHNDI:
       user.mehndiBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as MehndiBusinessDetails;
       break;
 
     case BusinessDetailsType.CAKE:
       user.cakeBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as CakeBusinessDetails;
       break;
 
     case BusinessDetailsType.SOUND:
       user.soundBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as SoundBusinessDetails;
       break;
 
@@ -526,6 +534,7 @@ user.vendorApprovalStatus =
     default:
       user.genericBusinessDetails = {
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as unknown as GenericBusinessDetails;
       break;
   }
@@ -589,6 +598,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.venueBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as VenueBusinessDetails;
 
       user.markModified(
@@ -602,6 +612,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.cateringBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as CateringBusinessDetails;
 
       user.markModified(
@@ -615,6 +626,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.photographerBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as PhotographerBusinessDetails;
 
       user.markModified(
@@ -628,6 +640,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.salonBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as SalonBusinessDetails;
 
       user.markModified(
@@ -641,6 +654,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.cakeBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as CakeBusinessDetails;
 
       user.markModified(
@@ -654,6 +668,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.mehndiBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as MehndiBusinessDetails;
 
       user.markModified(
@@ -667,6 +682,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.soundBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as SoundBusinessDetails;
 
       user.markModified(
@@ -681,6 +697,7 @@ user.vendorApprovalStatus =
           ?.toObject?.() ??
           user.genericBusinessDetails),
         ...dto,
+        currency: countryCurrency(user.marketplaceCountryCode),
       } as GenericBusinessDetails;
 
       user.markModified(
@@ -821,6 +838,7 @@ async addPackages(
 
     // Normalize new packages so they always match the Package schema
     const newPackages = incomingPackages.map((pkg) => ({
+        currency: countryCurrency(user.marketplaceCountryCode),
         ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, pkg[field]])),
         pricingMethod: pkg.pricingMethod,
         groupSize: pkg.groupSize,
@@ -1243,7 +1261,7 @@ const packages = visibleVendors.flatMap(vendor =>
         const pricing = quotePackage({ pricingMethod, groupSize: pkg.groupSize }, Number(pkg.price), quantity, guests);
         return {
             packageId: pkg._id.toString(), vendorId: vendor._id.toString(), vendorName: vendor.name,
-            packageName: pkg.packageName, price: pkg.price, services: pkg.services,
+            currency: pkg.currency || 'PKR', packageName: pkg.packageName, price: pkg.price, services: pkg.services,
             pricingMethod, groupSize: pricing.groupSize, personCount: pricing.personCount, quantity,
             estimatedAmount: pricing.packageAmount,
             maximumCapacity: vendor.BusinessDetails?.maximumPeopleCapacity ?? Infinity,
@@ -1254,16 +1272,18 @@ const packages = visibleVendors.flatMap(vendor =>
         return packages;
     }
 
-    async generateSmartPackage(input: SmartPackageInput) {
+    async generateSmartPackage(input: SmartPackageInput, marketplace?: MarketplaceScope) {
         const services = input.services;
-        const budget = input.budget;
+        const currency = countryCurrency(marketplace?.countryCode);
+        const budget = Number(input.budget);
+        if (!Number.isFinite(budget) || budget <= 0) throw new BadRequestException('Enter a valid budget.');
         const guests = input.guests;
 
         // Fetch all candidates per service
         const allCandidates: { [service: string]: any[] } = {};
         for (const service of services) {
-            const candidates = await this.findAllVendorPackagesForService(service, guests);
-            allCandidates[service] = candidates || [];
+            const candidates = await this.findAllVendorPackagesForService(service, guests, marketplace);
+            allCandidates[service] = (candidates || []).filter(candidate => currencyOf(candidate) === currency);
         }
 
         let bestCombination: any[] = [];
@@ -1323,6 +1343,7 @@ const packages = visibleVendors.flatMap(vendor =>
             eventName: input.eventName,
             eventDate: input.eventDate,
             guests,
+            currency,
             packages: bestCombination,
             totalCost,
             budget,

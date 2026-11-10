@@ -1,3 +1,4 @@
+import { assertSingleCurrency, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
@@ -301,7 +302,7 @@ const finalTotal =
       0,
     ) || 0;
 
-  const formatCurrency = (amount: number) => Math.round(amount).toLocaleString('en-PK');
+  const formatCurrency = (amount: number) => Number(amount).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   const toggleVendorDetails = (
   vendorId: string,
@@ -782,9 +783,9 @@ if (
 ) {
   Alert.alert(
     'Offer Requirements Not Met',
-    `Minimum order amount for this offer is Rs. ${formatCurrency(
+    `Minimum order amount for this offer is ${currencySymbol(currencyOf(pkg))} ${formatCurrency(
       minimumOrderAmount,
-    )}. Your package total is Rs. ${formatCurrency(
+    )}. Your package total is ${currencySymbol(currencyOf(pkg))} ${formatCurrency(
       originalAmount,
     )}.`,
     [{ text: 'OK' }],
@@ -1290,6 +1291,7 @@ const isInvalidCode =
 );
 
     if (!draft.isCurrent() || !eventDetails) throw new Error("Your session or event draft is unavailable.");
+    assertSingleCurrency(cartData);
     const response = await postPlaceOrder({
       organizerId: session.userId,
       bookingDraftRevision: draft.getRevision(),
@@ -2130,7 +2132,7 @@ const vendorPackageCount = countPackageUnits(packages);
                           <Text style={styles.guestTagText}>Quantity: {quantity} · {pricingLabel(pkg, !!isCatering)}</Text>
                           {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && <Text style={styles.guestTagText}>People: {pkg.personCount ?? guests}</Text>}
                           {pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
-                          <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
+                          <Text style={styles.packagePrice}>{currencySymbol(currencyOf(pkg))} {formatCurrency(finalPrice)}</Text>
                           <DeliveryDetails pkg={pkg} quantity={quantity} guests={Number(guests || 0)} isCatering={!!isCatering} />
                           {String(
   pkg?.bookingType || 'DURATION_BASED',
@@ -2186,7 +2188,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                         coupon.discountValue ||
                                           0,
                                       )}% OFF`
-                                    : `Rs. ${formatCurrency(
+                                    : `${currencySymbol(currencyOf(pkg))} ${formatCurrency(
                                         Number(
                                           coupon.discountValue ||
                                             0,
@@ -2231,7 +2233,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                             styles.offerDetail
                                           }
                                         >
-                                          Min Rs.{' '}
+                                          Min {currencySymbol(currencyOf(pkg))}{' '}
                                           {formatCurrency(
                                             Number(
                                               coupon.minimumOrderAmount,
@@ -2248,7 +2250,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                             styles.offerDetail
                                           }
                                         >
-                                          Max Rs.{' '}
+                                          Max {currencySymbol(currencyOf(pkg))}{' '}
                                           {formatCurrency(
                                             Number(
                                               coupon.maximumDiscountAmount,
@@ -2311,7 +2313,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                     styles.appliedPromotionText
                                   }
                                 >
-                                  Original: Rs.{' '}
+                                  Original: {currencySymbol(currencyOf(pkg))}{' '}
                                   {formatCurrency(
                                     appliedPromotion.originalAmount,
                                   )}
@@ -2322,7 +2324,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                     styles.appliedPromotionDiscount
                                   }
                                 >
-                                  Discount: - Rs.{' '}
+                                  Discount: - {currencySymbol(currencyOf(pkg))}{' '}
                                   {formatCurrency(
                                     appliedPromotion.discountAmount,
                                   )}
@@ -2333,7 +2335,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                     styles.appliedPromotionFinal
                                   }
                                 >
-                                  Final: Rs.{' '}
+                                  Final: {currencySymbol(currencyOf(pkg))}{' '}
                                   {formatCurrency(
                                     appliedPromotion.finalAmount,
                                   )}
@@ -2425,7 +2427,7 @@ const vendorPackageCount = countPackageUnits(packages);
         </Text>
 
         <Text style={styles.appliedCodeSaving}>
-          You saved Rs.{' '}
+          You saved {currencySymbol(currencyOf(pkg))}{' '}
           {formatCurrency(
             Number(
               appliedPromotion.discountAmount ||
@@ -2478,7 +2480,7 @@ const vendorPackageCount = countPackageUnits(packages);
   </Text>
 
   <Text style={styles.priceValue}>
-    Rs. {formatCurrency(totalAmount)}
+    {currencySymbol(cartCurrency(cartData))} {formatCurrency(totalAmount)}
   </Text>
 </View>
 
@@ -2493,7 +2495,7 @@ const vendorPackageCount = countPackageUnits(packages);
       </Text>
 
       <Text style={styles.discountValue}>
-        - Rs.{' '}
+        - {currencySymbol(cartCurrency(cartData))}{' '}
         {formatCurrency(
           Number(
             promotion.discountAmount || 0,
@@ -2512,7 +2514,7 @@ const vendorPackageCount = countPackageUnits(packages);
                   <Text style={styles.totalSubLabel}>Payable at checkout</Text>
                 </View>
               <Text style={styles.totalAmount}>
-  Rs. {formatCurrency(finalTotal)}
+  {currencySymbol(cartCurrency(cartData))} {formatCurrency(finalTotal)}
 </Text>
               </View>
             </View>
@@ -2549,7 +2551,7 @@ const vendorPackageCount = countPackageUnits(packages);
             </Text>
             </View>
             <Text style={styles.bottomAmount}>
-  Rs. {formatCurrency(finalTotal)}
+  {currencySymbol(cartCurrency(cartData))} {formatCurrency(finalTotal)}
 </Text>
           </View>
 

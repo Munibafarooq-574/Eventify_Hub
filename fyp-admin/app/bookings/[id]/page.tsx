@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/lib/currency';
 import { eventDurationLabel, formatEventTime, serviceTimingRows } from '@/lib/booking-time';
 import Link from "next/link";
 import BookingPolicySnapshot, { type SavedBookingPolicy } from "@/components/BookingPolicySnapshot";
@@ -127,8 +128,8 @@ type PageProps = {
   }>;
 };
 
-const money = (value?: number | null) =>
-  `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+const money = (value?: number | null, currency?: unknown) =>
+  `${currencySymbol(currency)} ${Number(value || 0).toLocaleString("en-PK")}`;
 
 const text = (value?: string | null) => {
   const cleaned = value?.trim();
@@ -306,19 +307,19 @@ export default async function BookingDetailsPage({
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Booking amount"
-                value={money(vendorOrder.price)}
+                value={money(vendorOrder.price, currencyOf(vendorOrder))}
               />
 
               <StatCard
                 label="Down payment"
-                value={money(vendorOrder.downPaymentAmount)}
+                value={money(vendorOrder.downPaymentAmount, currencyOf(vendorOrder))}
               />
 
               <StatCard
                 label="Remaining"
                 value={money(
                   vendorOrder.remainingAmount ??
-                    vendorOrder.price,
+                    vendorOrder.price, currencyOf(vendorOrder)
                 )}
               />
 
@@ -512,7 +513,7 @@ export default async function BookingDetailsPage({
 
                           <TableCell>
                             <strong>
-                              {money(payment.amount)}
+                              {money(payment.amount, currencyOf(payment))}
                             </strong>
                           </TableCell>
 
@@ -549,14 +550,14 @@ export default async function BookingDetailsPage({
                     <InfoRow
                       label="Gross amount"
                       value={money(
-                        data.payout.grossAmount,
+                        data.payout.grossAmount, currencyOf(vendorOrder)
                       )}
                     />
 
                     <InfoRow
                       label="Vendor payout"
                       value={money(
-                        data.payout.payoutAmount,
+                        data.payout.payoutAmount, currencyOf(vendorOrder)
                       )}
                     />
 
@@ -569,7 +570,7 @@ export default async function BookingDetailsPage({
                           Number(
                             data.payout.payoutAmount ||
                               0,
-                          ),
+                          ), currencyOf(vendorOrder)
                       )}
                     />
 
@@ -598,21 +599,21 @@ export default async function BookingDetailsPage({
                     <InfoRow
                       label="Amount paid"
                       value={money(
-                        data.refund.amountPaid,
+                        data.refund.amountPaid, currencyOf(vendorOrder)
                       )}
                     />
 
                     <InfoRow
                       label="Refund amount"
                       value={money(
-                        data.refund.refundAmount,
+                        data.refund.refundAmount, currencyOf(vendorOrder)
                       )}
                     />
 
                     <InfoRow
                       label="Withheld amount"
                       value={money(
-                        data.refund.withheldAmount,
+                        data.refund.withheldAmount, currencyOf(vendorOrder)
                       )}
                     />
 

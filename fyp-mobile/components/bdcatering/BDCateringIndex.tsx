@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿import postCateringBusinessDetails from "@/services/postCateringBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import { getUserData } from "@/store";
@@ -640,7 +641,7 @@ i===2 && styles.dotAccent
 
     <View style={styles.inputRow}>
   <Text style={styles.currencyPrefix}>
-    {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+    {downPaymentType === "PERCENTAGE" ? "%" : `${currencySymbol()}`}
   </Text>
 
   <TextInput

@@ -25,7 +25,7 @@ function device(server, platform = 'android') {
         setItemAsync: async (key, value) => secure.set(key, value),
         deleteItemAsync: async key => secure.delete(key),
       },
-      '@react-native-async-storage/async-storage': { default: {
+      '@react-native-async-storage/async-storage': { __esModule: true, default: {
         getItem: async key => users.get(key),
         setItem: async (key, value) => users.set(key, value),
         removeItem: async key => users.delete(key),
@@ -33,7 +33,7 @@ function device(server, platform = 'android') {
       '../services/cartReminder': { cancelCartReminder: async () => {} },
       '../services/apiConfig': { API_BASE_URL: 'https://example.invalid' },
     };
-    vm.runInNewContext(source, { exports, require: name => imports[name], localStorage: {
+    vm.runInNewContext(source, { exports, require: name => /currency/.test(name) ? require('./test-currency.cjs') : imports[name], localStorage: {
       getItem: key => secure.get(key) ?? null,
       setItem: (key, value) => secure.set(key, value),
       removeItem: key => secure.delete(key),

@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { getVendorPackagesList } from '@/services/getVendorPackagesList';
@@ -1402,7 +1403,7 @@ Alert.alert(
                     styles.summaryPrice
                   }
                 >
-                  Rs.{" "}
+                  {currencySymbol(currencyOf(packageDetails))}{" "}
                   {Number(
                     editablePrice || 0,
                   ).toLocaleString()}
@@ -1525,7 +1526,7 @@ Alert.alert(
                     styles.priceInputPrefix
                   }
                 >
-                  Rs.
+                  {currencySymbol(currencyOf(packageDetails))}
                 </Text>
 
                 <TextInput
@@ -1764,7 +1765,7 @@ Alert.alert(
             </TouchableOpacity>
           ))}
         </View>
-        {includedMinutes > 0 && Number.isFinite(includedMinutes) && <Text style={styles.includedTimeSummary}>Base Rs. {Number(editablePrice || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
+        {includedMinutes > 0 && Number.isFinite(includedMinutes) && <Text style={styles.includedTimeSummary}>Base {currencySymbol(currencyOf(packageDetails))} {Number(editablePrice || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
       </View>
       <Text style={styles.includedTimeHint}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
     </View>
@@ -2030,7 +2031,7 @@ Alert.alert(
                               styles.pricePrefixSmall
                             }
                           >
-                            Rs.
+                            {currencySymbol(currencyOf(packageDetails))}
                           </Text>
 
                           <TextInput
@@ -2219,7 +2220,7 @@ Alert.alert(
                         styles.pricePrefixSmall
                       }
                     >
-                      Rs.
+                      {currencySymbol(currencyOf(packageDetails))}
                     </Text>
 
                     <TextInput
@@ -2911,7 +2912,7 @@ Alert.alert(
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {editablePrice}<PackagePriceBasis pkg={pricing} />
+                  {currencySymbol(currencyOf(packageDetails))} {editablePrice}<PackagePriceBasis pkg={pricing} />
                 </Text>
               )}
             </View>
@@ -3091,7 +3092,7 @@ Alert.alert(
                           styles.previewDurationPrice
                         }
                       >
-                        Rs.{" "}
+                        {currencySymbol(currencyOf(packageDetails))}{" "}
                         {Number(
                           duration.price ||
                             0,
@@ -3123,7 +3124,7 @@ Alert.alert(
                     [styles.previewCustomText, { flexShrink: 1, textAlign: 'right' }]
                   }
                 >
-                  Rs.{" "}
+                  {currencySymbol(currencyOf(packageDetails))}{" "}
                   {Number(
                     customDurationRate ||
                       0,

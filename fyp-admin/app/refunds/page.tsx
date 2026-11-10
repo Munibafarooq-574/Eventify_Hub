@@ -1,3 +1,4 @@
+import { formatMoneyTotals, currencySymbol, currencyOf } from '@/lib/currency';
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -70,9 +71,9 @@ type SearchParams = Promise<{
 }>;
 
 const money = (
-  value?: number | null,
+  value?: number | null, currency?: unknown
 ) =>
-  `Rs ${Number(
+  `${currencySymbol(currency)} ${Number(
     value || 0,
   ).toLocaleString("en-PK")}`;
 
@@ -335,7 +336,7 @@ export default async function RefundsPage({
                 </p>
 
                 <p className="mt-3 text-3xl font-bold text-amber-700">
-                  {money(totalRefundDue)}
+                  {formatMoneyTotals(refunds, refund => Number(refund.refundAmount || 0))}
                 </p>
               </div>
 
@@ -355,7 +356,7 @@ export default async function RefundsPage({
                 </p>
 
                 <p className="mt-3 text-3xl font-bold text-emerald-700">
-                  {money(refundedAmount)}
+                  {formatMoneyTotals(refunds.filter(refund => refund.status === "REFUNDED"), refund => Number(refund.refundAmount || 0))}
                 </p>
               </div>
             </div>
@@ -544,25 +545,25 @@ export default async function RefundsPage({
                               {money(
                                 refund
                                   .booking
-                                  ?.totalAmount,
+                                  ?.totalAmount, currencyOf(refund)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold text-slate-700">
                               {money(
-                                refund.amountPaid,
+                                refund.amountPaid, currencyOf(refund)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right font-bold text-emerald-700">
                               {money(
-                                refund.refundAmount,
+                                refund.refundAmount, currencyOf(refund)
                               )}
                             </td>
 
                             <td className="whitespace-nowrap px-5 py-4 text-right font-semibold text-red-700">
                               {money(
-                                refund.withheldAmount,
+                                refund.withheldAmount, currencyOf(refund)
                               )}
                             </td>
 

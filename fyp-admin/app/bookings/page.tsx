@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/lib/currency';
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -62,8 +63,8 @@ const BOOKING_FILTERS = [
 
 type BookingFilter = (typeof BOOKING_FILTERS)[number];
 
-const money = (value?: number) =>
-  `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+const money = (value?: number, currency?: unknown) =>
+  `${currencySymbol(currency)} ${Number(value || 0).toLocaleString("en-PK")}`;
 
 const formatDate = (value?: string) => {
   if (!value) return "N/A";
@@ -516,14 +517,14 @@ export default async function BookingsPage({
                               <div>
                                 <p className="font-semibold text-slate-900">
                                   {money(
-                                    booking.amount,
+                                    booking.amount, currencyOf(booking)
                                   )}
                                 </p>
 
                                 <p className="mt-1 text-xs text-slate-500">
                                   Down:{" "}
                                   {money(
-                                    booking.downPayment,
+                                    booking.downPayment, currencyOf(booking)
                                   )}
                                 </p>
                               </div>
@@ -533,14 +534,14 @@ export default async function BookingsPage({
                               <div>
                                 <p className="font-semibold text-slate-900">
                                   {money(
-                                    booking.remaining,
+                                    booking.remaining, currencyOf(booking)
                                   )}
                                 </p>
 
                                 <p className="mt-1 text-xs text-slate-500">
                                   Vendor net:{" "}
                                   {money(
-                                    booking.vendorNet,
+                                    booking.vendorNet, currencyOf(booking)
                                   )}
                                 </p>
                               </div>

@@ -11,6 +11,9 @@ import { ContactDetails, ContactDetailsSchema } from './contact-details.schema';
 
 @Schema({ discriminatorKey: 'type' }) // Add discriminator key to the base schema
 export class BusinessDetails extends Document {
+  @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR' })
+  currency?: 'PKR' | 'USD';
+
 }
 
 export const BusinessDetailsSchema = SchemaFactory.createForClass(BusinessDetails);
@@ -552,6 +555,9 @@ export const SoundBusinessDetailsSchema = SchemaFactory.createForClass(
 
 @Schema({ _id: false })
 export class GenericBusinessDetails {
+  @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR' })
+  currency?: 'PKR' | 'USD';
+
   @Prop({ required: true, trim: true })
   description: string;
 
@@ -739,6 +745,9 @@ export enum PackageBookingType {
 
 @Schema()
 export class Package {
+  @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR' })
+  currency?: 'PKR' | 'USD';
+
   @Prop({ type: String, enum: PRICING_METHODS })
   pricingMethod?: PricingMethod;
 

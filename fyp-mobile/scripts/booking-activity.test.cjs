@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const ts=require('typescript');
-const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('utils/bookingActivity.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:m,exports:m.exports});const {bookingActivity:rows,formatBookingActivityTime:format}=m.exports;
+const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('utils/bookingActivity.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:m,exports:m.exports,require:()=>require('./test-timezone.cjs')});const {bookingActivity:rows,formatBookingActivityTime:format}=m.exports;
 const t='2026-10-26T15:18:00.000Z';
 test('each action uses its own timestamp; updatedAt never substitutes for missing history',()=>{
  const b={status:'completed',paymentStatus:'PARTIALLY_PAID',createdAt:t,acceptedAt:t,confirmationTime:t,completedAt:t,updatedAt:'2099-01-01'};

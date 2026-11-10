@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
@@ -1266,7 +1267,7 @@ if (!userId) {
 
   <View style={styles.priceContainer}>
     <Text style={styles.pricePrefix}>
-      Rs.
+      {currencySymbol()}
     </Text>
 
     <TextInput
@@ -1420,7 +1421,7 @@ if (!userId) {
             </TouchableOpacity>
           ))}
         </View>
-        {Number.isFinite(includedMinutes) && includedMinutes > 0 && <Text style={styles.includedTimeSummary}>Base Rs. {Number(price || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
+        {Number.isFinite(includedMinutes) && includedMinutes > 0 && <Text style={styles.includedTimeSummary}>Base {currencySymbol()} {Number(price || 0).toLocaleString()} includes {baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text>}
       </View>
       <Text style={styles.includedTimeHint}>Fixed duration prices are full prices, not extra charges. Longer durations cannot cost less.</Text>
     </View>
@@ -1648,7 +1649,7 @@ if (!userId) {
                           styles.pricePrefixSmall
                         }
                       >
-                        Rs.
+                        {currencySymbol()}
                       </Text>
 
                       <TextInput
@@ -1821,7 +1822,7 @@ if (!userId) {
                     styles.pricePrefixSmall
                   }
                 >
-                  Rs.
+                  {currencySymbol()}
                 </Text>
 
                 <TextInput
@@ -2506,7 +2507,7 @@ if (!userId) {
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {price}<PackagePriceBasis pkg={pricing} />
+                  {currencySymbol()} {price}<PackagePriceBasis pkg={pricing} />
                 </Text>
               )}
             </View>
@@ -2686,7 +2687,7 @@ if (!userId) {
                           styles.previewDurationPrice
                         }
                       >
-                        Rs.{" "}
+                        {currencySymbol()}{" "}
                         {Number(
                           duration.price ||
                             0,
@@ -2718,7 +2719,7 @@ if (!userId) {
                     [styles.previewCustomText, { flexShrink: 1, textAlign: 'right' }]
                   }
                 >
-                  Rs.{" "}
+                  {currencySymbol()}{" "}
                   {Number(
                     customDurationRate ||
                       0,

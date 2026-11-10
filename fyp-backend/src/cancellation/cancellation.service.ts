@@ -1,4 +1,5 @@
 // fyp-backend/src/cancellation/cancellation.service.ts
+import { currencyOf, currencySymbol } from '../common/utils/currency';
 import {
     BadRequestException,
     ConflictException,
@@ -189,12 +190,13 @@ export class CancellationService {
         if (!isVendor) this.requireClient(actor);
         else if (!actor?.id || !Types.ObjectId.isValid(actor.id)) throw new ForbiddenException('Authenticated Vendor required.');
         const records = await this.refundModel.find({ [isVendor ? 'vendorId' : 'organizerId']: new Types.ObjectId(actor.id) })
-            .select('_id vendorOrderId amountPaid refundAmount withheldAmount status processedAt refundedAt paidAt rejectedAt closedAt updatedAt rejectionReason')
+            .select('currency _id vendorOrderId amountPaid refundAmount withheldAmount status processedAt refundedAt paidAt rejectedAt closedAt updatedAt rejectionReason')
             .sort({ createdAt: -1 }).lean();
         const penalties = isVendor ? await this.vendorPenaltyModel.find({ vendorId: new Types.ObjectId(actor.id),
             vendorOrderId: { $in: records.map(record => record.vendorOrderId) },
         }).select('vendorOrderId penaltyAmount penaltyPercentage').lean() : [];
         return records.map(record => ({
+            currency: currencyOf(record),
             _id: record._id, vendorOrderId: record.vendorOrderId,
             ...(isVendor ? { vendorPenalty: penalties.filter(p => String(p.vendorOrderId) === String(record.vendorOrderId))
                 .map(p => ({ amount: p.penaltyAmount, percentage: p.penaltyPercentage })) } : {}),
@@ -261,6 +263,7 @@ export class CancellationService {
         }
         if (!Number.isSafeInteger(paidMinor)) throw new ConflictException('Payment total needs Support review.');
         const result: ClientCancellationPreview = {
+            currency: currencyOf(vendorOrder),
             vendorOrderId: String(vendorOrder._id), eligible: false, serviceName: vendorOrder.serviceName,
             eventStartDateTime: vendorOrder.eventStartDateTime && Number.isFinite(vendorOrder.eventStartDateTime.getTime()) ? vendorOrder.eventStartDateTime.toISOString() : null,
             amountPaid: paidMinor / 100, refundAmount: null, withheldAmount: null, refundPercentage: null,
@@ -377,6 +380,7 @@ export class CancellationService {
                 );
                 if (!updated) throw new ConflictException('Booking changed. Reload the cancellation preview.');
                 const [refund] = await this.refundModel.create([{
+                    currency: currencyOf(vendorOrder),
                     vendorOrderId: vendorOrder._id, orderId: order._id, organizerId: order.organizerId, vendorId: vendorOrder.vendorId,
                     amountPaid: result.amountPaid, refundAmount: result.refundAmount, withheldAmount: result.withheldAmount,
                     initiatedBy: 'ORGANIZER_CANCELLED', daysBeforeEvent: result.daysBeforeEvent,
@@ -458,6 +462,7 @@ export class CancellationService {
         const payments = await this.paymentModel.find({ vendorOrderId: booking._id, status: 'SUCCESS' })
             .select('amount type method paidAt').lean();
         return {
+            currency: currencyOf(booking),
             payments: payments.map(payment => ({ amount: payment.amount, type: payment.type, method: payment.method, paidAt: payment.paidAt })),
             vendorOrderId: String(booking._id), calculatedAt: calculation.calculatedAt,
             policyRevision: calculation.snapshot.policyRevision, amountPaid: calculation.amountPaid,
@@ -518,6 +523,7 @@ export class CancellationService {
                 const order = await this.orderModel.findOne({ vendorOrders: vendorOrder._id }).session(session);
 
                 const [refund] = await this.refundModel.create([{
+                    currency: currencyOf(vendorOrder),
                     vendorOrderId: vendorOrder._id,
                     orderId: order?._id,
                     organizerId: order?.organizerId,
@@ -536,6 +542,7 @@ export class CancellationService {
                 }], { session });
 
                 const [penalty] = await this.vendorPenaltyModel.create([{
+                    currency: currencyOf(vendorOrder),
                     vendorId: vendorOrder.vendorId,
                     vendorOrderId: vendorOrder._id,
                     penaltyPercentage,
@@ -562,7 +569,7 @@ export class CancellationService {
                 const isVendor = recipient === String(vendorOrder.vendorId);
                 try {
                     await this.notifications.notifyUser(recipient, 'Booking cancelled by vendor',
-                        `Booking ${String(vendorOrder._id).slice(-8).toUpperCase()}: ${isVendor ? 'You cancelled this booking.' : 'The vendor cancelled this booking.'} Reason: ${reason}. Recorded refund: Rs. ${refundAmount.toLocaleString('en-PK')} (pending review).${isVendor ? ` Vendor penalty: Rs. ${penaltyAmount.toLocaleString('en-PK')} (${penaltyPercentage}%).` : ''}`,
+                        `Booking ${String(vendorOrder._id).slice(-8).toUpperCase()}: ${isVendor ? 'You cancelled this booking.' : 'The vendor cancelled this booking.'} Reason: ${reason}. Recorded refund: ${currencySymbol(vendorOrder.currency)} ${refundAmount.toLocaleString('en-PK')} (pending review).${isVendor ? ` Vendor penalty: ${currencySymbol(vendorOrder.currency)} ${penaltyAmount.toLocaleString('en-PK')} (${penaltyPercentage}%).` : ''}`,
                         'REFUND_UPDATE', { orderId: order?._id ? String(order._id) : undefined, vendorOrderId: String(vendorOrder._id) });
                 } catch { /* Settlement remains pending; notifications are best effort. */ }
             }

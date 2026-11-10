@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { vendorStartingPrice, vendorStartingPackage } from '@/services/vendorSearchPreferences';
@@ -485,7 +486,7 @@ const category =
                             {startingPrice !== undefined && (
                                 <View style={styles.priceBadge}>
                                     <Text testID="vendor-price" style={styles.price}>
-                                        Rs. {startingPrice}<PackagePriceBasis pkg={vendorStartingPackage(vendorData) || {}} legacyPerPerson={category === 'catering'} />
+                                        {currencySymbol(currencyOf(vendorStartingPackage(vendorData)))} {startingPrice}<PackagePriceBasis pkg={vendorStartingPackage(vendorData) || {}} legacyPerPerson={category === 'catering'} />
                                     </Text>
                                     <Text style={styles.perHead}>Starting price</Text>
                                 </View>
@@ -1021,7 +1022,7 @@ const category =
                   styles.packageCardPriceActive,
               ]}
             >
-              Rs.{" "}
+              {currencySymbol(currencyOf(pkg))}{" "}
               {Number(
                 pkg.price || 0
               ).toLocaleString()}
@@ -1314,7 +1315,7 @@ const category =
                   </View>
 
                   <Text style={styles.durationPrice}>
-                    Rs.{" "}
+                    {currencySymbol(currencyOf(pkg))}{" "}
                     {Number(
                       duration.price || 0
                     ).toLocaleString()} <PackagePriceBasis pkg={pkg} legacyPerPerson={category === 'catering'} />
@@ -1359,7 +1360,7 @@ const category =
           </View>
 
           <Text style={styles.customDurationText}>
-            Rate: Rs.{" "}
+            Rate: {currencySymbol(currencyOf(pkg))}{" "}
             {Number(
               pkg.customDurationRate || 0
             ).toLocaleString()}
@@ -1517,7 +1518,7 @@ const category =
                 testID="package-price"
                 style={styles.priceText}
               >
-                Rs.{" "}
+                {currencySymbol(currencyOf(pkg))}{" "}
                 {Number(
                   pkg.price || 0
                 ).toLocaleString()}

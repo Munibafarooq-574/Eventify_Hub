@@ -14,7 +14,8 @@ function load(name, token = 'session-token') {
   const file = path.join(__dirname, '../services', `${name}.ts`);
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, console, require: dependency => {
+  vm.runInNewContext(code, { module, exports: module.exports, console, require: dependency => {if (/currency/.test(dependency)) return require('./test-currency.cjs');
+    if (/bookingTimezone/.test(dependency)) return require('./test-timezone.cjs');
     if (dependency === 'axios') return axios;
     if (dependency === './bookingActionError') return load('bookingActionError').api;
     if (dependency === '../store') return { getSecureData: async key => { assert.equal(key, 'token'); return token; } };

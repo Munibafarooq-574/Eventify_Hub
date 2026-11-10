@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/lib/currency';
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -94,8 +95,8 @@ function formatDate(value?: string | null) {
   }).format(date);
 }
 
-function money(value?: number | null) {
-  return `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+function money(value?: number | null, currency?: unknown) {
+  return `${currencySymbol(currency)} ${Number(value || 0).toLocaleString("en-PK")}`;
 }
 
 function InfoRow({
@@ -330,7 +331,7 @@ export default async function DisputeDetailsPage({
                     />
                     <InfoRow
                       label="Booking amount"
-                      value={money(vendorOrder?.price)}
+                      value={money(vendorOrder?.price, currencyOf(vendorOrder))}
                     />
                     <InfoRow
                       label="Booking status"
@@ -433,7 +434,7 @@ export default async function DisputeDetailsPage({
                   <Card title="Payment & Refund">
                     <InfoRow
                       label="Successful payments"
-                      value={money(amountPaid)}
+                      value={money(amountPaid, currencyOf(vendorOrder))}
                     />
                     <InfoRow
                       label="Refund status"
@@ -443,7 +444,7 @@ export default async function DisputeDetailsPage({
                       label="Refund amount"
                       value={
                         data?.refund
-                          ? money(data.refund.refundAmount)
+                          ? money(data.refund.refundAmount, currencyOf(vendorOrder))
                           : "—"
                       }
                     />
@@ -464,7 +465,7 @@ export default async function DisputeDetailsPage({
                       {dispute.status === "RESOLVED_PARTIAL" && (
                         <InfoRow
                           label="Partial refund"
-                          value={money(dispute.partialRefundAmount)}
+                          value={money(dispute.partialRefundAmount, currencyOf(vendorOrder))}
                         />
                       )}
                       <InfoRow
@@ -476,6 +477,7 @@ export default async function DisputeDetailsPage({
                     <DisputeResolutionForm
                       disputeId={dispute._id}
                       amountPaid={amountPaid}
+                      currency={currencyOf(vendorOrder)}
                     />
                   )}
                 </Card>

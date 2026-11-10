@@ -1,3 +1,4 @@
+import { formatMoney, currencyOf } from '@/utils/currency';
 import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import { deliveryDateTime, displayDeliveryWeight } from '@/utils/deliveryBooking';
 import getPaymentStatus from '@/services/getPaymentStatus';
@@ -30,8 +31,7 @@ const PRIMARY_LIGHT = '#F8E9F0';
 const TICKET_BG = '#FFFFFF';
 const SUCCESS = '#278A4B';
 
-const formatCurrency = (value: number) =>
-  `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
+
 
 const escapeHtml = (value: string) => String(value).replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
@@ -51,6 +51,7 @@ const PaymentConfirmationScreen = () => {
     vendorOrderId?: string;
   }>();
 
+  const formatCurrency = (value: number) => formatMoney(value, currencyOf(paymentData));
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

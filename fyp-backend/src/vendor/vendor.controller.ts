@@ -239,20 +239,22 @@ async submitVendorProfileForReview(
   }
 
   @Post('ai-package')
+  @UseGuards(JwtAuthGuard, MarketplaceGuard)
   async getSmartPackage(
     @Body() smartPackageDto: SmartPackageInput,
+    @Request() req: any,
   ) {
     smartPackageDto.guests = parseInt(
       smartPackageDto.guests.toString(),
     );
 
-    smartPackageDto.budget = parseInt(
+    smartPackageDto.budget = Number(
       smartPackageDto.budget.toString(),
     );
 
     return this.vendorService.generateSmartPackage({
       ...smartPackageDto,
-    });
+    }, req.marketplace);
   }
 
   // =========================

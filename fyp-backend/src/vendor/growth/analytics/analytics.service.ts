@@ -1,3 +1,4 @@
+import { currencyOf, currencyMatch } from '../../../common/utils/currency';
 // fyp-backend/src/vendor/growth/analytics/analytics.service.ts
 //
 // Everything here is computed from real collections — VendorOrder, Order,
@@ -172,11 +173,11 @@ export class AnalyticsService {
 
   private async computeGrowthAnalytics(vendorId: string): Promise<GrowthAnalytics> {
     const vendorObjId = new Types.ObjectId(vendorId);
-
-   const [baseAnalytics, orderCounts, packages, promoStats, views, campaigns] = await Promise.all([
-  this.vendorAnalyticsService.getVendorAnalytics(vendorId),
+    const baseAnalytics = await this.vendorAnalyticsService.getVendorAnalytics(vendorId);
+   const [baseCopy, orderCounts, packages, promoStats, views, campaigns] = await Promise.all([
+  Promise.resolve(baseAnalytics),
   this.computeOrderCounts(vendorObjId),
-  this.computeGrowthPackageStats(vendorObjId),
+  this.computeGrowthPackageStats(vendorObjId, currencyOf(baseAnalytics)),
   this.computePromotionStats(vendorId),
   this.computeSourceViews(vendorObjId),
   this.computeCampaignAnalytics(vendorObjId),
@@ -189,6 +190,7 @@ export class AnalyticsService {
       orderCounts.total > 0 ? Math.round((orderCounts.completed / orderCounts.total) * 1000) / 10 : null;
 
     return {
+      currency: currencyOf(baseAnalytics),
       sales: {
         totalRevenue: baseAnalytics.totalRevenue,
         monthlyRevenue: baseAnalytics.monthlyRevenue,
@@ -298,8 +300,9 @@ export class AnalyticsService {
     return { total, completed };
   }
 
-  private async computeGrowthPackageStats(vendorObjId: Types.ObjectId) {
+  private async computeGrowthPackageStats(vendorObjId: Types.ObjectId, currency: 'PKR' | 'USD' = 'PKR') {
     const revenueByService = await this.vendorOrderModel.aggregate([
+      { $match: currencyMatch(currency) },
       { $match: { vendorId: vendorObjId, status: 'completed' } },
       { $group: { _id: '$serviceName', revenue: { $sum: '$price' } } },
       { $sort: { revenue: -1 } },

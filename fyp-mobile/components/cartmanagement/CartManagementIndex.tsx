@@ -1,3 +1,4 @@
+import { cartCurrencies, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
@@ -478,6 +479,10 @@ if (eventDetailsRaw) {
 };
 
     const handleCheckout = () => {
+        if (cartCurrencies(cartData).length > 1) {
+            Alert.alert('Different currencies', 'Remove packages in the other currency before checkout.');
+            return;
+        }
         if (!cartData?.vendors?.length) {
             Toast.show({
                 type: 'info',
@@ -519,7 +524,8 @@ if (eventDetailsRaw) {
         );
     }
 
-    const totalAmount = calculateTotalAmount();
+    const mixedCurrency = cartCurrencies(cartData).length > 1;
+    const totalAmount = mixedCurrency ? 0 : calculateTotalAmount();
 
     const vendorCount = cartData?.vendors?.length || 0;
 
@@ -541,6 +547,7 @@ if (eventDetailsRaw) {
 
     return (
         <View style={styles.container}>
+            {mixedCurrency && <Text accessibilityRole="alert" style={{padding:16,color:'#A11A35'}}>This cart contains different currencies. Remove packages in the other currency before checkout.</Text>}
 
             {/* =====================================
                 HEADER
@@ -873,7 +880,7 @@ if (eventDetailsRaw) {
                                                             )}
 
                                                             <Text style={styles.packagePrice}>
-                                                                Rs.{' '}
+                                                                {currencySymbol(currencyOf(pkg))}{' '}
                                                                 {formatCurrency(finalPrice)}
                                                             </Text>
 
@@ -984,7 +991,7 @@ if (eventDetailsRaw) {
 
                                                                 <View style={{ flex: 1 }}>
                                                                     <Text style={styles.bookingDetailText}>
-                                                                        Rate: Rs.{' '}
+                                                                        Rate: {currencySymbol(currencyOf(pkg))}{' '}
                                                                         {formatCurrency(
                                                                             Number(pkg.customDurationRate)
                                                                         )}{' '}
@@ -996,8 +1003,8 @@ if (eventDetailsRaw) {
 
                                                                     <Text style={styles.bookingDetailText}>
                                                                         {Number(pkg.baseIncludedDurationMinutes) > 0 && Number(pkg.durationMinutes) > Number(pkg.baseIncludedDurationMinutes)
-                                                                            ? `Base Rs. ${formatCurrency(Number(pkg.basePrice))} includes ${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s). Extra time at the shown rate. Total Rs. ${formatCurrency(Number(pkg.price))}`
-                                                                            : `${pkg.customDurationUnit === 'DAYS' ? Number(pkg.durationMinutes) / 1440 : Number(pkg.durationMinutes) / 60} unit(s) at the custom rate. Total Rs. ${formatCurrency(Number(pkg.price))}`}
+                                                                            ? `Base ${currencySymbol(currencyOf(pkg))} ${formatCurrency(Number(pkg.basePrice))} includes ${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s). Extra time at the shown rate. Total ${currencySymbol(currencyOf(pkg))} ${formatCurrency(Number(pkg.price))}`
+                                                                            : `${pkg.customDurationUnit === 'DAYS' ? Number(pkg.durationMinutes) / 1440 : Number(pkg.durationMinutes) / 60} unit(s) at the custom rate. Total ${currencySymbol(currencyOf(pkg))} ${formatCurrency(Number(pkg.price))}`}
                                                                     </Text>
                                                                 </View>
                                                             </View>
@@ -1105,7 +1112,7 @@ if (eventDetailsRaw) {
                                 </Text>
 
                                 <Text style={styles.priceValue}>
-                                    Rs.{' '}
+                                    {currencySymbol(cartCurrency(cartData))}{' '}
                                     {formatCurrency(totalAmount)}
                                 </Text>
                             </View>
@@ -1124,7 +1131,7 @@ if (eventDetailsRaw) {
                                 </View>
 
                                 <Text style={styles.totalAmount}>
-                                    Rs.{' '}
+                                    {currencySymbol(cartCurrency(cartData))}{' '}
                                     {formatCurrency(totalAmount)}
                                 </Text>
                             </View>
@@ -1180,7 +1187,7 @@ if (eventDetailsRaw) {
                         </View>
 
                         <Text style={styles.bottomAmount}>
-                            Rs. {formatCurrency(totalAmount)}
+                            {currencySymbol(cartCurrency(cartData))} {formatCurrency(totalAmount)}
                         </Text>
                     </View>
 
@@ -1205,6 +1212,7 @@ if (eventDetailsRaw) {
                         <TouchableOpacity
                             style={styles.checkoutButton}
                             onPress={handleCheckout}
+                            disabled={mixedCurrency}
                             activeOpacity={0.85}
                         >
                             <View style={styles.checkoutButtonContent}>

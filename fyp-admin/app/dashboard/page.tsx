@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency';
 //fyp-admin/app/dashboard/page.tsx
 import { redirect } from "next/navigation";
 import LogoutButton from "@/components/LogoutButton";
@@ -44,6 +45,7 @@ type VendorPerformanceItem = {
   completed: number;
   cancellationRate: number;
   revenue: number;
+  revenueUSD?: number;
 };
 
 function formatCurrency(value: number | undefined) {
@@ -594,7 +596,7 @@ export default async function DashboardPage() {
                                   <p className="text-sm font-bold text-slate-950">
                                     {formatCurrency(
                                       vendor.revenue,
-                                    )}
+                                    )}{vendor.revenueUSD ? ' · ' + formatMoney(vendor.revenueUSD, 'USD') : ''}
                                   </p>
 
                                   <p className="mt-1 text-[11px] text-slate-400">

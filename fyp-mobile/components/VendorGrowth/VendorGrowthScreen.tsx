@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { reportMarketplaceLoadError } from "@/services/reportMarketplaceLoadError";
 
 // fyp-mobile/components/VendorGrowth/VendorGrowthScreen.tsx
@@ -690,7 +691,7 @@ export default function VendorGrowthScreen() {
                   />
                 }
                 label="Total Revenue"
-                value={`Rs. ${analytics.totalRevenue.toLocaleString()}`}
+                value={`${currencySymbol(currencyOf(analytics))} ${analytics.totalRevenue.toLocaleString()}`}
               />
 
               <StatBox
@@ -702,7 +703,7 @@ export default function VendorGrowthScreen() {
                   />
                 }
                 label="This Month"
-                value={`Rs. ${analytics.monthlyRevenue.toLocaleString()}`}
+                value={`${currencySymbol(currencyOf(analytics))} ${analytics.monthlyRevenue.toLocaleString()}`}
                 change={
                   analytics.monthlyRevenueChangePct
                 }

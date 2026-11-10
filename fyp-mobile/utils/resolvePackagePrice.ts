@@ -1,3 +1,4 @@
+import { roundForCurrency } from './currency';
 export const resolvePackagePrice = (
   pkg: any, selectedDurationMinutes: number,
 ): { price: number | null; reason?: string; basis?: 'fixed' | 'custom' } => {
@@ -8,7 +9,7 @@ export const resolvePackagePrice = (
     const exact = durations.find((d: any) => Number(d.value) * (d.unit === 'DAYS' ? 24 : 1) === hours);
     if (exact) return { price: Number(exact.price), basis: 'fixed' };
     if (pkg.allowCustomDuration && Number(pkg.customDurationRate) > 0) {
-      return { price: Math.round(Number(pkg.customDurationRate) * (pkg.customDurationUnit === 'DAYS' ? hours / 24 : hours)), basis: 'custom' };
+      return { price: roundForCurrency(Number(pkg.customDurationRate) * (pkg.customDurationUnit === 'DAYS' ? hours / 24 : hours), pkg), basis: 'custom' };
     }
     return { price: null, reason: 'This duration is not offered by the vendor.' };
   }
@@ -31,7 +32,7 @@ export const resolvePackagePrice = (
     if (!unitMinutes || selectedDurationMinutes <= 0 || selectedDurationMinutes % unitMinutes !== 0) {
       return { price: null, reason: 'Select a duration in whole units of the vendor’s custom rate.' };
     }
-    return { price: Math.round(Math.min(base, rate * selectedDurationMinutes / unitMinutes)), basis: 'custom' };
+    return { price: roundForCurrency(Math.min(base, rate * selectedDurationMinutes / unitMinutes), pkg), basis: 'custom' };
   }
   const lower = [...tiers].reverse().find(t => t.minutes < selectedDurationMinutes);
   const upper = tiers.find(t => t.minutes > selectedDurationMinutes);
@@ -40,5 +41,5 @@ export const resolvePackagePrice = (
   // beyond a discounted fixed tier. Fixed tiers remain exact overrides.
   const calculated = base + rate * (selectedDurationMinutes - included) / (pkg.customDurationUnit === 'DAYS' ? 1440 : 60);
   const monotonicPrice = Math.max(lower.price, upper ? Math.min(calculated, upper.price) : calculated);
-  return { price: Math.round(monotonicPrice), basis: 'custom' };
+  return { price: roundForCurrency(monotonicPrice, pkg), basis: 'custom' };
 };

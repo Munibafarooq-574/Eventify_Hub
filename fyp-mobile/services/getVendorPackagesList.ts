@@ -12,6 +12,7 @@ export interface VendorPackageDuration {
 }
 
 export interface VendorPackageListItem extends DeliverySettings, PackagePricing {
+  currency?: 'PKR' | 'USD';
   _id: string;
 
   packageName: string;

@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 import InfoHelp from './InfoHelp';
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Switch, StyleSheet } from 'react-native';
@@ -33,7 +34,7 @@ export default function DeliveryPackageFields({ value, onChange }: { value: Deli
     <View style={[s.heading,{marginBottom:8}]}><Text style={s.title}>Delivery charges</Text><InfoHelp title="Delivery charges" message="Choose Free Delivery for no extra delivery fee. Customers will see a Free Delivery badge. Otherwise, enter a delivery fee. It is charged once for this booking." /></View>
     <View style={s.row}>{(['FREE','PAID'] as const).map(type => <TouchableOpacity key={type} accessibilityRole="radio" accessibilityState={{ checked:value.deliveryFeeType === type }} style={[s.option,value.deliveryFeeType === type && s.active]} onPress={() => set({ deliveryFeeType:type, ...(type === 'FREE' ? { deliveryFee:0, deliveryExtraWeightEnabled:false } : {}) })}><Text style={s.label}>{type === 'FREE' ? 'Free Delivery' : 'Delivery Charges'}</Text></TouchableOpacity>)}</View>
     {value.deliveryFeeType === 'PAID' && <>
-      {number('Base delivery fee (Rs.)','deliveryFee','Charged once for this booking.')}
+      {number(`Base delivery fee (${currencySymbol()})`,'deliveryFee','Charged once for this booking.')}
     </>}
     {number('Time reserved for each delivery','deliveryReserveMinutes','Choose how long you need for a delivery. This time must fit within your working hours. Customers only choose the delivery time. Choose Minutes or Hours; for example, 1 hour reserves the same time as 60 minutes.')}
     {!!deliverySettingsError(value) && <Text style={s.error}>{deliverySettingsError(value)}</Text>}

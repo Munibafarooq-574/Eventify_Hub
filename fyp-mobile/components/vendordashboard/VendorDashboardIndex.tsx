@@ -1,3 +1,4 @@
+import { formatMoney, currencySymbol, currencyOf } from '@/utils/currency';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
@@ -61,8 +62,8 @@ const MONTH_NAMES = [
 type OrderStats = { totalOrders: number; pending: number; processing: number; confirmed: number; completed: number; fullyPaid: number; cancelled: number; requestExpired: number; paymentExpired: number; noLongerAssigned: number };
 
 function formatPKR(amount: number): string {
-    if (!amount) return "Rs. 0";
-    return `Rs. ${Math.round(amount).toLocaleString("en-PK")}`;
+    if (!amount) return `${currencySymbol()} 0`;
+    return `${currencySymbol()} ${Math.round(amount).toLocaleString("en-PK")}`;
 }
 
 const DashboardScreen = () => {
@@ -98,6 +99,7 @@ const DashboardScreen = () => {
     const [refreshing, setRefreshing] = useState<boolean>(false);
 
     // ---- Analytics state ----
+    const formatPKR = (amount: number) => formatMoney(amount, currencyOf(analytics));
     const [analytics, setAnalytics] = useState<VendorAnalytics | null>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true);
     const [analyticsError, setAnalyticsError] = useState<boolean>(false);
@@ -1292,6 +1294,10 @@ if (!hasValidSubscription) {
                                 <Text style={styles.revenueLabel}>Total Revenue</Text>
                                 <Text style={styles.revenueValue}>
                                     {formatPKR(analytics?.totalRevenue || 0)}
+                                    {!!analytics?.revenueByCurrency && Object.entries(analytics.revenueByCurrency)
+                                      .filter(([code, value]) => code !== currencyOf(analytics) && value > 0)
+                                      .map(([code, value]) => <Text key={code}>{'\n'}{formatMoney(value, code)}</Text>)}
+
                                 </Text>
                             </View>
                             <View style={styles.revenueDivider} />

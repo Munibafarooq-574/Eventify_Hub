@@ -1,3 +1,4 @@
+import { currencySymbol } from '../common/utils/currency';
 import {
     Controller,
     Get,
@@ -162,7 +163,7 @@ export class PaymentVerificationController {
             ],
             [
                 'Amount Paid',
-                `Rs. ${money(
+                `${currencySymbol(data.currency)} ${money(
                     data.amountPaid,
                 )}`,
             ],
@@ -172,13 +173,13 @@ export class PaymentVerificationController {
             ],
             [
                 'Paid So Far',
-                `Rs. ${money(
+                `${currencySymbol(data.currency)} ${money(
                     data.paidSoFar,
                 )}`,
             ],
             [
                 'Remaining',
-                `Rs. ${money(
+                `${currencySymbol(data.currency)} ${money(
                     data.remainingAmount,
                 )}`,
             ],

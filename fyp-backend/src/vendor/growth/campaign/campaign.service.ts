@@ -1185,7 +1185,9 @@ if (
       packageId:
         campaign.packageId,
 
+      currency: linkedPackage.currency || 'PKR',
       package: {
+        currency: linkedPackage.currency || 'PKR',
         _id:
           linkedPackage._id,
 

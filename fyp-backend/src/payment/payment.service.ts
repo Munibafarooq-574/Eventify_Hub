@@ -1,3 +1,4 @@
+import { currencyOf, currencySymbol, roundMoney } from '../common/utils/currency';
 import type { City } from '../schemas/city.schema';
 import { ChatGateway } from '../chat/chat.gateway';
 import { displayDeliveryWeight } from '../common/utils/delivery-booking';
@@ -288,8 +289,8 @@ if (
 
     const remainingAmount =
         Math.max(
-            totalAmount -
-                paidSoFar,
+            roundMoney(totalAmount -
+                paidSoFar),
             0,
         );
 
@@ -301,6 +302,7 @@ if (
 
     return {
         verified: true,
+        currency: currencyOf(vendorOrder),
         delivery: vendorOrder.delivery,
         deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
         packageName: bookedPackage?.packageName || vendorOrder.serviceName || 'N/A',
@@ -444,7 +446,7 @@ const paidAmount =
 
 await this.normalizeLegacyPaymentWindow(vendorOrder);
 const outstandingAmount = Math.max(
-    bookingAmount - paidAmount,
+    roundMoney(bookingAmount - paidAmount),
     0,
 );
 
@@ -481,6 +483,7 @@ return {
     vendorOrderId,
     organizerId,
     eventTimeZone,
+    currency: currencyOf(vendorOrder),
     delivery: vendorOrder.delivery,
     deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
     vendor: {
@@ -502,10 +505,10 @@ return {
     remainingAmount:
         vendorOrder.remainingAmount ??
         Math.max(
-            bookingAmount -
+            roundMoney(bookingAmount -
                 Number(
                     vendorOrder.downPaymentAmount ?? 0,
-                ),
+                )),
             0,
         ),
 
@@ -593,6 +596,9 @@ pendingPayment: pendingPayment
             throw new NotFoundException('Vendor order not found');
         }
 
+        if (currencyOf(vendorOrder) === 'USD' && method !== 'card') {
+            throw new BadRequestException('USD bookings require card payment.');
+        }
         const order =
     await this.assertOrganizerOwnsVendorOrder(
         vendorOrderId,
@@ -669,7 +675,7 @@ if (
         // Prevent duplicate pending down-payment transactions
         const existingPendingPayment =
             await this.paymentModel.findOne({
-                vendorOrderId: vendorOrder._id,
+            vendorOrderId: vendorOrder._id,
                 type: 'DOWN_PAYMENT',
                 status: 'PENDING',
             }).session(session);
@@ -683,7 +689,7 @@ if (
         // Prevent duplicate successful down payment
         const existingSuccessfulDownPayment =
             await this.paymentModel.findOne({
-                vendorOrderId: vendorOrder._id,
+            vendorOrderId: vendorOrder._id,
                 type: 'DOWN_PAYMENT',
                 status: 'SUCCESS',
             }).session(session);
@@ -696,6 +702,7 @@ if (
 
         if (deadline.getTime() <= Date.now()) throw new ConflictException('The down-payment deadline has passed.');
         const [payment] = await this.paymentModel.create([{
+            currency: currencyOf(vendorOrder),
             vendorOrderId: vendorOrder._id,
             orderId: order._id,
             organizerId: order.organizerId,
@@ -725,6 +732,7 @@ if (
 
 private buildPaymentReceiptEmail(
     data: {
+        currency?: string;
         amount: number;
         paymentType: string;
         method: string;
@@ -1072,7 +1080,7 @@ private buildPaymentReceiptEmail(
         ${data.quantity != null ? `<div style="margin-top:8px;"><strong>Quantity:</strong> ${this.escapeHtml(data.quantity)}</div>` : ''}
         ${data.pricingMethod === 'PER_PERSON' && data.personCount != null ? `<div style="margin-top:8px;"><strong>People:</strong> ${this.escapeHtml(data.personCount)}</div>` : ''}
         ${data.pricingMethod === 'GROUP' && data.groupSize != null ? `<div style="margin-top:8px;"><strong>People per group:</strong> ${this.escapeHtml(data.groupSize)}</div><div style="margin-top:8px;"><strong>People included:</strong> ${this.escapeHtml(data.groupSize * (data.quantity || 1))}</div>` : ''}
-        ${data.delivery ? `<div style="margin-top:8px;">Delivery: ${data.delivery.deliveryFeeType === 'FREE' ? 'Free' : `Rs. ${money(data.delivery.baseFee)} + extra weight Rs. ${money(data.delivery.extraFee)}`}</div>` : ''}
+        ${data.delivery ? `<div style="margin-top:8px;">Delivery: ${data.delivery.deliveryFeeType === 'FREE' ? 'Free' : `${currencySymbol(data.currency)} ${money(data.delivery.baseFee)} + extra weight ${currencySymbol(data.currency)} ${money(data.delivery.extraFee)}`}</div>` : ''}
         ${data.delivery?.deliveryFeeType === 'PAID' && data.delivery.deliveryExtraWeightEnabled ? `<div style="margin-top:8px;">Delivery weight: ${displayDeliveryWeight(data.delivery.weightKg, data.delivery.deliveryWeightUnit)} ${data.delivery.deliveryWeightUnit || 'kg'}</div>` : ''}
         ${serviceTimes.map(row => `<div style="margin-top:8px;">
           <strong>${row.label}:</strong> ${this.escapeHtml(formatDateTime(row.value))}
@@ -1080,7 +1088,7 @@ private buildPaymentReceiptEmail(
 
         <div style="margin-top:8px;">
           <strong>Booking Total:</strong>
-          Rs. ${money(
+          ${currencySymbol(data.currency)} ${money(
               data.bookingTotal,
           )}
         </div>
@@ -1114,26 +1122,26 @@ private buildPaymentReceiptEmail(
 
         <div style="margin-top:8px;">
           <strong>Amount Paid:</strong>
-          Rs. ${money(data.amount)}
+          ${currencySymbol(data.currency)} ${money(data.amount)}
         </div>
 
         <div style="margin-top:8px;">
           <strong>Previously Paid:</strong>
-          Rs. ${money(
+          ${currencySymbol(data.currency)} ${money(
               data.previouslyPaid,
           )}
         </div>
 
         <div style="margin-top:8px;">
           <strong>Total Paid:</strong>
-          Rs. ${money(
+          ${currencySymbol(data.currency)} ${money(
               data.totalPaid,
           )}
         </div>
 
         <div style="margin-top:8px;">
           <strong>Remaining Balance:</strong>
-          Rs. ${money(
+          ${currencySymbol(data.currency)} ${money(
               data.remainingBalance,
           )}
         </div>
@@ -1239,7 +1247,7 @@ private buildPaymentReceiptEmail(
         const successfulPayments =
             await this.paymentModel
                 .find({
-                    vendorOrderId: vendorOrder._id,
+            vendorOrderId: vendorOrder._id,
                     status: 'SUCCESS',
                 }).session(session)
                 .lean();
@@ -1265,7 +1273,7 @@ if (paidSoFar >= bookingAmount) {
         'PAYMENT_REQUIRED';
 }
 
-const remainingAmount = Math.max(bookingAmount - paidSoFar, 0);
+const remainingAmount = Math.max(roundMoney(bookingAmount - paidSoFar), 0);
 vendorOrder.remainingAmount = remainingAmount;
 if (['PARTIALLY_PAID', 'PAID'].includes(vendorOrder.paymentStatus)) {
     if (payment.type === 'DOWN_PAYMENT') vendorOrder.confirmationTime = vendorOrder.confirmationTime || payment.paidAt;
@@ -1385,20 +1393,21 @@ try {
 
         const previouslyPaid =
             Math.max(
-                totalPaid -
-                    paymentAmount,
+                roundMoney(totalPaid -
+                    paymentAmount),
                 0,
             );
 
         const remainingBalance =
             Math.max(
-                bookingAmount -
-                    totalPaid,
+                roundMoney(bookingAmount -
+                    totalPaid),
                 0,
             );
 
         const receiptHtml =
             this.buildPaymentReceiptEmail({
+                currency: currencyOf(vendorOrder),
                 amount:
                     paymentAmount,
 
@@ -1619,7 +1628,7 @@ return payment;
             }
 
             vendorOrder.remainingAmount = Math.max(
-                bookingAmount - paidSoFar,
+                roundMoney(bookingAmount - paidSoFar),
                 0,
             );
 
@@ -1649,6 +1658,9 @@ return payment;
             
         }
 
+        if (currencyOf(vendorOrder) === 'USD' && method !== 'card') {
+            throw new BadRequestException('USD bookings require card payment.');
+        }
         const order =
     await this.assertOrganizerOwnsVendorOrder(
         vendorOrderId,
@@ -1690,7 +1702,7 @@ const paidSoFar =
     );
 
     const remaining = Math.max(
-        bookingAmount - paidSoFar,
+        roundMoney(bookingAmount - paidSoFar),
         0,
     );
 
@@ -1706,7 +1718,7 @@ const paidSoFar =
         // Prevent duplicate successful remaining payment
         const existingSuccess =
             await this.paymentModel.findOne({
-                vendorOrderId: vendorOrder._id,
+            vendorOrderId: vendorOrder._id,
                 type: 'REMAINING',
                 status: 'SUCCESS',
             });
@@ -1720,7 +1732,7 @@ const paidSoFar =
         // Prevent duplicate pending remaining payment
         const existingPending =
             await this.paymentModel.findOne({
-                vendorOrderId: vendorOrder._id,
+            vendorOrderId: vendorOrder._id,
                 type: 'REMAINING',
                 status: 'PENDING',
             });
@@ -1734,6 +1746,7 @@ const paidSoFar =
 
         const payment =
             await this.paymentModel.create({
+                currency: currencyOf(vendorOrder),
                 vendorOrderId:
                     vendorOrder._id,
                 orderId: order._id,
@@ -1794,11 +1807,12 @@ const paidSoFar =
     vendorOrder.price;
 
         const outstandingAmount = Math.max(
-            bookingAmount - paidSoFar,
+            roundMoney(bookingAmount - paidSoFar),
             0,
         );
 
         return {
+            currency: currencyOf(vendorOrder),
             vendorOrderId,
             totalAmount: bookingAmount,
             downPaymentType:

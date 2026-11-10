@@ -50,7 +50,7 @@ export function servicePaymentCutoff(booking:any):Date|null {
  const valid=cutoffs.filter(Number.isFinite);return valid.length?new Date(Math.min(...valid)):null;
 }
 
-export function getVendorDownPaymentConfig(vendorUser: any): { type: string; value: number } | null {
+export function getVendorDownPaymentConfig(vendorUser: any): { type: string; value: number; currency?: string } | null {
         const businessDetails =
             vendorUser?.photographerBusinessDetails ||
             vendorUser?.cateringBusinessDetails ||
@@ -65,6 +65,7 @@ export function getVendorDownPaymentConfig(vendorUser: any): { type: string; val
         }
 
         return {
+            currency: businessDetails.currency,
             type: businessDetails.downPaymentType || 'PERCENTAGE',
             value: businessDetails.downPayment,
         };

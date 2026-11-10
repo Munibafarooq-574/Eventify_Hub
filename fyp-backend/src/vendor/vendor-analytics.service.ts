@@ -1,3 +1,4 @@
+import { currencyOf } from '../common/utils/currency';
 // fyp-backend/src/vendor/vendor-analytics.service.ts
 //
 // NEW FILE. Add this to VendorModule's `providers` array and export it if
@@ -31,6 +32,9 @@ import { Conversation } from 'src/schemas/conversation.schema';
 import { User } from 'src/schemas/user.schema';
 
 export interface VendorAnalytics {
+    currency?: 'PKR' | 'USD';
+    revenueByCurrency?: { PKR: number; USD: number };
+
     // Order overview (cancelled only — totalOrders/processing/completed
     // already come from the existing GET /orders/stats endpoint, reused
     // as-is on the frontend).
@@ -165,12 +169,16 @@ export class VendorAnalyticsService {
 
         const allVendorOrders = await this.vendorOrderModel
             .find({ vendorId: vendorObjId })
-            .select('status price createdAt')
+            .select('status price createdAt currency')
             .lean();
 
         const totalCount = allVendorOrders.length;
         const cancelledOrders = allVendorOrders.filter((vo) => vo.status === 'cancelled').length;
-        const completed = allVendorOrders.filter((vo) => vo.status === 'completed');
+        const completedAll = allVendorOrders.filter((vo) => vo.status === 'completed');
+        const currency = allVendorOrders.some(vo => currencyOf(vo) === 'USD') ? 'USD' as const : 'PKR' as const;
+        const revenueByCurrency = { PKR: 0, USD: 0 };
+        for (const booking of completedAll) revenueByCurrency[currencyOf(booking)] += Number(booking.price || 0);
+        const completed = completedAll.filter(vo => currencyOf(vo) === currency);
 
         const totalRevenue = completed.reduce((sum, vo) => sum + (vo.price || 0), 0);
 
@@ -213,6 +221,8 @@ export class VendorAnalyticsService {
         return {
             cancelledOrders,
             cancellationRate: totalCount > 0 ? (cancelledOrders / totalCount) * 100 : null,
+            currency,
+            revenueByCurrency,
             totalRevenue,
             monthlyRevenue,
             previousMonthRevenue,

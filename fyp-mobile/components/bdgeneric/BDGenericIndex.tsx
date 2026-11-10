@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿// fyp-mobile/components/bdgeneric/BDGenericIndex.tsx
 import { CreateGenericBusinessDetailsDto } from "@/dto/CreateGenericBusinessDetails.dto";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
@@ -737,7 +738,7 @@ router.replace("/vendorprofilepending");
                         {downPaymentType ===
                         "PERCENTAGE"
                             ? "%"
-                            : "Rs."}
+                            : `${currencySymbol()}`}
                     </Text>
 
                     <TextInput

@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 //fyp-mobile/components/FeatureVendor/FeaturedPackagesScreen.tsx
@@ -329,7 +330,7 @@ const Header = () => (
                     <Text style={styles.packageName}>{pkg.packageName}</Text>
                     <PackagePricingLabel pkg={pkg} />
                     <Text style={styles.packagePrice}>
-  Rs. {Number(pkg.price ?? 0).toLocaleString()} <PackagePriceBasis pkg={pkg} />
+  {currencySymbol(currencyOf(pkg))} {Number(pkg.price ?? 0).toLocaleString()} <PackagePriceBasis pkg={pkg} />
 </Text>
                      {isFeatured && activePromotion && (
   <>

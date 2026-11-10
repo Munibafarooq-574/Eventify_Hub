@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
@@ -1177,7 +1178,7 @@ const MyEventsScreen = () => {
                               <View style={styles.amountRow}>
                                 <Text style={styles.amountLabel}>Original Amount</Text>
                                 <Text style={styles.amountValueStrike}>
-                                  Rs.{' '}
+                                  {currencySymbol(currencyOf(vendor))}{' '}
                                   {Number(
                                     vendor?.originalAmount ?? vendor?.price ?? 0,
                                   ).toLocaleString()}
@@ -1190,7 +1191,7 @@ const MyEventsScreen = () => {
                                   <Text style={styles.discountLabel}>{vendor.promotionCode}</Text>
                                 </View>
                                 <Text style={styles.discountValue}>
-                                  - Rs. {Number(vendor?.discountAmount || 0).toLocaleString()}
+                                  - {currencySymbol(currencyOf(vendor))} {Number(vendor?.discountAmount || 0).toLocaleString()}
                                 </Text>
                               </View>
 
@@ -1199,14 +1200,14 @@ const MyEventsScreen = () => {
                               <View style={styles.amountRow}>
                                 <Text style={styles.finalAmountLabel}>Final Amount</Text>
                                 <Text style={styles.finalAmountValue}>
-                                  Rs.{' '}
+                                  {currencySymbol(currencyOf(vendor))}{' '}
                                   {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
                                 </Text>
                               </View>
                             </View>
                           ) : (
                             <Text style={styles.priceText}>
-                              Rs. {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
+                              {currencySymbol(currencyOf(vendor))} {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
                             </Text>
                           )}
 
@@ -1363,21 +1364,21 @@ const MyEventsScreen = () => {
                                 <View style={styles.paymentFigure}>
                                   <Text style={styles.paymentLabel}>Total</Text>
                                   <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    Rs. {finalAmount.toLocaleString()}
+                                    {currencySymbol(currencyOf(vendor))} {finalAmount.toLocaleString()}
                                   </Text>
                                 </View>
 
                                 <View style={styles.paymentFigure}>
                                   <Text style={styles.paymentLabel}>Down payment</Text>
                                   <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    Rs. {downPaymentAmount.toLocaleString()}
+                                    {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
                                   </Text>
                                 </View>
 
                                 <View style={[styles.paymentFigure, { alignItems: 'flex-end' }]}>
                                   <Text style={styles.paymentLabel}>Remaining</Text>
                                   <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    Rs. {remainingAmount.toLocaleString()}
+                                    {currencySymbol(currencyOf(vendor))} {remainingAmount.toLocaleString()}
                                   </Text>
                                 </View>
                               </View>
@@ -1405,7 +1406,7 @@ const MyEventsScreen = () => {
                                   </Text>
 
                                   <Text style={styles.paymentPendingSubtext}>
-                                    Rs. {Number(pendingPayment?.amount || 0).toLocaleString()}
+                                    {currencySymbol(currencyOf(vendor))} {Number(pendingPayment?.amount || 0).toLocaleString()}
                                     {' • '}
                                     {String(pendingPayment?.method || '').toUpperCase()}
                                   </Text>
@@ -1585,7 +1586,7 @@ const MyEventsScreen = () => {
                         </Text>
                       </View>
                       <Text style={styles.totalPrice}>
-                        Rs. {activeEventTotal.toLocaleString()}
+                        {currencySymbol(currencyOf(event))} {activeEventTotal.toLocaleString()}
                       </Text>
                     </View>
                   </View>

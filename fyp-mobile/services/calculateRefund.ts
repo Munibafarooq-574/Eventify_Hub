@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getSecureData } from '../store';
 
 export interface ClientCancellationPreview {
+  currency?: 'PKR' | 'USD';
   vendorOrderId: string;
   eligible: boolean;
   restrictionCode?: string;

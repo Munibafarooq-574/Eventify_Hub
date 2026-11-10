@@ -24,6 +24,7 @@ export enum DiscountStatus {
 }
 
 export interface DiscountCalculation {
+  currency?: 'PKR' | 'USD';
   valid: true;
   discountEntryId: string;
   code: string;

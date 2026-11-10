@@ -50,6 +50,7 @@ export interface CampaignAnalytics {
 }
 
 export interface GrowthAnalytics {
+  currency?: 'PKR' | 'USD';
   sales: GrowthSales;
   customers: GrowthCustomers;
   packages: GrowthPackages;

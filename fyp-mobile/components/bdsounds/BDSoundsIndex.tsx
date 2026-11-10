@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 ﻿import postSoundBusinessDetails from "@/services/Postsoundbusinessdetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
@@ -369,7 +370,7 @@ if (edit === "true") {
            
                <View style={styles.inputRow}>
                    <Text style={styles.currencyPrefix}>
-                       {downPaymentType === "PERCENTAGE" ? "%" : "Rs."}
+                       {downPaymentType === "PERCENTAGE" ? "%" : `${currencySymbol()}`}
                    </Text>
            
                    <TextInput
@@ -378,7 +379,7 @@ if (edit === "true") {
                        placeholder={
                            downPaymentType === "PERCENTAGE"
                                ? "Example: 30% advance"
-                               : "Example: Rs. 5000 advance"
+                               : `Example: ${currencySymbol()} 5000 advance`
                        }
                        placeholderTextColor="#B99DAF"
                        value={downPayment}

@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 // fyp-mobile/components/jazzcash/JazzCashIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
 import createPayment from '@/services/createPayment';
@@ -20,7 +21,7 @@ const PRIMARY = '#780C60';
 const PRIMARY_LIGHT = '#F8E9F0';
 const JAZZ_RED = '#ED1C24';
 
-const formatCurrency = (value: number) => `Rs. ${Math.round(value || 0).toLocaleString('en-PK')}`;
+const formatCurrency = (value: number) => `${currencySymbol()} ${Math.round(value || 0).toLocaleString('en-PK')}`;
 
 // Formats to "03XX-XXXXXXX" as the user types.
 const formatPhone = (raw: string) => {

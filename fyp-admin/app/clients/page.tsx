@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/currency';
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -19,6 +20,7 @@ type ClientRow = {
   totalEvents: number;
   totalVendorBookings: number;
   totalSpent: number;
+  totalSpentUSD?: number;
   pendingEvents: number;
   confirmedEvents: number;
   completedEvents: number;
@@ -419,7 +421,7 @@ export default async function ClientsPage({
 
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold">
-                            {formatCurrency(client.totalSpent)}
+                            {formatCurrency(client.totalSpent)}{client.totalSpentUSD ? ' · ' + formatMoney(client.totalSpentUSD, 'USD') : ''}
                           </p>
 
                           <p className="mt-1 text-xs text-slate-400">

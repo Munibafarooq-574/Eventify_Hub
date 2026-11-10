@@ -1,4 +1,5 @@
 "use client";
+import { currencyOf, currencySymbol } from "@/lib/currency";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,9 +12,11 @@ type Resolution =
 export default function DisputeResolutionForm({
   disputeId,
   amountPaid,
+  currency,
 }: {
   disputeId: string;
   amountPaid: number;
+  currency?: string;
 }) {
   const router = useRouter();
 
@@ -138,11 +141,11 @@ export default function DisputeResolutionForm({
             htmlFor="partialRefundAmount"
             className="block text-sm font-semibold text-slate-700"
           >
-            Partial refund amount (PKR)
+            Partial refund amount ({currencyOf(currency)})
           </label>
 
           <p className="mt-1 text-xs text-slate-500">
-            Successful payments: Rs{" "}
+            Successful payments: {currencySymbol(currency)}{" "}
             {amountPaid.toLocaleString("en-PK")}
           </p>
 

@@ -1,3 +1,4 @@
+import { currencySymbol } from '@/utils/currency';
 import postPhotographyBusinessDetails from "@/services/postPhotographyBusinessDetails";
 import submitVendorProfileForReview from "@/services/submitVendorProfileForReview";
 import patchBusinessDetails from "@/services/patchBusinessDetails";
@@ -1107,7 +1108,7 @@ if (edit === "true") {
         <Text style={styles.currencyPrefix}>
             {downPaymentType === "PERCENTAGE"
                 ? "%"
-                : "Rs."}
+                : `${currencySymbol()}`}
         </Text>
 
         <TextInput

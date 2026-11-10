@@ -69,6 +69,9 @@ const DeliverySnapshotSchema = SchemaFactory.createForClass(DeliverySnapshot);
 
 @Schema({ timestamps: true })
 export class VendorOrder extends Document {
+    @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR', immutable: true })
+    currency: 'PKR' | 'USD';
+
     @Prop({ type: String, enum: PRICING_METHODS }) pricingMethod?: PricingMethod;
     @Prop({ type: Number }) groupSize?: number | null;
     @Prop({ type: Number }) personCount?: number | null;

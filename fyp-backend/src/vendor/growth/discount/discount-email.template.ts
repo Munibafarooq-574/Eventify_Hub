@@ -1,4 +1,6 @@
+import { currencySymbol } from '../../../common/utils/currency';
 interface DiscountEmailTemplateData {
+  currency?: string;
   vendorBrandName: string;
   code: string;
   discountText: string;
@@ -42,7 +44,7 @@ export function buildDiscountOfferEmail(
 
   const minimumOrderText =
     data.minimumOrder > 0
-      ? `Rs ${data.minimumOrder.toLocaleString()}`
+      ? `${currencySymbol(data.currency)} ${data.minimumOrder.toLocaleString()}`
       : 'No minimum';
 
   const vendorInitials = escapeHtml(

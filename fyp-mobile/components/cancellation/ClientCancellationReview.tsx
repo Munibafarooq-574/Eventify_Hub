@@ -1,3 +1,4 @@
+import { currencySymbol, currencyOf } from '@/utils/currency';
 import type { ComponentRef } from 'react';
 import { formatNoticeHours } from '@/utils/bookingCancellation';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,7 +17,7 @@ function errorMessage(error: unknown): string {
   const request = error as { response?: { data?: unknown }; message?: string };
   return request.response?.data ? messageFrom(request.response.data) : request.message || 'Unable to connect. Please try again.';
 }
-const money = (value: number | null | undefined) => value == null ? '—' : `Rs. ${value.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
+const money = (value: number | null | undefined, currency: unknown) => value == null ? '—' : `${currencySymbol(currency)} ${value.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`;
 
 export default function ClientCancellationReview({ vendorOrderId, vendorName, onClose, onCancelled }: {
   vendorOrderId: string; vendorName: string; onClose: () => void; onCancelled: () => Promise<void>;
@@ -77,7 +78,7 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
       try { await onCancelled(); } catch { /* The parent can refresh on next focus. */ }
       if (mounted.current) onClose();
       Alert.alert('Booking cancelled', refundAmount > 0
-        ? `Only this vendor booking was cancelled. A refund of ${money(refundAmount)} is pending processing. Your other vendor bookings are unchanged.`
+        ? `Only this vendor booking was cancelled. A refund of ${money(refundAmount, currencyOf(preview))} is pending processing. Your other vendor bookings are unchanged.`
         : 'Only this vendor booking was cancelled. No monetary refund is due under its saved policy. Your other vendor bookings are unchanged.');
     } catch (err) {
       if (mounted.current) {
@@ -112,13 +113,13 @@ export default function ClientCancellationReview({ vendorOrderId, vendorName, on
           {!!error && <View accessibilityRole="alert" style={styles.error}><Text style={styles.errorText}>{error}</Text></View>}
           {!loading && preview && <>
             <View style={styles.summary}>
-              <Row stacked={compact} label="Amount paid" value={money(preview.amountPaid)} />
+              <Row stacked={compact} label="Amount paid" value={money(preview.amountPaid, currencyOf(preview))} />
               <Row stacked={compact} label="Saved policy" value={preview.cancellationPolicyApplied || 'Not available'} />
               {preview.eligible && <>
                 <Row stacked={compact} label="Notice before service" value={formatNoticeHours(preview.hoursBeforeEvent)} />
                 <Row stacked={compact} label="Applicable refund" value={`${preview.refundPercentage}%`} />
-                <Row stacked={compact} label="Estimated refund" value={money(preview.refundAmount)} />
-                <Row stacked={compact} label="Amount retained" value={money(preview.withheldAmount)} />
+                <Row stacked={compact} label="Estimated refund" value={money(preview.refundAmount, currencyOf(preview))} />
+                <Row stacked={compact} label="Amount retained" value={money(preview.withheldAmount, currencyOf(preview))} />
                 <Row stacked={compact} label="Saved policy revision" value={String(preview.policyRevision)} />
               </>}
             </View>

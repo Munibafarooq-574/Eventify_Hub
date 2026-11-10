@@ -1,8 +1,8 @@
 import { PaymentService } from './payment.service';
 describe('Card checkout account identity',()=>{
-  it('returns only the authenticated booking owner after the existing ownership check',async()=>{
+  it.each(['PKR','USD',undefined])('returns the owner and saved currency %s after the existing ownership check',async(currency)=>{
     const s:any=Object.create(PaymentService.prototype);
-    s.vendorOrderModel={findById:async()=>({_id:'booking',vendorId:'booked-vendor',bookingChatTimeZone:'America/Los_Angeles',price:3000,paymentStatus:'PAYMENT_REQUIRED',downPaymentAmount:1500})};
+    s.vendorOrderModel={findById:async()=>({_id:'booking',currency,vendorId:'booked-vendor',bookingChatTimeZone:'America/Los_Angeles',price:3000,paymentStatus:'PAYMENT_REQUIRED',downPaymentAmount:1500})};
     s.assertOrganizerOwnsVendorOrder=jest.fn(async()=>({organizerId:'verified-client'}));
     s.paymentModel={find:()=>({lean:async()=>[]}),findOne:()=>({sort:()=>({lean:async()=>null})})};
     const select=jest.fn(()=>({lean:async()=>({name:'Vendor10',email:'account@example.invalid',contactDetails:{brandName:'Brandvendor10',bookingEmail:'bookings@example.invalid'}})}));
@@ -11,6 +11,7 @@ describe('Card checkout account identity',()=>{
     expect(result.vendor).toEqual({name:'Vendor10',brandName:'Brandvendor10',email:'bookings@example.invalid'});
     expect(s.userModel.findById).toHaveBeenCalledWith('booked-vendor');
     expect(select).toHaveBeenCalledWith('name email contactDetails.brandName contactDetails.bookingEmail');
+    expect(result.currency).toBe(currency || 'PKR');
     expect(result.eventTimeZone).toBe('America/Los_Angeles');
     expect(result.organizerId).toBe('verified-client');expect(result.downPaymentAmount).toBe(1500);
     expect(s.assertOrganizerOwnsVendorOrder).toHaveBeenCalledWith('booking','verified-client');
@@ -32,4 +33,13 @@ describe('Card checkout account identity',()=>{
     s.paymentModel={find:jest.fn()};
     await expect(s.getPaymentStatus('booking','other')).rejects.toThrow('do not own');expect(s.paymentModel.find).not.toHaveBeenCalled();
   });
+  it.each(['initiateDownPaymentLocked','initiateRemainingPayment'])('%s rejects PKR wallets for USD without creating a transaction', async method => {
+    const s:any=Object.create(PaymentService.prototype);
+    const booking={_id:'booking',currency:'USD'};
+    s.vendorOrderModel={findById:()=>({session:async()=>booking,then:(resolve:any)=>resolve(booking)})};
+    s.paymentModel={create:jest.fn()};
+    await expect(s[method]('booking','jazzcash','client')).rejects.toThrow('USD bookings require card payment');
+    expect(s.paymentModel.create).not.toHaveBeenCalled();
+  });
+
 });

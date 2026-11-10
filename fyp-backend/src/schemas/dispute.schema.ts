@@ -4,6 +4,9 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Dispute extends Document {
+    @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR', immutable: true })
+    currency?: 'PKR' | 'USD';
+
     @Prop({ type: Types.ObjectId, required: true, ref: 'VendorOrder' })
     vendorOrderId: Types.ObjectId;
 
