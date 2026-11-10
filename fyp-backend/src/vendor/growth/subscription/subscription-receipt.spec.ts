@@ -65,6 +65,28 @@ describe('Vendor subscription receipt email', () => {
     expect(html).toContain('Studio &amp; Events');
   });
 
+  it('formats PST and EDT correctly using vendor city timezone, without changing stored instants', () => {
+    const { service } = makeService(true);
+    const sample = {
+      vendorName: 'Vendor14', planName: 'Premium', amount: 36.19, currency: 'USD',
+      provider: PaymentProvider.CARD_TEST, reference: 'TEST-CARD-XYZ',
+      verifiedAt: new Date('2026-11-10T17:16:00Z'),
+      startsAt: new Date('2026-11-10T17:16:00Z'),
+      endsAt: new Date('2026-12-10T17:16:00Z'), scheduled: false,
+    };
+    const pst = plain(service.buildSubscriptionPaymentReceiptEmail({ ...sample, timeZone: 'America/Los_Angeles' }));
+    expect(pst).toMatch(/Starts At:.*09:16.*PST.*America\/Los_Angeles/i);
+    expect(pst).toMatch(/Valid Until:.*09:16.*PST.*America\/Los_Angeles/i);
+    expect(pst).toMatch(/Verified At:.*09:16.*PST.*America\/Los_Angeles/i);
+    const summer = plain(service.buildSubscriptionPaymentReceiptEmail({
+      ...sample, startsAt: new Date('2026-07-10T17:16:00Z'),
+      timeZone: 'America/Los_Angeles',
+    }));
+    expect(summer).toMatch(/Starts At:.*10:16.*PDT/i);
+    const eastern = plain(service.buildSubscriptionPaymentReceiptEmail({ ...sample, timeZone: 'America/New_York' }));
+    expect(eastern).toMatch(/Verified At:.*12:16.*EST/i);
+  });
+
   it('sends receipt to vendor only after approved transaction commits', async () => {
     const { service, adminId, paymentRequest, sendTransactionalEmail } = makeService(true);
     const result = await service.reviewSubscriptionPayment(
@@ -76,6 +98,7 @@ describe('Vendor subscription receipt email', () => {
     const mail = sendTransactionalEmail.mock.calls[0][0] as any;
     expect(mail.to).toBe('vendor@example.invalid');
     expect(mail.subject).toContain('Growth');
+    expect(plain(mail.html)).toContain('UTC');
     expect(plain(mail.html)).toContain('Amount Paid: $ 25.33');
     expect(paymentRequest.save).toHaveBeenCalledTimes(1);
   });

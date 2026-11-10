@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { EmailService } from '../../../email/email.service';
+import { CityService } from '../../../city/city.service';
 import { renderEventifyPaymentEmail, emailReceiptSection } from '../../../email/payment-email-layout';
 // fyp-backend/src/vendor/growth/subscription/subscription.service.ts
 
@@ -62,6 +63,7 @@ export class SubscriptionService {
     private readonly connection: Connection,
     private readonly catalog: PlanCatalogService,
     private readonly emailService: EmailService,
+    private readonly cityService: CityService,
   ) {}
 
   // =========================================================
@@ -934,8 +936,9 @@ export class SubscriptionService {
         confirmedSubscription.sendReceipt !== false && this.emailService) {
       try {
         const vendor = await this.userModel.findById(confirmedSubscription.vendorId)
-          .select('email name contactDetails.brandName').lean();
+          .select('email name contactDetails.brandName city clientCityId marketplaceCountryCode').lean();
         if (vendor?.email) {
+          const vendorTimeZone = await this.cityService?.getUserTimeZone(vendor) || 'UTC';
           const planName = confirmedSubscription.entitlementSnapshot?.name ||
             (await this.catalog.get(confirmedSubscription.plan))?.name || confirmedSubscription.plan;
           await this.emailService.sendTransactionalEmail({
@@ -954,6 +957,7 @@ export class SubscriptionService {
               startsAt: confirmedSubscription.startDate,
               endsAt: confirmedSubscription.endDate,
               scheduled: confirmedSubscription.status === SubscriptionStatus.SCHEDULED,
+              timeZone: vendorTimeZone,
             }),
           });
         }
@@ -978,17 +982,23 @@ export class SubscriptionService {
     startsAt: Date | null;
     endsAt: Date | null;
     scheduled: boolean;
+    timeZone?: string;
   }): string {
     const amountFormatted = Number(data.amount || 0).toLocaleString(
       data.currency === 'USD' ? 'en-US' : 'en-PK',
       { minimumFractionDigits: data.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
     );
     const money = (data.currency === 'USD' ? '$ ' : 'Rs. ') + amountFormatted;
-    const date = (value?: Date | null) => value && Number.isFinite(new Date(value).getTime())
-      ? new Date(value).toLocaleString('en-GB', {
-          dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC', hour12: true,
-        }) + ' (UTC)'
-      : 'N/A';
+    const timeZone = data.timeZone || 'UTC';
+    const date = (value?: Date | null) => {
+      if (!value || !Number.isFinite(new Date(value).getTime())) return 'N/A';
+      const parts = new Intl.DateTimeFormat('en-US', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+        timeZone, timeZoneName: 'short',
+      }).format(new Date(value));
+      return parts + ' (' + timeZone + ')';
+    };
     const method = data.provider === PaymentProvider.CARD_TEST ? 'Credit / Debit Card (Test)' :
       data.provider === PaymentProvider.EASYPAISA ? 'Easypaisa' :
       data.provider === PaymentProvider.BANK_TRANSFER ? 'Bank Transfer' : data.provider;

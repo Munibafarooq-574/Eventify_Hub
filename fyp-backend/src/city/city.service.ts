@@ -62,6 +62,36 @@ export class CityService {
     return { ...location, businessCityIds };
   }
 
+  /** Vendor receipt timezone: city ID first, or a unique named-city match. */
+  async getUserTimeZone(user: {
+    clientCityId?: string | Types.ObjectId | null;
+    city?: string | null;
+    marketplaceCountryCode?: string | null;
+  }): Promise<string | null> {
+    const countryCode = user.marketplaceCountryCode?.trim().toUpperCase();
+    if (!countryCode) return null;
+    const validZone = (value: unknown): value is string => {
+      if (typeof value !== 'string' || !value.trim()) return false;
+      try { new Intl.DateTimeFormat('en-US', { timeZone: value }); return true; }
+      catch { return false; }
+    };
+    const cityId = user.clientCityId ? String(user.clientCityId) : '';
+    if (Types.ObjectId.isValid(cityId)) {
+      const record = await this.cityModel.findOne({
+        _id: new Types.ObjectId(cityId), countryCode,
+      }).lean();
+      if (record && validZone(record.timeZone)) return record.timeZone;
+    }
+    const cityName = user.city?.trim();
+    if (!cityName) return null;
+    const candidates = await this.cityModel.find({
+      countryCode, isActive: true, name: cityName,
+    }).select('timeZone').lean();
+    if (!candidates.length || candidates.some(item => !validZone(item.timeZone))) return null;
+    const zones = new Set(candidates.map(item => item.timeZone!));
+    return zones.size === 1 ? [...zones][0] : null;
+  }
+
   private validateCityTimeZone(value: string | undefined): string {
     if (typeof value !== 'string' || !value.trim()) {
       throw new BadRequestException('A valid IANA city timezone is required');
