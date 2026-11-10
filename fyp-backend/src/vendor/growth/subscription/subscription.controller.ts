@@ -21,6 +21,7 @@ import {
   IsOptional,
   IsInt,
   IsNumber,
+  IsBoolean,
   Min,
 } from 'class-validator';
 
@@ -71,6 +72,10 @@ class RequestSubscriptionPaymentDto {
   @IsString()
   @Length(2, 120)
   paymentReference?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sendReceipt?: boolean;
 
   @IsIn([
     SubscriptionActivationType.IMMEDIATE,
@@ -179,6 +184,7 @@ export class SubscriptionController {
         dto.paymentReference,
         dto.activationType,
         dto.expectedAmount,
+        dto.sendReceipt,
       );
   }
 
