@@ -41,7 +41,7 @@ describe('Down payment and expiry safety',()=>{
  it.each([0,50])('acceptance preserves no-advance behavior or snapshots a deadline (%s)',async downPayment=>{
   const f=fixture();f.booking.status='pending';f.booking.bookingChatTimeZone='UTC';const o:any=Object.create(OrderService.prototype);
   const parent={ organizerId:'client' }; const sendBookingNotice=jest.fn();
-  Object.assign(o,{vendorOrderModel:{findById:async()=>f.booking},userModel:{findById:()=>q({availabilitySettings:{minimumAdvanceMinutes:120},cakeBusinessDetails:{downPaymentType:'FIXED',downPayment}})},orderModel:{findById:()=>q(null),findOne:async()=>parent},commissionConfigModel:{findOne:async()=>null},chatGateway:{sendBookingNotice},sendPushNotification:jest.fn()});
+  Object.assign(o,{rescheduleRequestModel:{exists:async()=>null},vendorOrderModel:{findById:async()=>f.booking},userModel:{findById:()=>q({availabilitySettings:{minimumAdvanceMinutes:120},cakeBusinessDetails:{downPaymentType:'FIXED',downPayment}})},orderModel:{findById:()=>q(null),findOne:async()=>parent},commissionConfigModel:{findOne:async()=>null},chatGateway:{sendBookingNotice},sendPushNotification:jest.fn()});
   await o.updateVendorResponse('booking','accepted');expect(f.booking.status).toBe('accepted');
   expect(f.booking.acceptedAt).toEqual(new Date());
   if (downPayment===0) expect(sendBookingNotice).toHaveBeenCalledWith(parent,f.booking,'confirmed');

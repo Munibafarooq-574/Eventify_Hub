@@ -2152,6 +2152,16 @@ async getOrderStats(type: string, userId: string) {
         if (status === 'accepted' && vendorOrder.laterTimeRequest?.status === 'PENDING') throw new ConflictException('A later-time request is awaiting the client’s decision.');
         if (status === 'accepted' && vendorOrder.status === 'accepted') return vendorOrder;
         if (vendorOrder.status === 'expired') throw new ConflictException('This booking has expired.');
+        // Replacement acceptance is already coordinated by its linked reschedule
+        // request below. Original assignments must wait for the whole event.
+        if (status === 'accepted' && !vendorOrder.replacementRescheduleRequestId &&
+            await this.rescheduleRequestModel.exists({
+                orderId: vendorOrder.orderId,
+                resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] },
+            })) {
+            throw new ConflictException('Resolve the date/time change before accepting this booking. Refresh to review the latest schedule.');
+        }
+        const acceptanceVersion = vendorOrder.__v;
         vendorOrder.status = status;
         if (status === 'rejected' && previousStatus !== 'rejected') vendorOrder.rejectedAt = new Date();
         if (message) {
@@ -2293,7 +2303,7 @@ vendorOrder.vendorNetAmount =
     vendorOrder.price - vendorOrder.commissionAmount;
 }
 
-        if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' } };
+        if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' }, __v: acceptanceVersion == null ? { $exists: false } : acceptanceVersion };
         let saved;
         try { saved = await vendorOrder.save(); }
         catch(error) {
@@ -2895,10 +2905,11 @@ async completeVendorOrder(vendorOrderId: string) {
                 resolutionStatus: 'PENDING',
                 expiresAt,
             };
-            const request = vendorOrder.laterTimeRequest?.status === 'PENDING'
-                ? await withBookingPaymentLock(this.connection, this.vendorOrderModel, vendorOrder._id, async session => {
+            // Share the existing lock with acceptance/payment to reject stale writes.
+            const request = await withBookingPaymentLock(this.connection, this.vendorOrderModel, vendorOrder._id, async session => {
                     const current = await this.vendorOrderModel.findById(vendorOrder._id).session(session);
-                    if (!current || current.status !== 'pending' || current.replacementOutcome || current.laterTimeRequest?.status !== 'PENDING') {
+                    if (!current || !['pending', 'accepted'].includes(current.status) || current.replacementOutcome ||
+                        (vendorOrder.laterTimeRequest?.status === 'PENDING' && (current.status !== 'pending' || current.laterTimeRequest?.status !== 'PENDING'))) {
                         throw new ConflictException('This vendor request has changed. Please refresh the event.');
                     }
                     if (oldEventStart.getTime() <= Date.now()) throw new ConflictException('This event has already started and cannot be rescheduled.');
@@ -2908,17 +2919,18 @@ async completeVendorOrder(vendorOrderId: string) {
                     if (await this.connection.model(Payment.name).exists({ vendorOrderId: current._id, status: { $in: ['PENDING', 'SUCCESS'] } }).session(session)) {
                         throw new ConflictException('Resolve the existing payment before rescheduling.');
                     }
-                    if (acceptsSuggestion && new Date(current.laterTimeRequest.suggestedEventStart as any).getTime() !== newEventStart.getTime()) {
+                    if (acceptsSuggestion && new Date(current.laterTimeRequest?.suggestedEventStart as any).getTime() !== newEventStart.getTime()) {
                         throw new ConflictException('The suggestion has changed. Please refresh before confirming.');
                     }
                     const [saved] = await this.rescheduleRequestModel.create([requestData], { session });
-                    current.laterTimeRequest.status = 'RESCHEDULE_REQUESTED';
-                    current.laterTimeRequest.clientAcceptedSuggestion = acceptsSuggestion;
-                    current.laterTimeRequest.resolvedAt = new Date();
-                    await current.save({ session });
+                    if (current.laterTimeRequest?.status === 'PENDING') {
+                        current.laterTimeRequest.status = 'RESCHEDULE_REQUESTED';
+                        current.laterTimeRequest.clientAcceptedSuggestion = acceptsSuggestion;
+                        current.laterTimeRequest.resolvedAt = new Date();
+                        await current.save({ session });
+                    }
                     return saved;
-                })
-                : await this.rescheduleRequestModel.create(requestData);
+                });
             created.push(request);
             if (acceptsSuggestion) continue;
 

@@ -184,6 +184,16 @@ const OrderSummary = () => {
         setRescheduleRequests(Array.isArray(requests) ? requests : []);
     }, []);
 
+    const rescheduleHoldReason = (order: any) => {
+        if (order.vendorOrders?.[0]?.replacementRescheduleRequestId) return '';
+        const request = rescheduleRequests.find(request => String(request.orderId) === String(order._id) &&
+            ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING')));
+        if (!request) return '';
+        if (request.status === 'CHANGE_REQUESTED') return 'Review the date/time change request before accepting this booking.';
+        if (['REJECTED', 'EXPIRED'].includes(request.status)) return 'Waiting for the client to resolve the date/time change.';
+        return 'Waiting for the event schedule to be finalized.';
+    };
+
     const { refreshControl } = usePullToRefresh(
         async () => {
             const [ordersResult] = await Promise.allSettled([refreshScreenData(), loadRefunds()]);
@@ -447,6 +457,7 @@ const OrderSummary = () => {
 
     } catch (error: any) {
         if (/not enough time remains|service has already started/i.test(error?.message || '')) setLateAcceptanceId(vendorOrderId);
+        await refreshScreenData().catch(() => {});
         reportMarketplaceLoadError('Booking status unavailable', error);
         Alert.alert('Booking could not be updated', error?.message || 'Please refresh and try again.');
     }
@@ -695,6 +706,8 @@ const OrderSummary = () => {
                     }
                     renderItem={({ item }) => {
                         const isExpanded = expandedOrderId === item._id;
+                        const scheduleHold = rescheduleHoldReason(item);
+                        const acceptanceDisabled = !!scheduleHold || isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId);
                         // Show only THIS vendor's earnings for the order, not the
                         // organizer's full bill (which may include other vendors'
                         // services on the same booking).
@@ -996,12 +1009,13 @@ const OrderSummary = () => {
                                         </View>
                                     ) : (
                                     <View style={styles.bookingActions}>
+                                        {!!scheduleHold && <Text accessibilityRole="alert" style={styles.rescheduleReason}>{scheduleHold}</Text>}
                                         {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
                                             getVendorStatus(item) === "pending" ? (
                                                 <TouchableOpacity
-                                                    disabled={isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId)}
-                                                    accessibilityState={{ disabled: isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId) }}
-                                                    style={[styles.completeButton, (isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId)) && { opacity: 0.45 }]}
+                                                    disabled={acceptanceDisabled}
+                                                    accessibilityState={{ disabled: acceptanceDisabled }}
+                                                    style={[styles.completeButton, acceptanceDisabled && { opacity: 0.45 }]}
                                                    // onPress={() => mark(item._id, "confirmed")}
                                                    onPress={() =>
                                                         mark(
