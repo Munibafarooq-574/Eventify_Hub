@@ -139,10 +139,11 @@ export class SubscriptionService {
       const accountTitle = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_TITLE?.trim();
       const accountNumber = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_NUMBER?.trim();
       const bankName = process.env.SUBSCRIPTION_US_BANK_NAME?.trim();
-      if (!accountTitle || !accountNumber || !bankName) {
-        throw new BadRequestException('USA subscription bank transfer instructions are not configured.');
-      }
-      return { provider: PaymentProvider.BANK_TRANSFER, currency, accountTitle, accountNumber, bankName };
+      return {
+        provider: PaymentProvider.BANK_TRANSFER, currency,
+        accountTitle: accountTitle ?? '', accountNumber: accountNumber ?? '', bankName: bankName ?? '',
+        configured: Boolean(accountTitle && accountNumber && bankName),
+      };
     }
     const accountTitle = process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
     const mobileNumber = process.env.SUBSCRIPTION_EASYPAISA_MOBILE?.trim();
@@ -369,6 +370,9 @@ export class SubscriptionService {
     const instructions = await this.getPaymentInstructions(vendorId);
     if (paymentProvider !== instructions.provider) {
       throw new BadRequestException('Choose the configured payment provider for your country.');
+    }
+    if ('configured' in instructions && !instructions.configured) {
+      throw new BadRequestException('USA bank transfer instructions are not configured.');
     }
 
     /**
