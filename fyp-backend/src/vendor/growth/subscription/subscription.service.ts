@@ -992,7 +992,7 @@ export class SubscriptionService {
     const timeZone = data.timeZone || 'UTC';
     const date = (value?: Date | null) => {
       if (!value || !Number.isFinite(new Date(value).getTime())) return 'N/A';
-      const parts = new Intl.DateTimeFormat('en-GB', {
+      const parts = new Intl.DateTimeFormat('en-US', {
         day: '2-digit', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit', hour12: true,
         timeZone, timeZoneName: 'short',
