@@ -725,7 +725,7 @@ renderItem={({ item }) => {
   const vendorStatus = getVendorStatus(item);
 
   return (
-    <TouchableOpacity style={styles.eventCard} activeOpacity={0.85} onPress={() => toggleExpand(id)}>
+    <TouchableOpacity style={styles.eventCard} activeOpacity={0.85} onPress={() => router.push({ pathname: "/vendorordersummary", params: { orderId: id } })}>
       <View style={[styles.eventAccentBar, { backgroundColor: getStatusColor(vendorStatus) }]} />
 
       <View style={styles.eventIconWrap}>
@@ -891,7 +891,14 @@ renderItem={({ item }) => {
         )}
       </View>
 
-      <Ionicons name={isExpanded ? "chevron-up" : "chevron-forward"} size={20} color="#C6C6C6" />
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={isExpanded ? "Hide event details" : "Show event details"}
+        hitSlop={12}
+        onPress={(event) => { event.stopPropagation(); toggleExpand(id); }}
+      >
+        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color="#C6C6C6" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }}

@@ -104,7 +104,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
   vendorEvents: {
     title: 'My Events · Vendor guide',
     introduction: 'Use this screen to manage availability and review your own bookings. Booking actions are handled in Order Summary.',
-    quickSteps: ['Choose date → review free and booked time', 'Edit availability → save and recheck', 'Open Order Summary → manage each booking'],
+    quickSteps: ['Choose date → review free and booked time', 'Edit availability → save and recheck', 'Tap a booking → manage that order in Order Summary'],
     sections: [
       { id: 'calendar', title: 'Find a day and review bookings', summary: 'Use the calendar and the available views.', steps: [
         'Select the date you want to check. Read Working Hours, Booking Notice, available slots and booked slots for that date.',
@@ -120,6 +120,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ], note: 'Changing availability does not cancel an existing customer booking. Accepted bookings keep their saved payment deadline; changing notice is not a way to extend it.' },
       service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
+        'Tap a booking in My Events to open and expand that order in Order Summary. Use the arrow to show or hide details in My Events.',
         'Open My Orders / Order Summary to accept, review schedule changes, request a later time, cancel or mark a service completed when those actions are available.',
         'Check the client, package and booked service window before responding. If acceptance is blocked for insufficient time, use Request later service time rather than treating the booking as accepted.',
         'For completion and payment status, see Complete service and contact the client below.',

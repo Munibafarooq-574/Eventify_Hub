@@ -135,6 +135,8 @@ type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" |
 
 const OrderSummary = () => {
     const { selectedTab, orderId: targetOrderId } = useLocalSearchParams(); // Read tab from navigation params
+    const targetId = Array.isArray(targetOrderId) ? targetOrderId[0] : targetOrderId;
+    const ordersListRef = useRef<FlatList<any>>(null);
     const [selectedFilter, setSelectedFilter] = useState<FilterType>("All");
     const [orders, setOrders] = useState<any[]>([]);
     const [fullyPaidOrders, setFullyPaidOrders] = useState<any[]>([]);
@@ -175,14 +177,14 @@ const OrderSummary = () => {
         // Re-read both sources together so dates/times, statuses, stats and
         // reschedule cards always represent the latest backend state.
         const [ordersData, requests, paid] = await Promise.all([
-            getVendorOrders("Vendor", user._id),
+            getVendorOrders("Vendor", user._id, undefined, targetId ? 0 : 10),
             getRescheduleRequests(),
             getVendorOrders("Vendor", user._id, "fully_paid", 0).catch(() => null),
         ]);
         setOrders(ordersData || []);
         setFullyPaidOrders((paid ?? ordersData ?? []).filter(isFullyPaidVendorOrder));
         setRescheduleRequests(Array.isArray(requests) ? requests : []);
-    }, []);
+    }, [targetId]);
 
     const rescheduleHoldReason = (order: any) => {
         if (order.vendorOrders?.[0]?.replacementRescheduleRequestId) return '';
@@ -221,8 +223,12 @@ const OrderSummary = () => {
 
     useFocusEffect(useCallback(() => {
         void refreshScreenData().catch(() => {});
-        if (typeof targetOrderId === 'string' && targetOrderId) { setSelectedFilter('All'); setExpandedOrderId(targetOrderId); }
-    }, [targetOrderId, refreshScreenData]));
+        if (targetId) {
+            setSelectedFilter('All');
+            setExpandedOrderId(targetId);
+            ordersListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        }
+    }, [targetId, refreshScreenData]));
 
     const handleRescheduleResponse = async (
         requestId: string,
@@ -318,7 +324,7 @@ const OrderSummary = () => {
     // - Completed -> completed orders only
         const filteredOrders = useMemo(() => {
         if (selectedFilter === "Fully Paid") return fullyPaidOrders;
-        return orders.filter((order) => {
+        const matchingOrders = orders.filter((order) => {
             if (selectedFilter === "All") return true;
             if (selectedFilter === "Pending") return getVendorStatus(order) === PENDING_STATUS;
             if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
@@ -330,7 +336,15 @@ const OrderSummary = () => {
             if (selectedFilter === "No Longer Assigned") return getVendorStatus(order) === "no_longer_assigned";
             return true;
         });
-    }, [orders, selectedFilter, fullyPaidOrders]);
+        // Keep a booking opened from My Events or notifications immediately visible.
+        if (selectedFilter === "All" && targetId) {
+            return [
+                ...matchingOrders.filter(order => order._id === targetId),
+                ...matchingOrders.filter(order => order._id !== targetId),
+            ];
+        }
+        return matchingOrders;
+    }, [orders, selectedFilter, fullyPaidOrders, targetId]);
 
     /*const handleDelete = async (id: string) => {
         await patchUpdateOrderStatus(id, "cancelled");
@@ -680,6 +694,7 @@ const OrderSummary = () => {
 
                 {/* Orders List */}
                 <FlatList
+                    ref={ordersListRef}
                     refreshControl={refreshControl}
                     style={styles.ordersList}
                     contentContainerStyle={styles.ordersListContent}
