@@ -711,6 +711,8 @@ export class SubscriptionService {
               subscription.paymentReference ??
               null,
 
+            currency: subscription.currency ?? 'PKR',
+
             amountDue:
               Number(
                 subscription.amountDue ??
