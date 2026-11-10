@@ -979,7 +979,46 @@ export class SubscriptionService {
     endsAt: Date | null;
     scheduled: boolean;
   }): string {
-    const money = `${data.currency === 'USD' ? '
+    const amountFormatted = Number(data.amount || 0).toLocaleString(
+      data.currency === 'USD' ? 'en-US' : 'en-PK',
+      { minimumFractionDigits: data.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
+    );
+    const money = (data.currency === 'USD' ? '$ ' : 'Rs. ') + amountFormatted;
+    const date = (value?: Date | null) => value && Number.isFinite(new Date(value).getTime())
+      ? new Date(value).toLocaleString('en-GB', {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC', hour12: true,
+        }) + ' (UTC)'
+      : 'N/A';
+    const method = data.provider === PaymentProvider.CARD_TEST ? 'Credit / Debit Card (Test)' :
+      data.provider === PaymentProvider.EASYPAISA ? 'Easypaisa' :
+      data.provider === PaymentProvider.BANK_TRANSFER ? 'Bank Transfer' : data.provider;
+    const content = [
+      '<div style="font-size:22px;font-weight:700;color:#278A4B;">Payment Successful</div>',
+      '<p>Your subscription payment has been verified and approved by Eventify Hub.</p>',
+      emailReceiptSection('Subscription Details', [
+        ['Vendor', data.vendorName],
+        ['Business', data.brandName || data.vendorName],
+        ['Plan', data.planName],
+        ['Activation', data.scheduled ? 'Scheduled after current plan expires' : 'Active'],
+        ['Starts At', date(data.startsAt)],
+        ['Valid Until', date(data.endsAt)],
+      ]),
+      emailReceiptSection('Payment Details', [
+        ['Amount Paid', money],
+        ['Payment Method', method],
+        ['Transaction Reference', data.reference],
+        ['Verified At', date(data.verifiedAt)],
+        ['Payment Status', 'Paid — Admin Verified'],
+      ]),
+      '<p style="margin-top:24px;color:#766B73;">' +
+        (data.scheduled ? 'Your current plan remains active until the scheduled start date. ' : '') +
+        'You can view your subscription details inside the Eventify Hub app.</p>',
+    ].join('');
+    return renderEventifyPaymentEmail('Subscription Payment Receipt', content);
+  }
+
+  // =========================================================
+
   // =========================================================
 
   /**
