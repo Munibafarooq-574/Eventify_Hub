@@ -89,16 +89,14 @@ export class SubscriptionController {
   // =========================================================
 
   @Get('plans')
-  getPlans() {
-    return this.subscriptionService
-      .getPlans();
+  getPlans(@Query('vendorId') vendorId: string) {
+    return this.subscriptionService.getPlans(vendorId);
   }
 
   @Get('payment-instructions')
-getPaymentInstructions() {
-  return this.subscriptionService
-    .getPaymentInstructions();
-}
+  getPaymentInstructions(@Query('vendorId') vendorId: string) {
+    return this.subscriptionService.getPaymentInstructions(vendorId);
+  }
 
   // =========================================================
   // CURRENT
