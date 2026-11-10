@@ -89,6 +89,7 @@ export interface VendorSubscription {
 
   amountDue: number;
   amountPaid: number;
+  currency?: 'PKR' | 'USD';
 
   paymentSubmittedAt: string | null;
 
@@ -116,6 +117,8 @@ export interface PlanDefinition {
   description: string;
 
   monthlyPrice: number | null;
+  monthlyPriceUSD?: number | null;
+  currency?: 'PKR' | 'USD';
   priceLabel: string;
 
   isMostPopular: boolean;
@@ -185,7 +188,10 @@ export interface ScheduledSubscription {
 }
 
 export interface SubscriptionPaymentInstructions {
-  provider: PaymentProvider.EASYPAISA;
+  provider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER;
+  currency: 'PKR' | 'USD';
   accountTitle: string;
-  mobileNumber: string;
+  mobileNumber?: string;
+  accountNumber?: string;
+  bankName?: string;
 }
