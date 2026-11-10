@@ -1,0 +1,45 @@
+name: Validate currency subscription changes
+on:
+  pull_request:
+    paths:
+      - 'fyp-mobile/**'
+      - 'fyp-backend/**'
+      - 'fyp-admin/**'
+      - '.github/workflows/currency-subscriptions.yml'
+  push:
+    branches:
+      - 'fix/usa-currency-ui-20261110'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [fyp-backend, fyp-mobile, fyp-admin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Typecheck
+        if: matrix.project != 'fyp-admin'
+        run: npx tsc --noEmit
+      - name: Build admin
+        if: matrix.project == 'fyp-admin'
+        run: npm run build
+      - name: Backend tests
+        if: matrix.project == 'fyp-backend'
+        run: npm test -- --runInBand
+      - name: Mobile currency and subscription regressions
+        if: matrix.project == 'fyp-mobile'
+        run: |
+          node scripts/test-currency.cjs
+          node scripts/subscription-booking-safety.test.cjs
