@@ -186,6 +186,9 @@ export class VendorSubscription extends Document {
   amountDue:
     number;
 
+  @Prop({ type: String, enum: ['PKR', 'USD'], default: 'PKR' })
+  currency: 'PKR' | 'USD';
+
   @Prop({
     type:
       Number,
