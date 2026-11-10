@@ -20,6 +20,7 @@ import {
   Matches,
   IsOptional,
   IsInt,
+  IsNumber,
   Min,
 } from 'class-validator';
 
@@ -50,8 +51,8 @@ class RequestSubscriptionPaymentDto {
   plan!: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
   expectedAmount?: number;
 
   @IsIn([
