@@ -9,6 +9,9 @@ on:
   push:
     branches:
       - 'fix/usa-currency-ui-20261110'
+concurrency:
+  group: currency-subscriptions-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
