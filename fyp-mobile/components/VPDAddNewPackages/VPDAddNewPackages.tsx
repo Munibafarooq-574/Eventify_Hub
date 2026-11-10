@@ -1,5 +1,6 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, pricingUnit } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -2489,19 +2490,22 @@ if (!userId) {
             <View
               style={styles.previewRow}
             >
+              <View style={{ flex: 1, minWidth: 100 }}>
               <Text
-                style={styles.previewName}
+                style={[styles.previewName, { flex: 0 }]}
                 numberOfLines={2}
               >
                 {packageName ||
                   "Package Name"}
               </Text>
 
+              <PackagePricingLabel pkg={pricing} />
+              </View>
               {!!price && (
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {price}
+                  Rs. {price}{'\n'}{pricingUnit(pricing)}
                 </Text>
               )}
             </View>
@@ -2685,7 +2689,7 @@ if (!userId) {
                         {Number(
                           duration.price ||
                             0,
-                        ).toLocaleString()}
+                        ).toLocaleString()} {pricingUnit(pricing)}
                       </Text>
                     </View>
                   ),
@@ -2710,7 +2714,7 @@ if (!userId) {
 
                 <Text
                   style={
-                    styles.previewCustomText
+                    [styles.previewCustomText, { flexShrink: 1, textAlign: 'right' }]
                   }
                 >
                   Rs.{" "}
@@ -2722,7 +2726,7 @@ if (!userId) {
                   {customDurationUnit ===
                   "DAYS"
                     ? "day"
-                    : "hour"}
+                    : "hour"} {pricingUnit(pricing)}
                 </Text>
               </View>
             )}

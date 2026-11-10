@@ -1,3 +1,4 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { checkReviewPackageAvailability } from "@/services/checkReviewPackageAvailability";
@@ -2120,6 +2121,7 @@ const vendorPackageCount = countPackageUnits(packages);
                           <Text style={styles.packageName} numberOfLines={2}>
                             {pkg?.packageName}
                           </Text>
+                          <PackagePricingLabel pkg={pkg} legacyPerPerson={!!isCatering} />
 
                           {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && (
                             <View style={styles.guestTag}>

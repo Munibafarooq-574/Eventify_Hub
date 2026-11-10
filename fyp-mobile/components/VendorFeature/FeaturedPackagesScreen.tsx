@@ -1,3 +1,5 @@
+import { pricingLabel } from '@/utils/packagePricing';
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 //fyp-mobile/components/FeatureVendor/FeaturedPackagesScreen.tsx
 // Lets a Growth/Premium vendor pick which of their own packages are
 // "Featured" (no time duration — a toggle constrained by the plan's
@@ -325,8 +327,9 @@ const Header = () => (
                 <View style={styles.packageRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.packageName}>{pkg.packageName}</Text>
+                    <PackagePricingLabel pkg={pkg} />
                     <Text style={styles.packagePrice}>
-  Rs. {Number(pkg.price ?? 0).toLocaleString()}
+  Rs. {Number(pkg.price ?? 0).toLocaleString()} {pricingLabel(pkg)}
 </Text>
                      {isFeatured && activePromotion && (
   <>

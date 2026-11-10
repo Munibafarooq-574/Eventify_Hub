@@ -1,3 +1,5 @@
+import { pricingLabel } from '@/utils/packagePricing';
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { createBookingDraftStore } from '@/store';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -109,6 +111,7 @@ const AIPackageScreen = () => {
                 <Text style={styles.category} numberOfLines={1}>
                     {item.packageName}
                 </Text>
+                <PackagePricingLabel pkg={item} />
 
                 <Text style={styles.name} numberOfLines={1}>
                     {item.vendorName}
@@ -116,7 +119,7 @@ const AIPackageScreen = () => {
 
                 <View style={styles.priceRow}>
                     <Text style={styles.price}>Rs. {item.price}</Text>
-                    <Text style={styles.perHead}>/head</Text>
+                    <Text style={styles.perHead}>{pricingLabel(item)}</Text>
                 </View>
 
                 <View style={styles.divider} />

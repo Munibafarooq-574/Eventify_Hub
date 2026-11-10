@@ -1,4 +1,5 @@
-import { pricingLabel, pricingMethod } from '@/utils/packagePricing';
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
+import { pricingLabel, pricingMethod, pricingUnit } from '@/utils/packagePricing';
 import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -4426,6 +4427,7 @@ const serviceCityNamesFromIds =
       >
         {pkg.packageName || 'Package'}
       </Text>
+      <PackagePricingLabel pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
       {pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType === 'FREE' && <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',padding:6,borderRadius:8,alignSelf:'flex-start',fontWeight:'700'}}>Free Delivery</Text>}
 
       {/* Footer: price + check */}
@@ -4531,6 +4533,7 @@ const serviceCityNamesFromIds =
                                 selectedPackage.packageName
                               }
                             </Text>
+                            <PackagePricingLabel pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
 
                             <Text
                               style={
@@ -4792,7 +4795,7 @@ const serviceCityNamesFromIds =
                 Rs.{' '}
                 {Number(
                   duration.price || 0,
-                ).toLocaleString()}
+                ).toLocaleString()} {pricingUnit(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}
               </Text>
             </View>
           ),
@@ -4827,7 +4830,7 @@ const serviceCityNamesFromIds =
           per{' '}
           {selectedPackage.customDurationUnit === 'DAYS'
             ? 'day'
-            : 'hour'}
+            : 'hour'} {pricingUnit(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}
         </Text>
       </View>
     ) : null}

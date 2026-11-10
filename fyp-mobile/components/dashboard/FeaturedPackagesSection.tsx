@@ -1,3 +1,4 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -167,6 +168,7 @@ export function FeaturedPackagesSection() {
       <Text style={styles.packageName} numberOfLines={2}>
         {pkg.packageName}
       </Text>
+      <PackagePricingLabel pkg={pkg} />
 
       <Text style={styles.vendorName} numberOfLines={1}>
         {pkg.vendorName}

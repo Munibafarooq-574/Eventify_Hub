@@ -12,7 +12,7 @@ export const packagePreviewStyles = StyleSheet.create({
   },
   previewRow:{flexDirection:'row',alignItems:'flex-start',flexWrap:'wrap',gap:12},
   previewName:{flex:1,minWidth:100,fontSize:17,fontWeight:'800',color:'#3D1233',lineHeight:24},
-  previewPrice:{backgroundColor:'#7B2869',color:'#FFFFFF',fontSize:14,fontWeight:'800',paddingHorizontal:12,paddingVertical:8,borderRadius:12,overflow:'hidden'},
+  previewPrice:{maxWidth:'48%',flexShrink:1,textAlign:'right',lineHeight:20,backgroundColor:'#7B2869',color:'#FFFFFF',fontSize:14,fontWeight:'800',paddingHorizontal:12,paddingVertical:8,borderRadius:12,overflow:'hidden'},
   previewDescription:{fontSize:13,color:'#816C7A',marginTop:12,lineHeight:20},
   previewServices:{fontSize:12.5,color:'#745B6C',marginTop:12,lineHeight:20,padding:12,backgroundColor:'#F5EAF2',borderRadius:12},
   previewDurationSection:{marginTop:16,paddingTop:14,borderTopWidth:1,borderTopColor:'#EBD7E5'},

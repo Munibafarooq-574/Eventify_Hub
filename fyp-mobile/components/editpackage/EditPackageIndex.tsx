@@ -1,6 +1,7 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { getVendorPackagesList } from '@/services/getVendorPackagesList';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, pricingUnit } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -2894,19 +2895,22 @@ Alert.alert(
             <View
               style={styles.previewRow}
             >
+              <View style={{ flex: 1, minWidth: 100 }}>
               <Text
-                style={styles.previewName}
+                style={[styles.previewName, { flex: 0 }]}
                 numberOfLines={2}
               >
                 {editableName ||
                   "Package Name"}
               </Text>
 
+              <PackagePricingLabel pkg={pricing} />
+              </View>
               {!!editablePrice && (
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {editablePrice}
+                  Rs. {editablePrice}{'\n'}{pricingUnit(pricing)}
                 </Text>
               )}
             </View>
@@ -3090,7 +3094,7 @@ Alert.alert(
                         {Number(
                           duration.price ||
                             0,
-                        ).toLocaleString()}
+                        ).toLocaleString()} {pricingUnit(pricing)}
                       </Text>
                     </View>
                   ),
@@ -3115,7 +3119,7 @@ Alert.alert(
 
                 <Text
                   style={
-                    styles.previewCustomText
+                    [styles.previewCustomText, { flexShrink: 1, textAlign: 'right' }]
                   }
                 >
                   Rs.{" "}
@@ -3127,7 +3131,7 @@ Alert.alert(
                   {customDurationUnit ===
                   "DAYS"
                     ? "day"
-                    : "hour"}
+                    : "hour"} {pricingUnit(pricing)}
                 </Text>
               </View>
             )}

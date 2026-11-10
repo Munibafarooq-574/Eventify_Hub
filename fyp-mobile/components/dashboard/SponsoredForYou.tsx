@@ -1,3 +1,4 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import type { ComponentRef } from 'react';
@@ -730,8 +731,10 @@ const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
           </Text>
         </View>
 
+        <Text style={styles.vendorName}>{packageName}</Text>
+        <PackagePricingLabel pkg={item.package || {}} />
         <View style={styles.bottomRow}>
-          <Text style={styles.price} numberOfLines={1}>
+          <Text style={styles.price} numberOfLines={2}>
             {price > 0 ? `Rs ${price.toLocaleString()} ${item.package?.pricingMethod ? pricingLabel(item.package) : ''}` : packageName}
           </Text>
 

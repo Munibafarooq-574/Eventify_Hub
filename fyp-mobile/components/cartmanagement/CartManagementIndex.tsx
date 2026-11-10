@@ -1,3 +1,4 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from '@/components/refresh/usePullToRefresh';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -872,6 +873,7 @@ if (eventDetailsRaw) {
                                                             >
                                                                 {pkg?.packageName}
                                                             </Text>
+                                                            <PackagePricingLabel pkg={pkg} legacyPerPerson={!!isCatering} />
 
                                                             {isCatering && (
                                                                 <View style={styles.guestTag}>

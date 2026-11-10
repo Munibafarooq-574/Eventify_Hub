@@ -1,3 +1,5 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
+import { PackagePricing, pricingLabel, pricingUnit } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
@@ -30,7 +32,7 @@ interface PackageDuration {
   price: number;
 }
 
-interface PackageDetails {
+interface PackageDetails extends PackagePricing {
   _id: string;
   packageName: string;
   description?: string;
@@ -464,7 +466,7 @@ const PackageScreen = () => {
 
             <View style={styles.priceHero}>
               <Text style={styles.priceHeroLabel}>
-                Base Package Price
+                {packageDetails.pricingMethod === 'PER_PERSON' ? 'Price per person' : packageDetails.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
               </Text>
 
               <Text style={styles.priceHeroValue}>
@@ -472,7 +474,7 @@ const PackageScreen = () => {
                 {packageDetails.price !==
                 undefined
                   ? packageDetails.price.toLocaleString()
-                  : "N/A"}
+                  : "N/A"} {pricingLabel(packageDetails)}
               </Text>
             </View>
 
@@ -618,6 +620,7 @@ const PackageScreen = () => {
                   {packageDetails.packageName ||
                     "N/A"}
                 </Text>
+                <PackagePricingLabel pkg={packageDetails} />
               </View>
             </View>
 
@@ -802,7 +805,7 @@ const PackageScreen = () => {
                                 Rs.{" "}
                                 {Number(
                                   duration.price || 0
-                                ).toLocaleString()}
+                                ).toLocaleString()} {pricingUnit(packageDetails)}
                               </Text>
                             </View>
                           )
@@ -938,7 +941,7 @@ const PackageScreen = () => {
                               {packageDetails.customDurationUnit ===
                               "DAYS"
                                 ? "day"
-                                : "hour"}
+                                : "hour"} {pricingUnit(packageDetails)}
                             </Text>
                           </View>
                         </View>

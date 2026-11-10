@@ -1,3 +1,4 @@
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -337,6 +338,8 @@ return {
                     item.vendorName}
                 </Text>
 
+                <Text style={styles.vendor}>{item.package?.packageName || 'Package'}</Text>
+                <PackagePricingLabel pkg={item.package || {}} />
                 <Text style={styles.price}>
                   {price > 0
                     ? `Rs ${price.toLocaleString()} ${item.package?.pricingMethod ? pricingLabel(item.package) : ''}`

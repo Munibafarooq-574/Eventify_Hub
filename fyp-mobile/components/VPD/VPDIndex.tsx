@@ -1,4 +1,5 @@
-import { pricingLabel } from '@/utils/packagePricing';
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
+import { pricingLabel, pricingUnit } from '@/utils/packagePricing';
 import { vendorStartingPrice, vendorStartingPackage } from '@/services/vendorSearchPreferences';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
@@ -1011,6 +1012,7 @@ const category =
             >
               {pkg.packageName}
             </Text>
+            <PackagePricingLabel pkg={pkg} legacyPerPerson={category === 'catering'} />
 
             <Text
               style={[
@@ -1073,6 +1075,7 @@ const category =
                 >
                   {pkg.packageName}
                 </Text>
+                <PackagePricingLabel pkg={pkg} legacyPerPerson={category === 'catering'} />
 
                 <Text
                   style={
@@ -1314,7 +1317,7 @@ const category =
                     Rs.{" "}
                     {Number(
                       duration.price || 0
-                    ).toLocaleString()}
+                    ).toLocaleString()} {pricingUnit(pkg, category === 'catering')}
                   </Text>
                 </View>
               );
@@ -1363,7 +1366,7 @@ const category =
             /
             {pkg.customDurationUnit === "DAYS"
               ? "day"
-              : "hour"}
+              : "hour"} {pricingUnit(pkg, category === 'catering')}
           </Text>
         </View>
       ) : (

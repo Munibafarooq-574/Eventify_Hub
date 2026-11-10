@@ -1,3 +1,5 @@
+import { pricingLabel } from '@/utils/packagePricing';
+import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 // fyp-mobile/components/CustomerFeatures/FeaturedPackagesSection.tsx
 //
 // Same drop-in pattern as FeaturedVendorsSection.tsx:
@@ -67,10 +69,11 @@ export function FeaturedPackagesSection({ navigation }: { navigation: any }) {
             <Text style={styles.packageName} numberOfLines={1}>
               {pkg.packageName}
             </Text>
+            <PackagePricingLabel pkg={pkg} />
             <Text style={styles.vendorName} numberOfLines={1}>
               {pkg.vendorName}
             </Text>
-            <Text style={styles.price}>Rs. {pkg.price.toLocaleString()}</Text>
+            <Text style={styles.price}>Rs. {pkg.price.toLocaleString()} {pricingLabel(pkg)}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
