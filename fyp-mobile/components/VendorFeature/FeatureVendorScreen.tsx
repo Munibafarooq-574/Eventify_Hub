@@ -99,7 +99,7 @@ const { vendorId } = useLocalSearchParams<{
       const [mine, subscription, plans] = await Promise.all([
         getMyFeaturedVendorPromotions(vendorIdValue),
         getVendorSubscription(vendorIdValue),
-        getSubscriptionPlans(),
+        getSubscriptionPlans(vendorIdValue),
       ]);
       setPromotions(mine);
       const planDef = plans.find((p) => p.key === subscription.plan);
