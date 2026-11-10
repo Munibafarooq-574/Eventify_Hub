@@ -1,3 +1,4 @@
+import { renderEventifyPaymentEmail } from '../email/payment-email-layout';
 import { currencyOf, currencySymbol, roundMoney } from '../common/utils/currency';
 import type { City } from '../schemas/city.schema';
 import { ChatGateway } from '../chat/chat.gateway';
@@ -853,56 +854,8 @@ private buildPaymentReceiptEmail(
                 ? 'EasyPaisa'
                 : data.method;
 
-    return `
-<!DOCTYPE html>
-<html>
-<body
-  style="
-    margin:0;
-    padding:0;
-    background:#F8E9F6;
-    font-family:Arial,sans-serif;
-    color:#332633;
-  "
->
-  <div
-    style="
-      max-width:650px;
-      margin:30px auto;
-      background:#FFFFFF;
-      border-radius:16px;
-      overflow:hidden;
-      border:1px solid #EAD5E6;
-    "
-  >
+    return renderEventifyPaymentEmail('Payment Receipt', `
 
-    <div
-      style="
-        background:#7D0C72;
-        color:#FFFFFF;
-        padding:28px;
-      "
-    >
-      <div
-        style="
-          font-size:24px;
-          font-weight:700;
-        "
-      >
-        Eventify Hub
-      </div>
-
-      <div
-        style="
-          margin-top:8px;
-          font-size:16px;
-        "
-      >
-        Payment Receipt
-      </div>
-    </div>
-
-    <div style="padding:28px;">
 
       <div
         style="
@@ -1185,11 +1138,7 @@ private buildPaymentReceiptEmail(
         the Eventify Hub app.
       </p>
 
-    </div>
-  </div>
-</body>
-</html>
-`;
+    `);
 }
 
     // ===== Called by gateway webhook (or manually for now) on success =====
