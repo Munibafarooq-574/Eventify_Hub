@@ -368,11 +368,6 @@ export default function SubscriptionScreen() {
       return;
     }
 
-    if (paymentInstructions?.configured === false) {
-      Alert.alert('Payments Unavailable', 'USA bank transfer instructions have not been configured yet. Please contact support.');
-      return;
-    }
-
     if (hasPendingPayment) {
       Alert.alert(
         'Payment Under Review',
@@ -1404,12 +1399,12 @@ export default function SubscriptionScreen() {
                       style={[
                         styles.primaryButton,
 
-                                                (hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
+                                                (hasPendingPayment || !plan.monthlyPrice ||
                           !!accessState.scheduledSubscription) &&
                           styles.disabledButton,
                       ]}
                       disabled={
-                        hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
+                        hasPendingPayment || !plan.monthlyPrice ||
                         !!accessState.scheduledSubscription
                       }
                       onPress={() =>
@@ -1456,8 +1451,22 @@ export default function SubscriptionScreen() {
           {/* PAYMENT */}
           {/* ================================================= */}
 
+          {selectedPlan && !hasPendingPayment && paymentInstructions?.configured === false && (
+            <View style={[styles.paymentCard, { borderColor: COLORS.border }]} onLayout={handlePaymentCardLayout}>
+              <Text style={styles.paymentTitle}>USA bank transfer is not configured</Text>
+              <Text style={[styles.instructionText, { marginTop: 10 }]}>
+                You selected {selectedPlan.name} ({selectedPlan.priceLabel}).
+                Payment requests are temporarily unavailable until Eventify Hub configures its USD bank account.
+                Your current subscription remains unchanged. Contact support for assistance.
+              </Text>
+              <TouchableOpacity style={styles.changePlanButton} onPress={() => setSelectedPlan(null)}>
+                <Text style={styles.changePlanText}>Choose another plan</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {selectedPlan &&
-            !hasPendingPayment && (
+            !hasPendingPayment && paymentInstructions?.configured !== false && (
               <View
                 style={
                   styles.paymentCard
