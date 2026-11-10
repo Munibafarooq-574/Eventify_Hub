@@ -2509,8 +2509,13 @@ if (!userId) {
                     {currencySymbol()} {price}
                   </Text>
                   <Text style={styles.previewPriceMeta}>
-                    {pricingLabel(pricing).replace(' · serves ', '\nserves ')}
+                    {pricing.pricingMethod === 'GROUP' ? 'per group' : pricingLabel(pricing)}
                   </Text>
+                  {pricing.pricingMethod === 'GROUP' && Number(pricing.groupSize) > 0 && (
+                    <Text style={styles.previewPriceServing}>
+                      serves {pricing.groupSize} people
+                    </Text>
+                  )}
                 </View>
               )}
             </View>
@@ -3342,7 +3347,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 3,
+  },
+  previewPriceServing: {
+    color: "#F7EAF4",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
   },
   previewDurationPriceBlock: {
     flex: 1,
