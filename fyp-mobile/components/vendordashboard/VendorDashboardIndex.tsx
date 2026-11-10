@@ -1706,7 +1706,7 @@ if (!hasValidSubscription) {
                                         <View style={[styles.packageIconWrap, { backgroundColor: "#fff" }]}>
                                             <Ionicons name={accent.icon} size={18} color={accent.tint} />
                                         </View>
-                                        <Text style={styles.packageValue} numberOfLines={1}>
+                                        <Text style={styles.packageValue}>
                                             {pkg.packageName}
                                         </Text>
                                         <Text style={[styles.packageLabel, { color: accent.tint }]}>
