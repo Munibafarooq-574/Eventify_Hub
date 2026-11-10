@@ -18,7 +18,7 @@ const makeService = (sendReceipt: boolean, emailFails = false) => {
     save: jest.fn(async () => undefined),
   };
   const sessionQuery = (value: any) => ({ session: jest.fn(async () => value) });
-  const sendTransactionalEmail = jest.fn(async () => {
+  const sendTransactionalEmail = jest.fn(async (_params?: any) => {
     if (emailFails) throw new Error('Brevo offline');
   });
   const vendor = {
