@@ -1451,14 +1451,49 @@ export default function SubscriptionScreen() {
           {/* PAYMENT */}
           {/* ================================================= */}
 
-          {selectedPlan && !hasPendingPayment && paymentInstructions?.configured === false && (
-            <View style={[styles.paymentCard, { borderColor: COLORS.border }]} onLayout={handlePaymentCardLayout}>
-              <Text style={styles.paymentTitle}>USA bank transfer is not configured</Text>
+          {selectedPlan && !hasPendingPayment && paymentInstructions?.provider === PaymentProvider.CARD_TEST && (
+            <View style={styles.paymentCard} onLayout={handlePaymentCardLayout}>
+              <Text style={styles.paymentTitle}>Pay with Credit / Debit Card</Text>
               <Text style={[styles.instructionText, { marginTop: 10 }]}>
-                You selected {selectedPlan.name} ({selectedPlan.priceLabel}).
-                Payment requests are temporarily unavailable until Eventify Hub configures its USD bank account.
-                Your current subscription remains unchanged. Contact support for assistance.
+                Test cards only — no real money will be charged. Your subscription remains unchanged until Admin approves the payment request.
               </Text>
+              <View style={styles.selectedPlanSummary}>
+                <Text style={styles.summaryLabel}>Selected Plan</Text>
+                <Text style={styles.summaryValue}>{selectedPlan.name}</Text>
+                <Text style={styles.summaryPrice}>{selectedPlan.priceLabel}</Text>
+              </View>
+              {isUpgrade && (
+                <View style={{ marginTop: 18 }}>
+                  <Text style={styles.referenceLabel}>When should your new plan start?</Text>
+                  {(['IMMEDIATE', 'SCHEDULED'] as const).map(option => (
+                    <TouchableOpacity key={option} onPress={() => setActivationType(option)}
+                      style={{ padding: 14, marginTop: 10, borderRadius: 12, borderWidth: activationType === option ? 2 : 1,
+                        borderColor: activationType === option ? COLORS.primary : COLORS.border }}>
+                      <Text style={{ color: COLORS.text, fontWeight: '800' }}>
+                        {activationType === option ? '◉ ' : '○ '}{option === 'IMMEDIATE' ? 'Immediate Upgrade' : 'Scheduled Upgrade'}
+                      </Text>
+                      <Text style={{ color: COLORS.muted, marginTop: 5 }}>
+                        {option === 'IMMEDIATE' ? 'Starts after Admin approval.' : `Starts after your current plan expires on ${formatDate(currentSubscription?.endDate)}.`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {changingPaidPlan && !isUpgrade && currentSubscription && (
+                <Text style={[styles.instructionText, { marginTop: 14 }]}>
+                  Your current plan remains active until {formatDate(currentSubscription.endDate)}. The new plan will start after that, subject to Admin approval.
+                </Text>
+              )}
+              <TouchableOpacity style={[styles.submitButton, { marginTop: 18 }]}
+                onPress={() => {
+                  if (!vendorId || !selectedPlan.monthlyPrice) return;
+                  router.push({ pathname: '/creditcard', params: {
+                    subscriptionVendorId: vendorId, subscriptionPlan: selectedPlan.key,
+                    subscriptionActivationType: isUpgrade ? activationType.toLowerCase() : 'immediate',
+                  }});
+                }}>
+                <Text style={styles.submitButtonText}>Continue to Test Card Payment</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.changePlanButton} onPress={() => setSelectedPlan(null)}>
                 <Text style={styles.changePlanText}>Choose another plan</Text>
               </TouchableOpacity>
@@ -1466,7 +1501,7 @@ export default function SubscriptionScreen() {
           )}
 
           {selectedPlan &&
-            !hasPendingPayment && paymentInstructions?.configured !== false && (
+            !hasPendingPayment && paymentInstructions?.provider !== PaymentProvider.CARD_TEST && paymentInstructions?.configured !== false && (
               <View
                 style={
                   styles.paymentCard
