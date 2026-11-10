@@ -6,9 +6,9 @@ import {
   SubscriptionPaymentInstructions,
 } from '../types/subscription.types';
 
-export async function getSubscriptionPaymentInstructions():
+export async function getSubscriptionPaymentInstructions(vendorId: string):
 Promise<SubscriptionPaymentInstructions> {
   return growthApi.get<SubscriptionPaymentInstructions>(
-    '/vendor/growth/subscription/payment-instructions',
+    `/vendor/growth/subscription/payment-instructions?vendorId=${encodeURIComponent(vendorId)}`,
   );
 }
