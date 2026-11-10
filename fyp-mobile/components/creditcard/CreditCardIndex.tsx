@@ -1,6 +1,10 @@
 import { formatMoney, currencyOf } from '@/utils/currency';
 import type { ComponentRef } from 'react';
 import getPaymentStatus from '@/services/getPaymentStatus';
+import { getSubscriptionPlans } from '@/services/getSubscriptionPlans';
+import { getSubscriptionAccessState } from '@/services/getSubscriptionAccessState';
+import { requestSubscriptionPayment } from '@/services/requestSubscriptionPayment';
+import { PaymentProvider } from '@/types/subscription.types';
 import { getCardOwnerId, assertCardOwner, listDemoCards, rememberDemoCard, removeDemoCard, type SavedDemoCard } from '@/services/demoSavedCards';
 import { DEMO_CARD_OPTIONS, formatCardNumber, formatExpiry, validateCardForm, cardPaymentAmount, isExpiryValid } from '@/utils/cardPaymentValidation';
 
@@ -149,10 +153,13 @@ const Field = React.forwardRef<ComponentRef<typeof TextInput>, FieldProps>(
 Field.displayName = 'Field';
 
 const CreditCardPaymentScreen = () => {
-  const { vendorOrderId, paymentType } = useLocalSearchParams<{
+  const { vendorOrderId, paymentType, subscriptionVendorId, subscriptionPlan, subscriptionActivationType } = useLocalSearchParams<{
     vendorOrderId?: string;
     amount?: string;
     paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
+    subscriptionVendorId?: string;
+    subscriptionPlan?: string;
+    subscriptionActivationType?: 'immediate' | 'scheduled';
   }>();
 
   const insets = useSafeAreaInsets();
@@ -169,6 +176,7 @@ const CreditCardPaymentScreen = () => {
   const cardHeight = cardWidth / 1.586;
   const cardNumberFont = Math.max(15, Math.min(22, cardWidth * 0.058));
 
+  const isSubscription = typeof subscriptionVendorId === 'string' && !!subscriptionVendorId;
   const paymentKind = paymentType || 'DOWN_PAYMENT';
   const [paymentCurrency, setPaymentCurrency] = useState<'PKR' | 'USD'>('PKR');
   const formatCurrency = (value: number) => formatMoney(value, paymentCurrency);
@@ -192,22 +200,45 @@ const CreditCardPaymentScreen = () => {
     setCardholderName(''); setCardNumber(''); setExpiry(''); setCvv('');
     setRememberCard(false); setTouched({});
   }, []);
+  const loadSubscriptionPayment = useCallback(async (owner: string) => {
+    if (!subscriptionVendorId || subscriptionVendorId !== owner || !subscriptionPlan) {
+      throw new Error('Open subscription payment from your own vendor account.');
+    }
+    const [plans, access] = await Promise.all([
+      getSubscriptionPlans(subscriptionVendorId),
+      getSubscriptionAccessState(subscriptionVendorId),
+    ]);
+    if (access.hasPendingPayment || access.scheduledSubscription) {
+      throw new Error('A subscription payment or scheduled plan already exists. Refresh your subscription.');
+    }
+    const plan = plans.find(item => item.key === subscriptionPlan);
+    if (!plan || plan.currency !== 'USD' || !plan.isPurchasable ||
+        typeof plan.monthlyPrice !== 'number' || plan.monthlyPrice <= 0) {
+      throw new Error('This USD subscription is not available. Refresh your subscription plans.');
+    }
+    if (access.isPaidPlan && access.subscription?.plan === plan.key &&
+        access.subscription?.status !== 'cancelled') {
+      throw new Error('This is already your active subscription.');
+    }
+    return plan.monthlyPrice;
+  }, [subscriptionVendorId, subscriptionPlan]);
   const loadScreen = useCallback(async () => {
     const request = ++generation.current;
     setLoading(true); setScreenError(''); setOwnerId(null); setSavedCards([]); setAmountPayable(null);
     try {
-      if (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId)) throw new Error('Open card payment from your booking.');
+      if (!isSubscription && (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId))) throw new Error('Open card payment from your booking.');
       const id = await getCardOwnerId();
-      const financials = await getPaymentStatus(vendorOrderId);
-      if (request === generation.current) setPaymentCurrency(currencyOf(financials));
-      const payable = cardPaymentAmount(financials, paymentKind, id);
+      const payable = isSubscription
+        ? await loadSubscriptionPayment(id)
+        : cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, id);
+      if (request === generation.current) setPaymentCurrency(isSubscription ? 'USD' : currencyOf(await getPaymentStatus(vendorOrderId!)));
       const cards = await listDemoCards(id);
       await assertCardOwner(id);
       if (request === generation.current) { setOwnerId(id); setSavedCards(cards); setAmountPayable(payable); }
     } catch (error) {
       if (request === generation.current) setScreenError(error instanceof Error ? error.message : 'Could not load payment details.');
     } finally { if (request === generation.current) setLoading(false); }
-  }, [vendorOrderId, paymentKind]);
+  }, [vendorOrderId, paymentKind, isSubscription, loadSubscriptionPayment]);
   useFocusEffect(useCallback(() => {
     clearForm(); void loadScreen();
     const subscription = AppState.addEventListener('change', state => {
@@ -222,8 +253,8 @@ const CreditCardPaymentScreen = () => {
     const request = generation.current;
     try {
       await assertCardOwner(ownerId);
-      const financials = await getPaymentStatus(vendorOrderId!);
-      cardPaymentAmount(financials, paymentKind, ownerId);
+      if (isSubscription) await loadSubscriptionPayment(ownerId);
+      else cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
       if (request !== generation.current) return;
       if (!isExpiryValid(card.expiry)) { Alert.alert('Expired test card', 'Remove this shortcut and enter a new expiry.'); return; }
       const demo = DEMO_CARD_OPTIONS.find(item => item.id === card.demoCardId)!;
@@ -236,8 +267,8 @@ const CreditCardPaymentScreen = () => {
     if (!ownerId || paymentLock.current) return;
     const request = generation.current;
     try {
-      const financials = await getPaymentStatus(vendorOrderId!);
-      cardPaymentAmount(financials, paymentKind, ownerId);
+      if (isSubscription) await loadSubscriptionPayment(ownerId);
+      else cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
       const cards = await removeDemoCard(ownerId, card.demoCardId);
       if (request === generation.current) setSavedCards(cards);
     } catch { Alert.alert('Unable to remove card', 'Please reload and try again.'); }
@@ -273,24 +304,31 @@ const CreditCardPaymentScreen = () => {
   const handlePayNow = async () => {
     const current = validateCardForm({ name: cardholderName, number: cardNumber, expiry, cvv });
     setTouched({ name: true, number: true, expiry: true, cvv: true });
-    if (!current.valid || paymentLock.current || loading || !ownerId || !vendorOrderId || amountPayable == null) return;
+    if (!current.valid || paymentLock.current || loading || !ownerId || (!isSubscription && !vendorOrderId) || amountPayable == null) return;
     paymentLock.current = true;
     const request = generation.current;
     setSubmitting(true);
     let initiated = false;
     try {
       await assertCardOwner(ownerId);
-      const latest = await getPaymentStatus(vendorOrderId);
-      const payable = cardPaymentAmount(latest, paymentKind, ownerId);
+      const payable = isSubscription
+        ? await loadSubscriptionPayment(ownerId)
+        : cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
       await assertCardOwner(ownerId);
       if (request !== generation.current) return;
       if (payable !== amountPayable) {
         setAmountPayable(payable);
         Alert.alert('Amount updated', 'Your booking amount changed. Review it before submitting again.'); return;
       }
-      // Phase 12A submits only the method. No card number, expiry or CVV leaves this form.
-      if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId, 'card', sendReceipt);
-      else await createPayment(vendorOrderId, 'card', sendReceipt);
+      // Synthetic-card validation stays on the device. Never send PAN, expiry or CVV.
+      if (isSubscription) {
+        await requestSubscriptionPayment({
+          plan: subscriptionPlan!, expectedAmount: payable,
+          paymentProvider: PaymentProvider.CARD_TEST,
+          activationType: subscriptionActivationType === 'scheduled' ? 'scheduled' : 'immediate',
+        });
+      } else if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId!, 'card', sendReceipt);
+      else await createPayment(vendorOrderId!, 'card', sendReceipt);
       initiated = true;
       let saveNotice = '';
       if (rememberCard && current.demo && request === generation.current) {
@@ -303,7 +341,9 @@ const CreditCardPaymentScreen = () => {
         clearForm(); setOwnerId(null);
         Alert.alert('Test payment request created',
           'Your request is awaiting Admin confirmation. No real card has been charged.' + saveNotice,
-          [{ text: 'OK', onPress: () => router.replace('/myevents') }]);
+          [{ text: 'OK', onPress: () => isSubscription
+            ? router.replace({ pathname: '/vendorsubscription', params: { vendorId: subscriptionVendorId! } } as any)
+            : router.replace('/myevents') }]);
       }
     } catch (error: any) {
       if (request === generation.current && !initiated) {
@@ -317,7 +357,7 @@ const CreditCardPaymentScreen = () => {
   };
 
   const topPad = Math.max(insets.top, 24) + 10;
-  const typeLabel = paymentType === 'REMAINING' ? 'Remaining payment' : 'Down payment';
+  const typeLabel = isSubscription ? 'Monthly vendor subscription' : paymentType === 'REMAINING' ? 'Remaining payment' : 'Down payment';
 
   // ───────────── Card preview (flip) ─────────────
   const cardPreview = (
@@ -561,7 +601,7 @@ const CreditCardPaymentScreen = () => {
           </TouchableOpacity>
 
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>Card Payment</Text>
+            <Text style={styles.headerTitle}>{isSubscription ? 'Subscription Card Payment' : 'Card Payment'}</Text>
             <Text style={styles.headerSubtitle}>Test card checkout</Text>
           </View>
 
