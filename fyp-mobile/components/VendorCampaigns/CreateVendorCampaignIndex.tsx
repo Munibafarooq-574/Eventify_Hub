@@ -22,6 +22,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
 import { createVendorCampaign } from "@/services/vendorCampaignApi";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { formatMoney, vendorDisplayCurrency } from "@/utils/currency";
+import { getUserData } from "@/store";
 
 const PRIMARY = "#7D0C72";
 const PRIMARY_DARK = "#5E0A55";
@@ -63,7 +65,7 @@ const getPackagePrice = (pkg: VendorPackage) => {
     return "";
   }
 
-  return `Rs. ${value.toLocaleString()}`;
+  return formatMoney(value, vendorDisplayCurrency(pkg));
 };
 
 const formatDate = (date: Date | null) => {
@@ -221,6 +223,8 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     try {
       setLoadingPackages(true);
 
+      // Refresh the signed-in vendor's country currency before rendering prices.
+      await getUserData();
       const response: any =
         await getVendorPackagesList(vendorId);
 
