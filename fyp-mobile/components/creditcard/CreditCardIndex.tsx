@@ -228,10 +228,11 @@ const CreditCardPaymentScreen = () => {
     try {
       if (!isSubscription && (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId))) throw new Error('Open card payment from your booking.');
       const id = await getCardOwnerId();
+      const financials = isSubscription ? null : await getPaymentStatus(vendorOrderId!);
       const payable = isSubscription
         ? await loadSubscriptionPayment(id)
-        : cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, id);
-      if (request === generation.current) setPaymentCurrency(isSubscription ? 'USD' : currencyOf(await getPaymentStatus(vendorOrderId!)));
+        : cardPaymentAmount(financials!, paymentKind, id);
+      if (request === generation.current) setPaymentCurrency(isSubscription ? 'USD' : currencyOf(financials));
       const cards = await listDemoCards(id);
       await assertCardOwner(id);
       if (request === generation.current) { setOwnerId(id); setSavedCards(cards); setAmountPayable(payable); }
@@ -342,7 +343,7 @@ const CreditCardPaymentScreen = () => {
         Alert.alert('Test payment request created',
           'Your request is awaiting Admin confirmation. No real card has been charged.' + saveNotice,
           [{ text: 'OK', onPress: () => isSubscription
-            ? router.replace({ pathname: '/vendorsubscription', params: { vendorId: subscriptionVendorId! } } as any)
+            ? router.replace({ pathname: '/subscriptionscreen', params: { vendorId: subscriptionVendorId! } } as any)
             : router.replace('/myevents') }]);
       }
     } catch (error: any) {
@@ -566,8 +567,8 @@ const CreditCardPaymentScreen = () => {
           />
         </View>
 
-        <View style={styles.switchDivider} />
-        <View style={styles.switchRow}>
+        {!isSubscription && <View style={styles.switchDivider} />}
+        {!isSubscription && <View style={styles.switchRow}>
           <View style={styles.switchIcon}><Ionicons name="mail-outline" size={16} color={PRIMARY} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.switchTitle}>Email me a receipt</Text>
@@ -576,7 +577,7 @@ const CreditCardPaymentScreen = () => {
           <Switch accessibilityLabel="Email me a receipt" disabled={submitting || loading || !ownerId}
             value={sendReceipt} onValueChange={setSendReceipt}
             trackColor={{ false: '#E3D3DD', true: ACCENT }} thumbColor="#FFFFFF" />
-        </View>
+        </View>}
       </View>
     </View>
   );
