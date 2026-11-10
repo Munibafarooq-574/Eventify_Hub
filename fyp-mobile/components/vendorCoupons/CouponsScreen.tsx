@@ -136,7 +136,7 @@ const insets = useSafeAreaInsets();
       const [mine, subscription, plans] = await Promise.all([
         activeTab === 'coupon' ? getVendorCoupons(vendorIdValue) : getVendorDiscountCodes(vendorIdValue),
         getVendorSubscription(vendorIdValue),
-        getSubscriptionPlans(),
+        getSubscriptionPlans(vendorIdValue),
       ]);
       setEntries(mine);
       const planDef = plans.find((p) => p.key === subscription.plan);
