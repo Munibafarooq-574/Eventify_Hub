@@ -368,6 +368,11 @@ export default function SubscriptionScreen() {
       return;
     }
 
+    if (paymentInstructions?.configured === false) {
+      Alert.alert('Payments Unavailable', 'USA bank transfer instructions have not been configured yet. Please contact support.');
+      return;
+    }
+
     if (hasPendingPayment) {
       Alert.alert(
         'Payment Under Review',
@@ -1399,12 +1404,12 @@ export default function SubscriptionScreen() {
                       style={[
                         styles.primaryButton,
 
-                                                (hasPendingPayment || !plan.monthlyPrice ||
+                                                (hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
                           !!accessState.scheduledSubscription) &&
                           styles.disabledButton,
                       ]}
                       disabled={
-                        hasPendingPayment || !plan.monthlyPrice ||
+                        hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
                         !!accessState.scheduledSubscription
                       }
                       onPress={() =>
