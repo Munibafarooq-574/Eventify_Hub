@@ -1460,7 +1460,7 @@ export default function SubscriptionScreen() {
                 Your current subscription remains unchanged. Contact support for assistance.
               </Text>
               <TouchableOpacity style={styles.changePlanButton} onPress={() => setSelectedPlan(null)}>
-                <Text style={styles.changePlanButtonText}>Choose another plan</Text>
+                <Text style={styles.changePlanText}>Choose another plan</Text>
               </TouchableOpacity>
             </View>
           )}
