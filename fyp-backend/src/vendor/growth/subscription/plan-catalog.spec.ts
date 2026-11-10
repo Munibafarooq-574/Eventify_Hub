@@ -108,6 +108,8 @@ describe('Admin subscription catalog', () => {
   it('validates prices, limits, keys and feature selections before saving', async () => {
     const catalog = createCatalog();
     await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPrice: 0 }, true)).rejects.toThrow();
+    await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPriceUSD: -5 }, true)).rejects.toThrow();
+    await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPriceUSD: 3.999 }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['unknown'] }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['custom:fake feature'] }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, limits: { ...planInput.limits, maxPackages: -1 } }, true)).rejects.toThrow();
@@ -123,6 +125,8 @@ describe('Admin subscription catalog', () => {
     const create = jest.fn(async input => input);
     const service = Object.assign(Object.create(SubscriptionService.prototype), {
       catalog, subscriptionModel: { findOne: async () => null, create },
+      userModel: { findById: () => ({ select: () => ({ lean: async () => ({ marketplaceCountryCode: 'PK' }) }) }) },
+      getPaymentInstructions: async () => ({ provider: PaymentProvider.EASYPAISA, currency: 'PKR' }),
       getCurrentSubscription: async () => current,
     }) as SubscriptionService;
     const purchase = (amount: number) => service.requestSubscriptionPayment(
