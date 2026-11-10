@@ -1,3 +1,4 @@
+import { bookingDateKey } from '@/utils/bookingTimezone';
 import { growthApi } from '@/services/growthApiClient';
 //fyp-mobile/components/EventDetailsForm/EventDetailsFormIndex.tsx
 import getAllCategories from "@/services/getAllCategories";
@@ -52,6 +53,9 @@ const formatTime = (date: Date) => {
   });
 };
 
+// Native picker Date objects hold wall-clock fields chosen for the event city.
+const pickerDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const timeToHHMM = (date: Date) => {
   return `${String(date.getHours()).padStart(2, "0")}:${String(
     date.getMinutes()
@@ -99,6 +103,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
           parsedTime.setHours(hours, minutes, 0, 0);
           setStartTime(parsedTime);
         }
+        setEventCityId(String(saved.eventCityId || ''));
         setSavedEditEvent(saved);
       } catch (error) {
         console.error("Could not restore event details:", error);
@@ -119,7 +124,7 @@ const PersonalizedExperienceScreen: React.FC = () => {
       end.setMinutes(end.getMinutes() + duration);
       await draft.save("eventDetails", JSON.stringify({
         ...savedEditEvent,
-        eventDate,
+        eventDate: pickerDateKey(eventDate),
         startTime: timeToHHMM(startTime),
         endTime: timeToHHMM(end),
       }));
@@ -327,7 +332,7 @@ const selectedCity = useMemo(
       return null;
     }
 
-    return eventDate.toISOString().split("T")[0];
+    return pickerDateKey(eventDate);
   }, [eventDate]);
 
   // -------------------------------------------------------
@@ -415,9 +420,7 @@ const selectedCity = useMemo(
       return {};
     }
 
-    const key = eventDate
-      .toISOString()
-      .split("T")[0];
+    const key = pickerDateKey(eventDate);
 
     return {
       [key]: {
@@ -516,12 +519,13 @@ const eventEndTime = timeToHHMM(eventEndDateTime);
   eventId,
   eventName,
   eventType: eventType.trim(),
-  eventDate,
+  eventDate: eventDate ? pickerDateKey(eventDate) : null,
   startTime: eventStartTime,
   endTime: eventEndTime,
   durationMinutes,
   guests,
   eventCityId,
+  eventTimeZone: selectedCity?.timeZone,
   eventAddress: eventAddress.trim(),
   selectedServices,
   selectedCategoryIds,
@@ -585,15 +589,15 @@ const handleContinue = async () => {
             <Text style={styles.label}>Event Date</Text>
             <View style={styles.calendarContainer}>
               <Calendar
-                current={eventDate ? eventDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)}
-                minDate={new Date().toISOString().slice(0, 10)}
+                current={eventDate ? pickerDateKey(eventDate) : bookingDateKey(new Date(), selectedCity?.timeZone || 'UTC')}
+                minDate={bookingDateKey(new Date(), selectedCity?.timeZone || 'UTC')}
                 markedDates={calendarMarks}
                 onDayPress={(day) => setEventDate(new Date(day.dateString + "T12:00:00"))}
                 enableSwipeMonths
                 theme={{ arrowColor: PRIMARY, todayTextColor: PRIMARY, selectedDayBackgroundColor: PRIMARY }}
               />
             </View>
-            <Text style={[styles.label, { marginTop: 18 }]}>Event Start Time</Text>
+            <Text style={[styles.label, { marginTop: 18 }]}>Event Start Time · {selectedCity?.timeZone || "Select event city"}</Text>
             <TouchableOpacity style={styles.timeSelector} onPress={() => setShowTimePicker(true)}>
               <Ionicons name="time-outline" size={20} color={PRIMARY} />
               <Text style={[styles.timeValue, { flex: 1, marginLeft: 12 }]}>{formatTime(startTime)}</Text>
@@ -748,17 +752,11 @@ const handleContinue = async () => {
         <Calendar
           current={
             eventDate
-              ? eventDate
-                  .toISOString()
-                  .split("T")[0]
-              : new Date()
-                  .toISOString()
-                  .split("T")[0]
+              ? pickerDateKey(eventDate)
+              : bookingDateKey(new Date(), selectedCity?.timeZone || 'UTC')
           }
           minDate={
-            new Date()
-              .toISOString()
-              .split("T")[0]
+            bookingDateKey(new Date(), selectedCity?.timeZone || 'UTC')
           }
           markedDates={calendarMarks}
           onDayPress={(day) => {
@@ -833,7 +831,7 @@ const handleContinue = async () => {
       ================================================== */}
 
       <Text style={styles.label}>
-        Event Start Time
+        Event Start Time · {selectedCity?.timeZone || "Select event city"}
       </Text>
 
       <TouchableOpacity
@@ -1121,7 +1119,7 @@ const handleContinue = async () => {
     ]}
   >
     {selectedCity
-      ? `${selectedCity.name}, ${selectedCity.stateProvinceName}`
+      ? `${selectedCity.name}, ${selectedCity.stateProvinceName} · ${selectedCity.timeZone || 'UTC'}`
       : "Select event city"}
   </Text>
 

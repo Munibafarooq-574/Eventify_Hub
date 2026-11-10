@@ -75,7 +75,7 @@ describe('Automatic booking chat', () => {
         expect(messages).toHaveLength(2);
         expect(photoMessage?.chatId).toBe(existing);
         expect(cakeMessage?.chatId).not.toBe(existing);
-        expect(photoMessage?.message).toBe('Booking request sent for Sara Wedding on 20 September.\nService: Photography\nPackage: Premium\nTime: 6:00 PM – 10:00 PM');
+        expect(photoMessage?.message).toBe('Booking request sent for Sara Wedding on 20 September.\nService: Photography\nPackage: Premium\nTime: 6:00 PM – 10:00 PM\nTimes shown in Asia/Karachi');
         expect(cakeMessage?.message).toContain('Package: Three tiers\nQuantity: 2\nDelivery: 5:30 PM');
         expect(cakeMessage?.message).not.toContain('Time:');
         expect(await db.model(Conversation.name).countDocuments()).toBe(2);

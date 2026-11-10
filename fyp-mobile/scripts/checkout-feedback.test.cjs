@@ -91,7 +91,7 @@ test('pull after reconnect rechecks the saved duration and updates price without
  let offline = true;
  const context = {
   usePullToRefresh: fn => { reload = fn; return {}; },
-  PRIMARY:'#780C60', OFFLINE_NOTICE:'No internet connection.',
+  eventTimeZone:'Asia/Karachi', PRIMARY:'#780C60', OFFLINE_NOTICE:'No internet connection.',
   cartData, eventDetails:{eventDate:'2026-11-09',startTime:'15:00',eventDurationMinutes:120,eventCityId:'city',durationMinutes:120},
   checkoutLock:{current:false}, applyingCouponId:null, applyingDiscountCodeKey:null, connectivityRequest:{current:0},
   promotionWriteLock:{current:false}, replacementDeadlinePassed:false,

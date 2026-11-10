@@ -34,7 +34,7 @@ export async function checkReviewPackageAvailability({
     result = await growthApi.post("/vendor-availability/setup-candidates", event);
   } else if (bookingType === "DELIVERY_BASED") {
     const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: deliveryTimeZone || "Asia/Karachi",
+      timeZone: deliveryTimeZone || "UTC",
       year: "numeric", month: "2-digit", day: "2-digit",
     }).formatToParts(new Date(window.startDateTime));
     const date = Object.fromEntries(parts.map(({ type, value }) => [type, value]));

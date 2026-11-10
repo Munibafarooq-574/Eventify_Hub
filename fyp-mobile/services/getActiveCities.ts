@@ -5,6 +5,7 @@ import { API_BASE_URL } from "./apiConfig";
 export interface ActiveCity {
   _id: string;
   name: string;
+  timeZone?: string;
   countryCode: string;
   countryName: string;
   stateProvinceCode: string;

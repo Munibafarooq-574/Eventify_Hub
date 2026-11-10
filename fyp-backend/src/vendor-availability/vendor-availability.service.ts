@@ -1138,6 +1138,7 @@ return {
 return {
   vendorId,
   date: dateStr,
+  timeZone: vendorTimeZone,
   day: dayCode,
 
   enabled: daySlotConfig

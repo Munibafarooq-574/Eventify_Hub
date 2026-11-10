@@ -39,7 +39,7 @@ export class CityService {
       name: 1,
     })
     .select(
-      '_id name countryCode countryName stateProvinceCode stateProvinceName',
+      '_id name countryCode countryName stateProvinceCode stateProvinceName timeZone',
     )
     .lean();
 }

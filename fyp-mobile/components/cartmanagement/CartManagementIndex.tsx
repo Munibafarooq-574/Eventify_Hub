@@ -1,3 +1,4 @@
+import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from '@/components/refresh/usePullToRefresh';
@@ -71,6 +72,7 @@ const [cateringCategory, setCateringCategory] = useState<any>(null);
 const [guests, setGuests] = useState<number>(0);
 
 const [eventCityName, setEventCityName] = useState('');
+const [eventTimeZone, setEventTimeZone] = useState('UTC');
  const [eventAddress, setEventAddress] = useState('');
 const [eventDetails, setEventDetails] = useState<any>(null);
 
@@ -124,6 +126,7 @@ if (eventDetailsRaw) {
                   )
                 : undefined;
 
+                    setEventTimeZone(validTimeZone(selectedCity?.timeZone || eventDetails?.eventTimeZone));
                     setEventCityName(
                         selectedCity?.name || ''
                     );
@@ -377,7 +380,7 @@ if (eventDetailsRaw) {
     // -----------------------------------------
 
     const getResolvedServiceTiming = (pkg: any) => {
-    if (pkg.deliveryFeeType && pkg.requiredServiceWindow) return {bookingType:'DELIVERY_BASED',start:new Date(pkg.requiredServiceWindow.startDateTime),end:new Date(pkg.requiredServiceWindow.endDateTime)};
+    if (String(pkg.bookingType || 'DURATION_BASED').toUpperCase() !== 'DURATION_BASED' && pkg.requiredServiceWindow?.startDateTime && pkg.requiredServiceWindow?.endDateTime) return { bookingType: pkg.deliveryFeeType ? 'DELIVERY_BASED' : String(pkg.bookingType || 'DURATION_BASED').toUpperCase(), start: new Date(pkg.requiredServiceWindow.startDateTime), end: new Date(pkg.requiredServiceWindow.endDateTime) };
     const bookingType = String(
         pkg?.bookingType || 'DURATION_BASED',
     ).toUpperCase();
@@ -403,9 +406,7 @@ if (eventDetailsRaw) {
         String(eventDate).split('T')[0];
 
     const eventStart =
-        new Date(
-            `${dateOnly}T${eventStartTime}:00`,
-        );
+        eventLocalDateTime(dateOnly, eventStartTime, eventTimeZone);
 
     if (Number.isNaN(eventStart.getTime())) {
         return null;
@@ -416,29 +417,10 @@ if (eventDetailsRaw) {
     // Event start -> event end
     // -----------------------------------------
     if (bookingType === 'DURATION_BASED') {
-        let end: Date | null = null;
-
-        if (eventEndTime) {
-            end = new Date(
-                `${dateOnly}T${eventEndTime}:00`,
-            );
-        } else {
-            const durationMinutes =
-                Number(
-                    pkg?.durationMinutes ||
-                    eventDetails?.durationMinutes,
-                );
-
-            if (
-                Number.isFinite(durationMinutes) &&
-                durationMinutes > 0
-            ) {
-                end = new Date(
-                    eventStart.getTime() +
-                    durationMinutes * 60000,
-                );
-            }
-        }
+        const durationMinutes = Number(pkg?.durationMinutes || eventDetails?.durationMinutes);
+        const end = Number.isFinite(durationMinutes) && durationMinutes > 0
+            ? new Date(eventStart.getTime() + durationMinutes * 60000)
+            : eventLocalDateTime(dateOnly, eventEndTime || '', eventTimeZone);
 
         if (
             !end ||
@@ -656,7 +638,7 @@ if (eventDetailsRaw) {
                     </Text>
 
                     <Text style={styles.eventLocationValue}>
-                        {eventCityName}
+                        {eventCityName} · {eventTimeZone}
                     </Text>
                 </View>
             )}
@@ -831,7 +813,7 @@ if (eventDetailsRaw) {
                                                             return value.toLocaleTimeString(
                                                                 'en-US',
                                                                 {
-                                                                    timeZone: pkg.deliveryTimeZone || undefined,
+                                                                    timeZone: eventTimeZone,
                                                                     hour: 'numeric',
                                                                     minute: '2-digit',
                                                                     hour12: true,

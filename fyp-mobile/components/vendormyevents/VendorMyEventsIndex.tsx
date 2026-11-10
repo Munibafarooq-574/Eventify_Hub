@@ -1,3 +1,4 @@
+import { bookingTimeZone, formatBookingTime, formatCalendarDate, eventLocalDateTime, bookingDateKey } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import BookingUserGuide from '../guides/BookingUserGuide';
@@ -10,7 +11,7 @@ import getVendorAvailability, { getVendorDayAvailability, type VendorAvailabilit
 import { getUserData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VendorAvailabilityEditor from './VendorAvailabilityEditor';
 import { ActivityIndicator, Dimensions, FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Calendar } from "react-native-calendars";
@@ -42,7 +43,7 @@ const toKey = (date: string | Date) => {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
 };
 
-const formatTime = (date: Date) => date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+const formatTime = formatBookingTime;
 
 const formatDisplayTime = (time: string) => {
   const [h, m] = time.split(":").map(Number);
@@ -55,13 +56,6 @@ const formatDisplayTime = (time: string) => {
 const parseTime = (time: string) => {
   const [h, m] = time.split(":").map(Number);
   const date = new Date();
-  date.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
-  return date;
-};
-
-const parseTimeOnDate = (dateKey: string, time: string) => {
-  const [h, m] = time.split(":").map(Number);
-  const date = new Date(`${dateKey}T00:00:00`);
   date.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
   return date;
 };
@@ -123,7 +117,14 @@ const MyEventsScreen = () => {
    * AVAILABILITY EDITOR STATE
    */
   const [availabilityEditorVisible, setAvailabilityEditorVisible] = useState(false);
-  const todayKey = toKey(new Date());
+  const todayKey = bookingDateKey(new Date(), daySnapshot?.timeZone || 'UTC');
+  const initializedCalendarZone = useRef(false);
+  useEffect(() => {
+    if (daySnapshot?.timeZone && !initializedCalendarZone.current) {
+      initializedCalendarZone.current = true;
+      setSelectedDate(bookingDateKey(new Date(), daySnapshot.timeZone));
+    }
+  }, [daySnapshot?.timeZone]);
 
   /**
    * LOAD EVENTS + AVAILABILITY
@@ -268,11 +269,9 @@ const MyEventsScreen = () => {
  * STATS
  */
 const stats = useMemo(() => {
-  const now = new Date();
   const thisMonth = scheduleOrders.filter((order) => {
     if (!order?.eventDate) return false;
-    const d = new Date(order.eventDate);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return toKey(order.eventDate).slice(0, 7) === todayKey.slice(0, 7);
   });
   const upcoming = scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey);
   const pending = scheduleOrders.filter((order) => String(getVendorStatus(order) || "").toLowerCase() === "pending");
@@ -283,13 +282,11 @@ const stats = useMemo(() => {
  * EVENTS FILTER
  */
 const events = useMemo(() => {
-  const now = new Date();
   if (viewMode === "day") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) === selectedDate);
   if (viewMode === "upcoming") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) >= todayKey).sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
   if (viewMode === "month") return scheduleOrders.filter((order) => {
     if (!order?.eventDate) return false;
-    const d = new Date(order.eventDate);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return toKey(order.eventDate).slice(0, 7) === todayKey.slice(0, 7);
   }).sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
   if (viewMode === "past") return scheduleOrders.filter((order) => order?.eventDate && toKey(order.eventDate) < todayKey).sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
   return [];
@@ -361,8 +358,8 @@ const dayAvailability = useMemo(() => {
   const windows = selectedDayWindows, SLOT_MINUTES = 60, slots: GeneratedSlot[] = [];
 
   windows.forEach((workingWindow) => {
-    const start = parseTimeOnDate(selectedDate, workingWindow.start);
-    const end = parseTimeOnDate(selectedDate, workingWindow.end);
+    const start = eventLocalDateTime(selectedDate, workingWindow.start, daySnapshot?.timeZone || 'UTC');
+    const end = eventLocalDateTime(selectedDate, workingWindow.end, daySnapshot?.timeZone || 'UTC');
     let cursor = start;
 
     while (cursor < end) {
@@ -379,7 +376,7 @@ const dayAvailability = useMemo(() => {
         return !Number.isNaN(bookingStart) && !Number.isNaN(bookingEnd) && bookingStart < slotEndKey && bookingEnd > slotStartKey;
       });
 
-      slots.push({ start: formatTime(cursor), end: formatTime(slotEnd), status: booking ? "booked" : "available", booking, durationMinutes, belowMinimum });
+      slots.push({ start: formatTime(cursor, daySnapshot?.timeZone), end: formatTime(slotEnd, daySnapshot?.timeZone), status: booking ? "booked" : "available", booking, durationMinutes, belowMinimum });
       cursor = slotEnd;
     }
   });
@@ -440,7 +437,7 @@ const totalWorkingMinutes = useMemo(() => {
 
 const toggleExpand = (id: string) => { setExpandedId((previous) => (previous === id ? null : id)); };
 
-const listTitle = viewMode === "day" ? new Date(`${selectedDate}T12:00:00`).toDateString() : viewMode === "upcoming" ? "Upcoming Bookings" : viewMode === "month" ? `Bookings in ${monthLabel}` : "Past Bookings";
+const listTitle = viewMode === "day" ? `${formatCalendarDate(selectedDate)} · ${daySnapshot?.timeZone || "UTC"}` : viewMode === "upcoming" ? "Upcoming Bookings" : viewMode === "month" ? `Bookings in ${monthLabel}` : "Past Bookings";
 
 const availabilityState = dayAvailability.isBlocked ? "Blocked" : !dayAvailability.isWorking ? "Not Working" : dayAvailability.slots.length === 0 ? "No Slots" : "Available";
 
@@ -738,7 +735,7 @@ renderItem={({ item }) => {
         <View style={styles.eventTopRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.eventDate}>
-              {item?.eventDate ? new Date(item.eventDate).toDateString() : "Date unavailable"}
+              {item?.eventDate ? formatCalendarDate(item.eventDate) : "Date unavailable"}
             </Text>
             <Text style={styles.eventTitle} numberOfLines={1}>
               {item?.eventName || "Unnamed Event"}
@@ -755,7 +752,7 @@ renderItem={({ item }) => {
           )}
         </View>
 
-        {ownVendorOrders.map((booking: any) => <BookingActivity key={booking._id} booking={booking} timeZone={item.eventCityId?.timeZone} />)}
+        {ownVendorOrders.map((booking: any) => <BookingActivity key={booking._id} booking={booking} timeZone={bookingTimeZone(item)} />)}
         <View style={styles.metaRow}>
           {!!item?.guests && (
             <View style={styles.eventMeta}>
@@ -793,7 +790,7 @@ renderItem={({ item }) => {
             {!!item?.eventDate && (
               <View style={styles.eventMeta}>
                 <Ionicons name="calendar-number-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>Date: {new Date(item.eventDate).toDateString()}</Text>
+                <Text style={styles.expandedText}>Date: {formatCalendarDate(item.eventDate)}</Text>
               </View>
             )}
 
@@ -811,17 +808,18 @@ renderItem={({ item }) => {
               </View>
             )}
 
+            <Text style={[styles.expandedText, { fontSize: 11 }]}>Times shown in {bookingTimeZone(item).replace(/_/g, ' ')}</Text>
             {!!item?.eventStartDateTime && (
               <View style={styles.eventMeta}>
                 <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>Start Time: {formatTime(new Date(item.eventStartDateTime))}</Text>
+                <Text style={styles.expandedText}>Start Time: {formatTime(item.eventStartDateTime, bookingTimeZone(item))}</Text>
               </View>
             )}
 
             {!!item?.eventEndDateTime && (
               <View style={styles.eventMeta}>
                 <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                <Text style={styles.expandedText}>End Time: {formatTime(new Date(item.eventEndDateTime))}</Text>
+                <Text style={styles.expandedText}>End Time: {formatTime(item.eventEndDateTime, bookingTimeZone(item))}</Text>
               </View>
             )}
 
@@ -877,8 +875,8 @@ renderItem={({ item }) => {
                         {service.pricingMethod && <Text style={styles.expandedText}>Pricing: {pricingLabel(service)}</Text>}
                         {service.personCount != null && <Text style={styles.expandedText}>People: {service.personCount}</Text>}
                         {service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
-                      {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
-                      <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text></>}
+                      {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
+                      <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
                       <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>
                       <Text style={styles.expandedText}>Paid: Rs. {paid}</Text>
                       <Text style={styles.expandedText}>Remaining: Rs. {remaining}</Text>

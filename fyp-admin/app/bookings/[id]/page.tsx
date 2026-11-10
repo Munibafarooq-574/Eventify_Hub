@@ -145,13 +145,14 @@ const formatDate = (value?: string | null) => {
   }
 
   return new Intl.DateTimeFormat("en-PK", {
+    timeZone: "UTC",
     day: "2-digit",
     month: "short",
     year: "numeric",
   }).format(date);
 };
 
-const formatDateTime = (value?: string | null, timeZone?: string) => {
+const formatInTimeZone = (value?: string | null, timeZone?: string) => {
   if (!value) return "N/A";
 
   const date = new Date(value);
@@ -163,7 +164,7 @@ const formatDateTime = (value?: string | null, timeZone?: string) => {
   try {
     return new Intl.DateTimeFormat("en-PK", {
       day: "2-digit", month: "short", year: "numeric",
-      hour: "2-digit", minute: "2-digit", hour12: true, timeZone,
+      hour: "2-digit", minute: "2-digit", hour12: true, timeZone: timeZone || "UTC",
     }).format(date);
   } catch { return "N/A"; }
 };
@@ -249,6 +250,9 @@ export default async function BookingDetailsPage({
 
   const vendorOrder = data.vendorOrder;
   const order = data.order;
+  const eventTimeZone = typeof order?.eventCityId === 'object' ? order.eventCityId?.timeZone || 'UTC' : 'UTC';
+  const formatDateTime = (value?: string | null, zone = eventTimeZone) => formatInTimeZone(value, zone);
+
   const vendor = vendorOrder.vendorId;
   const client = order?.organizerId;
 
@@ -344,7 +348,7 @@ export default async function BookingDetailsPage({
                 />
 
                 <InfoRow
-                  label="Event date"
+                  label={`Event date · ${eventTimeZone}`}
                   value={formatDate(order?.eventDate)}
                 />
 

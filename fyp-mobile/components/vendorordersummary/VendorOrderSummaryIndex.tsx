@@ -1,3 +1,4 @@
+import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
@@ -98,13 +99,6 @@ const formatScheduleTime = (value: string) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value || '')) return 'Not provided';
     const [hour, minute] = value.split(':').map(Number);
     return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
-};
-
-const formatTimeOnly = (value: string | Date) => {
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime())
-        ? "Not provided"
-        : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 };
 
 // IMPORTANT: don't use order.status here — that's the PARENT order's
@@ -740,12 +734,12 @@ const OrderSummary = () => {
                                         </View>
                                     )}
                                     {(item.vendorOrders || []).map((booking: any) => (
-                                        <BookingActivity key={booking._id} booking={booking} timeZone={item.eventCityId?.timeZone} cancellationDetailsVisible />
+                                        <BookingActivity key={booking._id} booking={booking} timeZone={bookingTimeZone(item)} cancellationDetailsVisible />
                                     ))}
                                     <View style={styles.detailsBlock}>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>{new Date(item.eventDate).toDateString()}</Text>
+                                            <Text style={styles.detailText}>{formatCalendarDate(item.eventDate)}</Text>
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="pricetags-outline" size={14} color="#8A8A8A" />
@@ -788,7 +782,7 @@ const OrderSummary = () => {
                                                 {!!item.eventDate && (
                                                     <View style={styles.detailRow}>
                                                         <Ionicons name="calendar-number-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Date: {new Date(item.eventDate).toDateString()}</Text>
+                                                        <Text style={styles.detailText}>Date: {formatCalendarDate(item.eventDate)}</Text>
                                                     </View>
                                                 )}
                                                 {!!item.guests && (
@@ -801,8 +795,9 @@ const OrderSummary = () => {
                                                 {!!(item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city) && (
                                                     <View style={styles.detailRow}><Ionicons name="location-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>City: {item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city}</Text></View>
                                                 )}
-                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatTimeOnly(item.eventStartDateTime)}</Text></View>}
-                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatTimeOnly(item.eventEndDateTime)}</Text></View>}
+                                                <Text style={[styles.detailText, { fontSize: 11 }]}>Times shown in {bookingTimeZone(item).replace(/_/g, ' ')}</Text>
+                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatBookingTime(item.eventStartDateTime, bookingTimeZone(item))}</Text></View>}
+                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatBookingTime(item.eventEndDateTime, bookingTimeZone(item))}</Text></View>}
                                                 {(item.vendorOrders || []).filter((service: any) => {
                                                     const packages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
                                                     const pkg = packages.find((p: any) => String(p?._id || p?.id) === String(service?.packageId || ''));
@@ -811,7 +806,7 @@ const OrderSummary = () => {
                                                 }).map((service: any, index: number) => (
                                                     <View key={String(service?._id || index)} style={styles.detailRow}>
                                                         <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Appointment Time: {formatTimeOnly(service.eventStartDateTime)} - {formatTimeOnly(service.eventEndDateTime)}</Text>
+                                                        <Text style={styles.detailText}>Appointment Time: {formatBookingTime(service.eventStartDateTime, bookingTimeZone(item))} - {formatBookingTime(service.eventEndDateTime, bookingTimeZone(item))}</Text>
                                                     </View>
                                                 ))}
                                                 {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
@@ -831,8 +826,8 @@ const OrderSummary = () => {
                                                             <Text style={styles.rescheduleLine}>You’re no longer assigned to this event.</Text>
                                                             {!!request && (
                                                                 <>
-                                                                    <Text style={styles.rescheduleLine}>Original: {new Date(request.oldEventDate).toDateString()} · {request.oldStartTime}</Text>
-                                                                    <Text style={styles.rescheduleLine}>Requested: {new Date(request.newEventDate).toDateString()} · {request.newStartTime}</Text>
+                                                                    <Text style={styles.rescheduleLine}>Original: {formatCalendarDate(request.oldEventDate)} · {request.oldStartTime}</Text>
+                                                                    <Text style={styles.rescheduleLine}>Requested: {formatCalendarDate(request.newEventDate)} · {request.newStartTime}</Text>
                                                                     <Text style={styles.rescheduleResolved}>Your response: Unable to accommodate</Text>
                                                                 </>
                                                             )}
@@ -860,10 +855,10 @@ const OrderSummary = () => {
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New start time: {formatScheduleTime(request.newStartTime)}
                                                                 </Text>
-                                                                {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleLine}>New delivery date &amp; time: {deliveryDateTime(request.newServiceStartDateTime,item.eventCityId?.timeZone || 'UTC')}</Text>}
+                                                                {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleLine}>New delivery date &amp; time: {deliveryDateTime(request.newServiceStartDateTime,bookingTimeZone(item))}</Text>}
                                                                 <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
-                                                                <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, item.eventCityId?.timeZone)}</Text>
-                                                                <Text style={styles.rescheduleReason}>Times shown in {item.eventCityId?.timeZone || 'your device timezone'}</Text>
+                                                                <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, bookingTimeZone(item))}</Text>
+                                                                <Text style={styles.rescheduleReason}>Times shown in {bookingTimeZone(item)}</Text>
                                                                 {request.availabilityPrecheckPassed === false && (
                                                                     <Text style={styles.rescheduleWarning}>
                                                                         Availability pre-check found a conflict. Review carefully.
@@ -957,8 +952,8 @@ const OrderSummary = () => {
                         {service.pricingMethod && <Text style={styles.serviceDetailText}>Pricing: {pricingLabel(service)}</Text>}
                         {service.personCount != null && <Text style={styles.serviceDetailText}>People: {service.personCount}</Text>}
                         {service.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
-                                                                {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text></>}
+                                                                {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatBookingTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatBookingTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
                                                                 <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>
                                                                 <Text style={styles.serviceDetailText}>Paid: Rs. {paid}</Text>
                                                                 <Text style={styles.serviceDetailText}>Remaining: Rs. {remaining}</Text>
@@ -1027,7 +1022,7 @@ const OrderSummary = () => {
                                                     const hint = time === null
                                                         ? 'Scheduled service time unavailable.'
                                                         : time > Date.now()
-                                                            ? `Button unlocks at ${formatBookingActivityTime(new Date(time).toISOString(), item.eventCityId?.timeZone || 'UTC')}.`
+                                                            ? `Button unlocks at ${formatBookingActivityTime(new Date(time).toISOString(), bookingTimeZone(item))}.`
                                                             : 'Button unlocks once payment is secured.';
                                                     return (
                                                         <View key={booking._id} style={styles.completionAction}>

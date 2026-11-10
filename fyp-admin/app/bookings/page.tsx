@@ -75,6 +75,7 @@ const formatDate = (value?: string) => {
   }
 
   return new Intl.DateTimeFormat("en-PK", {
+    timeZone: "UTC",
     day: "2-digit",
     month: "short",
     year: "numeric",

@@ -28,6 +28,6 @@ export function formatBookingActivityTime(value: string | null, timeZone?: strin
   const options: Intl.DateTimeFormatOptions = {
     day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true,
   };
-  try { return new Date(value).toLocaleString('en-GB', { ...options, ...(timeZone ? { timeZone } : {}) }); }
-  catch { return new Date(value).toLocaleString('en-GB', options); }
+  try { return new Date(value).toLocaleString('en-GB', { ...options, timeZone: timeZone || 'UTC' }); }
+  catch { return new Date(value).toLocaleString('en-GB', { ...options, timeZone: 'UTC' }); }
 }

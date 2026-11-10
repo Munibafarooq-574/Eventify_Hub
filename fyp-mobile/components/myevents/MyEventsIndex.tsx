@@ -1,3 +1,4 @@
+import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -337,38 +338,6 @@ const MyEventsScreen = () => {
     }));
   };
 
-  const formatDate = (value?: string | Date) => {
-    if (!value) return 'N/A';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (value?: string | Date) => {
-    if (!value) return 'N/A';
-
-    if (typeof value === 'string' && /^\d{1,2}:\d{2}$/.test(value)) {
-      const [hourPart, minutePart] = value.split(':');
-      const hour = Number(hourPart);
-      const minute = Number(minutePart);
-      const period = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour % 12 || 12;
-      return `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
-    }
-
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'N/A';
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   const formatDuration = (minutes?: number) => {
     const total = Number(minutes || 0);
     if (!total) return 'N/A';
@@ -385,8 +354,8 @@ const MyEventsScreen = () => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return { day: '--', month: '---' };
     return {
-      day: String(date.getDate()),
-      month: date.toLocaleDateString('en-GB', { month: 'short' }),
+      day: String(date.getUTCDate()),
+      month: date.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }),
     };
   };
 
@@ -637,6 +606,7 @@ const MyEventsScreen = () => {
             </View>
 
             {events.map((event, eventIndex) => {
+              const timeZone = bookingTimeZone(event);
               const isDeleting = deletingId === event._id;
               const eventExpanded = !!expandedEvents[event._id];
               const badge = getDateBadge(event.eventDate);
@@ -679,7 +649,7 @@ const MyEventsScreen = () => {
 
                             <View style={styles.infoRow}>
                               <Ionicons name="calendar-outline" size={13} color="#777" />
-                              <Text style={styles.info}>{formatDate(event.eventDate)}</Text>
+                              <Text style={styles.info}>{formatCalendarDate(event.eventDate)}</Text>
                             </View>
 
                             <View style={styles.metaChipsRow}>
@@ -740,7 +710,7 @@ const MyEventsScreen = () => {
                           <InfoTile
                             icon="calendar-outline"
                             label="Date"
-                            value={formatDate(event.eventDate)}
+                            value={formatCalendarDate(event.eventDate)}
                           />
                           <InfoTile
                             icon="location-outline"
@@ -749,6 +719,7 @@ const MyEventsScreen = () => {
                           />
                         </View>
 
+                        <Text style={styles.detailLabel}>Times shown in {timeZone.replace(/_/g, ' ')}</Text>
                         {/* Timeline */}
                         <View style={styles.timeline}>
                           <View style={styles.timelineItem}>
@@ -757,7 +728,7 @@ const MyEventsScreen = () => {
                             <View style={styles.timelineContent}>
                               <Text style={styles.detailLabel}>Start time</Text>
                               <Text style={styles.timelineValue}>
-                                {formatTime(event.eventStartDateTime || event.eventTime)}
+                                {formatBookingTime(event.eventStartDateTime || event.eventTime, timeZone)}
                               </Text>
                             </View>
                           </View>
@@ -767,7 +738,7 @@ const MyEventsScreen = () => {
                             <View style={styles.timelineContent}>
                               <Text style={styles.detailLabel}>End time</Text>
                               <Text style={styles.timelineValue}>
-                                {formatTime(event.eventEndDateTime)}
+                                {formatBookingTime(event.eventEndDateTime, timeZone)}
                               </Text>
                             </View>
                           </View>
@@ -820,6 +791,7 @@ const MyEventsScreen = () => {
                               eventName: event.eventName,
                               eventDate: event.eventDate,
                               eventTime: event.eventTime,
+                              eventTimeZone: timeZone,
                               durationMinutes: String(event.eventDurationMinutes || 60),
                             },
                           })
@@ -866,14 +838,14 @@ const MyEventsScreen = () => {
                             <View style={styles.rescheduleSummaryItem}>
                               <Text style={styles.rescheduleSummaryLabel}>Original</Text>
                               <Text style={styles.rescheduleSummaryValue}>
-                                {formatDate(firstRequest?.oldEventDate)} • {formatTime(firstRequest?.oldStartTime)}
+                                {formatCalendarDate(firstRequest?.oldEventDate)} • {formatBookingTime(firstRequest?.oldStartTime, timeZone)}
                               </Text>
                             </View>
                             <Ionicons name="arrow-forward" size={18} color={COLORS.primary} />
                             <View style={styles.rescheduleSummaryItem}>
                               <Text style={styles.rescheduleSummaryLabel}>Requested</Text>
                               <Text style={styles.rescheduleSummaryValue}>
-                                {formatDate(firstRequest?.newEventDate)} • {formatTime(firstRequest?.newStartTime)}
+                                {formatCalendarDate(firstRequest?.newEventDate)} • {formatBookingTime(firstRequest?.newStartTime, timeZone)}
                               </Text>
                             </View>
                           </View>
@@ -886,7 +858,7 @@ const MyEventsScreen = () => {
                             <View style={styles.rescheduleMetaPill}>
                               <Ionicons name="time-outline" size={13} color={COLORS.primary} />
                               <Text style={styles.rescheduleMetaText}>
-                                {firstRequest?.createdAt ? new Date(firstRequest.createdAt).toLocaleString() : 'N/A'}
+                                {firstRequest?.createdAt ? new Date(firstRequest.createdAt).toLocaleString('en-GB', { timeZone }) : 'N/A'}
                               </Text>
                             </View>
                           </View>
@@ -939,7 +911,7 @@ const MyEventsScreen = () => {
                                     </View>
                                   </View>
 
-                                  {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleResponseLabel}>Requested delivery: {deliveryDateTime(request.newServiceStartDateTime,event.eventCityId?.timeZone || 'UTC')}</Text>}
+                                  {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleResponseLabel}>Requested delivery: {deliveryDateTime(request.newServiceStartDateTime,timeZone)}</Text>}
                                   {request.respondedAt && (() => {
                                     const respondedAt = new Date(request.respondedAt);
                                     return (
@@ -950,11 +922,11 @@ const MyEventsScreen = () => {
                                         <Text style={styles.rescheduleResponseLabel}>Responded</Text>
                                         <View style={styles.rescheduleResponseDot} />
                                         <Text style={styles.rescheduleResponseDate}>
-                                          {respondedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                          {respondedAt.toLocaleDateString('en-GB', { timeZone, day: '2-digit', month: 'short', year: 'numeric' })}
                                         </Text>
                                         <View style={styles.rescheduleResponseDot} />
                                         <Text style={styles.rescheduleResponseDate}>
-                                          {respondedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                          {respondedAt.toLocaleTimeString('en-US', { timeZone, hour: 'numeric', minute: '2-digit' })}
                                         </Text>
                                       </View>
                                     );
@@ -1271,12 +1243,12 @@ const MyEventsScreen = () => {
                               {vendor.pricingMethod && <DetailRow label="Pricing" value={pricingLabel(vendor)} />}
                               {vendor.personCount != null && <DetailRow label="People" value={String(vendor.personCount)} />}
                               {vendor.pricingMethod === 'GROUP' && <DetailRow label="People included" value={String(Number(vendor.groupSize) * Number(vendor.quantity || 1))} />}
-                              <DeliveryDetails pkg={vendor} timeZone={event.eventCityId?.timeZone || "UTC"} />
+                              <DeliveryDetails pkg={vendor} timeZone={timeZone} />
 
                               {bookingType !== 'DELIVERY_BASED' && (
                                 <DetailRow
                                   label="Service date"
-                                  value={formatDate(vendor?.eventStartDateTime || event.eventDate)}
+                                  value={vendor?.eventStartDateTime ? formatBookingDate(vendor.eventStartDateTime, timeZone) : formatCalendarDate(event.eventDate)}
                                 />
                               )}
 
@@ -1285,9 +1257,7 @@ const MyEventsScreen = () => {
                                   label="Delivered at"
                                   value={
                                     vendor?.eventStartDateTime
-                                      ? `${formatDate(vendor.eventStartDateTime)} • ${formatTime(
-                                          vendor.eventStartDateTime,
-                                        )}`
+                                      ? `${formatBookingDate(vendor.eventStartDateTime, timeZone)} • ${formatBookingTime(vendor.eventStartDateTime, timeZone)}`
                                       : 'N/A'
                                   }
                                 />
@@ -1295,33 +1265,33 @@ const MyEventsScreen = () => {
                                 <>
                                   <DetailRow
                                     label="Setup start"
-                                    value={formatTime(vendor.eventStartDateTime)}
+                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
                                   />
                                   <DetailRow
                                     label="Setup end"
-                                    value={formatTime(vendor.eventEndDateTime)}
+                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
                                   />
                                 </>
                               ) : bookingType === 'TIME_SLOT_BASED' ? (
                                 <>
                                   <DetailRow
                                     label="Appointment start"
-                                    value={formatTime(vendor.eventStartDateTime)}
+                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
                                   />
                                   <DetailRow
                                     label="Appointment end"
-                                    value={formatTime(vendor.eventEndDateTime)}
+                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
                                   />
                                 </>
                               ) : (
                                 <>
                                   <DetailRow
                                     label="Service start"
-                                    value={formatTime(vendor.eventStartDateTime)}
+                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
                                   />
                                   <DetailRow
                                     label="Service end"
-                                    value={formatTime(vendor.eventEndDateTime)}
+                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
                                   />
                                 </>
                               )}
@@ -1330,7 +1300,7 @@ const MyEventsScreen = () => {
 
                           {!!vendor.laterTimeRequest && <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData}
                             canReschedule={!hasSuccessfulVendorPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id))} />}
-                          <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
+                          <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
                           {/* Status + message row */}
                           <View style={styles.vendorFooterRow}>
                             <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
@@ -1417,7 +1387,7 @@ const MyEventsScreen = () => {
                                   <Ionicons name="alarm-outline" size={12} color="#B8860B" />
                                   <Text style={styles.paymentDeadlineText}>
                                     {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
-                                    {paymentDeadline.toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    {paymentDeadline.toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
                                   </Text>
                                 </View>
                               )}
@@ -1597,7 +1567,7 @@ const MyEventsScreen = () => {
                                   <Text style={styles.messageButtonText}>Contact Support</Text>
                                 </TouchableOpacity>
                               </View>
-                              <BookingActivity booking={vendor} timeZone={event.eventCityId?.timeZone} cancellationDetailsVisible />
+                              <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
                               <BookingCancellationDetails booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
                             </View>

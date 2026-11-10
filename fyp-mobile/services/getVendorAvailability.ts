@@ -3,6 +3,7 @@ import { growthApi } from './growthApiClient';
 
 export type VendorAvailabilityResponse = {
   vendorId: string;
+  timeZone?: string;
   minimumWorkingWindowMinutes?: number;
 
   date?: string;

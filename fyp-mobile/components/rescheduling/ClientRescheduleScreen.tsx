@@ -1,3 +1,4 @@
+import { bookingDateKey } from '@/utils/bookingTimezone';
 import PickerSheet from '@/components/booking/PickerSheet';
 import DeliveryTimePicker from '@/components/booking/DeliveryTimePicker';
 import { growthApi } from '@/services/growthApiClient';
@@ -39,11 +40,14 @@ export default function ClientRescheduleScreen() {
     eventName?: string;
     eventDate?: string;
     eventTime?: string;
+    eventTimeZone?: string;
     durationMinutes?: string;
   }>();
 
   const initialDate = useMemo(() => {
-    const value = params.eventDate ? new Date(params.eventDate) : new Date();
+    const key = String(params.eventDate || '').slice(0, 10);
+    // Native pickers edit event-city calendar fields, not the UTC instant.
+    const value = /^\d{4}-\d{2}-\d{2}$/.test(key) ? new Date(`${key}T12:00:00`) : new Date();
     if (params.eventTime && /^\d{1,2}:\d{2}$/.test(params.eventTime)) {
       const [h, m] = params.eventTime.split(':').map(Number);
       value.setHours(h, m, 0, 0);
@@ -203,7 +207,7 @@ export default function ClientRescheduleScreen() {
                 <Ionicons name="time-outline" size={20} color={PRIMARY} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fieldText}>{timeLabel}</Text>
+                <Text style={styles.fieldText}>{timeLabel} · {params.eventTimeZone || 'UTC'}</Text>
               </View>
               <Ionicons name="chevron-down" size={18} color={MUTED} />
             </TouchableOpacity>
@@ -312,7 +316,7 @@ export default function ClientRescheduleScreen() {
             value={date}
             mode="date"
             display="spinner"
-            minimumDate={new Date()}
+            minimumDate={new Date(`${bookingDateKey(new Date(), params.eventTimeZone || 'UTC')}T00:00:00`)}
             textColor={PRIMARY_DARK}
             themeVariant="light"
             style={{ width: '100%', height: 180 }}
@@ -342,7 +346,7 @@ export default function ClientRescheduleScreen() {
               value={date}
               mode="date"
               display="default"
-              minimumDate={new Date()}
+              minimumDate={new Date(`${bookingDateKey(new Date(), params.eventTimeZone || 'UTC')}T00:00:00`)}
               onChange={(_, selected) => {
                 setShowDate(false);
                 if (selected) setDate(selected);

@@ -1,3 +1,4 @@
+import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { pricingMethod, } from '@/utils/packagePricing';
@@ -814,8 +815,9 @@ useEffect(() => {
   return () => { active = false; };
 }, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
 
+const eventTimeZone = validTimeZone(cities.find((city: any) => String(city._id) === deliveryCity)?.timeZone);
 const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
-  'en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true },
+  'en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true },
 );
 
 const fetchPublicCoupons = async () => {
@@ -1791,6 +1793,7 @@ Toast.show({
         const cartPackageItem = {
           ...(pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? deliverySettings(pkg) : {}),
           deliveryStartDateTime: pkg.bookingType === 'DELIVERY_BASED' ? selectedDelivery?.startDateTime : undefined,
+          eventTimeZone,
           deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
           packageName: pkg.packageName,
@@ -4131,15 +4134,16 @@ const serviceCityNamesFromIds =
       </Text>
     </View>
     <Text style={styles.availabilityValue}>
+      {eventTimeZone}{'\n'}
       {selectedBookingType === 'TIME_SLOT_BASED'
         ? selectedAppointment?.available
-          ? `${new Date(selectedAppointment.startDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(selectedAppointment.endDateTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit', hour12: true })}`
+          ? `${new Date(selectedAppointment.startDateTime).toLocaleTimeString('en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(selectedAppointment.endDateTime).toLocaleTimeString('en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true })}`
           : 'Select your appointment time'
         : selectedBookingType === 'DELIVERY_BASED'
           ? selectedPackage?.deliveryFeeType ? selectedDelivery ? new Date(selectedDelivery.startDateTime).toLocaleString('en-GB', {timeZone:selectedDelivery.timeZone,day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}) : 'Choose a delivery time' : deliveredAtTime || 'Delivery time unavailable'
           : selectedBookingType === 'SETUP_BASED' && selectedSetup
             ? `${formatSetupChoice(selectedSetup.startDateTime)} - ${formatSetupChoice(selectedSetup.endDateTime)}`
-            : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+            : `${new Date(availabilityCheck!.requiredServiceWindow!.startDateTime).toLocaleTimeString('en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true })} - ${new Date(availabilityCheck!.requiredServiceWindow!.endDateTime).toLocaleTimeString('en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true })}`}
     </Text>
   </View>
 )}
@@ -4849,7 +4853,7 @@ const serviceCityNamesFromIds =
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {appointmentSlots.map(slot => {
                     const chosen = selectedAppointment?.startDateTime === slot.startDateTime;
-                    const label = (date: string) => new Date(date).toLocaleTimeString('en-PK', { timeZone: 'Asia/Karachi', hour: 'numeric', minute: '2-digit' });
+                    const label = (date: string) => new Date(date).toLocaleTimeString('en-PK', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit' });
                     return (
                       <TouchableOpacity
                         key={slot.startDateTime}

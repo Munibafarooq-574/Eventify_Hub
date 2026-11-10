@@ -39,5 +39,6 @@ export function formatBookingNotice(
         booking.pricingMethod === 'PER_PERSON' && `People: ${booking.personCount}`,
         booking.pricingMethod === 'GROUP' && `People included: ${Number(booking.groupSize) * Number(booking.quantity || 1)}`,
         schedule,
+        schedule && `Times shown in ${timeZone}`,
     ].filter(Boolean).join('\n');
 }

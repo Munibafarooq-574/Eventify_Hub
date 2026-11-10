@@ -1,3 +1,4 @@
+import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -136,6 +137,8 @@ const [expandedVendors, setExpandedVendors] =
 
 const [cityOptions, setCityOptions] =
   useState<any[]>([]);
+
+const eventTimeZone = validTimeZone(cityOptions.find(city => String(city._id) === String(eventDetails?.eventCityId))?.timeZone || eventDetails?.eventTimeZone);
 
   useEffect(() => {
     const fetchCartData = async () => {
@@ -323,7 +326,7 @@ const formatEventDate = (
   return date.toLocaleDateString(
     'en-GB',
     {
-      day: 'numeric',
+      timeZone: 'UTC', day: 'numeric',
       month: 'short',
       year: 'numeric',
     },
@@ -491,6 +494,8 @@ const getResolvedServiceWindow = (
       'DURATION_BASED',
   ).toUpperCase();
 
+  if (bookingType !== 'DURATION_BASED' && pkg.requiredServiceWindow?.startDateTime && pkg.requiredServiceWindow?.endDateTime) return pkg.requiredServiceWindow;
+
   const eventDate =
     eventDetails?.eventDate;
 
@@ -511,9 +516,7 @@ const getResolvedServiceWindow = (
     String(eventDate).split('T')[0];
 
   const eventStart =
-    new Date(
-      `${dateOnly}T${eventStartTime}:00`,
-    );
+    eventLocalDateTime(dateOnly, eventStartTime, eventTimeZone);
 
   if (
     Number.isNaN(
@@ -531,14 +534,10 @@ const getResolvedServiceWindow = (
     bookingType ===
     'DURATION_BASED'
   ) {
-    if (!eventEndTime) {
-      return null;
-    }
-
-    const eventEnd =
-      new Date(
-        `${dateOnly}T${eventEndTime}:00`,
-      );
+    const durationMinutes = Number(pkg?.durationMinutes || eventDetails?.durationMinutes);
+    const eventEnd = Number.isFinite(durationMinutes) && durationMinutes > 0
+      ? new Date(eventStart.getTime() + durationMinutes * 60000)
+      : eventLocalDateTime(dateOnly, eventEndTime || '', eventTimeZone);
 
     if (
       Number.isNaN(
@@ -1142,7 +1141,7 @@ const isInvalidCode =
             : await checkReviewPackageAvailability({
                 vendorId, packageId, eventDate, eventStartTime, eventCityId,
                 eventDurationMinutes: bookingType === 'DURATION_BASED' ? selectedDuration : eventDurationMinutes,
-                bookingType, window: selectedWindow, deliveryTimeZone: pkg.deliveryTimeZone,
+                bookingType, window: selectedWindow, deliveryTimeZone: eventTimeZone,
                 replacementMode: !!eventDetails?.replacementVendorOrderId,
               });
           const updated = {
@@ -1613,7 +1612,7 @@ const isInvalidCode =
           City
         </Text>
         <Text style={styles.detailValue}>
-          {eventCityName || 'N/A'}
+          {eventCityName || 'N/A'} · {eventTimeZone}
         </Text>
       </View>
 
@@ -1754,9 +1753,7 @@ const vendorPackageCount = countPackageUnits(packages);
             String(eventDate).split('T')[0];
 
           const eventStart =
-            new Date(
-              `${dateOnly}T${eventStartTime}:00`,
-            );
+            eventLocalDateTime(dateOnly, eventStartTime, eventTimeZone);
 
           if (
             !Number.isNaN(
@@ -1812,7 +1809,7 @@ const vendorPackageCount = countPackageUnits(packages);
         start.toLocaleDateString(
           'en-GB',
           {
-            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
+            timeZone: eventTimeZone,
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -1823,7 +1820,7 @@ const vendorPackageCount = countPackageUnits(packages);
         start.toLocaleTimeString(
           'en-US',
           {
-            timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
+            timeZone: eventTimeZone,
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
@@ -1836,7 +1833,7 @@ const vendorPackageCount = countPackageUnits(packages);
           ? end.toLocaleTimeString(
               'en-US',
               {
-                timeZone: pkg.deliveryTimeZone || 'Asia/Karachi',
+                timeZone: eventTimeZone,
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
