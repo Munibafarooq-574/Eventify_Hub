@@ -327,6 +327,7 @@ const CreditCardPaymentScreen = () => {
           plan: subscriptionPlan!, expectedAmount: payable,
           paymentProvider: PaymentProvider.CARD_TEST,
           activationType: subscriptionActivationType === 'scheduled' ? 'scheduled' : 'immediate',
+          sendReceipt,
         });
       } else if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId!, 'card', sendReceipt);
       else await createPayment(vendorOrderId!, 'card', sendReceipt);
@@ -567,8 +568,8 @@ const CreditCardPaymentScreen = () => {
           />
         </View>
 
-        {!isSubscription && <View style={styles.switchDivider} />}
-        {!isSubscription && <View style={styles.switchRow}>
+        <View style={styles.switchDivider} />
+        <View style={styles.switchRow}>
           <View style={styles.switchIcon}><Ionicons name="mail-outline" size={16} color={PRIMARY} /></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.switchTitle}>Email me a receipt</Text>
@@ -577,7 +578,7 @@ const CreditCardPaymentScreen = () => {
           <Switch accessibilityLabel="Email me a receipt" disabled={submitting || loading || !ownerId}
             value={sendReceipt} onValueChange={setSendReceipt}
             trackColor={{ false: '#E3D3DD', true: ACCENT }} thumbColor="#FFFFFF" />
-        </View>}
+        </View>
       </View>
     </View>
   );

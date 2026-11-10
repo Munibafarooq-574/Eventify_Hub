@@ -14,6 +14,7 @@ interface RequestSubscriptionPaymentInput {
   paymentProvider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER | PaymentProvider.CARD_TEST;
 
   paymentReference?: string;
+  sendReceipt?: boolean;
   activationType: 'immediate' | 'scheduled';
 }
 

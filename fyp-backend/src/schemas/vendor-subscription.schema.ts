@@ -172,6 +172,9 @@ export class VendorSubscription extends Document {
   paymentReference:
     string | null;
 
+  @Prop({ type: Boolean, default: true })
+  sendReceipt: boolean;
+
  
   @Prop({
     type:

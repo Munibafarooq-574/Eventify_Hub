@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import { EmailService } from '../../../email/email.service';
+import { renderEventifyPaymentEmail, emailReceiptSection } from '../../../email/payment-email-layout';
 // fyp-backend/src/vendor/growth/subscription/subscription.service.ts
 
 import {
@@ -59,6 +61,7 @@ export class SubscriptionService {
     @InjectConnection()
     private readonly connection: Connection,
     private readonly catalog: PlanCatalogService,
+    private readonly emailService: EmailService,
   ) {}
 
   // =========================================================
@@ -292,6 +295,7 @@ export class SubscriptionService {
      paymentReference: string | undefined,
     activationType: SubscriptionActivationType,
     expectedAmount?: number,
+    sendReceipt = true,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
@@ -495,6 +499,7 @@ export class SubscriptionService {
         PaymentStatus.PENDING,
 
       paymentProvider,
+      sendReceipt,
 
       paymentReference:
         normalizedReference,
@@ -923,7 +928,93 @@ export class SubscriptionService {
       throw new Error('Subscription review did not complete.');
     }
 
+    const confirmedSubscription = reviewedSubscription as VendorSubscriptionDocument;
+    // Payment and access changes must commit before sending any email.
+    if (confirmedSubscription.paymentStatus === PaymentStatus.PAID &&
+        confirmedSubscription.sendReceipt !== false && this.emailService) {
+      try {
+        const vendor = await this.userModel.findById(confirmedSubscription.vendorId)
+          .select('email name contactDetails.brandName').lean();
+        if (vendor?.email) {
+          const planName = confirmedSubscription.entitlementSnapshot?.name ||
+            (await this.catalog.get(confirmedSubscription.plan))?.name || confirmedSubscription.plan;
+          await this.emailService.sendTransactionalEmail({
+            to: vendor.email,
+            senderName: 'Eventify Hub',
+            subject: 'Subscription Payment Receipt — ' + planName + ' | Eventify Hub',
+            html: this.buildSubscriptionPaymentReceiptEmail({
+              vendorName: vendor.name || 'Vendor',
+              brandName: vendor.contactDetails?.brandName || null,
+              planName,
+              amount: confirmedSubscription.amountPaid,
+              currency: confirmedSubscription.currency || 'PKR',
+              provider: confirmedSubscription.paymentProvider,
+              reference: confirmedSubscription.paymentReference || 'N/A',
+              verifiedAt: confirmedSubscription.verifiedAt,
+              startsAt: confirmedSubscription.startDate,
+              endsAt: confirmedSubscription.endDate,
+              scheduled: confirmedSubscription.status === SubscriptionStatus.SCHEDULED,
+            }),
+          });
+        }
+      } catch (error) {
+        console.error('[Subscription Payment Receipt Email Failed]',
+          error instanceof Error ? error.message : error);
+      }
+    }
+
     return reviewedSubscription;
+  }
+
+  private buildSubscriptionPaymentReceiptEmail(data: {
+    vendorName: string;
+    brandName?: string | null;
+    planName: string;
+    amount: number;
+    currency: 'PKR' | 'USD';
+    provider: PaymentProvider;
+    reference: string;
+    verifiedAt: Date | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    scheduled: boolean;
+  }): string {
+    const amountFormatted = Number(data.amount || 0).toLocaleString(
+      data.currency === 'USD' ? 'en-US' : 'en-PK',
+      { minimumFractionDigits: data.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
+    );
+    const money = (data.currency === 'USD' ? '$ ' : 'Rs. ') + amountFormatted;
+    const date = (value?: Date | null) => value && Number.isFinite(new Date(value).getTime())
+      ? new Date(value).toLocaleString('en-GB', {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC', hour12: true,
+        }) + ' (UTC)'
+      : 'N/A';
+    const method = data.provider === PaymentProvider.CARD_TEST ? 'Credit / Debit Card (Test)' :
+      data.provider === PaymentProvider.EASYPAISA ? 'Easypaisa' :
+      data.provider === PaymentProvider.BANK_TRANSFER ? 'Bank Transfer' : data.provider;
+    const content = [
+      '<div style="font-size:22px;font-weight:700;color:#278A4B;">Payment Successful</div>',
+      '<p>Your subscription payment has been verified and approved by Eventify Hub.</p>',
+      emailReceiptSection('Subscription Details', [
+        ['Vendor', data.vendorName],
+        ['Business', data.brandName || data.vendorName],
+        ['Plan', data.planName],
+        ['Activation', data.scheduled ? 'Scheduled after current plan expires' : 'Active'],
+        ['Starts At', date(data.startsAt)],
+        ['Valid Until', date(data.endsAt)],
+      ]),
+      emailReceiptSection('Payment Details', [
+        ['Amount Paid', money],
+        ['Payment Method', method],
+        ['Transaction Reference', data.reference],
+        ['Verified At', date(data.verifiedAt)],
+        ['Payment Status', 'Paid — Admin Verified'],
+      ]),
+      '<p style="margin-top:24px;color:#766B73;">' +
+        (data.scheduled ? 'Your current plan remains active until the scheduled start date. ' : '') +
+        'You can view your subscription details inside the Eventify Hub app.</p>',
+    ].join('');
+    return renderEventifyPaymentEmail('Subscription Payment Receipt', content);
   }
 
   // =========================================================
