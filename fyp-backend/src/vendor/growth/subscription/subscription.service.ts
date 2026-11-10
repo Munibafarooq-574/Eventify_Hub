@@ -928,15 +928,16 @@ export class SubscriptionService {
       throw new Error('Subscription review did not complete.');
     }
 
+    const confirmedSubscription = reviewedSubscription as VendorSubscriptionDocument;
     // Payment and access changes must commit before sending any email.
-    if (reviewedSubscription.paymentStatus === PaymentStatus.PAID &&
-        reviewedSubscription.sendReceipt !== false && this.emailService) {
+    if (confirmedSubscription.paymentStatus === PaymentStatus.PAID &&
+        confirmedSubscription.sendReceipt !== false && this.emailService) {
       try {
-        const vendor = await this.userModel.findById(reviewedSubscription.vendorId)
+        const vendor = await this.userModel.findById(confirmedSubscription.vendorId)
           .select('email name contactDetails.brandName').lean();
         if (vendor?.email) {
-          const planName = reviewedSubscription.entitlementSnapshot?.name ||
-            (await this.catalog.get(reviewedSubscription.plan))?.name || reviewedSubscription.plan;
+          const planName = confirmedSubscription.entitlementSnapshot?.name ||
+            (await this.catalog.get(confirmedSubscription.plan))?.name || confirmedSubscription.plan;
           await this.emailService.sendTransactionalEmail({
             to: vendor.email,
             senderName: 'Eventify Hub',
@@ -945,14 +946,14 @@ export class SubscriptionService {
               vendorName: vendor.name || 'Vendor',
               brandName: vendor.contactDetails?.brandName || null,
               planName,
-              amount: reviewedSubscription.amountPaid,
-              currency: reviewedSubscription.currency || 'PKR',
-              provider: reviewedSubscription.paymentProvider,
-              reference: reviewedSubscription.paymentReference || 'N/A',
-              verifiedAt: reviewedSubscription.verifiedAt,
-              startsAt: reviewedSubscription.startDate,
-              endsAt: reviewedSubscription.endDate,
-              scheduled: reviewedSubscription.status === SubscriptionStatus.SCHEDULED,
+              amount: confirmedSubscription.amountPaid,
+              currency: confirmedSubscription.currency || 'PKR',
+              provider: confirmedSubscription.paymentProvider,
+              reference: confirmedSubscription.paymentReference || 'N/A',
+              verifiedAt: confirmedSubscription.verifiedAt,
+              startsAt: confirmedSubscription.startDate,
+              endsAt: confirmedSubscription.endDate,
+              scheduled: confirmedSubscription.status === SubscriptionStatus.SCHEDULED,
             }),
           });
         }
