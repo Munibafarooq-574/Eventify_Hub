@@ -1,11 +1,5 @@
 name: Validate currency subscription changes
 on:
-  pull_request:
-    paths:
-      - 'fyp-mobile/**'
-      - 'fyp-backend/**'
-      - 'fyp-admin/**'
-      - '.github/workflows/currency-subscriptions.yml'
   push:
     branches:
       - 'fix/usa-currency-ui-20261110'
