@@ -40,6 +40,7 @@ type Plan = {
   name: string;
   description: string;
   monthlyPrice: number | null;
+  monthlyPriceUSD?: number | null;
   rank: number;
   featureKeys: string[];
   featureLabels?: string[];
@@ -86,6 +87,7 @@ async function savePlan(existingKey: string | null, form: FormData) {
     name: form.get("name"),
     description: form.get("description"),
     monthlyPrice: Number(form.get("monthlyPrice")),
+    monthlyPriceUSD: form.get("monthlyPriceUSD") === "" ? null : Number(form.get("monthlyPriceUSD")),
     rank: Number(form.get("rank")),
     isPurchasable: form.has("isPurchasable"),
     isMostPopular: form.has("isMostPopular"),
@@ -115,6 +117,11 @@ function PlanForm({ plan, features }: { plan?: Plan; features: Feature[] }) {
         <label>Monthly price (PKR)
           <input name="monthlyPrice" className={input} required type="number" min={1}
             step={1} defaultValue={plan?.monthlyPrice ?? undefined} />
+        </label>
+        <label>Monthly price (USD) — USA vendors
+          <input name="monthlyPriceUSD" className={input} type="number" min={0.01} step={0.01}
+            placeholder="Not configured" defaultValue={plan?.monthlyPriceUSD ?? undefined} />
+          <span className="mt-1 block text-xs text-slate-600">Independent USD price. Leave blank to block USA sales until configured.</span>
         </label>
         <label>Plan rank
           <input name="rank" className={input} required type="number" min={1} step={1} defaultValue={plan?.rank ?? 1} />
