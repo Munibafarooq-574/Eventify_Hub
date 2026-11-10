@@ -9,6 +9,17 @@ export function currentCurrency(): Currency { return profileCurrency; }
 export function currencyOf(value?: unknown): Currency {
   return (typeof value === 'string' ? value : value && typeof value === 'object' && 'currency' in value ? value.currency : undefined) === 'USD' ? 'USD' : 'PKR';
 }
+// Vendor-owned management screens: prefer an explicit money snapshot, otherwise
+// use the signed-in vendor's signup country (not a hard-coded PKR fallback).
+// Keep currencyOf() unchanged for historical booking/payment records.
+export function vendorDisplayCurrency(value?: unknown): Currency {
+  if (value && typeof value === 'object' && 'currency' in value &&
+      (value.currency === 'USD' || value.currency === 'PKR')) {
+    return value.currency;
+  }
+  return currentCurrency();
+}
+
 export function countryCurrency(country?: string | null): Currency {
   return country === 'US' ? 'USD' : 'PKR';
 }
