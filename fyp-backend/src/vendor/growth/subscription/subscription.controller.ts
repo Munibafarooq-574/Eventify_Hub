@@ -57,17 +57,20 @@ class RequestSubscriptionPaymentDto {
 
   @IsIn([
     PaymentProvider.BANK_TRANSFER,
+    PaymentProvider.CARD_TEST,
     PaymentProvider.JAZZCASH,
     PaymentProvider.EASYPAISA,
   ])
   paymentProvider!:
     | PaymentProvider.BANK_TRANSFER
+    | PaymentProvider.CARD_TEST
     | PaymentProvider.JAZZCASH
     | PaymentProvider.EASYPAISA;
 
+  @IsOptional()
   @IsString()
   @Length(2, 120)
-  paymentReference!: string;
+  paymentReference?: string;
 
   @IsIn([
     SubscriptionActivationType.IMMEDIATE,

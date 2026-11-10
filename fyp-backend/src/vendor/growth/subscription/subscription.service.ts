@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 // fyp-backend/src/vendor/growth/subscription/subscription.service.ts
 
 import {
@@ -136,14 +137,9 @@ export class SubscriptionService {
   async getPaymentInstructions(vendorId: string) {
     const currency = await this.billingCurrency(vendorId);
     if (currency === 'USD') {
-      const accountTitle = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_TITLE?.trim();
-      const accountNumber = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_NUMBER?.trim();
-      const bankName = process.env.SUBSCRIPTION_US_BANK_NAME?.trim();
-      return {
-        provider: PaymentProvider.BANK_TRANSFER, currency,
-        accountTitle: accountTitle ?? '', accountNumber: accountNumber ?? '', bankName: bankName ?? '',
-        configured: Boolean(accountTitle && accountNumber && bankName),
-      };
+      // Synthetic-card flow: no external gateway or real card charge.
+      // Never return bank credentials or accept a user-supplied card number.
+      return { provider: PaymentProvider.CARD_TEST, currency, configured: true };
     }
     const accountTitle = process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
     const mobileNumber = process.env.SUBSCRIPTION_EASYPAISA_MOBILE?.trim();
@@ -293,7 +289,7 @@ export class SubscriptionService {
     vendorId: string,
     plan: string,
     paymentProvider: PaymentProvider,
-     paymentReference: string,
+     paymentReference: string | undefined,
     activationType: SubscriptionActivationType,
     expectedAmount?: number,
   ): Promise<VendorSubscriptionDocument> {
@@ -371,8 +367,8 @@ export class SubscriptionService {
     if (paymentProvider !== instructions.provider) {
       throw new BadRequestException('Choose the configured payment provider for your country.');
     }
-    if ('configured' in instructions && !instructions.configured) {
-      throw new BadRequestException('USA bank transfer instructions are not configured.');
+    if (paymentProvider === PaymentProvider.CARD_TEST && currency !== 'USD') {
+      throw new BadRequestException('Test card subscriptions are available only for USA vendors.');
     }
 
     /**
@@ -394,10 +390,11 @@ export class SubscriptionService {
       throw new BadRequestException('This plan price changed. Refresh the plans and contact support if you already paid.');
     }
 
-    const normalizedReference =
-      paymentReference
-        ?.trim()
-        .toUpperCase();
+    // Generate the reference on the server for synthetic cards. No fake
+    // transaction reference or card credentials are submitted by the client.
+    const normalizedReference = paymentProvider === PaymentProvider.CARD_TEST
+      ? `TEST-CARD-${randomUUID().toUpperCase()}`
+      : paymentReference?.trim().toUpperCase();
 
     if (
       !normalizedReference ||
@@ -1641,6 +1638,7 @@ if (!vendorCreatedAt || !Number.isFinite(vendorCreatedAt.getTime())) {
     if (
       ![
         PaymentProvider.BANK_TRANSFER,
+        PaymentProvider.CARD_TEST,
         PaymentProvider.JAZZCASH,
         PaymentProvider.EASYPAISA,
       ].includes(provider)

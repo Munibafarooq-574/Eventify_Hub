@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'fix/**'
+      - 'feat/usa-subscription-demo-card'
 concurrency:
   group: currency-subscriptions-${{ github.ref }}
   cancel-in-progress: true

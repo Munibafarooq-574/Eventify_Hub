@@ -11,9 +11,9 @@ interface RequestSubscriptionPaymentInput {
   plan: string;
   expectedAmount?: number;
 
-  paymentProvider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER;
+  paymentProvider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER | PaymentProvider.CARD_TEST;
 
-  paymentReference: string;
+  paymentReference?: string;
   activationType: 'immediate' | 'scheduled';
 }
 

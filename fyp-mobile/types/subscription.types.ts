@@ -36,6 +36,7 @@ export enum PaymentProvider {
   NONE = 'none',
   DEMO = 'demo',
   BANK_TRANSFER = 'bank_transfer',
+  CARD_TEST = 'card_test',
   JAZZCASH = 'jazzcash',
   EASYPAISA = 'easypaisa',
 }
@@ -188,7 +189,7 @@ export interface ScheduledSubscription {
 }
 
 export interface SubscriptionPaymentInstructions {
-  provider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER;
+  provider: PaymentProvider.EASYPAISA | PaymentProvider.BANK_TRANSFER | PaymentProvider.CARD_TEST;
   currency: 'PKR' | 'USD';
   accountTitle: string;
   mobileNumber?: string;
