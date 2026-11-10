@@ -2,7 +2,7 @@ import type { Order } from '../schemas/order.schema';
 import type { VendorOrder } from '../schemas/vendor-order.schema';
 
 export type BookingChatOrder = Pick<Order, 'organizerId' | 'eventName' | 'eventDate' | 'eventStartDateTime'>;
-export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService' | 'quantity'>;
+export type BookingChatLine = Pick<VendorOrder, '_id' | 'vendorId' | 'serviceName' | 'eventStartDateTime' | 'eventEndDateTime' | 'bookingType' | 'bookingChatTimeZone' | 'bookingChatService' | 'quantity' | 'pricingMethod' | 'personCount' | 'groupSize'>;
 export type BookingChatStage = 'requested' | 'confirmed' | 'completed' | 'cancelled';
 
 export type BookingChatPayment = { amount: number; remainingAmount: number };
@@ -36,6 +36,8 @@ export function formatBookingNotice(
         booking.bookingChatService && `Service: ${booking.bookingChatService}`,
         `Package: ${booking.serviceName}`,
         booking.quantity != null && `Quantity: ${booking.quantity}`,
+        booking.pricingMethod === 'PER_PERSON' && `People: ${booking.personCount}`,
+        booking.pricingMethod === 'GROUP' && `People included: ${Number(booking.groupSize) * Number(booking.quantity || 1)}`,
         schedule,
     ].filter(Boolean).join('\n');
 }

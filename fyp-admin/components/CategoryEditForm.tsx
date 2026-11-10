@@ -1,4 +1,5 @@
 "use client";
+import CategoryPricingOptions from "./CategoryPricingOptions";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +11,7 @@ type Category = {
   image?: string;
   description?: string;
   businessDetailsType?: string;
+  allowedPricingMethods?: string[];
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -71,6 +73,7 @@ export default function CategoryEditForm({
   const [pictureUrl, setPictureUrl] = useState(
     category.image || "",
   );
+  const [allowedPricingMethods, setAllowedPricingMethods] = useState<string[]>(category.allowedPricingMethods ?? [(category.businessDetailsType === "CATERING" || /catering/i.test(category.normalizedName || category.name)) ? "PER_PERSON" : "FIXED"]);
   const [businessDetailsType, setBusinessDetailsType] =
     useState(category.businessDetailsType || "GENERIC");
 
@@ -107,6 +110,7 @@ export default function CategoryEditForm({
             description: description.trim(),
             pictureUrl: pictureUrl.trim(),
             businessDetailsType,
+            allowedPricingMethods,
           }),
         },
       );
@@ -214,6 +218,8 @@ export default function CategoryEditForm({
         onSubmit={handleSubmit}
         className="rounded-2xl border border-slate-200 bg-white shadow-sm"
       >
+      <CategoryPricingOptions value={allowedPricingMethods} onChange={setAllowedPricingMethods} />
+
         <div className="border-b border-slate-200 px-6 py-5">
           <h2 className="text-lg font-bold text-slate-900">
             Category Information

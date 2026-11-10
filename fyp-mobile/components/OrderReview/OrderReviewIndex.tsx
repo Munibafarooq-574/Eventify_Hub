@@ -1,3 +1,4 @@
+import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { checkReviewPackageAvailability } from "@/services/checkReviewPackageAvailability";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
@@ -243,12 +244,7 @@ try {
       );
 
       totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
-      totalAmount += isCatering
-        ? Number(pkg?.price || 0) *
-          Number(guests || 0) *
-          quantity
-        : Number(pkg?.price || 0) *
-          quantity;
+      totalAmount += packageAmount(pkg, Number(guests || 0), !!isCatering);
       });
     });
 
@@ -647,12 +643,7 @@ const getPackageAmount = (
     Number(pkg?.quantity || 1),
   );
 
-  return deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee + (isCatering
-    ? Number(pkg?.price || 0) *
-        Number(guests || 0) *
-        quantity
-    : Number(pkg?.price || 0) *
-        quantity);
+  return deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee + packageAmount(pkg, Number(guests || 0), !!isCatering);
 };
 
 
@@ -1156,6 +1147,8 @@ const isInvalidCode =
           const updated = {
             ...pkg,
             price,
+            pricingMethod: latest.pricingMethod ?? pkg.pricingMethod,
+            groupSize: latest.groupSize,
             ...(bookingType === 'DELIVERY_BASED' && latest.deliveryFeeType
               ? { deliveryFeeType: latest.deliveryFeeType, deliveryFee: latest.deliveryFee }
               : {}),
@@ -1258,6 +1251,10 @@ const isInvalidCode =
         vendorId: vendor.vendor._id,
         serviceName: pkg.packageName,
         price: Number(pkg.price),
+        expectedPricingMethod: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
+        expectedGroupSize: pkg.groupSize,
+        personCount: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? Number(pkg.personCount ?? guests) : undefined,
+        expectedPackageAmount: packageAmount(pkg, Number(guests), !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
         deliveryStartDateTime: pkg.deliveryStartDateTime,
         expectedDeliveryFee: pkg.deliveryFeeType ? deliveryFee(pkg,Number(pkg.quantity || 1),Number(guests || 0),!!(cateringCategory?._id && vendor?.vendor?.buisnessCategory === cateringCategory._id)).totalFee : undefined,
         packageId:
@@ -2124,14 +2121,16 @@ const vendorPackageCount = countPackageUnits(packages);
                             {pkg?.packageName}
                           </Text>
 
-                          {isCatering && (
+                          {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && (
                             <View style={styles.guestTag}>
                               <Ionicons name="people-outline" size={12} color={GOLD} />
-                              <Text style={styles.guestTagText}>{guests} guests</Text>
+                              <Text style={styles.guestTagText}>{pkg.personCount ?? guests} people</Text>
                             </View>
                           )}
 
-                          <Text style={styles.guestTagText}>Quantity: {quantity}</Text>
+                          <Text style={styles.guestTagText}>Quantity: {quantity} · {pricingLabel(pkg, !!isCatering)}</Text>
+                          {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && <Text style={styles.guestTagText}>People: {pkg.personCount ?? guests}</Text>}
+                          {pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
                           <Text style={styles.packagePrice}>Rs. {formatCurrency(finalPrice)}</Text>
                           <DeliveryDetails pkg={pkg} quantity={quantity} guests={Number(guests || 0)} isCatering={!!isCatering} />
                           {String(

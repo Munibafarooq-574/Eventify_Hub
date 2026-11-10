@@ -1,3 +1,4 @@
+import { PackagePricing } from '@/utils/packagePricing';
 import { DeliverySettings } from '@/utils/deliveryBooking';
 
 // fyp-mobile/services/getVendorPackagesList.ts
@@ -10,7 +11,7 @@ export interface VendorPackageDuration {
   price: number;
 }
 
-export interface VendorPackageListItem extends DeliverySettings {
+export interface VendorPackageListItem extends DeliverySettings, PackagePricing {
   _id: string;
 
   packageName: string;

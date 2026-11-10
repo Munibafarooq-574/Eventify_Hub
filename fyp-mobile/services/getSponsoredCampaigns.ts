@@ -1,7 +1,8 @@
+import { PackagePricing } from '@/utils/packagePricing';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { growthApi } from "./growthApiClient";
 
-export interface SponsoredCampaignPackage {
+export interface SponsoredCampaignPackage extends PackagePricing {
   _id: string;
   packageName: string;
   description?: string;

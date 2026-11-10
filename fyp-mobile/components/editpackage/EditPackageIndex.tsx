@@ -1,3 +1,7 @@
+import { getVendorPackagesList } from '@/services/getVendorPackagesList';
+import PackagePricingFields from '@/components/booking/PackagePricingFields';
+import { PackagePricing, PricingMethod, pricingFieldsError } from '@/utils/packagePricing';
+import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -250,6 +254,8 @@ const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowE
 
   const [customDurationRate, setCustomDurationRate] =
     useState("");
+  const [pricing, setPricing] = useState<PackagePricing>({ pricingMethod: 'FIXED' });
+  const [pricingOptions, setPricingOptions] = useState<PricingMethod[]>([]);
   const [baseIncludedHours, setBaseIncludedHours] = useState("");
   const [baseIncludedUnit, setBaseIncludedUnit] = useState<"HOURS" | "DAYS">("HOURS");
   const includedMinutes = Number(baseIncludedHours) * (baseIncludedUnit === "DAYS" ? 1440 : 60);
@@ -381,6 +387,7 @@ const packageImageLimitReached =
 
       try {
         const user = await readUser();
+    setPricingOptions(await getVendorPricingOptions(user));
 
         if (!user?._id) {
           throw new Error("Vendor ID not found.");
@@ -421,6 +428,7 @@ const packageImageLimitReached =
     // ---------------------------------------------------
 
     const user = await readUser();
+    const allowed = await getVendorPricingOptions(user);
 
     let packageObj =
       user?.packages?.find(
@@ -496,9 +504,10 @@ const packageImageLimitReached =
       packageObj,
     );
 
-    setPackageDetails(
-      packageObj,
-    );
+    const freshPackages = await getVendorPackagesList(user._id);
+    packageObj = freshPackages.find((pkg: any) => String(pkg._id) === String(id)) || packageObj;
+    setPricingOptions([...new Set([...allowed, packageObj.pricingMethod || allowed[0]])]);
+    setPackageDetails(packageObj);
   } catch (error) {
     console.error(
       "Error fetching package details:",
@@ -518,6 +527,8 @@ const packageImageLimitReached =
   useEffect(() => {
     if (!packageDetails) return;
 
+    const method = packageDetails.pricingMethod || 'FIXED';
+    setPricing({ pricingMethod: method, groupSize: packageDetails.groupSize });
     setEditableName(
       packageDetails.packageName || "",
     );
@@ -827,7 +838,7 @@ const removeExistingImage = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
     return false;
   }
 
@@ -872,6 +883,7 @@ const removeExistingImage = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
+  pricing, pricingOptions,
   editableName,
   editablePrice,
   delivery,
@@ -934,6 +946,8 @@ const removeExistingImage = (index: number) => {
 
   try {
     const updatedData = {
+  pricingMethod: pricing.pricingMethod,
+  groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: editableName.trim(),
 
@@ -1469,6 +1483,7 @@ Alert.alert(
                 Base Price
             ------------------------------------------- */}
 
+            <PackagePricingFields value={pricing} allowed={pricingOptions} onChange={setPricing} />
             <View
               style={styles.card}
             >
@@ -1494,7 +1509,7 @@ Alert.alert(
                     styles.sectionHeader
                   }
                 >
-                  Base Package Price
+                  {pricing.pricingMethod === 'PER_PERSON' ? 'Price per person' : pricing.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
                 </Text>
               </View>
 

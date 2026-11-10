@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import {
@@ -338,7 +339,7 @@ return {
 
                 <Text style={styles.price}>
                   {price > 0
-                    ? `Rs ${price.toLocaleString()}`
+                    ? `Rs ${price.toLocaleString()} ${item.package?.pricingMethod ? pricingLabel(item.package) : ''}`
                     : item.package
                         ?.packageName ||
                       "Package"}

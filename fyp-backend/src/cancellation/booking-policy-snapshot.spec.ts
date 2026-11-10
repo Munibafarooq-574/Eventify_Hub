@@ -75,7 +75,7 @@ function query(value: unknown) {
     const result: any = { select: () => result, session: () => result, lean: async () => value };
     return result;
 }
-function checkout(replacement = false, pricing: Record<string, unknown> = {}, durationMinutes = 60) {
+function checkout(replacement = false, pricing: Record<string, unknown> = {}, durationMinutes = 60, serviceInput: Record<string, unknown> = {}) {
     const organizerId = id(), categoryId = id(), cityId = id();
     const vendors = [0, 1].map(() => ({ _id: id(), buisnessCategory: categoryId,
         packages: [{ _id: id(), packageName: 'Package', bookingType: 'DELIVERY_BASED', price: 1000, ...pricing }],
@@ -106,7 +106,7 @@ function checkout(replacement = false, pricing: Record<string, unknown> = {}, du
     jest.spyOn(service, 'sendPushNotification').mockResolvedValue(undefined);
     jest.spyOn(service as any, 'attachReplacementOrder').mockResolvedValue(undefined);
     const services = vendors.slice(0, replacement ? 1 : 2).map(vendor => ({ vendorId: vendor._id, packageId: vendor.packages[0]._id,
-        serviceName: 'Client label', price: 1, policySnapshot: { selectedPolicy: 'NON-REFUNDABLE', policyRevision: 999 } }));
+        serviceName: 'Client label', price: 1, ...serviceInput, policySnapshot: { selectedPolicy: 'NON-REFUNDABLE', policyRevision: 999 } }));
     const run = (revision?: number) => service.createOrder(organizerId, new Date('2099-01-01'), '12:00', services,
         'Event', 10, 'Wedding', durationMinutes, cityId, 'Address', [categoryId], eventId, replacement ? request._id : undefined, undefined, revision);
     return { run, policy, source, snapshots, vendorOrders, orders, session, service, request, sendBookingNotice, updateDraft, eventId };
@@ -196,5 +196,34 @@ describe('Duration Based checkout pricing', () => {
         const fixture = checkout(false, { ...pricing, allowCustomDuration: false });
         await expect(fixture.run()).rejects.toThrow('This duration is not offered by the vendor');
         expect(fixture.vendorOrders.create).not.toHaveBeenCalled();
+    });
+});
+
+describe('pricing snapshot through real checkout', () => {
+    it.each([
+        [{ pricingMethod: 'FIXED' }, { quantity: 2 }, 2000, null],
+        [{ pricingMethod: 'PER_PERSON' }, { personCount: 5 }, 5000, 5],
+        [{ pricingMethod: 'GROUP', groupSize: 10 }, { quantity: 2 }, 2000, null],
+    ])('persists trusted pricing and counts for %j', async (pricing, input, amount, people) => {
+        const fixture = checkout(false, pricing, 60, input);
+        await fixture.run();
+        for (const saved of fixture.snapshots) {
+            expect(saved.finalAmount).toBe(amount);
+            expect(saved.pricingMethod).toBe(pricing.pricingMethod);
+            expect(saved.personCount).toBe(people);
+            expect(saved.groupSize).toBe(pricing.pricingMethod === 'GROUP' ? 10 : null);
+        }
+        expect(fixture.sendBookingNotice.mock.calls[0][1].pricingMethod).toBe(pricing.pricingMethod);
+    });
+    it('rejects a stale reviewed price before creating bookings', async () => {
+        const fixture = checkout(false, { pricingMethod: 'PER_PERSON' }, 60, { expectedPackageAmount: 1000 });
+        await expect(fixture.run()).rejects.toThrow('pricing has changed');
+        expect(fixture.snapshots).toHaveLength(0);
+    });
+    it('rejects changed group capacity even when the unit price is the same', async () => {
+        const fixture = checkout(false, { pricingMethod: 'GROUP', groupSize: 20 }, 60,
+            { expectedPricingMethod: 'GROUP', expectedGroupSize: 10 });
+        await expect(fixture.run()).rejects.toThrow('pricing has changed');
+        expect(fixture.snapshots).toHaveLength(0);
     });
 });

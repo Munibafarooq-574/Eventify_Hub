@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
@@ -953,6 +954,9 @@ const OrderSummary = () => {
                                                                 <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
                                                                 <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
                                                                 {service.quantity != null && <Text style={styles.serviceDetailText}>Quantity: {service.quantity}</Text>}
+                        {service.pricingMethod && <Text style={styles.serviceDetailText}>Pricing: {pricingLabel(service)}</Text>}
+                        {service.personCount != null && <Text style={styles.serviceDetailText}>People: {service.personCount}</Text>}
+                        {service.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                                                                 {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatTimeOnly(service.eventStartDateTime) : "Not provided"}</Text>
                                                                 <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatTimeOnly(service.eventEndDateTime) : "Not provided"}</Text></>}
                                                                 <Text style={styles.serviceDetailText}>Booking Amount: Rs. {total}</Text>

@@ -17,7 +17,7 @@ Notifications.setNotificationHandler({
     const draft = createBookingDraftStore();
     const data = request.content.data;
     const session = data?.type === CART_REMINDER ? await draft.getSession() : null;
-    const isReminder = !!session && session.userId === data.userId && draft.isCurrent();
+    const isReminder = !!session && session.userId === data?.userId && draft.isCurrent();
     return { shouldShowBanner: isReminder, shouldShowList: isReminder, shouldPlaySound: isReminder, shouldSetBadge: false };
   },
 });

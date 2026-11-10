@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import BookingUserGuide from '../guides/BookingUserGuide';
 //fyp-mobile/components/vendormyevents/VendorMyEventsIndex.tsx
@@ -873,6 +874,9 @@ renderItem={({ item }) => {
                       <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
                       <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
                       {service.quantity != null && <Text style={styles.expandedText}>Quantity: {service.quantity}</Text>}
+                        {service.pricingMethod && <Text style={styles.expandedText}>Pricing: {pricingLabel(service)}</Text>}
+                        {service.personCount != null && <Text style={styles.expandedText}>People: {service.personCount}</Text>}
+                        {service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                       {service.delivery ? <DeliveryDetails pkg={service} timeZone={item.eventCityId?.timeZone || 'UTC'} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(new Date(service.eventStartDateTime)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(new Date(service.eventEndDateTime)) : "Not provided"}</Text></>}
                       <Text style={styles.expandedText}>Booking Amount: Rs. {total}</Text>

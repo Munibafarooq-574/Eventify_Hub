@@ -1,3 +1,4 @@
+import { CategoryPricingDto } from './category-pricing.dto';
 import {
   IsEnum,
   IsMongoId,
@@ -16,7 +17,7 @@ export enum CategoryRequestReviewAction {
   MERGE = 'MERGE',
 }
 
-export class ReviewCategoryRequestDto {
+export class ReviewCategoryRequestDto extends CategoryPricingDto {
   @IsEnum(CategoryRequestReviewAction)
   action: CategoryRequestReviewAction;
 

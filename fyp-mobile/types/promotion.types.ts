@@ -1,3 +1,4 @@
+import { PackagePricing } from '@/utils/packagePricing';
 
 // fyp-mobile/types/promotion.types.ts
 //
@@ -49,7 +50,7 @@ export interface FeaturedVendorPublicEntry {
   featuredUntil: string;
 }
 
-export interface FeaturedPackagePublicEntry {
+export interface FeaturedPackagePublicEntry extends PackagePricing {
   promotionId: string;
   vendorId: string;
   vendorName: string;

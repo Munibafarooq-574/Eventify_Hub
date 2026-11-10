@@ -1,3 +1,4 @@
+import { legacyPricingMethod } from '../../../common/utils/package-pricing';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 import {
   BadRequestException,
@@ -1090,7 +1091,7 @@ if (
     await this.userModel
       .find(vendorQuery)
       .select(
-        '_id name contactDetails packages buisnessCategory serviceLocationCityIds',
+        '_id name contactDetails packages buisnessCategory serviceLocationCityIds cateringBusinessDetails',
       )
       .lean();
 
@@ -1188,6 +1189,8 @@ if (
         _id:
           linkedPackage._id,
 
+        pricingMethod: linkedPackage.pricingMethod ?? legacyPricingMethod({ businessDetailsType: vendor.cateringBusinessDetails ? 'CATERING' : undefined }),
+        groupSize: linkedPackage.groupSize,
         packageName:
           linkedPackage.packageName,
 

@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     const incomingFormData = await request.formData();
 
     const formData = new FormData();
+    const pricingMethods = incomingFormData.get("allowedPricingMethods");
+    if (typeof pricingMethods === "string") formData.append("allowedPricingMethods", pricingMethods);
 
     const name = incomingFormData.get("name");
     const description = incomingFormData.get("description");

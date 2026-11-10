@@ -83,7 +83,7 @@ describe('EditProfileScreen', () => {
   });
 
   it('does not show a personal address field', async () => {
-    const { queryByTestId, findByDisplayValue } = render(<EditProfileScreen />);
+    const { queryByTestId, findByDisplayValue } = await render(<EditProfileScreen />);
     await findByDisplayValue('Ali');
     expect(queryByTestId('input-address')).toBeNull();
   });
@@ -105,12 +105,12 @@ describe('EditProfileScreen', () => {
   });
 
   it('shows the vendor’s saved country as read-only', async () => {
-    const { findByDisplayValue } = render(<EditProfileScreen />);
+    const { findByDisplayValue } = await render(<EditProfileScreen />);
     expect((await findByDisplayValue('United States')).props.editable).toBe(false);
   });
 
   it('back button navigates correctly', async () => {
-    const { getByLabelText } = render(<EditProfileScreen />);
+    const { getByLabelText } = await render(<EditProfileScreen />);
     const backBtn = getByLabelText('Go back');
     await fireEvent.press(backBtn);
     expect(mockBack).toHaveBeenCalled();

@@ -121,6 +121,7 @@ export class CategoryService {
       businessDetailsType:
         createDto.businessDetailsType ??
         BusinessDetailsType.GENERIC,
+      allowedPricingMethods: createDto.allowedPricingMethods,
       isActive: true,
     });
   }
@@ -213,7 +214,7 @@ export class CategoryService {
     return this.categoryModel
       .find(filter)
       .select(
-        '_id name normalizedName image description businessDetailsType isActive createdAt updatedAt',
+        '_id name normalizedName image description businessDetailsType allowedPricingMethods isActive createdAt updatedAt',
       )
       .sort({
         createdAt: -1,
@@ -246,7 +247,7 @@ export class CategoryService {
       await this.categoryModel
         .findById(categoryId)
         .select(
-          '_id name normalizedName image description businessDetailsType isActive createdAt updatedAt',
+          '_id name normalizedName image description businessDetailsType allowedPricingMethods isActive createdAt updatedAt',
         )
         .lean()
         .exec();
@@ -579,6 +580,7 @@ export class CategoryService {
     const createdCategory =
       await this.create(
         {
+          allowedPricingMethods: dto.allowedPricingMethods,
           name: request.requestedName,
           description:
             request.description,
@@ -676,6 +678,10 @@ async updateAdminCategory(
     category.name = name;
     category.normalizedName =
       normalizedName;
+  }
+
+  if (dto.allowedPricingMethods !== undefined) {
+    category.allowedPricingMethods = dto.allowedPricingMethods;
   }
 
   if (dto.description !== undefined) {

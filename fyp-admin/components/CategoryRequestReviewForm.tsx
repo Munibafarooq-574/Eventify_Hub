@@ -1,4 +1,5 @@
 "use client";
+import CategoryPricingOptions from "./CategoryPricingOptions";
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -78,6 +79,7 @@ export default function CategoryRequestReviewForm({
   const [adminNote, setAdminNote] =
     useState("");
 
+  const [allowedPricingMethods, setAllowedPricingMethods] = useState<string[]>(["FIXED"]);
   const [businessDetailsType, setBusinessDetailsType] =
     useState("GENERIC");
 
@@ -141,6 +143,7 @@ export default function CategoryRequestReviewForm({
 
     try {
       const formData = new FormData();
+      formData.append("allowedPricingMethods", JSON.stringify(allowedPricingMethods));
 
       formData.append("action", action);
 
@@ -257,6 +260,7 @@ export default function CategoryRequestReviewForm({
         </div>
       </div>
 
+      {action === "APPROVE" && <CategoryPricingOptions value={allowedPricingMethods} onChange={setAllowedPricingMethods} />}
       {action === "APPROVE" ? (
         <div className="space-y-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
           <div>

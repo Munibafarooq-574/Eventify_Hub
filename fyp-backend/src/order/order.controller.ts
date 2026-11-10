@@ -71,6 +71,10 @@ async placeOrder(
     deliveryStartDateTime?: string;
         expectedDeliveryFee?: number;
     quantity?: number;
+        personCount?: number;
+        expectedPackageAmount?: number;
+        expectedPricingMethod?: string;
+        expectedGroupSize?: number | null;
     requiredServiceWindow?: {
         startDateTime: string;
         endDateTime: string;

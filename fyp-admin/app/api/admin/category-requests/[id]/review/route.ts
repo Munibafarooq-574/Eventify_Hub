@@ -33,6 +33,8 @@ export async function PATCH(
 
     const incomingFormData = await request.formData();
     const formData = new FormData();
+    const pricingMethods = incomingFormData.get("allowedPricingMethods");
+    if (typeof pricingMethods === "string") formData.append("allowedPricingMethods", pricingMethods);
 
     const action = incomingFormData.get("action");
     const adminNote = incomingFormData.get("adminNote");

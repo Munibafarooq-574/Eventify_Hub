@@ -1,3 +1,4 @@
+import { CategoryPricingDto } from './category-pricing.dto';
 import {
   IsEnum,
   IsOptional,
@@ -6,7 +7,7 @@ import {
 } from 'class-validator';
 import { BusinessDetailsType } from '../../schemas/category.schema';
 
-export class CreateDto {
+export class CreateDto extends CategoryPricingDto {
   @IsString()
   @MinLength(2)
   name: string;

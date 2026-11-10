@@ -1,3 +1,4 @@
+import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from '@/components/refresh/usePullToRefresh';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
@@ -330,10 +331,11 @@ if (eventDetailsRaw) {
             ...vendor.packages[packageIndex],
         };
 
-        pkg.quantity = Math.max(
-            1,
-            Number(pkg.quantity || 1) + delta
-        );
+        if (pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON') {
+            pkg.personCount = Math.max(1, Number(pkg.personCount ?? guests ?? 1) + delta);
+        } else {
+            pkg.quantity = Math.max(1, Number(pkg.quantity || 1) + delta);
+        }
 
         vendor.packages[packageIndex] = pkg;
         updatedCart.vendors[vendorIndex] = vendor;
@@ -360,12 +362,9 @@ if (eventDetailsRaw) {
                         cateringCategory._id;
 
                 const quantity = Number(pkg?.quantity || 1);
-                const unitPrice = Number(pkg?.price || 0);
 
                 totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
-                totalAmount += isCatering
-                    ? unitPrice * Number(guests || 0) * quantity
-                    : unitPrice * quantity;
+                totalAmount += packageAmount(pkg, Number(guests || 0), !!isCatering);
             });
         });
 
@@ -844,14 +843,9 @@ if (eventDetailsRaw) {
 
                                                     const serviceEndText =
                                                         formatServiceTime(serviceWindowEnd);
-                                                const packagePrice =
-                                                    Number(pkg?.price || 0);
+                                                const finalPrice = deliveryFee(pkg, Number(pkg.quantity || 1), Number(guests || 0), !!isCatering).totalFee +
+                                                    packageAmount(pkg, Number(guests || 0), !!isCatering);
 
-                                                const finalPrice = deliveryFee(pkg, Number(pkg.quantity || 1), Number(guests || 0), !!isCatering).totalFee + (
-                                                    isCatering
-                                                        ? packagePrice *
-                                                          Number(guests || 0)
-                                                        : packagePrice);
 
                                                 return (
                                                     <View
@@ -990,6 +984,7 @@ if (eventDetailsRaw) {
                                                                     </Text>
                                                                 </View>
 
+                                                    <Text style={styles.quantityLabel}>Rate {pricingLabel(pkg, !!isCatering)}{pricingMethod(pkg, !!isCatering) === 'GROUP' ? ` · ${Number(pkg.groupSize) * Number(pkg.quantity || 1)} people included` : ''}</Text>
                                                     <DeliveryDetails pkg={pkg} quantity={Number(pkg.quantity || 1)} guests={Number(guests || 0)} isCatering={!!isCatering} />
                                                     {pkg.priceBasis === 'custom' &&
                                                         Number(pkg.customDurationRate) > 0 &&
@@ -1029,7 +1024,7 @@ if (eventDetailsRaw) {
 
                                                             <View style={styles.quantityRow}>
                                                                 <Text style={styles.quantityLabel}>
-                                                                    Quantity
+                                                                    {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' ? 'People' : 'Quantity'}
                                                                 </Text>
 
                                                                 <View style={styles.quantityControl}>
@@ -1052,7 +1047,7 @@ if (eventDetailsRaw) {
                                                                     </TouchableOpacity>
 
                                                                     <Text style={styles.quantityValue}>
-                                                                        {pkg.quantity || 1}
+                                                                        {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' ? (pkg.personCount ?? guests) : (pkg.quantity || 1)}
                                                                     </Text>
 
                                                                     <TouchableOpacity

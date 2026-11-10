@@ -21,6 +21,7 @@ describe('VendorService - Unit Tests', () => {
             aggregate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
         };
         categoryModel = {
+            findById: jest.fn().mockReturnValue({ select: () => ({ lean: async () => ({ name: 'Cake', allowedPricingMethods: ['FIXED'] }) }) }),
             findOne: jest.fn().mockResolvedValue({ _id: 'c1' }),
         };
 

@@ -1,4 +1,5 @@
-import { vendorStartingPrice } from '@/services/vendorSearchPreferences';
+import { pricingLabel } from '@/utils/packagePricing';
+import { vendorStartingPrice, vendorStartingPackage } from '@/services/vendorSearchPreferences';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -99,7 +100,6 @@ const openPackageImageViewer = (image: string) => {
       ? vendorData?.buisnessCategory?._id
       : vendorData?.buisnessCategory;
 
-  const startingPrice = vendorStartingPrice(vendorData);
 const category = categories.find(
     (item: any) => item._id === categoryId
   );
@@ -298,6 +298,7 @@ useFocusEffect(
         );
     }
 
+    const startingPrice = vendorStartingPrice(vendorData);
     const businessDetails =
     vendorData?.photographerBusinessDetails ||
     vendorData?.salonBusinessDetails ||
@@ -483,7 +484,7 @@ const category =
                             {startingPrice !== undefined && (
                                 <View style={styles.priceBadge}>
                                     <Text testID="vendor-price" style={styles.price}>
-                                        Rs. {startingPrice}{category === 'catering' ? ' per guest' : ''}
+                                        Rs. {startingPrice}{' ' + pricingLabel(vendorStartingPackage(vendorData) || {}, category === 'catering')}
                                     </Text>
                                     <Text style={styles.perHead}>Starting price</Text>
                                 </View>
@@ -1022,7 +1023,7 @@ const category =
               {Number(
                 pkg.price || 0
               ).toLocaleString()}
-              /-
+              {pricingLabel(pkg, category === 'catering')}
             </Text>
           </TouchableOpacity>
         );
@@ -1506,7 +1507,7 @@ const category =
                   styles.priceFooterLabel
                 }
               >
-                Base Package Price
+                {pkg.pricingMethod === 'PER_PERSON' ? 'Price per person' : pkg.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
               </Text>
 
               <Text
@@ -1517,7 +1518,7 @@ const category =
                 {Number(
                   pkg.price || 0
                 ).toLocaleString()}
-                /-
+                {pricingLabel(pkg, category === 'catering')}
               </Text>
             </View>
 

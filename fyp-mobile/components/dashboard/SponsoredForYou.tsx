@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import type { ComponentRef } from 'react';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -731,7 +732,7 @@ const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
 
         <View style={styles.bottomRow}>
           <Text style={styles.price} numberOfLines={1}>
-            {price > 0 ? `Rs ${price.toLocaleString()}` : packageName}
+            {price > 0 ? `Rs ${price.toLocaleString()} ${item.package?.pricingMethod ? pricingLabel(item.package) : ''}` : packageName}
           </Text>
 
           <View style={styles.viewButton}>

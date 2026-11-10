@@ -1,4 +1,5 @@
 "use client";
+import CategoryPricingOptions from "./CategoryPricingOptions";
 
 import {
   ChangeEvent,
@@ -58,6 +59,7 @@ export default function CategoryCreateForm() {
   const [name, setName] = useState("");
   const [description, setDescription] =
     useState("");
+  const [allowedPricingMethods, setAllowedPricingMethods] = useState<string[]>(["FIXED"]);
   const [businessDetailsType, setBusinessDetailsType] =
     useState("GENERIC");
   const [pictureUrl, setPictureUrl] = useState("");
@@ -139,6 +141,7 @@ export default function CategoryCreateForm() {
       setSubmitting(true);
 
       const formData = new FormData();
+      formData.append("allowedPricingMethods", JSON.stringify(allowedPricingMethods));
 
       formData.append("name", trimmedName);
 
@@ -215,6 +218,8 @@ export default function CategoryCreateForm() {
       onSubmit={handleSubmit}
       className="space-y-6"
     >
+      <CategoryPricingOptions value={allowedPricingMethods} onChange={setAllowedPricingMethods} />
+
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}

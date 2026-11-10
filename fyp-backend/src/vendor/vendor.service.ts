@@ -1,3 +1,4 @@
+import { legacyPricingMethod, quotePackage, validatePackagePricing } from '../common/utils/package-pricing';
 import type { MarketplaceScope } from '../city/marketplace.guard';
 import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -809,14 +810,20 @@ async addPackages(
         );
     }
 
-        for (const pkg of createPackagesDto.packages) {
+    const category = await this.categoryModel.findById(user.buisnessCategory).select('name normalizedName businessDetailsType allowedPricingMethods').lean();
+    const incomingPackages = createPackagesDto.packages.map(pkg => ({
+      ...pkg, ...validatePackagePricing(pkg, category),
+    }));
+        for (const pkg of incomingPackages) {
       this.validatePackageBookingConfiguration(pkg);
       await this.validateDeliveryWeightBasis(pkg, user);
     }
 
     // Normalize new packages so they always match the Package schema
-    const newPackages = createPackagesDto.packages.map((pkg) => ({
+    const newPackages = incomingPackages.map((pkg) => ({
         ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, pkg[field]])),
+        pricingMethod: pkg.pricingMethod,
+        groupSize: pkg.groupSize,
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
@@ -940,9 +947,13 @@ async getVendorApprovalStatus(userId: string) {
     }
 
     async getPackages(userId: string) {
-        const user = await this.userModel.findById(userId).select('packages');
+        const user = await this.userModel.findById(userId).select('packages buisnessCategory');
         if (!user) throw new NotFoundException('User not found');
-        return user.packages;
+        const category = await this.categoryModel.findById(user.buisnessCategory).select('name normalizedName businessDetailsType allowedPricingMethods').lean();
+        return user.packages.filter(pkg => pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE).map(pkg => ({
+          ...((pkg as any).toObject?.() ?? pkg),
+          pricingMethod: pkg.pricingMethod ?? legacyPricingMethod(category),
+        }));
     }
 
     async getVendor(userId: string): Promise<any> {
@@ -1226,15 +1237,18 @@ const visibleVendors = vendorAccessResults
 
 // Flatten all packages with vendor info
 const packages = visibleVendors.flatMap(vendor =>
-    vendor.packages.filter((pkg: Package) => pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE).map((pkg: any) => ({
-        packageId: pkg._id.toString(),
-        vendorId: vendor._id.toString(),
-        vendorName: vendor.name,
-        packageName: pkg.packageName,
-        price: pkg.price,
-        services: pkg.services,
-        maximumCapacity: vendor.BusinessDetails?.maximumPeopleCapacity ?? Infinity,
-    }))
+    vendor.packages.filter((pkg: Package) => pkg.isActive !== false && pkg.bookingType !== RETIRED_PACKAGE_BOOKING_TYPE).map((pkg: any) => {
+        const pricingMethod = pkg.pricingMethod ?? legacyPricingMethod(categoryObj);
+        const quantity = pricingMethod === 'GROUP' ? Math.ceil(guests / Number(pkg.groupSize)) : 1;
+        const pricing = quotePackage({ pricingMethod, groupSize: pkg.groupSize }, Number(pkg.price), quantity, guests);
+        return {
+            packageId: pkg._id.toString(), vendorId: vendor._id.toString(), vendorName: vendor.name,
+            packageName: pkg.packageName, price: pkg.price, services: pkg.services,
+            pricingMethod, groupSize: pricing.groupSize, personCount: pricing.personCount, quantity,
+            estimatedAmount: pricing.packageAmount,
+            maximumCapacity: vendor.BusinessDetails?.maximumPeopleCapacity ?? Infinity,
+        };
+    })
 );
 
         return packages;
@@ -1281,9 +1295,9 @@ const packages = visibleVendors.flatMap(vendor =>
 
             // Option 2: try each candidate package for this service
             for (const pkg of candidates) {
-                // Calculate price considering Catering special rule
+                // Candidate amounts use each package’s saved pricing method.
                 const priceToAdd =
-                    service.toLowerCase() === 'caterings' ? pkg.price * guests : pkg.price;
+                    pkg.estimatedAmount;
 
                 backtrack(index + 1, [...chosen, pkg], currentCost + priceToAdd);
             }
@@ -1295,14 +1309,14 @@ const packages = visibleVendors.flatMap(vendor =>
             throw new Error(`Cannot find any package combination within budget ${budget}`);
         }
 
-        // Calculate totalCost to reflect Catering pricing as well
+        // Reuse the candidate quote for the budget and the selected result.
         const totalCost = bestCombination.reduce((sum, pkg) => {
             // Find the service this package belongs to
             const pkgService = services.find(s =>
                 allCandidates[s].some(c => c.vendorId === pkg.vendorId && c.packageName === pkg.packageName)
             );
             if (!pkgService) return sum;
-            return sum + (pkgService.toLowerCase() === 'caterings' ? pkg.price * guests : pkg.price);
+            return sum + pkg.estimatedAmount;
         }, 0);
 
         return {
@@ -1373,7 +1387,15 @@ async updatePackage(
         }
     }
 
-    const updatePayload: Record<string, any> = {};
+    const category = await this.categoryModel.findById(user.buisnessCategory).select('name normalizedName businessDetailsType allowedPricingMethods').lean();
+    const pricing = validatePackagePricing({
+      pricingMethod: updateDto.pricingMethod ?? existingPackage.pricingMethod,
+      groupSize: updateDto.groupSize ?? existingPackage.groupSize,
+    }, category, existingPackage);
+    const updatePayload: Record<string, any> = {
+      'packages.$.pricingMethod': pricing.pricingMethod,
+      'packages.$.groupSize': pricing.groupSize,
+    };
 
     if (updateDto.packageName !== undefined) {
         updatePayload['packages.$.packageName'] =

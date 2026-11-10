@@ -79,6 +79,6 @@ describe('Delivery package settings save through existing package actions',()=>{
   return {service,user,old,update};
  }
  it('adds delivery settings without replacing an existing package',async()=>{const f=fixture();await f.service.addPackages('vendor',{packages:[config]});expect(f.user.packages).toHaveLength(2);expect(f.user.packages[0]).toBe(f.old);expect(f.user.packages[1]).toMatchObject(config);expect(f.user.save).toHaveBeenCalledTimes(1)});
- it('updates only requested delivery fields and keeps existing package data',async()=>{const f=fixture();f.user.packages=[{...config,_id:'delivery'}];await f.service.updatePackage('delivery',{deliveryFee:500});expect(f.update.mock.calls[0][1]).toEqual({$set:{'packages.$.deliveryFee':500}})});
+ it('updates only requested delivery fields and keeps existing package data',async()=>{const f=fixture();f.user.packages=[{...config,_id:'delivery'}];await f.service.updatePackage('delivery',{deliveryFee:500});expect(f.update.mock.calls[0][1]).toEqual({$set:{'packages.$.deliveryFee':500,'packages.$.pricingMethod':'FIXED','packages.$.groupSize':null}})});
  it('keeps flat delivery fees for Catering without weight settings',async()=>{const f=fixture('Catering');await f.service.addPackages('vendor',{packages:[config]});expect(f.user.packages[1]).toMatchObject(config);expect(f.user.packages[1]).not.toHaveProperty('deliveryWeightBasis');expect(f.user.packages[1]).not.toHaveProperty('deliveryExtraWeightEnabled');expect(f.user.save).toHaveBeenCalledTimes(1)});
 });

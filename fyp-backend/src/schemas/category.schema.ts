@@ -1,3 +1,4 @@
+import { PRICING_METHODS, PricingMethod } from '../common/utils/package-pricing';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -61,6 +62,9 @@ export class Category extends Document {
    * Deactivated categories remain in DB for historical bookings/vendors
    * but are hidden from new registration/discovery.
    */
+  @Prop({ type: [String], enum: PRICING_METHODS, default: undefined })
+  allowedPricingMethods?: PricingMethod[];
+
   @Prop({ default: true, index: true })
   isActive: boolean;
 }

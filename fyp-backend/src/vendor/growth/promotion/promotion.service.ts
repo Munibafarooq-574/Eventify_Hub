@@ -1,3 +1,4 @@
+import { legacyPricingMethod } from '../../../common/utils/package-pricing';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 
 // fyp-backend/src/vendor/growth/promotion/promotion.service.ts
@@ -44,6 +45,8 @@ export interface FeaturedPackagePublicEntry {
   coverImage: string | null;
   packageId: string;
   packageName: string;
+  pricingMethod?: 'FIXED' | 'PER_PERSON' | 'GROUP';
+  groupSize?: number | null;
   price: number;
   rating: number | null;
   totalReviews: number;
@@ -843,7 +846,7 @@ if (hasAvailabilityContext) {
         : {}),
     })
     .select(
-      'name coverImage packages contactDetails buisnessCategory serviceLocationCityIds',
+      'name coverImage packages contactDetails buisnessCategory serviceLocationCityIds cateringBusinessDetails',
     )
     .lean();
 
@@ -1027,6 +1030,8 @@ const featuredScore =
       packageId:
         pkg._id.toString(),
 
+      pricingMethod: pkg.pricingMethod ?? legacyPricingMethod({ businessDetailsType: vendor.cateringBusinessDetails ? 'CATERING' : undefined }),
+      groupSize: pkg.groupSize,
       packageName:
         pkg.packageName,
 

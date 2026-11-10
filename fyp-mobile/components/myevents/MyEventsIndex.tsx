@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -1267,6 +1268,9 @@ const MyEventsScreen = () => {
 
                               <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
                               {vendor.quantity != null && <DetailRow label="Quantity" value={String(vendor.quantity)} />}
+                              {vendor.pricingMethod && <DetailRow label="Pricing" value={pricingLabel(vendor)} />}
+                              {vendor.personCount != null && <DetailRow label="People" value={String(vendor.personCount)} />}
+                              {vendor.pricingMethod === 'GROUP' && <DetailRow label="People included" value={String(Number(vendor.groupSize) * Number(vendor.quantity || 1))} />}
                               <DeliveryDetails pkg={vendor} timeZone={event.eventCityId?.timeZone || "UTC"} />
 
                               {bookingType !== 'DELIVERY_BASED' && (

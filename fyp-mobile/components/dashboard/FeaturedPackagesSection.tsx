@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
@@ -172,7 +173,7 @@ export function FeaturedPackagesSection() {
       </Text>
 
       <Text style={styles.price}>
-        Rs. {Number(pkg.price || 0).toLocaleString()}
+        Rs. {Number(pkg.price || 0).toLocaleString()} {pkg.pricingMethod ? pricingLabel(pkg) : ''}
       </Text>
 
       <Text style={styles.rating}>

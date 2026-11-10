@@ -43,13 +43,15 @@ export async function saveVendorFilters(filters: VendorSearchPreferences) {
   const key = await storageKey();
   if (key) await AsyncStorage.setItem(key, JSON.stringify(filters));
 }
-export function vendorStartingPrice(vendor: any, packages = vendor?.packages): number | undefined {
+export function vendorStartingPackage(vendor: any, packages = vendor?.packages): any | undefined {
   if (!Array.isArray(packages)) return undefined;
-  const prices = packages
-    .filter(pkg => pkg?.isActive !== false && pkg?.bookingType !== 'CUSTOM' && pkg?.price != null && pkg.price !== '')
-    .map(pkg => Number(pkg.price))
-    .filter(price => Number.isFinite(price) && price >= 0);
-  return prices.length ? Math.min(...prices) : undefined;
+  return packages
+    .filter(pkg => pkg?.isActive !== false && pkg?.bookingType !== 'CUSTOM' && pkg?.price != null && pkg.price !== '' && Number.isFinite(Number(pkg.price)) && Number(pkg.price) >= 0)
+    .reduce((lowest, pkg) => !lowest || Number(pkg.price) < Number(lowest.price) ? pkg : lowest, undefined);
+}
+export function vendorStartingPrice(vendor: any, packages = vendor?.packages): number | undefined {
+  const pkg = vendorStartingPackage(vendor, packages);
+  return pkg ? Number(pkg.price) : undefined;
 }
 export function sortVendorResults(vendors: any[], sort: VendorSort, reviews: Record<string, any>, packages: Record<string, any[]> = {}) {
   const name = (v: any) => String(v.contactDetails?.brandName || v.ContactDetails?.brandName || v.BusinessDetails?.brandName || v.name || '');

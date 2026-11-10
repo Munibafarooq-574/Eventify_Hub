@@ -1,3 +1,6 @@
+import PackagePricingFields from '@/components/booking/PackagePricingFields';
+import { PackagePricing, PricingMethod, pricingFieldsError } from '@/utils/packagePricing';
+import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -190,6 +193,8 @@ export default function VendorPackagesScreen() {
 
   const insets = useSafeAreaInsets();
 
+  const [pricing, setPricing] = useState<PackagePricing>({ pricingMethod: 'FIXED' });
+  const [pricingOptions, setPricingOptions] = useState<PricingMethod[]>([]);
   const [packageName, setPackageName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -318,6 +323,9 @@ const [currentPackageCount, setCurrentPackageCount] = useState(0);
         );
       }
 
+      const allowed = await getVendorPricingOptions(userData);
+      setPricingOptions(allowed);
+      setPricing(current => ({ ...current, pricingMethod: allowed[0] }));
       const id = String(userData._id);
 
       setVendorId(id);
@@ -467,6 +475,7 @@ const existingPackage =
           return;
         }
 
+        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize });
         setPackageName(
           existingPackage.packageName || "",
         );
@@ -779,7 +788,7 @@ const removeImageAsset = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
     return false;
   }
 
@@ -824,6 +833,7 @@ const removeImageAsset = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
+  pricing, pricingOptions,
   packageName,
   price,
   delivery,
@@ -947,6 +957,8 @@ if (!userId) {
       }));
 
     const payload = {
+  pricingMethod: pricing.pricingMethod,
+  groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: packageName.trim(),
 
@@ -1244,9 +1256,10 @@ if (!userId) {
 
           {/* Base Price */}
 
+          <PackagePricingFields value={pricing} allowed={pricingOptions} onChange={setPricing} />
           <View style={styles.fieldGroup}>
   <Text style={styles.label}>
-    Base Package Price
+    {pricing.pricingMethod === 'PER_PERSON' ? 'Price per person' : pricing.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
   </Text>
 
   <View style={styles.priceContainer}>

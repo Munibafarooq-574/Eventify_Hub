@@ -1,3 +1,4 @@
+import { legacyPricingMethod, quotePackage } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
 import { ChatGateway } from '../chat/chat.gateway';
 import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
@@ -92,6 +93,10 @@ export class OrderService {
         expectedDeliveryFee?: number;
         durationMinutes?: number;
         quantity?: number;
+        personCount?: number;
+        expectedPackageAmount?: number;
+        expectedPricingMethod?: string;
+        expectedGroupSize?: number | null;
         requiredServiceWindow?: {
             startDateTime: string;
             endDateTime: string;
@@ -256,7 +261,7 @@ export class OrderService {
             },
             isActive: { $ne: false },
         })
-        .select('_id name normalizedName')
+        .select('_id name normalizedName businessDetailsType')
         .lean();
 
     if (
@@ -582,6 +587,9 @@ export class OrderService {
                         packageId: string;
                         serviceName: string;
                         quantity: number;
+                        pricingMethod: 'FIXED' | 'PER_PERSON' | 'GROUP';
+                        groupSize: number | null;
+                        personCount: number | null;
                         unitPrice: number;
                         originalAmount: number;
                         finalAmount: number;
@@ -897,27 +905,17 @@ export class OrderService {
                                 vendorCategoryId,
                             );
 
-                        const categoryIdentity =
-                            String(
-                                category
-                                    ?.normalizedName ??
-                                    category?.name ??
-                                    '',
-                            ).toLowerCase();
-
-                        const isCatering =
-                            categoryIdentity.includes(
-                                'catering',
-                            );
-
-                        const packageAmount =
-                            Number(unitPrice) *
-                            quantity *
-                            (isCatering
-                                ? Number(
-                                      guests,
-                                  )
-                                : 1);
+                        const pricing = quotePackage({
+                            pricingMethod: packageDoc.pricingMethod ?? legacyPricingMethod(category),
+                            groupSize: packageDoc.groupSize,
+                        }, Number(unitPrice), quantity, Number(service.personCount ?? guests));
+                        if (service.expectedPricingMethod !== undefined &&
+                            (service.expectedPricingMethod !== pricing.pricingMethod ||
+                            (pricing.pricingMethod === 'GROUP' && service.expectedGroupSize !== pricing.groupSize))) {
+                            throw new ConflictException('Package pricing has changed. Refresh your cart and review the total.');
+                        }
+                        const packageAmount = pricing.packageAmount;
+                        const isCatering = pricing.pricingMethod === 'PER_PERSON';
 
                         const deliveryQuote = packageDoc.bookingType === 'DELIVERY_BASED' && packageDoc.deliveryFeeType
                             ? quoteDelivery(packageDoc, quantity, Number(guests), isCatering) : undefined;
@@ -931,6 +929,9 @@ export class OrderService {
                             !Number.isFinite(service.expectedDeliveryFee) || Math.abs(service.expectedDeliveryFee - deliveryQuote.totalFee) > 0.001
                         )) throw new ConflictException('Delivery charges have changed. Please reopen the package and review the updated total.');
                         const originalAmount = packageAmount + (deliveryQuote?.totalFee || 0);
+                        if (service.expectedPackageAmount !== undefined && service.expectedPackageAmount !== packageAmount) {
+                            throw new ConflictException('Package pricing has changed. Refresh your cart and review the total.');
+                        }
 
                         if (
                             !Number.isFinite(
@@ -1091,6 +1092,9 @@ export class OrderService {
                                             service.serviceName,
                                     ),
                                 quantity,
+                                pricingMethod: pricing.pricingMethod,
+                                groupSize: pricing.groupSize,
+                                personCount: pricing.personCount,
                                 unitPrice:
                                     Number(
                                         unitPrice,
@@ -1239,6 +1243,9 @@ export class OrderService {
                                                     ?.promotionCode ??
                                                 null,
                                             quantity: validatedService.quantity,
+                                            pricingMethod: validatedService.pricingMethod,
+                                            groupSize: validatedService.groupSize,
+                                            personCount: validatedService.personCount,
                                             delivery: validatedService.delivery,
                                             bookingType: validatedService.bookingType,
                                             bookingChatService: validatedService.bookingChatService,
@@ -1358,6 +1365,9 @@ export class OrderService {
                     vendorId: booking.vendorId,
                     serviceName: booking.serviceName,
                     quantity: booking.quantity,
+                    pricingMethod: booking.pricingMethod,
+                    personCount: booking.personCount,
+                    groupSize: booking.groupSize,
                     bookingType: booking.bookingType,
                     bookingChatService: booking.bookingChatService,
                     bookingChatTimeZone: eventTimeZone,

@@ -1,3 +1,4 @@
+import { CategoryPricingDto } from './category-pricing.dto';
 import {
   IsEnum,
   IsOptional,
@@ -9,7 +10,7 @@ import {
   BusinessDetailsType,
 } from '../../schemas/category.schema';
 
-export class UpdateCategoryDto {
+export class UpdateCategoryDto extends CategoryPricingDto {
   @IsOptional()
   @IsString()
   @MinLength(2)

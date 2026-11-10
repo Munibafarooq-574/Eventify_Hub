@@ -1,3 +1,4 @@
+import { PRICING_METHODS, PricingMethod } from '../common/utils/package-pricing';
 
 // fyp-backend/src/schemas/vendor-order.schema.ts
 
@@ -68,6 +69,9 @@ const DeliverySnapshotSchema = SchemaFactory.createForClass(DeliverySnapshot);
 
 @Schema({ timestamps: true })
 export class VendorOrder extends Document {
+    @Prop({ type: String, enum: PRICING_METHODS }) pricingMethod?: PricingMethod;
+    @Prop({ type: Number }) groupSize?: number | null;
+    @Prop({ type: Number }) personCount?: number | null;
     @Prop({ type: DeliverySnapshotSchema }) delivery?: DeliverySnapshot;
     @Prop() bookingType?: string;
     @Prop() bookingChatTimeZone?: string;

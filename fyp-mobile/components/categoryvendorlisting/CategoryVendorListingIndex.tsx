@@ -1,3 +1,4 @@
+import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 //fyp-mobile/components/categoryvendorlisting/CategoryVendorListingIndex.tsx
 
@@ -6,7 +7,7 @@ import axios from "axios";
 import { API_BASE_URL } from "@/services/apiConfig";
 import getVendorReviewSummary from "@/services/getVendorReviewSummary";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
-import { emptyVendorFilters, loadVendorFilters, saveVendorFilters, SORT_OPTIONS, sortVendorResults, vendorStartingPrice, VendorSearchPreferences } from '@/services/vendorSearchPreferences';
+import { emptyVendorFilters, loadVendorFilters, saveVendorFilters, SORT_OPTIONS, sortVendorResults, vendorStartingPrice, vendorStartingPackage, VendorSearchPreferences } from '@/services/vendorSearchPreferences';
 import getMarketplaceEventContext from "@/services/getMarketplaceEventContext";
 import { getSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -552,7 +553,7 @@ router.push({
           {price !== undefined && (
             <>
               <Text style={styles.priceText}>Starting from</Text>
-              <Text style={styles.price}>Rs {price}{item.cateringBusinessDetails || /^caterings?$/i.test(categoryName) ? ' per guest' : ''}</Text>
+              <Text style={styles.price}>Rs {price}{' ' + pricingLabel(vendorStartingPackage(item, vendorPackages[item._id]) || {}, /^caterings?$/i.test(categoryName))}</Text>
             </>
           )}
         </View>

@@ -1,3 +1,4 @@
+import { pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -1791,6 +1792,9 @@ Toast.show({
           deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
           packageName: pkg.packageName,
+          pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
+          groupSize: pkg.groupSize,
+          personCount: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? deliveryGuests : undefined,
           price: resolvedPrice,
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
@@ -4446,7 +4450,7 @@ const serviceCityNamesFromIds =
               isActive && styles.packageCardPriceActive,
             ]}
           >
-            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}
+            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()} ${pricingLabel(pkg, profileCategoryName?.toLowerCase().includes('catering'))}`}
           </Text>
           {!durationQuote && pkg.bookingType === 'DURATION_BASED' &&
             Number(pkg.baseIncludedDurationMinutes) > 0 && (
@@ -5033,7 +5037,7 @@ const serviceCityNamesFromIds =
                           >
                             {selectedDurationQuote?.price === null
                               ? '—'
-                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}/-`}
+                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()} ${pricingLabel(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}`}
                           </Text>
                            {selectedDurationQuote?.reason && (
                              <Text style={styles.priceFooterLabel}>{selectedDurationQuote.reason}</Text>

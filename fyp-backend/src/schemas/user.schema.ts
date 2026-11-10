@@ -1,3 +1,4 @@
+import { PRICING_METHODS, PricingMethod } from '../common/utils/package-pricing';
 //fyp-backend/src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import {
@@ -738,6 +739,11 @@ export enum PackageBookingType {
 
 @Schema()
 export class Package {
+  @Prop({ type: String, enum: PRICING_METHODS })
+  pricingMethod?: PricingMethod;
+
+  @Prop({ type: Number, min: 1 })
+  groupSize?: number | null;
   @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
   @Prop({ min: 0 }) deliveryFee?: number;
