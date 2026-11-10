@@ -57,6 +57,7 @@ export enum PaymentProvider {
 
  
   BANK_TRANSFER = 'bank_transfer',
+  CARD_TEST = 'card_test',
 
   JAZZCASH = 'jazzcash',
 
