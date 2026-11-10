@@ -1,5 +1,5 @@
 import { currencySymbol } from '@/utils/currency';
-import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
+import { pricingLabel } from '@/utils/packagePricing';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
 import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
@@ -2504,11 +2504,14 @@ if (!userId) {
               <PackagePricingLabel pkg={pricing} />
               </View>
               {!!price && (
-                <Text
-                  style={styles.previewPrice}
-                >
-                  {currencySymbol()} {price}<PackagePriceBasis pkg={pricing} />
-                </Text>
+                <View style={styles.previewPriceBadge}>
+                  <Text style={styles.previewPriceAmount} numberOfLines={1} adjustsFontSizeToFit>
+                    {currencySymbol()} {price}
+                  </Text>
+                  <Text style={styles.previewPriceMeta}>
+                    {pricingLabel(pricing).replace(' · serves ', '\nserves ')}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -2682,17 +2685,15 @@ if (!userId) {
                           : "Days"}
                       </Text>
 
-                      <Text
-                        style={
-                          styles.previewDurationPrice
-                        }
-                      >
-                        {currencySymbol()}{" "}
-                        {Number(
-                          duration.price ||
-                            0,
-                        ).toLocaleString()} <PackagePriceBasis pkg={pricing} />
-                      </Text>
+                      <View style={styles.previewDurationPriceBlock}>
+                        <Text style={styles.previewDurationAmount}>
+                          {currencySymbol()}{" "}
+                          {Number(duration.price || 0).toLocaleString()}
+                        </Text>
+                        <Text style={styles.previewDurationBasis}>
+                          {pricingLabel(pricing).replace(' · serves ', '\nserves ')}
+                        </Text>
+                      </View>
                     </View>
                   ),
                 )}
@@ -2714,22 +2715,15 @@ if (!userId) {
                   Custom Duration
                 </Text>
 
-                <Text
-                  style={
-                    [styles.previewCustomText, { flexShrink: 1, textAlign: 'right' }]
-                  }
-                >
-                  {currencySymbol()}{" "}
-                  {Number(
-                    customDurationRate ||
-                      0,
-                  ).toLocaleString()}
-                  /
-                  {customDurationUnit ===
-                  "DAYS"
-                    ? "day"
-                    : "hour"} <PackagePriceBasis pkg={pricing} />
-                </Text>
+                <View style={styles.previewCustomPriceBlock}>
+                  <Text style={styles.previewCustomText} numberOfLines={1}>
+                    {currencySymbol()}{" "}
+                    {Number(customDurationRate || 0).toLocaleString()}/{customDurationUnit === "DAYS" ? "day" : "hour"}
+                  </Text>
+                  <Text style={styles.previewCustomBasis}>
+                    {pricingLabel(pricing).replace(' · serves ', '\nserves ')}
+                  </Text>
+                </View>
               </View>
             )}
           </View>
@@ -3327,11 +3321,64 @@ const styles = StyleSheet.create({
 
   ...packagePreviewStyles,
 
+  previewPriceBadge: {
+    alignSelf: "flex-start",
+    maxWidth: "46%",
+    minWidth: 116,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#7B2869",
+    borderRadius: 15,
+    alignItems: "center",
+  },
+  previewPriceAmount: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  previewPriceMeta: {
+    color: "#F7EAF4",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
+    marginTop: 2,
+  },
+  previewDurationPriceBlock: {
+    flex: 1,
+    alignItems: "flex-end",
+    minWidth: 0,
+  },
+  previewDurationAmount: {
+    color: "#632052",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+  previewDurationBasis: {
+    color: "#805876",
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: "right",
+  },
+  previewCustomPriceBlock: {
+    alignItems: "flex-end",
+    flexShrink: 1,
+    marginLeft: 8,
+  },
+  previewCustomBasis: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    color: "#3D6E4D",
+    textAlign: "right",
+  },
+
   previewCustomBox: {
     marginTop: 10,
     backgroundColor: "#F3F9F5",
     borderRadius: 12,
-    padding: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: "#DCEBDD",
     flexDirection: "row",
