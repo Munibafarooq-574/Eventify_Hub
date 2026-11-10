@@ -1,4 +1,4 @@
-import { pricingLabel } from '@/utils/packagePricing';
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { createBookingDraftStore } from '@/store';
 import { router } from 'expo-router';
@@ -118,8 +118,7 @@ const AIPackageScreen = () => {
                 </Text>
 
                 <View style={styles.priceRow}>
-                    <Text style={styles.price}>Rs. {item.price}</Text>
-                    <Text style={styles.perHead}>{pricingLabel(item)}</Text>
+                    <Text style={styles.price}>Rs. {item.price}<PackagePriceBasis pkg={item} /></Text>
                 </View>
 
                 <View style={styles.divider} />

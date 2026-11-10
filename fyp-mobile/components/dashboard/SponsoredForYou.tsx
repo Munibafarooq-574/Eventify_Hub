@@ -1,5 +1,5 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import type { ComponentRef } from 'react';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -734,8 +734,8 @@ const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
         <Text style={styles.vendorName}>{packageName}</Text>
         <PackagePricingLabel pkg={item.package || {}} />
         <View style={styles.bottomRow}>
-          <Text style={styles.price} numberOfLines={2}>
-            {price > 0 ? `Rs ${price.toLocaleString()} ${item.package?.pricingMethod ? pricingLabel(item.package) : ''}` : packageName}
+          <Text style={styles.price}>
+            {price > 0 ? `Rs ${price.toLocaleString()}` : packageName}{price > 0 && <PackagePriceBasis pkg={item.package || {}} />}
           </Text>
 
           <View style={styles.viewButton}>

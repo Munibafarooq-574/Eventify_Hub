@@ -1,6 +1,7 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError, pricingUnit } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -2505,7 +2506,7 @@ if (!userId) {
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {price}{'\n'}{pricingUnit(pricing)}
+                  Rs. {price}<PackagePriceBasis pkg={pricing} />
                 </Text>
               )}
             </View>
@@ -2689,7 +2690,7 @@ if (!userId) {
                         {Number(
                           duration.price ||
                             0,
-                        ).toLocaleString()} {pricingUnit(pricing)}
+                        ).toLocaleString()} <PackagePriceBasis pkg={pricing} />
                       </Text>
                     </View>
                   ),
@@ -2726,7 +2727,7 @@ if (!userId) {
                   {customDurationUnit ===
                   "DAYS"
                     ? "day"
-                    : "hour"} {pricingUnit(pricing)}
+                    : "hour"} <PackagePriceBasis pkg={pricing} />
                 </Text>
               </View>
             )}

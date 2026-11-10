@@ -1,5 +1,5 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { pricingLabel } from '@/utils/packagePricing';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/VendorFeature/FeaturedPackagesSection.tsx
@@ -175,7 +175,7 @@ export function FeaturedPackagesSection() {
       </Text>
 
       <Text style={styles.price}>
-        Rs. {Number(pkg.price || 0).toLocaleString()} {pkg.pricingMethod ? pricingLabel(pkg) : ''}
+        Rs. {Number(pkg.price || 0).toLocaleString()} <PackagePriceBasis pkg={pkg} />
       </Text>
 
       <Text style={styles.rating}>

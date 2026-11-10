@@ -1,5 +1,5 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { pricingLabel, pricingUnit } from '@/utils/packagePricing';
 import { vendorStartingPrice, vendorStartingPackage } from '@/services/vendorSearchPreferences';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
@@ -485,7 +485,7 @@ const category =
                             {startingPrice !== undefined && (
                                 <View style={styles.priceBadge}>
                                     <Text testID="vendor-price" style={styles.price}>
-                                        Rs. {startingPrice}{' ' + pricingLabel(vendorStartingPackage(vendorData) || {}, category === 'catering')}
+                                        Rs. {startingPrice}<PackagePriceBasis pkg={vendorStartingPackage(vendorData) || {}} legacyPerPerson={category === 'catering'} />
                                     </Text>
                                     <Text style={styles.perHead}>Starting price</Text>
                                 </View>
@@ -1025,7 +1025,7 @@ const category =
               {Number(
                 pkg.price || 0
               ).toLocaleString()}
-              {pricingLabel(pkg, category === 'catering')}
+              <PackagePriceBasis pkg={pkg} legacyPerPerson={category === 'catering'} />
             </Text>
           </TouchableOpacity>
         );
@@ -1317,7 +1317,7 @@ const category =
                     Rs.{" "}
                     {Number(
                       duration.price || 0
-                    ).toLocaleString()} {pricingUnit(pkg, category === 'catering')}
+                    ).toLocaleString()} <PackagePriceBasis pkg={pkg} legacyPerPerson={category === 'catering'} />
                   </Text>
                 </View>
               );
@@ -1366,7 +1366,7 @@ const category =
             /
             {pkg.customDurationUnit === "DAYS"
               ? "day"
-              : "hour"} {pricingUnit(pkg, category === 'catering')}
+              : "hour"} <PackagePriceBasis pkg={pkg} legacyPerPerson={category === 'catering'} />
           </Text>
         </View>
       ) : (
@@ -1521,7 +1521,7 @@ const category =
                 {Number(
                   pkg.price || 0
                 ).toLocaleString()}
-                {pricingLabel(pkg, category === 'catering')}
+                <PackagePriceBasis pkg={pkg} legacyPerPerson={category === 'catering'} />
               </Text>
             </View>
 

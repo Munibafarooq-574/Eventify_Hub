@@ -1,7 +1,8 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { getVendorPackagesList } from '@/services/getVendorPackagesList';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError, pricingUnit } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -2910,7 +2911,7 @@ Alert.alert(
                 <Text
                   style={styles.previewPrice}
                 >
-                  Rs. {editablePrice}{'\n'}{pricingUnit(pricing)}
+                  Rs. {editablePrice}<PackagePriceBasis pkg={pricing} />
                 </Text>
               )}
             </View>
@@ -3094,7 +3095,7 @@ Alert.alert(
                         {Number(
                           duration.price ||
                             0,
-                        ).toLocaleString()} {pricingUnit(pricing)}
+                        ).toLocaleString()} <PackagePriceBasis pkg={pricing} />
                       </Text>
                     </View>
                   ),
@@ -3131,7 +3132,7 @@ Alert.alert(
                   {customDurationUnit ===
                   "DAYS"
                     ? "day"
-                    : "hour"} {pricingUnit(pricing)}
+                    : "hour"} <PackagePriceBasis pkg={pricing} />
                 </Text>
               </View>
             )}

@@ -1,4 +1,4 @@
-import { pricingLabel } from '@/utils/packagePricing';
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 // fyp-mobile/components/CustomerFeatures/FeaturedPackagesSection.tsx
 //
@@ -73,7 +73,7 @@ export function FeaturedPackagesSection({ navigation }: { navigation: any }) {
             <Text style={styles.vendorName} numberOfLines={1}>
               {pkg.vendorName}
             </Text>
-            <Text style={styles.price}>Rs. {pkg.price.toLocaleString()} {pricingLabel(pkg)}</Text>
+            <Text style={styles.price}>Rs. {pkg.price.toLocaleString()} <PackagePriceBasis pkg={pkg} /></Text>
           </TouchableOpacity>
         ))}
       </ScrollView>

@@ -1,5 +1,6 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { pricingLabel, pricingMethod, pricingUnit } from '@/utils/packagePricing';
+import { pricingMethod, } from '@/utils/packagePricing';
 import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -4452,7 +4453,7 @@ const serviceCityNamesFromIds =
               isActive && styles.packageCardPriceActive,
             ]}
           >
-            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()} ${pricingLabel(pkg, profileCategoryName?.toLowerCase().includes('catering'))}`}
+            {durationQuote?.price === null ? '—' : `Rs. ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}{durationQuote?.price !== null && <PackagePriceBasis pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
           </Text>
           {!durationQuote && pkg.bookingType === 'DURATION_BASED' &&
             Number(pkg.baseIncludedDurationMinutes) > 0 && (
@@ -4795,7 +4796,7 @@ const serviceCityNamesFromIds =
                 Rs.{' '}
                 {Number(
                   duration.price || 0,
-                ).toLocaleString()} {pricingUnit(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}
+                ).toLocaleString()} <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
               </Text>
             </View>
           ),
@@ -4830,7 +4831,7 @@ const serviceCityNamesFromIds =
           per{' '}
           {selectedPackage.customDurationUnit === 'DAYS'
             ? 'day'
-            : 'hour'} {pricingUnit(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}
+            : 'hour'} <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
         </Text>
       </View>
     ) : null}
@@ -5040,7 +5041,7 @@ const serviceCityNamesFromIds =
                           >
                             {selectedDurationQuote?.price === null
                               ? '—'
-                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()} ${pricingLabel(selectedPackage, profileCategoryName?.toLowerCase().includes('catering'))}`}
+                              : `Rs. ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}`}{selectedDurationQuote?.price !== null && <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
                           </Text>
                            {selectedDurationQuote?.reason && (
                              <Text style={styles.priceFooterLabel}>{selectedDurationQuote.reason}</Text>

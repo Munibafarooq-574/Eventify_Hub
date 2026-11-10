@@ -1,5 +1,6 @@
+import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { PackagePricing, pricingLabel, pricingUnit } from '@/utils/packagePricing';
+import { PackagePricing, } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
@@ -474,7 +475,7 @@ const PackageScreen = () => {
                 {packageDetails.price !==
                 undefined
                   ? packageDetails.price.toLocaleString()
-                  : "N/A"} {pricingLabel(packageDetails)}
+                  : "N/A"} <PackagePriceBasis pkg={packageDetails} />
               </Text>
             </View>
 
@@ -805,7 +806,7 @@ const PackageScreen = () => {
                                 Rs.{" "}
                                 {Number(
                                   duration.price || 0
-                                ).toLocaleString()} {pricingUnit(packageDetails)}
+                                ).toLocaleString()} <PackagePriceBasis pkg={packageDetails} />
                               </Text>
                             </View>
                           )
@@ -941,7 +942,7 @@ const PackageScreen = () => {
                               {packageDetails.customDurationUnit ===
                               "DAYS"
                                 ? "day"
-                                : "hour"} {pricingUnit(packageDetails)}
+                                : "hour"} <PackagePriceBasis pkg={packageDetails} />
                             </Text>
                           </View>
                         </View>
