@@ -108,6 +108,8 @@ describe('Admin subscription catalog', () => {
   it('validates prices, limits, keys and feature selections before saving', async () => {
     const catalog = createCatalog();
     await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPrice: 0 }, true)).rejects.toThrow();
+    await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPriceUSD: -5 }, true)).rejects.toThrow();
+    await expect(catalog.savePlan('studio-plus', { ...planInput, monthlyPriceUSD: 3.999 }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['unknown'] }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, featureKeys: ['custom:fake feature'] }, true)).rejects.toThrow();
     await expect(catalog.savePlan('studio-plus', { ...planInput, limits: { ...planInput.limits, maxPackages: -1 } }, true)).rejects.toThrow();
@@ -123,6 +125,8 @@ describe('Admin subscription catalog', () => {
     const create = jest.fn(async input => input);
     const service = Object.assign(Object.create(SubscriptionService.prototype), {
       catalog, subscriptionModel: { findOne: async () => null, create },
+      userModel: { findById: () => ({ select: () => ({ lean: async () => ({ marketplaceCountryCode: 'PK' }) }) }) },
+      getPaymentInstructions: async () => ({ provider: PaymentProvider.EASYPAISA, currency: 'PKR' }),
       getCurrentSubscription: async () => current,
     }) as SubscriptionService;
     const purchase = (amount: number) => service.requestSubscriptionPayment(
@@ -144,6 +148,29 @@ describe('Admin subscription catalog', () => {
     expect(await access.canUseFeature(vendorId, FeatureKey.COUPONS)).toBe(true);
     expect(await access.canUseFeature(vendorId, FeatureKey.CAMPAIGNS)).toBe(false);
     expect(await access.getFeatureLimit(vendorId, LimitKey.MAX_PACKAGES)).toBe(4);
+  });
+
+  it('uses USD admin price and snapshots USD for a USA vendor without converting PKR', async () => {
+    const catalog = createCatalog();
+    await catalog.savePlan('studio-plus', { ...planInput, monthlyPriceUSD: 29.95 }, true);
+    const vendorId = new Types.ObjectId().toString();
+    const create = jest.fn(async input => input);
+    const service = Object.assign(Object.create(SubscriptionService.prototype), {
+      catalog,
+      userModel: { findById: () => ({ select: () => ({ lean: async () => ({ marketplaceCountryCode: 'US' }) }) }) },
+      subscriptionModel: { findOne: async () => null, create },
+      getPaymentInstructions: async () => ({ provider: PaymentProvider.BANK_TRANSFER, currency: 'USD', configured: true }),
+      getCurrentSubscription: async () => ({ plan: 'basic', status: 'trial', endDate: new Date(Date.now() + 86400000) }),
+    }) as SubscriptionService;
+    const plan = (await service.getPlans(vendorId)).find(item => item.key === 'studio-plus');
+    expect(plan).toMatchObject({ monthlyPrice: 29.95, currency: 'USD', priceLabel: '$ 29.95 / month' });
+    await expect(service.requestSubscriptionPayment(
+      vendorId, 'studio-plus', PaymentProvider.EASYPAISA, 'US-01', SubscriptionActivationType.IMMEDIATE, 29.95,
+    )).rejects.toThrow('payment provider');
+    await expect(service.requestSubscriptionPayment(
+      vendorId, 'studio-plus', PaymentProvider.BANK_TRANSFER, 'US-01', SubscriptionActivationType.IMMEDIATE, 29.95,
+    )).resolves.toMatchObject({ amountDue: 29.95, currency: 'USD', paymentProvider: PaymentProvider.BANK_TRANSFER });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('preserves purchased features and limits after an admin edits the live plan', async () => {

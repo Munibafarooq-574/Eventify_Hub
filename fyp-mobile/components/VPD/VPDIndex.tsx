@@ -1,4 +1,4 @@
-import { currencySymbol, currencyOf } from '@/utils/currency';
+import { currencySymbol, currencyOf, countryCurrency } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { vendorStartingPrice, vendorStartingPackage } from '@/services/vendorSearchPreferences';
@@ -301,6 +301,12 @@ useFocusEffect(
     }
 
     const startingPrice = vendorStartingPrice(vendorData);
+    const startingPackage = vendorStartingPackage(vendorData);
+    // Some vendor profile responses omit currency on nested packages.
+    // Prefer a stored package currency; otherwise use the vendor's marketplace country.
+    const startingPriceCurrency = startingPackage?.currency
+      ? currencyOf(startingPackage)
+      : countryCurrency(vendorData?.marketplaceCountryCode);
     const businessDetails =
     vendorData?.photographerBusinessDetails ||
     vendorData?.salonBusinessDetails ||
@@ -486,7 +492,7 @@ const category =
                             {startingPrice !== undefined && (
                                 <View style={styles.priceBadge}>
                                     <Text testID="vendor-price" style={styles.price}>
-                                        {currencySymbol(currencyOf(vendorStartingPackage(vendorData)))} {startingPrice}<PackagePriceBasis pkg={vendorStartingPackage(vendorData) || {}} legacyPerPerson={category === 'catering'} />
+                                        {currencySymbol(startingPriceCurrency)} {Number(startingPrice).toLocaleString(undefined, { maximumFractionDigits: 2 })}<PackagePriceBasis pkg={startingPackage || {}} legacyPerPerson={category === 'catering'} />
                                     </Text>
                                     <Text style={styles.perHead}>Starting price</Text>
                                 </View>

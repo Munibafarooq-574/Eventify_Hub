@@ -64,8 +64,26 @@ export class SubscriptionService {
   // PLANS
   // =========================================================
 
-  async getPlans() {
-    return (await this.catalog.list()).filter(plan => plan.isPurchasable);
+  private async billingCurrency(vendorId: string): Promise<'PKR' | 'USD'> {
+    this.assertValidId(vendorId);
+    const vendor = await this.userModel.findById(vendorId).select('marketplaceCountryCode').lean();
+    if (!vendor) throw new NotFoundException('Vendor not found.');
+    return vendor.marketplaceCountryCode === 'US' ? 'USD' : 'PKR';
+  }
+
+  async getPlans(vendorId: string) {
+    const currency = await this.billingCurrency(vendorId);
+    const plans = await this.catalog.list();
+    return plans.filter(plan => plan.isPurchasable).map(plan => {
+      const monthlyPrice = currency === 'USD' ? plan.monthlyPriceUSD : plan.monthlyPrice;
+      return {
+        ...plan, currency, monthlyPrice: monthlyPrice ?? null,
+        isPurchasable: monthlyPrice != null && monthlyPrice > 0,
+        priceLabel: monthlyPrice == null ? 'Price not configured' :
+          currency === 'USD' ? `$ ${monthlyPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / month` :
+            `Rs. ${monthlyPrice.toLocaleString('en-PK')} / month`,
+      };
+    });
   }
 
   async getPlanForAccess(key: string) {
@@ -115,25 +133,26 @@ export class SubscriptionService {
     return currentPlan;
   }
 
-  getPaymentInstructions() {
-  const accountTitle =
-    process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
-
-  const mobileNumber =
-    process.env.SUBSCRIPTION_EASYPAISA_MOBILE?.trim();
-
-  if (!accountTitle || !mobileNumber) {
-    throw new BadRequestException(
-      'Easypaisa subscription payment details are not configured.',
-    );
+  async getPaymentInstructions(vendorId: string) {
+    const currency = await this.billingCurrency(vendorId);
+    if (currency === 'USD') {
+      const accountTitle = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_TITLE?.trim();
+      const accountNumber = process.env.SUBSCRIPTION_US_BANK_ACCOUNT_NUMBER?.trim();
+      const bankName = process.env.SUBSCRIPTION_US_BANK_NAME?.trim();
+      return {
+        provider: PaymentProvider.BANK_TRANSFER, currency,
+        accountTitle: accountTitle ?? '', accountNumber: accountNumber ?? '', bankName: bankName ?? '',
+        configured: Boolean(accountTitle && accountNumber && bankName),
+      };
+    }
+    const accountTitle = process.env.SUBSCRIPTION_EASYPAISA_ACCOUNT_TITLE?.trim();
+    const mobileNumber = process.env.SUBSCRIPTION_EASYPAISA_MOBILE?.trim();
+    if (!accountTitle || !mobileNumber) {
+      throw new BadRequestException('Easypaisa subscription payment details are not configured.');
+    }
+    return { provider: PaymentProvider.EASYPAISA, currency, accountTitle, mobileNumber };
   }
 
-  return {
-    provider: PaymentProvider.EASYPAISA,
-    accountTitle,
-    mobileNumber,
-  };
-}
   // =========================================================
   // CURRENT SUBSCRIPTION
   // =========================================================
@@ -346,8 +365,15 @@ export class SubscriptionService {
       );
     }
 
-    const amountDue =
-      definition.monthlyPrice;
+    const currency = await this.billingCurrency(vendorId);
+    const amountDue = currency === 'USD' ? definition.monthlyPriceUSD : definition.monthlyPrice;
+    const instructions = await this.getPaymentInstructions(vendorId);
+    if (paymentProvider !== instructions.provider) {
+      throw new BadRequestException('Choose the configured payment provider for your country.');
+    }
+    if ('configured' in instructions && !instructions.configured) {
+      throw new BadRequestException('USA bank transfer instructions are not configured.');
+    }
 
     /**
      * Backend is the source of truth.
@@ -480,6 +506,7 @@ export class SubscriptionService {
        * Backend-controlled price snapshot.
        */
       amountDue,
+      currency,
 
       amountPaid:
         0,
@@ -683,6 +710,8 @@ export class SubscriptionService {
             paymentReference:
               subscription.paymentReference ??
               null,
+
+            currency: subscription.currency ?? 'PKR',
 
             amountDue:
               Number(

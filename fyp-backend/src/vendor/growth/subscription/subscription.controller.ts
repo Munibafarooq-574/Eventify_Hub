@@ -20,6 +20,7 @@ import {
   Matches,
   IsOptional,
   IsInt,
+  IsNumber,
   Min,
 } from 'class-validator';
 
@@ -50,8 +51,8 @@ class RequestSubscriptionPaymentDto {
   plan!: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
   expectedAmount?: number;
 
   @IsIn([
@@ -89,16 +90,14 @@ export class SubscriptionController {
   // =========================================================
 
   @Get('plans')
-  getPlans() {
-    return this.subscriptionService
-      .getPlans();
+  getPlans(@Query('vendorId') vendorId: string) {
+    return this.subscriptionService.getPlans(vendorId);
   }
 
   @Get('payment-instructions')
-getPaymentInstructions() {
-  return this.subscriptionService
-    .getPaymentInstructions();
-}
+  getPaymentInstructions(@Query('vendorId') vendorId: string) {
+    return this.subscriptionService.getPaymentInstructions(vendorId);
+  }
 
   // =========================================================
   // CURRENT

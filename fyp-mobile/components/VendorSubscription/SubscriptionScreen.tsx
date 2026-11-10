@@ -259,7 +259,7 @@ export default function SubscriptionScreen() {
           instructions,
         ] =
           await Promise.all([
-            getSubscriptionPlans(),
+            getSubscriptionPlans(vendorId),
 
             getSubscriptionAccessState(
               vendorId,
@@ -269,7 +269,7 @@ export default function SubscriptionScreen() {
               vendorId,
             ),
 
-            getSubscriptionPaymentInstructions(),
+            getSubscriptionPaymentInstructions(vendorId),
           ]);
 
         setPlans(
@@ -368,6 +368,11 @@ export default function SubscriptionScreen() {
       return;
     }
 
+    if (paymentInstructions?.configured === false) {
+      Alert.alert('Payments Unavailable', 'USA bank transfer instructions have not been configured yet. Please contact support.');
+      return;
+    }
+
     if (hasPendingPayment) {
       Alert.alert(
         'Payment Under Review',
@@ -425,7 +430,7 @@ export default function SubscriptionScreen() {
       ) {
         Alert.alert(
           'Payment Reference Required',
-          'Enter the Easypaisa transaction/reference ID after sending the payment.',
+          'Enter the transaction/reference ID after sending the payment.',
         );
 
         return;
@@ -433,7 +438,7 @@ export default function SubscriptionScreen() {
 
       Alert.alert(
         'Submit Payment?',
-       `Confirm that you have sent ${selectedPlan.priceLabel} through Easypaisa.\n\nActivation: ${
+       `Confirm that you have sent ${selectedPlan.priceLabel} through ${paymentInstructions?.provider === PaymentProvider.BANK_TRANSFER ? 'bank transfer' : 'Easypaisa'}.\n\nActivation: ${
       isUpgrade
     ? activationType === 'IMMEDIATE'
       ? 'Immediate — after Admin approval'
@@ -462,7 +467,7 @@ export default function SubscriptionScreen() {
                       expectedAmount: selectedPlan.monthlyPrice ?? undefined,
 
                       paymentProvider:
-                        PaymentProvider.EASYPAISA,
+                        paymentInstructions?.provider ?? PaymentProvider.EASYPAISA,
 
                       paymentReference:
                         reference,
@@ -1226,7 +1231,7 @@ export default function SubscriptionScreen() {
               }
             >
               Monthly subscription ·
-              manual Easypaisa payment
+              manual payment
             </Text>
           </View>
 
@@ -1399,12 +1404,12 @@ export default function SubscriptionScreen() {
                       style={[
                         styles.primaryButton,
 
-                                                (hasPendingPayment || !plan.monthlyPrice ||
+                                                (hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
                           !!accessState.scheduledSubscription) &&
                           styles.disabledButton,
                       ]}
                       disabled={
-                        hasPendingPayment || !plan.monthlyPrice ||
+                        hasPendingPayment || paymentInstructions?.configured === false || !plan.monthlyPrice ||
                         !!accessState.scheduledSubscription
                       }
                       onPress={() =>
@@ -1483,8 +1488,7 @@ export default function SubscriptionScreen() {
                         styles.paymentTitle
                       }
                     >
-                      Pay with
-                      Easypaisa
+                      Pay with {paymentInstructions?.provider === PaymentProvider.BANK_TRANSFER ? 'Bank Transfer' : 'Easypaisa'}
                     </Text>
 
                     <Text
@@ -1621,9 +1625,7 @@ export default function SubscriptionScreen() {
                     styles.instructionText
                   }
                 >
-                  Send the exact amount
-                  shown above to the
-                  Easypaisa account below.
+                  Send the exact amount shown above using the payment details below.
                 </Text>
 
                 <View
@@ -1660,7 +1662,7 @@ export default function SubscriptionScreen() {
                       styles.accountLabel
                     }
                   >
-                    Easypaisa Number
+                    {paymentInstructions?.provider === PaymentProvider.BANK_TRANSFER ? 'Bank / Account Number' : 'Easypaisa Number'}
                   </Text>
 
                   <Text
@@ -1668,9 +1670,9 @@ export default function SubscriptionScreen() {
                       styles.accountValue
                     }
                   >
-                    {paymentInstructions
-                      ?.mobileNumber ||
-                      'Not configured'}
+                    {paymentInstructions?.provider === PaymentProvider.BANK_TRANSFER
+                      ? `${paymentInstructions.bankName || ''} · ${paymentInstructions.accountNumber || 'Not configured'}`
+                      : paymentInstructions?.mobileNumber || 'Not configured'}
                   </Text>
                 </View>
 
@@ -1693,7 +1695,7 @@ export default function SubscriptionScreen() {
                   onChangeText={
                     setPaymentReference
                   }
-                  placeholder="Enter Easypaisa transaction ID"
+                  placeholder="Enter payment transaction ID"
                   placeholderTextColor="#9CA3AF"
                   autoCapitalize="characters"
                   autoCorrect={
@@ -1713,8 +1715,7 @@ export default function SubscriptionScreen() {
                 >
                   Enter the transaction
                   reference shown in your
-                  Easypaisa payment
-                  confirmation.
+                  payment confirmation.
                 </Text>
 
                 <TouchableOpacity

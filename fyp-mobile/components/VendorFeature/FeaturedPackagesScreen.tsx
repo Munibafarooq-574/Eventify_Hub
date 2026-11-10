@@ -115,7 +115,7 @@ const [selectedDuration, setSelectedDuration] = useState<number>(15);
         getVendorPackagesList(vendorIdValue),
         getMyFeaturedPackages(vendorIdValue),
         getVendorSubscription(vendorIdValue),
-        getSubscriptionPlans(),
+        getSubscriptionPlans(vendorIdValue),
       ]);
       setPackages(pkgs);
       setPromotions(mine);

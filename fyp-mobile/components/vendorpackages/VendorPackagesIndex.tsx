@@ -471,12 +471,11 @@ const PackageScreen = () => {
                 {packageDetails.pricingMethod === 'PER_PERSON' ? 'Price per person' : packageDetails.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
               </Text>
 
-              <Text style={styles.priceHeroValue}>
+              <Text style={styles.priceHeroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {currencySymbol(currencyOf(packageDetails))}{" "}
-                {packageDetails.price !==
-                undefined
-                  ? packageDetails.price.toLocaleString()
-                  : "N/A"} <PackagePriceBasis pkg={packageDetails} />
+                {packageDetails.price !== undefined
+                  ? Number(packageDetails.price).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                  : "N/A"}
               </Text>
             </View>
 
@@ -1457,6 +1456,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 30,
     fontWeight: "800",
+    textAlign: "center",
+    paddingHorizontal: 14,
+    width: "100%",
   },
 
   sectionBlock: {

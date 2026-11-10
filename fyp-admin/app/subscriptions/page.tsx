@@ -45,6 +45,7 @@ type SubscriptionPaymentRow = {
   paymentReference?: string | null;
 
   amountDue: number;
+  currency?: 'PKR' | 'USD';
 
   amountPaid: number;
 
@@ -83,8 +84,14 @@ type PageProps = {
   searchParams?: Promise<SearchParams>;
 };
 
-const money = (value?: number | null) =>
-  `Rs ${Number(value || 0).toLocaleString("en-PK")}`;
+const money = (value?: number | null, currency: 'PKR' | 'USD' = 'PKR') => {
+  const symbol = currency === 'USD' ? '$' : 'Rs.';
+  const formatted = Number(value || 0).toLocaleString(
+    currency === 'USD' ? 'en-US' : 'en-PK',
+    { minimumFractionDigits: currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
+  );
+  return symbol + ' ' + formatted;
+};
 
 const formatDateTime = (
   value?: string | null,
@@ -316,24 +323,13 @@ export default async function SubscriptionsPage({
         "FAILED",
     ).length;
 
-  const loadedRevenue =
-    items
-      .filter(
-        (item) =>
-          String(
-            item.paymentStatus,
-          ).toUpperCase() ===
-          "PAID",
-      )
-      .reduce(
-        (sum, item) =>
-          sum +
-          Number(
-            item.amountPaid ||
-              0,
-          ),
-        0,
-      );
+  const loadedRevenue = items
+    .filter(item => String(item.paymentStatus).toUpperCase() === 'PAID')
+    .reduce((sum, item) => {
+      const currency = item.currency === 'USD' ? 'USD' : 'PKR';
+      sum[currency] += Number(item.amountPaid || 0);
+      return sum;
+    }, { PKR: 0, USD: 0 });
 
   const statusFilters = [
     "ALL",
@@ -479,10 +475,8 @@ export default async function SubscriptionsPage({
                 </p>
 
                 <p className="mt-2 text-xs text-slate-400">
-                  {money(
-                    loadedRevenue,
-                  )}{" "}
-                  loaded revenue
+                  {money(loadedRevenue.PKR, 'PKR')} · {money(loadedRevenue.USD, 'USD')}{" "}
+                  loaded revenue (separate currencies)
                 </p>
               </div>
 
@@ -767,7 +761,7 @@ export default async function SubscriptionsPage({
                             <td className="px-5 py-4">
                               <p className="font-semibold text-slate-900">
                                 {money(
-                                  item.amountDue,
+                                  item.amountDue, item.currency,
                                 )}
                               </p>
 
@@ -778,7 +772,7 @@ export default async function SubscriptionsPage({
                                 <p className="mt-1 text-xs text-emerald-700">
                                   Paid:{" "}
                                   {money(
-                                    item.amountPaid,
+                                    item.amountPaid, item.currency,
                                   )}
                                 </p>
                               ) : null}

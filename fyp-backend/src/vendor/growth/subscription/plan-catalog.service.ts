@@ -5,6 +5,7 @@ import { getAllPlanDefinitions, getPlanDefinition, PlanDefinition } from '../pla
 import { FeatureKey, LimitKey, SubscriptionPlan } from './subscription.types';
 
 type CatalogPlan = Omit<PlanDefinition, 'key' | 'priceLabel' | 'features'> & {
+  monthlyPriceUSD?: number | null;
   rank: number;
   featureKeys: string[];
 };
@@ -63,6 +64,7 @@ export class PlanCatalogService {
       name: plan.name,
       description: plan.description,
       monthlyPrice: plan.monthlyPrice,
+      monthlyPriceUSD: null,
       isMostPopular: plan.isMostPopular,
       isPurchasable: plan.isPurchasable,
       limits: plan.limits,
@@ -78,6 +80,7 @@ export class PlanCatalogService {
       ...plan,
       featureKeys: [...enabled],
       key,
+      monthlyPriceUSD: plan.monthlyPriceUSD ?? null,
       priceLabel: plan.monthlyPrice === null
         ? 'Price not configured'
         : `Rs. ${plan.monthlyPrice.toLocaleString('en-PK')} / month`,
@@ -149,6 +152,7 @@ export class PlanCatalogService {
     if (!data || typeof data.name !== 'string' || !data.name.trim() || data.name.trim().length > 80 ||
         typeof data.description !== 'string' || data.description.trim().length > 500 ||
         typeof data.monthlyPrice !== 'number' || !Number.isSafeInteger(data.monthlyPrice) || data.monthlyPrice <= 0 ||
+        (data.monthlyPriceUSD != null && (typeof data.monthlyPriceUSD !== 'number' || !Number.isFinite(data.monthlyPriceUSD) || data.monthlyPriceUSD <= 0 || Math.round(data.monthlyPriceUSD * 100) !== data.monthlyPriceUSD * 100)) ||
         !Number.isSafeInteger(data.rank) || data.rank! < 1 ||
         typeof data.isPurchasable !== 'boolean' || typeof data.isMostPopular !== 'boolean' ||
         !Array.isArray(data.featureKeys) || !data.limits || typeof data.limits !== 'object') {
@@ -169,6 +173,7 @@ export class PlanCatalogService {
     }
     const plan: CatalogPlan = {
       name: data.name.trim(), description: data.description.trim(), monthlyPrice: data.monthlyPrice,
+      monthlyPriceUSD: data.monthlyPriceUSD ?? null,
       rank: data.rank!, isPurchasable: data.isPurchasable, isMostPopular: data.isMostPopular,
       featureKeys: [...new Set(data.featureKeys)], limits,
     };
