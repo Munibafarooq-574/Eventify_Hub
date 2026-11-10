@@ -84,8 +84,14 @@ type PageProps = {
   searchParams?: Promise<SearchParams>;
 };
 
-const money = (value?: number | null, currency: 'PKR' | 'USD' = 'PKR') =>
-  `${currency === 'USD' ? '
+const money = (value?: number | null, currency: 'PKR' | 'USD' = 'PKR') => {
+  const symbol = currency === 'USD' ? '$' : 'Rs.';
+  const formatted = Number(value || 0).toLocaleString(
+    currency === 'USD' ? 'en-US' : 'en-PK',
+    { minimumFractionDigits: currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
+  );
+  return symbol + ' ' + formatted;
+};
 
 const formatDateTime = (
   value?: string | null,
