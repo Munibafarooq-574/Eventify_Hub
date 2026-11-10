@@ -194,4 +194,5 @@ export interface SubscriptionPaymentInstructions {
   mobileNumber?: string;
   accountNumber?: string;
   bankName?: string;
+  configured?: boolean;
 }
