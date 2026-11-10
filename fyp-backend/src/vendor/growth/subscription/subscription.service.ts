@@ -1,4 +1,6 @@
 import { randomUUID } from 'crypto';
+import { EmailService } from '../../../email/email.service';
+import { renderEventifyPaymentEmail, emailReceiptSection } from '../../../email/payment-email-layout';
 // fyp-backend/src/vendor/growth/subscription/subscription.service.ts
 
 import {
@@ -59,6 +61,7 @@ export class SubscriptionService {
     @InjectConnection()
     private readonly connection: Connection,
     private readonly catalog: PlanCatalogService,
+    private readonly emailService: EmailService,
   ) {}
 
   // =========================================================
@@ -292,6 +295,7 @@ export class SubscriptionService {
      paymentReference: string | undefined,
     activationType: SubscriptionActivationType,
     expectedAmount?: number,
+    sendReceipt = true,
   ): Promise<VendorSubscriptionDocument> {
     this.assertValidId(vendorId);
 
@@ -495,6 +499,7 @@ export class SubscriptionService {
         PaymentStatus.PENDING,
 
       paymentProvider,
+      sendReceipt,
 
       paymentReference:
         normalizedReference,
@@ -923,7 +928,823 @@ export class SubscriptionService {
       throw new Error('Subscription review did not complete.');
     }
 
+    // Do not send email inside the transaction: only committed, approved
+    // subscription payments receive receipts. Email errors never reverse payment.
+    if (reviewedSubscription.paymentStatus === PaymentStatus.PAID &&
+        reviewedSubscription.sendReceipt !== false && this.emailService) {
+      try {
+        const vendor = await this.userModel.findById(reviewedSubscription.vendorId)
+          .select('email name contactDetails.brandName').lean();
+        if (vendor?.email) {
+          const planName = reviewedSubscription.entitlementSnapshot?.name ||
+            (await this.catalog.get(reviewedSubscription.plan))?.name || reviewedSubscription.plan;
+          await this.emailService.sendTransactionalEmail({
+            to: vendor.email,
+            senderName: 'Eventify Hub',
+            subject: `Subscription Payment Receipt — ${planName} | Eventify Hub`,
+            html: this.buildSubscriptionPaymentReceiptEmail({
+              vendorName: vendor.name || 'Vendor',
+              brandName: vendor.contactDetails?.brandName || null,
+              planName,
+              amount: reviewedSubscription.amountPaid,
+              currency: reviewedSubscription.currency || 'PKR',
+              provider: reviewedSubscription.paymentProvider,
+              reference: reviewedSubscription.paymentReference || 'N/A',
+              verifiedAt: reviewedSubscription.verifiedAt,
+              startsAt: reviewedSubscription.startDate,
+              endsAt: reviewedSubscription.endDate,
+              scheduled: reviewedSubscription.status === SubscriptionStatus.SCHEDULED,
+            }),
+          });
+        }
+      } catch (error) {
+        console.error('[Subscription Payment Receipt Email Failed]',
+          error instanceof Error ? error.message : error);
+      }
+    }
+
     return reviewedSubscription;
+  }
+
+  private buildSubscriptionPaymentReceiptEmail(data: {
+    vendorName: string;
+    brandName?: string | null;
+    planName: string;
+    amount: number;
+    currency: 'PKR' | 'USD';
+    provider: PaymentProvider;
+    reference: string;
+    verifiedAt: Date | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    scheduled: boolean;
+  }): string {
+    const money = `${data.currency === 'USD' ? '
+  // =========================================================
+
+  /**
+   * Kept temporarily for backward compatibility.
+   *
+   * Production Vendor UI must not use this flow.
+   */
+  async activateDemoPlan(
+    vendorId: string,
+    plan: SubscriptionPlan,
+  ): Promise<VendorSubscriptionDocument> {
+    this.assertValidId(vendorId);
+
+    const demoDefinition = await this.catalog.getPurchasable(plan);
+
+    const vendorObjectId =
+      new Types.ObjectId(vendorId);
+
+    const now =
+      new Date();
+
+    const endDate =
+      new Date(now);
+
+    endDate.setDate(
+      endDate.getDate() +
+        DEMO_SUBSCRIPTION_DURATION_DAYS,
+    );
+
+    await this.subscriptionModel.updateMany(
+      {
+        vendorId:
+          vendorObjectId,
+
+        isCurrent:
+          true,
+      },
+      {
+        $set: {
+          isCurrent:
+            false,
+        },
+      },
+    );
+
+    return this.subscriptionModel.create({
+      vendorId:
+        vendorObjectId,
+
+      plan,
+      entitlementSnapshot: this.snapshotPlan(demoDefinition),
+
+      status:
+        SubscriptionStatus.ACTIVE,
+
+      startDate:
+        now,
+
+      endDate,
+
+      paymentStatus:
+        PaymentStatus.DEMO,
+
+      paymentProvider:
+        PaymentProvider.DEMO,
+
+      paymentReference:
+        `DEMO-${vendorId}-${now.getTime()}`,
+
+      amountDue:
+        0,
+
+      amountPaid:
+        0,
+
+      paymentSubmittedAt:
+        null,
+
+      verifiedAt:
+        null,
+
+      verifiedBy:
+        null,
+
+      rejectionReason:
+        null,
+
+      isCurrent:
+        true,
+
+      cancelledReason:
+        null,
+    });
+  }
+
+  // =========================================================
+  // CANCEL RENEWAL
+  // =========================================================
+
+  async cancelSubscription(
+    vendorId: string,
+    reason?: string,
+  ): Promise<VendorSubscriptionDocument> {
+    this.assertValidId(vendorId);
+
+    const current =
+      await this.getCurrentSubscription(
+        vendorId,
+      );
+
+    /**
+     * BASIC trial cannot be cancelled as
+     * a paid subscription because it has
+     * no renewal/payment yet.
+     */
+    if (
+      current.status ===
+        SubscriptionStatus.TRIAL ||
+      current.plan ===
+        SubscriptionPlan.FREE
+    ) {
+      throw new BadRequestException(
+        'A free trial cannot be cancelled as a paid subscription.',
+      );
+    }
+
+    if (
+      current.status ===
+      SubscriptionStatus.EXPIRED
+    ) {
+      throw new BadRequestException(
+        'This subscription has already expired.',
+      );
+    }
+
+    if (
+      current.status ===
+      SubscriptionStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Subscription renewal is already cancelled.',
+      );
+    }
+
+    if (
+      current.status !==
+      SubscriptionStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Only an active paid subscription can be cancelled.',
+      );
+    }
+
+    current.status =
+      SubscriptionStatus.CANCELLED;
+
+    current.cancelledReason =
+      reason?.trim() || null;
+
+    await current.save();
+
+    return current;
+  }
+
+  // =========================================================
+  // ACCESS STATE
+  // =========================================================
+
+  async isSubscriptionRequired(
+    vendorId: string,
+  ): Promise<boolean> {
+    const current =
+      await this.getCurrentSubscription(
+        vendorId,
+      );
+
+    return (
+      current.status ===
+      SubscriptionStatus.EXPIRED
+    );
+  }
+
+  async getSubscriptionAccessState(
+    vendorId: string,
+  ) {
+    const subscription =
+      await this.getCurrentSubscription(
+        vendorId,
+      );
+
+    const endTime =
+      subscription.endDate
+        ? new Date(
+            subscription.endDate,
+          ).getTime()
+        : null;
+
+    const remainingMs =
+      endTime !== null
+        ? Math.max(
+            endTime -
+              Date.now(),
+            0,
+          )
+        : 0;
+
+    const remainingDays =
+      endTime !== null
+        ? Math.ceil(
+            remainingMs /
+              (
+                1000 *
+                60 *
+                60 *
+                24
+              ),
+          )
+        : 0;
+
+    const expired =
+      subscription.status ===
+      SubscriptionStatus.EXPIRED;
+
+      const accessAllowed =
+  subscription.status === SubscriptionStatus.TRIAL ||
+  subscription.status === SubscriptionStatus.ACTIVE ||
+  (
+    subscription.status === SubscriptionStatus.CANCELLED &&
+    Boolean(
+      subscription.endDate &&
+      new Date(subscription.endDate).getTime() > Date.now()
+    )
+  );
+
+    /**
+     * Trial is now lifecycle status,
+     * not SubscriptionPlan.TRIAL.
+     */
+    const isTrial =
+      subscription.status ===
+      SubscriptionStatus.TRIAL;
+
+    /**
+     * BASIC during TRIAL is not a paid plan.
+     *
+     * A paid plan must be:
+     *
+     * status        = ACTIVE
+     * paymentStatus = PAID
+     */
+    const isPaidPlan =
+      (subscription.status === SubscriptionStatus.ACTIVE ||
+        (subscription.status === SubscriptionStatus.CANCELLED && accessAllowed)) &&
+      subscription.paymentStatus ===
+        PaymentStatus.PAID &&
+      subscription.plan !== SubscriptionPlan.FREE;
+
+    /**
+     * Payment request exists separately from
+     * current access so active trial/paid plan
+     * remains untouched until approval.
+     */
+    const pendingPayment =
+      await this.subscriptionModel
+        .findOne({
+          vendorId:
+            new Types.ObjectId(
+              vendorId,
+            ),
+
+          status:
+            SubscriptionStatus.PENDING_PAYMENT,
+
+          paymentStatus:
+            PaymentStatus.PENDING,
+        })
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+        const scheduledSubscription =
+  await this.subscriptionModel
+    .findOne({
+      vendorId: new Types.ObjectId(vendorId),
+      status: SubscriptionStatus.SCHEDULED,
+      paymentStatus: PaymentStatus.PAID,
+      isCurrent: false,
+    })
+    .sort({ scheduledActivationDate: 1 })
+    .lean();
+
+    const planDefinition = await this.getPlanForSubscription(subscription);
+
+/**
+ * Expired vendors keep their historical plan,
+ * but subscription-controlled entitlements
+ * must no longer be usable.
+ *
+ * We do NOT delete packages/images here.
+ * Actual create/upload enforcement will be
+ * added in Phase 14A.7.
+ */
+const entitlementFeatures =
+  expired
+    ? Object.fromEntries(
+        Object.keys(
+          planDefinition.features,
+        ).map((key) => [
+          key,
+          false,
+        ]),
+      )
+    : planDefinition.features;
+
+const entitlementLimits =
+  expired
+    ? Object.fromEntries(
+        Object.keys(
+          planDefinition.limits,
+        ).map((key) => [
+          key,
+          0,
+        ]),
+      )
+    : planDefinition.limits; 
+
+        return {
+      subscription,
+
+      scheduledSubscription: scheduledSubscription
+  ? {
+      subscriptionId: String(scheduledSubscription._id),
+      plan: scheduledSubscription.plan,
+      activationType: scheduledSubscription.activationType,
+      planChangeType: scheduledSubscription.planChangeType,
+      scheduledActivationDate:
+        scheduledSubscription.scheduledActivationDate,
+      startDate: scheduledSubscription.startDate,
+      endDate: scheduledSubscription.endDate,
+      paymentStatus: scheduledSubscription.paymentStatus,
+    }
+  : null,
+
+      isTrial,
+     
+      effectivePlan:
+  subscription.plan,
+      planName: planDefinition.name,
+      planRank: planDefinition.rank,
+      featureLabels: accessAllowed ? planDefinition.featureLabels : [],
+
+features:
+  entitlementFeatures,
+
+limits:
+  entitlementLimits,
+
+isPaidPlan,
+       accessAllowed,
+      subscriptionRequired:
+        expired,
+
+      hasPendingPayment:
+        Boolean(
+          pendingPayment,
+        ),
+
+      pendingPayment:
+        pendingPayment
+          ? {
+              subscriptionId:
+                String(
+                  pendingPayment._id,
+                ),
+
+              plan:
+                pendingPayment.plan,
+
+              amountDue:
+                Number(
+                  pendingPayment.amountDue ??
+                  0,
+                ),
+
+              paymentProvider:
+                pendingPayment.paymentProvider,
+
+              paymentReference:
+                pendingPayment.paymentReference,
+
+              paymentStatus:
+                pendingPayment.paymentStatus,
+
+              submittedAt:
+                pendingPayment.paymentSubmittedAt ??
+                null,
+            }
+          : null,
+
+      /**
+       * Authoritative backend values.
+       *
+       * Mobile should display these instead
+       * of calculating its own trial duration.
+       */
+      trialDaysRemaining:
+        isTrial &&
+        !expired
+          ? remainingDays
+          : 0,
+
+      daysRemaining:
+        !expired
+          ? remainingDays
+          : 0,
+
+      trialEndDate:
+        isTrial
+          ? subscription.endDate
+          : null,
+    };
+  }
+
+  // =========================================================
+  // INITIAL 7-DAY BASIC TRIAL
+  // =========================================================
+
+  private async createInitialTrial(
+  vendorObjectId: Types.ObjectId,
+): Promise<VendorSubscriptionDocument> {
+  const existing = await this.subscriptionModel.findOne({
+    vendorId: vendorObjectId,
+    isCurrent: true,
+  });
+
+  if (existing) return existing;
+
+  await this.connection.transaction(async (session): Promise<void> => {
+    const vendor = await this.userModel
+      .findOneAndUpdate(
+        { _id: vendorObjectId },
+        { $currentDate: { updatedAt: true } },
+        { new: true, session },
+      )
+      .select('_id role createdAt created_at');
+
+    if (!vendor) {
+      throw new NotFoundException('Vendor not found.');
+    }
+
+    if (String(vendor.role).toLowerCase() !== 'vendor') {
+      throw new BadRequestException(
+        'Subscription is available only for Vendor accounts.',
+      );
+    }
+
+    const current = await this.subscriptionModel
+      .findOne({
+        vendorId: vendorObjectId,
+        isCurrent: true,
+      })
+      .session(session);
+
+    if (current) return;
+
+    const vendorCreatedAt = (vendor as any).createdAt
+  ? new Date((vendor as any).createdAt)
+  : vendor.created_at
+    ? new Date(vendor.created_at)
+    : null;
+
+if (!vendorCreatedAt || !Number.isFinite(vendorCreatedAt.getTime())) {
+  throw new BadRequestException(
+    'Vendor creation date is missing or invalid. Trial cannot be initialized.',
+  );
+}
+
+    const trialEndDate = new Date(vendorCreatedAt);
+
+    trialEndDate.setDate(
+      trialEndDate.getDate() + VENDOR_TRIAL_DURATION_DAYS,
+    );
+
+    const alreadyExpired =
+      trialEndDate.getTime() <= Date.now();
+
+    await this.subscriptionModel.create(
+      [
+        {
+          vendorId: vendorObjectId,
+          plan: SubscriptionPlan.BASIC,
+          status: alreadyExpired
+            ? SubscriptionStatus.EXPIRED
+            : SubscriptionStatus.TRIAL,
+          startDate: vendorCreatedAt,
+          endDate: trialEndDate,
+          paymentStatus: PaymentStatus.NONE,
+          paymentProvider: PaymentProvider.NONE,
+          paymentReference: null,
+          amountDue: 0,
+          amountPaid: 0,
+          paymentSubmittedAt: null,
+          verifiedAt: null,
+          verifiedBy: null,
+          rejectionReason: null,
+          isCurrent: true,
+          cancelledReason: null,
+        },
+      ],
+      { session },
+    );
+  });
+
+  const subscription = await this.subscriptionModel.findOne({
+    vendorId: vendorObjectId,
+    isCurrent: true,
+  });
+
+  if (!subscription) {
+    throw new Error('Initial subscription could not be created.');
+  }
+
+  return subscription;
+}
+
+  // =========================================================
+  // LEGACY FREE → BASIC TRIAL MIGRATION
+  // =========================================================
+
+  private async convertLegacyFreeToTrial(
+    subscription:
+      VendorSubscriptionDocument,
+  ): Promise<VendorSubscriptionDocument> {
+    const vendor =
+      await this.userModel
+        .findById(
+          subscription.vendorId,
+        )
+        .select(
+          'role createdAt',
+        )
+        .lean();
+
+    if (!vendor) {
+      throw new NotFoundException(
+        'Vendor not found.',
+      );
+    }
+
+    /**
+     * Use original account creation date.
+     *
+     * Never grant seven fresh days simply because
+     * an old FREE document is being migrated now.
+     */
+    const vendorCreatedAt =
+      (vendor as any).createdAt
+        ? new Date(
+            (vendor as any)
+              .createdAt,
+          )
+        : subscription.startDate;
+
+    const trialEndDate =
+      new Date(
+        vendorCreatedAt,
+      );
+
+    trialEndDate.setDate(
+      trialEndDate.getDate() +
+        VENDOR_TRIAL_DURATION_DAYS,
+    );
+
+    /**
+     * Legacy FREE becomes BASIC entitlement.
+     */
+    subscription.plan =
+      SubscriptionPlan.BASIC;
+
+    subscription.startDate =
+      vendorCreatedAt;
+
+    subscription.endDate =
+      trialEndDate;
+
+    subscription.status =
+      trialEndDate.getTime() <=
+      Date.now()
+        ? SubscriptionStatus.EXPIRED
+        : SubscriptionStatus.TRIAL;
+
+    subscription.paymentStatus =
+      PaymentStatus.NONE;
+
+    subscription.paymentProvider =
+      PaymentProvider.NONE;
+
+    subscription.paymentReference =
+      null;
+
+    subscription.amountDue =
+      0;
+
+    subscription.amountPaid =
+      0;
+
+    subscription.paymentSubmittedAt =
+      null;
+
+    subscription.verifiedAt =
+      null;
+
+    subscription.verifiedBy =
+      null;
+
+    subscription.rejectionReason =
+      null;
+
+    subscription.cancelledReason =
+      null;
+
+    subscription.isCurrent =
+      true;
+
+    await subscription.save();
+
+    return subscription;
+  }
+
+  // =========================================================
+  // EXPIRY
+  // =========================================================
+
+  private async expireIfNeeded(
+    subscription:
+      VendorSubscriptionDocument,
+  ): Promise<VendorSubscriptionDocument> {
+    if (
+      subscription.status ===
+      SubscriptionStatus.EXPIRED
+    ) {
+      return subscription;
+    }
+
+    /**
+     * Pending/rejected payment records are not
+     * lifecycle entitlements and should not be
+     * automatically expired here.
+     */
+    if (
+      subscription.status ===
+        SubscriptionStatus.PENDING_PAYMENT ||
+      subscription.status ===
+        SubscriptionStatus.REJECTED
+    ) {
+      return subscription;
+    }
+
+    if (!subscription.endDate) {
+      return subscription;
+    }
+
+    if (
+      subscription.endDate.getTime() >
+      Date.now()
+    ) {
+      return subscription;
+    }
+
+    /**
+     * Applies to:
+     *
+     * TRIAL
+     * ACTIVE
+     * CANCELLED
+     *
+     * once their endDate is reached.
+     */
+    subscription.status =
+      SubscriptionStatus.EXPIRED;
+
+    /**
+     * Keep expired entitlement as current.
+     *
+     * This allows subscription/access endpoints
+     * to return:
+     *
+     * subscriptionRequired = true
+     *
+     * instead of silently creating a fresh trial.
+     */
+    subscription.isCurrent =
+      true;
+
+    await subscription.save();
+
+    return subscription;
+  }
+
+  // =========================================================
+  // VALIDATION
+  // =========================================================
+
+  private assertManualPaymentProvider(
+    provider: PaymentProvider,
+  ) {
+    if (
+      ![
+        PaymentProvider.BANK_TRANSFER,
+        PaymentProvider.CARD_TEST,
+        PaymentProvider.JAZZCASH,
+        PaymentProvider.EASYPAISA,
+      ].includes(provider)
+    ) {
+      throw new BadRequestException(
+        'Choose Bank Transfer, JazzCash, or Easypaisa.',
+      );
+    }
+  }
+
+  private assertValidId(
+    vendorId: string,
+  ) {
+    if (
+      !Types.ObjectId.isValid(
+        vendorId,
+      )
+    ) {
+      throw new BadRequestException(
+        'Invalid vendorId.',
+      );
+    }
+  }
+} : 'Rs.'} ${Number(data.amount || 0).toLocaleString(
+      data.currency === 'USD' ? 'en-US' : 'en-PK',
+      { minimumFractionDigits: data.currency === 'USD' ? 2 : 0, maximumFractionDigits: 2 },
+    )}`;
+    const date = (value?: Date | null) => value && Number.isFinite(new Date(value).getTime())
+      ? new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC', hour12: true }) + ' (UTC)'
+      : 'N/A';
+    const method = data.provider === PaymentProvider.CARD_TEST ? 'Credit / Debit Card (Test)' :
+      data.provider === PaymentProvider.EASYPAISA ? 'Easypaisa' :
+      data.provider === PaymentProvider.BANK_TRANSFER ? 'Bank Transfer' : data.provider;
+    const content = `
+      <div style="font-size:22px;font-weight:700;color:#278A4B;">Payment Successful</div>
+      <p>Your subscription payment has been verified and approved by Eventify Hub.</p>
+      ${emailReceiptSection('Subscription Details', [
+        ['Vendor', data.vendorName],
+        ['Business', data.brandName || data.vendorName],
+        ['Plan', data.planName],
+        ['Activation', data.scheduled ? 'Scheduled after current plan expires' : 'Active'],
+        ['Starts At', date(data.startsAt)],
+        ['Valid Until', date(data.endsAt)],
+      ])}
+      ${emailReceiptSection('Payment Details', [
+        ['Amount Paid', money],
+        ['Payment Method', method],
+        ['Transaction Reference', data.reference],
+        ['Verified At', date(data.verifiedAt)],
+        ['Payment Status', 'Paid — Admin Verified'],
+      ])}
+      <p style="margin-top:24px;color:#766B73;">${data.scheduled ? 'Your current plan remains active until the scheduled start date. ' : ''}You can view your subscription details inside the Eventify Hub app.</p>
+    `;
+    return renderEventifyPaymentEmail('Subscription Payment Receipt', content);
   }
 
   // =========================================================
