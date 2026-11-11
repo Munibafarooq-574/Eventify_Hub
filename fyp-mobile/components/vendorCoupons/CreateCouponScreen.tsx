@@ -282,34 +282,32 @@ export default function CreateCouponScreen() {
         )}
 
        <Field label="Apply Discount To">
-  <View style={styles.scopeChoices}>
+  <View style={styles.segment}>
     {([
-      { key: 'all', label: 'All My Packages' },
-      { key: 'selected', label: 'Selected Packages Only' },
+      { key: 'all', label: 'All Packages', icon: 'layers-outline' },
+      { key: 'selected', label: 'Selected Only', icon: 'pricetags-outline' },
     ] as const).map(opt => {
       const active = packageScope === opt.key;
+      const disabled = opt.key === 'all' && (hasOccupiedPackages || packagesLoading || packagesError);
       return (
         <TouchableOpacity
           key={opt.key}
           activeOpacity={0.85}
-          disabled={opt.key === 'all' && (hasOccupiedPackages || packagesLoading || packagesError)}
+          disabled={disabled}
           accessibilityRole="radio"
-          accessibilityState={{ checked: active, disabled: opt.key === 'all' && hasOccupiedPackages }}
+          accessibilityState={{ checked: active, disabled }}
           onPress={() => {
             setPackageScope(opt.key);
             if (opt.key === 'all') setSelectedPackageIds([]);
           }}
-          style={[styles.scopeChoice, active && styles.scopeChoiceActive, opt.key === 'all' && hasOccupiedPackages && styles.disabledOption]}
+          style={[styles.segmentItem, active && styles.segmentItemActive, disabled && styles.disabledOption]}
         >
-          <View style={[styles.scopeCircle, active && styles.scopeCircleActive]}>
-            {active && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
-          </View>
-          <Text style={[styles.scopeChoiceText, active && styles.scopeChoiceTextActive]}>{opt.label}</Text>
+          <Ionicons name={opt.icon} size={16} color={active ? '#FFFFFF' : COLORS.muted} />
+          <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{opt.label}</Text>
         </TouchableOpacity>
       );
     })}
   </View>
-
   {hasOccupiedPackages && (
     <Text style={styles.occupiedHint}>
       Packages with an active coupon or discount code are locked until the vendor cancels that offer.
@@ -601,7 +599,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 6,
     borderWidth: 1.5,
     borderColor: '#D2C6D5',
     backgroundColor: '#FFFFFF',
