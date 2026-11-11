@@ -35,6 +35,20 @@ export function pricingLabel(pkg: PackagePricing, legacyPerPerson = false) {
 }
 
 export function pricingFieldsError(pkg: PackagePricing) {
-  return pkg.pricingMethod === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)
-    ? 'Enter the number of people included in one group package.' : '';
+  if (pkg.pricingMethod === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)) {
+    return 'Enter the number of people included in one group package.';
+  }
+  if (pkg.capacityUnit === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)) {
+    return 'Select Group Package pricing and enter its serving size.';
+  }
+  if (pkg.capacityUnit === 'GROUP' && pkg.pricingMethod !== 'GROUP') {
+    return 'Group capacity requires Group Package pricing.';
+  }
+  for (const field of ['maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
+    const value = pkg[field];
+    if (value !== undefined && (!Number.isSafeInteger(value) || Number(value) < 1)) {
+      return 'Capacity values must be positive whole numbers.';
+    }
+  }
+  return '';
 }
