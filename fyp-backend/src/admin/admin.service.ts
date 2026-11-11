@@ -1,3 +1,4 @@
+import { adminVendorCity } from './admin-city-display';
 import { currencyOf } from '../common/utils/currency';
 // fyp-backend/src/admin/admin.service.ts
 
@@ -662,6 +663,7 @@ export class AdminService {
                         'buisnessCategory',
 
                         'contactDetails',
+                        'businessCityId',
 
                         'coverImage',
 
@@ -705,6 +707,7 @@ export class AdminService {
                 .limit(
                     safeLimit,
                 )
+                .populate({ path: 'businessCityId', select: 'name stateProvinceName countryName' })
                 .lean();
 
         // --------------------------------------------------------
@@ -774,12 +777,7 @@ export class AdminService {
                             ?.trim?.() ||
                         'N/A',
 
-                    city:
-                        vendor
-                            .contactDetails
-                            ?.city
-                            ?.trim?.() ||
-                        'N/A',
+                    city: adminVendorCity(vendor),
 
                     brandLogo:
                         vendor
@@ -905,6 +903,7 @@ export class AdminService {
                 'categoryId',
                 'buisnessCategory',
                 'contactDetails',
+                'businessCityId',
                 'coverImage',
                 'images',
                 'packages',
@@ -923,6 +922,7 @@ export class AdminService {
                 'updatedAt',
             ].join(' '),
         )
+        .populate({ path: 'businessCityId', select: 'name stateProvinceName countryName' })
         .lean();
 
     if (!vendor) {
@@ -976,9 +976,7 @@ export class AdminService {
             data.phone_number?.trim?.() ||
             'N/A',
 
-        city:
-            data.contactDetails?.city?.trim?.() ||
-            'N/A',
+        city: adminVendorCity(data),
 
         officialAddress:
             data.contactDetails?.officialAddress?.trim?.() ||
