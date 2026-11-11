@@ -750,7 +750,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
                       uri: campaignImage.uri,
                     }}
                     style={styles.selectedImage}
-                    resizeMode="cover"
+                    resizeMode={displayMode === 'POSTER' ? 'contain' : 'cover'}
                   />
 
                   <View style={styles.imageOverlay}>
