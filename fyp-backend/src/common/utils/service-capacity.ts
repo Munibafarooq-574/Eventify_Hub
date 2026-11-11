@@ -41,7 +41,8 @@ export function checkServiceCapacity(
     throw new BadRequestException('Enter a positive whole number for service requirements.');
   }
   const groupSize = capacity.capacityUnit === 'GROUP' ? capacity.peopleIncludedPerGroup! : null;
-  const unitsNeeded = groupSize ? Math.ceil(requiredPeople / groupSize) : requiredUnits;
+  const unitsNeeded = groupSize ? Math.ceil(requiredPeople / groupSize) :
+    capacity.capacityUnit === 'PERSON' ? requiredPeople : requiredUnits;
   if (capacity.maxPeoplePerBooking != null && requiredPeople > capacity.maxPeoplePerBooking) {
     throw new BadRequestException(`This package supports at most ${capacity.maxPeoplePerBooking} people per booking.`);
   }
