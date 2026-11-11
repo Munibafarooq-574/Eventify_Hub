@@ -270,8 +270,9 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
       const result =
         await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
-          allowsEditing: true,
-          aspect: [16, 9],
+          // Keep the original image dimensions on Android and iOS.
+          // Editing with a fixed aspect ratio permanently crops poster artwork.
+          allowsEditing: false,
           quality: 0.85,
           selectionLimit: 1,
         });
@@ -740,7 +741,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
             </View>
             <TouchableOpacity
               activeOpacity={0.85}
-              style={styles.imagePicker}
+              style={[styles.imagePicker, displayMode === 'POSTER' && styles.posterImagePicker]}
               onPress={pickCampaignImage}
             >
               {campaignImage ? (
@@ -750,7 +751,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
                       uri: campaignImage.uri,
                     }}
                     style={styles.selectedImage}
-                    resizeMode={displayMode === 'POSTER' ? 'contain' : 'cover'}
+                    resizeMode="contain"
                   />
 
                   <View style={styles.imageOverlay}>
@@ -1739,6 +1740,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
+  posterImagePicker: { height: 400, backgroundColor: '#F7F0E9' },
   imagePicker: {
     height: 190,
     borderRadius: 20,
