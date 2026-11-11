@@ -803,8 +803,15 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
             <SectionHeader
               number="3"
               title="Campaign Details"
-              subtitle="Tell clients what makes this offer special"
+              subtitle={displayMode === 'POSTER'
+                ? 'Required for campaign management; not printed over your poster'
+                : 'Tell clients what makes this offer special'}
             />
+            {displayMode === 'POSTER' && (
+              <Text style={styles.posterDetailsNote}>
+                Campaign Title and Short Description are required, but will not appear on your uploaded poster. Offer Label is optional.
+              </Text>
+            )}
 
             <InputLabel
               label="Campaign Title"
@@ -1555,6 +1562,11 @@ function CalendarModal({
 
 const styles = StyleSheet.create({
   posterModeChoices: { gap: 10, marginBottom: 14 },
+  posterDetailsNote: {
+    fontSize: 12, lineHeight: 18, color: '#756874',
+    backgroundColor: '#FBF1F8', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 9, marginBottom: 13,
+  },
   posterModeCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E8DCE7',
