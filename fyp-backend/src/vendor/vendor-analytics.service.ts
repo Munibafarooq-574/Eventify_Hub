@@ -1,4 +1,4 @@
-import { currencyOf } from '../common/utils/currency';
+import { countryCurrency, currencyOf } from '../common/utils/currency';
 // fyp-backend/src/vendor/vendor-analytics.service.ts
 //
 // NEW FILE. Add this to VendorModule's `providers` array and export it if
@@ -175,7 +175,13 @@ export class VendorAnalyticsService {
         const totalCount = allVendorOrders.length;
         const cancelledOrders = allVendorOrders.filter((vo) => vo.status === 'cancelled').length;
         const completedAll = allVendorOrders.filter((vo) => vo.status === 'completed');
-        const currency = allVendorOrders.some(vo => currencyOf(vo) === 'USD') ? 'USD' as const : 'PKR' as const;
+        // Revenue is grouped by its original recorded currency; never convert or
+        // relabel historical orders. The primary reporting currency is the
+        // vendor's registered marketplace, even with zero orders.
+        const vendor = await this.userModel.findById(vendorObjId)
+            .select('marketplaceCountryCode')
+            .lean();
+        const currency = countryCurrency(vendor?.marketplaceCountryCode);
         const revenueByCurrency = { PKR: 0, USD: 0 };
         for (const booking of completedAll) revenueByCurrency[currencyOf(booking)] += Number(booking.price || 0);
         const completed = completedAll.filter(vo => currencyOf(vo) === currency);
