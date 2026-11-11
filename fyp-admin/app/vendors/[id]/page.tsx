@@ -23,6 +23,20 @@ type VendorPackage = {
   packageName?: string;
   price?: number;
   services?: string;
+  currency?: 'PKR' | 'USD';
+  pricingMethod?: string;
+  groupSize?: number;
+  capacityUnit?: string;
+  peopleIncludedPerGroup?: number;
+  maxPeoplePerBooking?: number;
+  maxUnitsPerBooking?: number;
+  availableParallelUnits?: number;
+  bookingType?: string;
+  baseIncludedDurationMinutes?: number;
+  allowCustomDuration?: boolean;
+  customDurationRate?: number;
+  customDurationUnit?: string;
+  durations?: {value: number; unit: string; price: number}[];
 };
 
 type Category = {
@@ -768,6 +782,20 @@ export default async function VendorDetailPage({
                           </div>
                         </div>
 
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                          <div>Pricing: {pkg.pricingMethod || 'Legacy fixed'}</div>
+                          <div>Booking: {pkg.bookingType || 'Not specified'}</div>
+                          {pkg.capacityUnit && <div>Service unit: {pkg.capacityUnit}</div>}
+                          {pkg.groupSize != null && <div>People per group: {pkg.groupSize}</div>}
+                          {pkg.maxPeoplePerBooking != null && <div>Maximum people: {pkg.maxPeoplePerBooking}</div>}
+                          {pkg.maxUnitsPerBooking != null && <div>Maximum units: {pkg.maxUnitsPerBooking}</div>}
+                          {pkg.availableParallelUnits != null && <div>Parallel resources: {pkg.availableParallelUnits}</div>}
+                          {pkg.baseIncludedDurationMinutes != null && <div>Included duration: {pkg.baseIncludedDurationMinutes} minutes</div>}
+                          {pkg.allowCustomDuration && <div>Custom duration: {money(pkg.customDurationRate, currencyOf(pkg))} / {pkg.customDurationUnit || 'unit'}</div>}
+                        </div>
+                        {!!pkg.durations?.length && <div className="mt-2 text-xs text-slate-600">
+                          Duration options: {pkg.durations.map(d => `${d.value} ${d.unit.toLowerCase()} — ${money(d.price, currencyOf(pkg))}`).join(' · ')}
+                        </div>}
                         {pkg.services ? (
                           <p className="mt-4 whitespace-pre-line text-sm leading-6 text-slate-600">
                             {
