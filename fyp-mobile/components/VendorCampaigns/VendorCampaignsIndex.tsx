@@ -27,6 +27,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  LayoutAnimation,
   Image,
   Platform,
   RefreshControl,
@@ -1274,6 +1275,13 @@ const CampaignCard = ({
   onCancel: (campaign: VendorCampaign) => void;
   isCancelling: boolean;
 }) => {
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descriptionNeedsToggle, setDescriptionNeedsToggle] = useState(false);
+  const toggleDescription = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDescriptionExpanded((previous) => !previous);
+  };
+
   const status =
   getCampaignStatusConfig(
     campaign.status,
@@ -1372,12 +1380,42 @@ return (
           </View>
         ) : null}
 
-        <Text
-          style={styles.campaignDescription}
-          numberOfLines={2}
-        >
-          {campaign.description}
-        </Text>
+        <View>
+          <Text
+            style={styles.campaignDescription}
+            numberOfLines={descriptionExpanded ? undefined : 2}
+          >
+            {campaign.description}
+          </Text>
+          <Text
+            accessible={false}
+            pointerEvents="none"
+            style={[
+              styles.campaignDescription,
+              { position: "absolute", opacity: 0, left: 0, right: 0 },
+            ]}
+            onTextLayout={(event) => {
+              const needsToggle = event.nativeEvent.lines.length > 2;
+              setDescriptionNeedsToggle((previous) =>
+                previous === needsToggle ? previous : needsToggle,
+              );
+            }}
+          >
+            {campaign.description}
+          </Text>
+          {descriptionNeedsToggle ? (
+            <TouchableOpacity
+              onPress={toggleDescription}
+              accessibilityRole="button"
+              accessibilityLabel={descriptionExpanded ? "Show less description" : "Read more description"}
+              style={{ alignSelf: "flex-start", paddingVertical: 5 }}
+            >
+              <Text style={{ color: PRIMARY, fontSize: 12, fontWeight: "700" }}>
+                {descriptionExpanded ? "Show less" : "Read more"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
         <View style={styles.dateContainer}>
           <View style={styles.dateItem}>
