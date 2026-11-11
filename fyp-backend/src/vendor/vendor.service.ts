@@ -1423,6 +1423,7 @@ async updatePackage(
       groupSize: updateDto.groupSize ?? existingPackage.groupSize,
     }, category, existingPackage);
     validateServiceCapacity({
+      groupSize: pricing.groupSize,
       capacityUnit: updateDto.capacityUnit ?? existingPackage.capacityUnit,
       maxPeoplePerBooking: updateDto.maxPeoplePerBooking ?? existingPackage.maxPeoplePerBooking,
       maxUnitsPerBooking: updateDto.maxUnitsPerBooking ?? existingPackage.maxUnitsPerBooking,
