@@ -860,9 +860,11 @@ export class OrderService {
 
                         // Per-service requirements are independent from overall event attendance.
                         // Apply new capacity rules only to packages that explicitly configured them.
+                        let resourceUnits = quantity;
                         if (packageDoc.capacityUnit) {
                             const capacityPeople = Number(service.personCount ?? (packageDoc.capacityUnit === 'PERSON' || packageDoc.capacityUnit === 'GROUP' ? NaN : 1));
                             const capacity = checkServiceCapacity(packageDoc, capacityPeople, quantity);
+                            resourceUnits = capacity.unitsNeeded;
                             if (packageDoc.capacityUnit === 'GROUP' && quantity !== capacity.unitsNeeded) {
                                 throw new BadRequestException('Package group count does not match the selected people. Refresh your cart.');
                             }
@@ -932,9 +934,6 @@ export class OrderService {
                         // The vendor lock above serializes transactions for this vendor.
                         // A configured resource budget is shared by overlapping bookings
                         // of this package; a booking that uses two teams reserves two units.
-                        const resourceUnits = packageDoc.capacityUnit === 'GROUP'
-                            ? Math.ceil(Number(service.personCount) / Number(packageDoc.peopleIncludedPerGroup))
-                            : quantity;
                         if (packageDoc.availableParallelUnits != null) {
                             const overlappingPackageOrders = await this.vendorOrderModel.find({
                                 vendorId: new Types.ObjectId(String(service.vendorId)),
