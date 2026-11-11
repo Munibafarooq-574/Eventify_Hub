@@ -1,5 +1,5 @@
 import { countryCurrency, currencyOf } from '../common/utils/currency';
-import { legacyPricingMethod, quotePackage, validateMehndiCapacity, validatePackagePricing } from '../common/utils/package-pricing';
+import { legacyPricingMethod, quotePackage, validatePackagePricing } from '../common/utils/package-pricing';
 import type { MarketplaceScope } from '../city/marketplace.guard';
 import { DELIVERY_FIELDS, DeliveryConfiguration, quoteDelivery, validateDeliveryConfiguration } from '../common/utils/delivery-booking';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -842,7 +842,6 @@ async addPackages(
         ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, pkg[field]])),
         pricingMethod: pkg.pricingMethod,
         groupSize: pkg.groupSize,
-        maxServicePeople: validateMehndiCapacity(pkg, category),
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
@@ -1414,13 +1413,9 @@ async updatePackage(
       pricingMethod: updateDto.pricingMethod ?? existingPackage.pricingMethod,
       groupSize: updateDto.groupSize ?? existingPackage.groupSize,
     }, category, existingPackage);
-    const maxServicePeople = validateMehndiCapacity({
-      ...pricing, maxServicePeople: updateDto.maxServicePeople ?? existingPackage.maxServicePeople,
-    }, category);
     const updatePayload: Record<string, any> = {
       'packages.$.pricingMethod': pricing.pricingMethod,
       'packages.$.groupSize': pricing.groupSize,
-      ...(maxServicePeople !== undefined && { 'packages.$.maxServicePeople': maxServicePeople }),
     };
 
     if (updateDto.packageName !== undefined) {

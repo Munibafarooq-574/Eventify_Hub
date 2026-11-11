@@ -3,7 +3,7 @@ import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { getVendorPackagesList } from '@/services/getVendorPackagesList';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError, mehndiCapacityError, mehndiCapacity, } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -258,7 +258,6 @@ const serviceWindowEndOffsetMinutesValue = useMemo(() => offsetToMinutes(windowE
   const [customDurationRate, setCustomDurationRate] =
     useState("");
   const [pricing, setPricing] = useState<PackagePricing>({ pricingMethod: 'FIXED' });
-  const [isMehndiPackage, setIsMehndiPackage] = useState(false);
   const [pricingOptions, setPricingOptions] = useState<PricingMethod[]>([]);
   const [baseIncludedHours, setBaseIncludedHours] = useState("");
   const [baseIncludedUnit, setBaseIncludedUnit] = useState<"HOURS" | "DAYS">("HOURS");
@@ -391,9 +390,7 @@ const packageImageLimitReached =
 
       try {
         const user = await readUser();
-    const { allowed, isMehndi } = await getVendorPricingOptions(user);
-    setPricingOptions(allowed);
-    setIsMehndiPackage(isMehndi);
+    setPricingOptions(await getVendorPricingOptions(user));
 
         if (!user?._id) {
           throw new Error("Vendor ID not found.");
@@ -434,8 +431,7 @@ const packageImageLimitReached =
     // ---------------------------------------------------
 
     const user = await readUser();
-    const { allowed, isMehndi } = await getVendorPricingOptions(user);
-    setIsMehndiPackage(isMehndi);
+    const allowed = await getVendorPricingOptions(user);
 
     let packageObj =
       user?.packages?.find(
@@ -535,7 +531,7 @@ const packageImageLimitReached =
     if (!packageDetails) return;
 
     const method = packageDetails.pricingMethod || 'FIXED';
-    setPricing({ pricingMethod: method, groupSize: packageDetails.groupSize, maxServicePeople: packageDetails.maxServicePeople });
+    setPricing({ pricingMethod: method, groupSize: packageDetails.groupSize });
     setEditableName(
       packageDetails.packageName || "",
     );
@@ -845,7 +841,7 @@ const removeExistingImage = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || (isMehndiPackage && mehndiCapacityError(pricing)) || !bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
     return false;
   }
 
@@ -890,7 +886,7 @@ const removeExistingImage = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions, isMehndiPackage,
+  pricing, pricingOptions,
   editableName,
   editablePrice,
   delivery,
@@ -955,7 +951,6 @@ const removeExistingImage = (index: number) => {
     const updatedData = {
   pricingMethod: pricing.pricingMethod,
   groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
-  ...(isMehndiPackage && { maxServicePeople: mehndiCapacity(pricing) }),
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: editableName.trim(),
 
@@ -1491,7 +1486,7 @@ Alert.alert(
                 Base Price
             ------------------------------------------- */}
 
-            <PackagePricingFields value={pricing} allowed={pricingOptions} isMehndi={isMehndiPackage} onChange={setPricing} />
+            <PackagePricingFields value={pricing} allowed={pricingOptions} onChange={setPricing} />
             <View
               style={styles.card}
             >

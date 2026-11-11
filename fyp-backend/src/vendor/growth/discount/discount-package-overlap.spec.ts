@@ -122,7 +122,7 @@ describe('DiscountService public package price previews', () => {
     discountType: DiscountKind.PERCENTAGE, discountValue: 10, minimumOrderAmount: 0,
     packageIds: [packageId.toString()] };
 
-  function setup(overrides: object = {}, packageOverrides: object = {}) {
+  function setup(overrides: object = {}) {
     const coupon = { ...baseCoupon, ...overrides };
     const service = Object.create(DiscountService.prototype);
     service.featureAccessService = { hasActiveSubscription: async () => true };
@@ -131,7 +131,7 @@ describe('DiscountService public package price previews', () => {
     };
     service.userModel = {
       findById: () => ({ select: () => ({
-        lean: async () => ({ packages: [{ ...basePackage, ...packageOverrides }, { ...basePackage, _id: otherId }] }),
+        lean: async () => ({ packages: [basePackage, { ...basePackage, _id: otherId }] }),
       }) }),
     };
     service.findActiveEntryByCode = async () => coupon;
@@ -176,19 +176,6 @@ describe('DiscountService public package price previews', () => {
     expect(find.mock.calls[2][0]._id).toEqual({ $nin: [baseCoupon._id] });
     expect(distinct.mock.calls[0][1].vendorId).toEqual(new Types.ObjectId(vendorId));
     expect(distinct.mock.calls[2][1]).toEqual({ clientId: usedClient });
-  });
-
-  it('quotes the coupon on all required groups and excludes a package over its serving limit', async () => {
-    const pkg = { pricingMethod: 'GROUP', groupSize: 6, maxServicePeople: 15,
-      allowCustomDuration: true, customDurationUnit: 'HOURS', customDurationRate: 15,
-      durations: [{ value: 6, unit: 'HOURS', price: 210 }] };
-    const service = setup({ minimumOrderAmount: 500 }, pkg);
-    const [offer] = await service.getPublicCoupons(vendorId, undefined, { durationMinutes: 420, servicePeople: 15 });
-    expect(offer).toMatchObject({
-      packagePricePreviews: { [packageId.toString()]: { originalPrice: 690, finalAmount: 621 } },
-    });
-    const [overCapacity] = await service.getPublicCoupons(vendorId, undefined, { durationMinutes: 420, servicePeople: 16 });
-    expect(overCapacity).toMatchObject({ packagePricePreviews: {} });
   });
 
   it('uses the duration tier and respects the discount cap', async () => {

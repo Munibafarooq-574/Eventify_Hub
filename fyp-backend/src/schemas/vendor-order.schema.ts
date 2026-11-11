@@ -73,7 +73,6 @@ export class VendorOrder extends Document {
     currency: 'PKR' | 'USD';
 
     @Prop({ type: String, enum: PRICING_METHODS }) pricingMethod?: PricingMethod;
-    @Prop({ type: Number, min: 1 }) servicePeople?: number;
     @Prop({ type: Number }) groupSize?: number | null;
     @Prop({ type: Number }) personCount?: number | null;
     @Prop({ type: DeliverySnapshotSchema }) delivery?: DeliverySnapshot;

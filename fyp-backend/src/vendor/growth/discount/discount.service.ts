@@ -1,5 +1,5 @@
 import { countryCurrency, currencyOf, currencySymbol } from '../../../common/utils/currency';
-import { mehndiServiceQuantity, quotePackage, resolvePackageUnitPrice } from '../../../common/utils/package-pricing';
+import { resolvePackageUnitPrice } from '../../../common/utils/package-pricing';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.service.ts
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
@@ -94,7 +94,7 @@ private readonly emailService: EmailService,
   async getPublicCoupons(
   vendorId: string,
   packageId?: string,
-  preview?: { durationMinutes: number; servicePeople?: number },
+  preview?: { durationMinutes: number },
   clientId?: string,
 ) {
   this.assertValidId(vendorId);
@@ -148,17 +148,9 @@ private readonly emailService: EmailService,
     if (pkg.isActive === false || pkg.bookingType === 'CUSTOM' || (packageId && packageId !== id)) return [];
     const currency = currencyOf(pkg);
     try {
-      const unitPrice = durationMinutes !== null
+      const originalPrice = durationMinutes !== null
         ? resolvePackageUnitPrice(pkg, durationMinutes, currency)
         : Number(pkg.price);
-      const pricing = {
-        pricingMethod: pkg.pricingMethod ?? 'FIXED' as const,
-        groupSize: pkg.groupSize,
-        maxServicePeople: pkg.maxServicePeople,
-      };
-      const people = preview.servicePeople;
-      const originalPrice = people === undefined ? unitPrice
-        : quotePackage(pricing, unitPrice, mehndiServiceQuantity(pricing, people), people).packageAmount;
       if (!Number.isFinite(originalPrice) || originalPrice <= 0) return [];
       return [{ id, currency, originalPrice }];
     } catch (error) {

@@ -4,42 +4,8 @@ import type { Package } from '../../schemas/user.schema';
 
 export const PRICING_METHODS = ['FIXED', 'PER_PERSON', 'GROUP'] as const;
 export type PricingMethod = typeof PRICING_METHODS[number];
-export type PackagePricing = { pricingMethod?: PricingMethod; groupSize?: number | null; maxServicePeople?: number | null };
+export type PackagePricing = { pricingMethod?: PricingMethod; groupSize?: number | null };
 type CategoryPricing = { allowedPricingMethods?: PricingMethod[]; businessDetailsType?: string; normalizedName?: string; name?: string };
-
-export function isMehndiCategory(category?: CategoryPricing | null): boolean {
-    return category?.businessDetailsType === 'MEHNDI' ||
-        /^(mehndi|mendhi)$/.test(String(category?.normalizedName || category?.name || '').trim().toLowerCase());
-}
-
-function mehndiCapacity(pkg: PackagePricing) {
-    return pkg.maxServicePeople ?? (pkg.pricingMethod === 'GROUP' ? pkg.groupSize : undefined);
-}
-
-export function mehndiServiceQuantity(pkg: PackagePricing, people: number): number {
-    // Existing group packages included one group unless the vendor sets a higher capacity.
-    const capacity = mehndiCapacity(pkg);
-    if (!Number.isSafeInteger(people) || people < 1) throw new BadRequestException('Enter how many people need Mehndi.');
-    if (!Number.isSafeInteger(capacity) || Number(capacity) < 1) {
-        throw new BadRequestException('This package needs a Mehndi serving capacity before it can be booked.');
-    }
-    if (people > Number(capacity)) {
-        throw new BadRequestException(`This Mehndi package serves up to ${capacity} people per booking.`);
-    }
-    if (pkg.pricingMethod !== 'GROUP') return 1;
-    const groupSize = Number(pkg.groupSize);
-    if (!Number.isSafeInteger(groupSize) || groupSize < 1) throw new BadRequestException('This group package needs a valid serving size.');
-    return Math.ceil(people / groupSize);
-}
-
-export function validateMehndiCapacity(pkg: PackagePricing, category: CategoryPricing | null) {
-    if (!isMehndiCategory(category)) return undefined;
-    const capacity = mehndiCapacity(pkg);
-    if (!Number.isSafeInteger(capacity) || Number(capacity) < 1) {
-        throw new BadRequestException('Enter a maximum Mehndi serving capacity of at least one person.');
-    }
-    return Number(capacity);
-}
 
 export function legacyPricingMethod(category?: CategoryPricing | null): PricingMethod {
   return category?.businessDetailsType === 'CATERING' ||

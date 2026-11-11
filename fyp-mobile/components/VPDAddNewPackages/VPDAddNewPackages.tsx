@@ -2,7 +2,7 @@ import { currencySymbol } from '@/utils/currency';
 import { pricingLabel } from '@/utils/packagePricing';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
-import { PackagePricing, PricingMethod, pricingFieldsError, mehndiCapacityError, mehndiCapacity, } from '@/utils/packagePricing';
+import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
 import InfoHelp from '@/components/booking/InfoHelp';
 import { packagePreviewStyles } from '@/components/booking/packagePreviewStyles';
@@ -197,7 +197,6 @@ export default function VendorPackagesScreen() {
   const insets = useSafeAreaInsets();
 
   const [pricing, setPricing] = useState<PackagePricing>({ pricingMethod: 'FIXED' });
-  const [isMehndiPackage, setIsMehndiPackage] = useState(false);
   const [pricingOptions, setPricingOptions] = useState<PricingMethod[]>([]);
   const [packageName, setPackageName] = useState("");
   const [price, setPrice] = useState("");
@@ -327,8 +326,7 @@ const [currentPackageCount, setCurrentPackageCount] = useState(0);
         );
       }
 
-      const { allowed, isMehndi } = await getVendorPricingOptions(userData);
-      setIsMehndiPackage(isMehndi);
+      const allowed = await getVendorPricingOptions(userData);
       setPricingOptions(allowed);
       setPricing(current => ({ ...current, pricingMethod: allowed[0] }));
       const id = String(userData._id);
@@ -480,7 +478,7 @@ const existingPackage =
           return;
         }
 
-        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize, maxServicePeople: existingPackage.maxServicePeople });
+        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize });
         setPackageName(
           existingPackage.packageName || "",
         );
@@ -793,7 +791,7 @@ const removeImageAsset = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || (isMehndiPackage && mehndiCapacityError(pricing)) || !bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
     return false;
   }
 
@@ -838,7 +836,7 @@ const removeImageAsset = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions, isMehndiPackage,
+  pricing, pricingOptions,
   packageName,
   price,
   delivery,
@@ -964,7 +962,6 @@ if (!userId) {
     const payload = {
   pricingMethod: pricing.pricingMethod,
   groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
-  ...(isMehndiPackage && { maxServicePeople: mehndiCapacity(pricing) }),
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: packageName.trim(),
 
@@ -1262,7 +1259,7 @@ if (!userId) {
 
           {/* Base Price */}
 
-          <PackagePricingFields value={pricing} allowed={pricingOptions} isMehndi={isMehndiPackage} onChange={setPricing} />
+          <PackagePricingFields value={pricing} allowed={pricingOptions} onChange={setPricing} />
           <View style={styles.fieldGroup}>
   <Text style={styles.label}>
     {pricing.pricingMethod === 'PER_PERSON' ? 'Price per person' : pricing.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}

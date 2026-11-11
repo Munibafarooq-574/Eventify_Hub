@@ -72,7 +72,6 @@ async placeOrder(
         expectedDeliveryFee?: number;
     quantity?: number;
         personCount?: number;
-        servicePeople?: number;
         expectedPackageAmount?: number;
         expectedPricingMethod?: string;
         expectedGroupSize?: number | null;

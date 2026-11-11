@@ -18,7 +18,6 @@ export interface ServiceItem {
   deliveryStartDateTime?: string;
         expectedDeliveryFee?: number;
   quantity?: number;
-  servicePeople?: number;
   requiredServiceWindow?: {
     startDateTime: string;
     endDateTime: string;

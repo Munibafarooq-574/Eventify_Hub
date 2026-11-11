@@ -3,7 +3,7 @@ import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { isMehndiCategory, mehndiCapacity, mehndiServiceQuantity, packageAmount, pricingMethod } from '@/utils/packagePricing';
+import { pricingMethod, } from '@/utils/packagePricing';
 import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -515,9 +515,6 @@ const phase6AvailablePackageIds = useMemo(() => {
     const [vendorData, setVendorData] =
       useState<any>(null);
     const [profileCategoryName, setProfileCategoryName] = useState('');
-    const [isMehndiProfile, setIsMehndiProfile] = useState(false);
-    const [mehndiPeopleInput, setMehndiPeopleInput] = useState('');
-    useEffect(() => { setMehndiPeopleInput(''); }, [cartVendorId, cartEventId]);
 
       const [publicCoupons, setPublicCoupons] =
   useState<any[]>([]);
@@ -830,11 +827,6 @@ const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
 );
 
 const couponPreviewDuration = isEventMode ? Number(durationMinutes) : undefined;
-const requiresMehndiHeadcount = isMehndiProfile && isEventMode && isClientView && !isOwnerView;
-const mehndiPeople = Number(mehndiPeopleInput);
-const validMehndiPeople = Number.isSafeInteger(mehndiPeople) && mehndiPeople > 0 && mehndiPeople <= deliveryGuests;
-const couponServicePeople = requiresMehndiHeadcount && validMehndiPeople ? mehndiPeople : undefined;
-const getMehndiQuantity = (pkg: any) => validMehndiPeople ? mehndiServiceQuantity(pkg, mehndiPeople) : null;
 const couponVendorId = vendorData?._id;
 const fetchPublicCoupons = useCallback(async () => {
   const requestId = ++publicCouponRequest.current;
@@ -846,7 +838,7 @@ const fetchPublicCoupons = useCallback(async () => {
 
   try {
     const coupons = await getEligibleCoupons(String(couponVendorId), {
-      includePackagePrices: true, durationMinutes: couponPreviewDuration, servicePeople: couponServicePeople,
+      includePackagePrices: true, durationMinutes: couponPreviewDuration,
     });
     if (requestId !== publicCouponRequest.current) return;
     setPublicCoupons(Array.isArray(coupons) ? coupons : []);
@@ -861,7 +853,7 @@ const fetchPublicCoupons = useCallback(async () => {
   } finally {
     if (requestId === publicCouponRequest.current) setCheckingCoupons(false);
   }
-}, [couponVendorId, couponPreviewDuration, couponServicePeople]);
+}, [couponVendorId, couponPreviewDuration]);
 
 useFocusEffect(useCallback(() => {
   setPublicCoupons([]);
@@ -1742,12 +1734,6 @@ Toast.show({
         return;
       }
 
-      const mehndiQuantity = requiresMehndiHeadcount ? getMehndiQuantity(pkg) : 1;
-      if (mehndiQuantity === null) {
-        showCartNotice('Mehndi capacity', 'Enter a service headcount within this package’s capacity.', true);
-        return;
-      }
-
       const vendorDisplayName =
         vendorData?.contactDetails?.brandName ||
         vendorData?.ContactDetails?.brandName ||
@@ -1826,9 +1812,7 @@ Toast.show({
           packageName: pkg.packageName,
           pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
           groupSize: pkg.groupSize,
-          personCount: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
-            ? requiresMehndiHeadcount ? mehndiPeople : deliveryGuests : undefined,
-          ...(requiresMehndiHeadcount && { servicePeople: mehndiPeople }),
+          personCount: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? deliveryGuests : undefined,
           price: resolvedPrice,
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
@@ -1870,7 +1854,7 @@ Toast.show({
             Array.isArray(endTime) ? endTime[0] : endTime,
           ),
           durationMinutes: selectedDurationMinutes,
-          quantity: mehndiQuantity,
+          quantity: 1,
           requiredServiceWindow:
          pkg.bookingType === 'DELIVERY_BASED' && selectedDelivery
     ? { startDateTime:selectedDelivery.startDateTime, endDateTime:selectedDelivery.endDateTime }
@@ -2022,12 +2006,11 @@ Toast.show({
           let loadedCategoryName = categoryReference?.name || categoryReference?.categoryName || vendor?.categoryName || '';
           const savedCategoryId = typeof categoryReference === 'string'
             ? categoryReference : categoryReference?._id;
-          const savedCategory = savedCategoryId && (!loadedCategoryName || !categoryReference?.businessDetailsType)
-            ? await getCategoryById(String(savedCategoryId)) : null;
-          loadedCategoryName = loadedCategoryName || savedCategory?.name || '';
+          if (!loadedCategoryName && savedCategoryId) {
+            const savedCategory = await getCategoryById(String(savedCategoryId));
+            loadedCategoryName = savedCategory?.name || '';
+          }
           setProfileCategoryName(String(loadedCategoryName).trim());
-          setIsMehndiProfile(isMehndiCategory(savedCategory || categoryReference) ||
-            isMehndiCategory({ name: String(loadedCategoryName) }));
           let isOwner = false;
 
           // The same profile screen is reused for clients and for the
@@ -2338,14 +2321,10 @@ const serviceCityNamesFromIds =
     };
 
     const getPackagePriceDisplay = (pkg: any, durationQuote: { price: number | null } | null) => {
-      const unitPrice = Number(durationQuote?.price ?? pkg.price ?? 0);
-      const quantity = requiresMehndiHeadcount ? getMehndiQuantity(pkg) : null;
-      const originalPrice = quantity !== null
-        ? packageAmount({ ...pkg, price: unitPrice, quantity, personCount: mehndiPeople }, mehndiPeople)
-        : unitPrice;
+      const originalPrice = Number(durationQuote?.price ?? pkg.price ?? 0);
       const coupon = getApplicablePublicCoupon(String(pkg._id));
       const preview = coupon?.packagePricePreviews?.[String(pkg._id)];
-      const hasDiscount = durationQuote?.price !== null && (!requiresMehndiHeadcount || quantity !== null) &&
+      const hasDiscount = durationQuote?.price !== null &&
         preview?.currency === currencyOf(pkg) && preview.originalPrice === originalPrice &&
         Number.isFinite(preview.finalAmount) && preview.finalAmount >= 0 && preview.finalAmount < originalPrice;
       return {
@@ -2371,7 +2350,6 @@ const serviceCityNamesFromIds =
   ).toUpperCase();
     const packageInCart = !!selectedPackage && addedPackages.includes(String(selectedPackage._id));
     const cartDisabled = selectedDurationQuote?.price === null || (isClientView && checkingCoupons) ||
-      (requiresMehndiHeadcount && (!selectedPackage || getMehndiQuantity(selectedPackage) === null)) ||
       (selectedPackage?.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType
         ? !selectedDelivery?.available
         : selectedPackage?.bookingType === 'TIME_SLOT_BASED'
@@ -4374,28 +4352,6 @@ const serviceCityNamesFromIds =
                 Available Packages
               </Text>
 
-              {requiresMehndiHeadcount && visiblePackages.length > 0 && (
-                <View style={{ marginBottom: 14, gap: 6 }}>
-                  <Text style={styles.pkgMetaText}>How many people need Mehndi?</Text>
-                  <TextInput
-                    accessibilityLabel="People receiving Mehndi"
-                    keyboardType="number-pad"
-                    value={mehndiPeopleInput}
-                    onChangeText={value => {
-                      const next = value.replace(/[^0-9]/g, '');
-                      if (next !== mehndiPeopleInput && Number(next) !== mehndiPeople) setPublicCoupons([]);
-                      setMehndiPeopleInput(next);
-                    }}
-                    placeholder={`Up to ${deliveryGuests} event guests`}
-                    placeholderTextColor={TEXT_MUTED}
-                    style={{ backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 12, padding: 12, color: TEXT_DARK }}
-                  />
-                  {mehndiPeopleInput.length > 0 && !validMehndiPeople && (
-                    <Text style={styles.pkgMetaText}>Enter a whole number from 1 to {deliveryGuests}.</Text>
-                  )}
-                </View>
-              )}
-
               {visiblePackages.length === 0 ? (
                 <View
                   style={
@@ -4449,9 +4405,6 @@ const serviceCityNamesFromIds =
   const isActive =
     String(activePackage) === String(pkg._id);
 
-  const serviceQuantity = requiresMehndiHeadcount ? getMehndiQuantity(pkg) : null;
-  const capacity = requiresMehndiHeadcount ? mehndiCapacity(pkg) : null;
-  const exceedsCapacity = requiresMehndiHeadcount && validMehndiPeople && serviceQuantity === null;
   const durationQuote = getEventDurationQuote(pkg);
   const { originalPrice, price, coupon: applicableCoupon } = getPackagePriceDisplay(pkg, durationQuote);
 
@@ -4523,7 +4476,6 @@ const serviceCityNamesFromIds =
               {Number(pkg.baseIncludedDurationMinutes) % 1440 === 0
                 ? `${Number(pkg.baseIncludedDurationMinutes) / 1440} days`
                 : `${Number(pkg.baseIncludedDurationMinutes) / 60} hrs`}
-              {requiresMehndiHeadcount ? ' included' : ''}
             </Text>
           </View>
         )}
@@ -4533,12 +4485,6 @@ const serviceCityNamesFromIds =
         <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>Free delivery</Text>
       )}
 
-      {requiresMehndiHeadcount && (
-        <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>
-          {capacity ? `Serves up to ${capacity} per booking` : 'Serving capacity unavailable'}
-          {exceedsCapacity ? ' · Unavailable for this headcount' : ''}
-        </Text>
-      )}
       <View style={[styles.pkgFooter, isActive && styles.pkgFooterActive]}>
         <View style={styles.pkgPriceLine}>
           <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
@@ -4551,9 +4497,7 @@ const serviceCityNamesFromIds =
           )}
         </View>
         <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
-          {serviceQuantity !== null
-            ? `${mehndiPeople} people${pkg.pricingMethod === 'GROUP' ? ` · ${serviceQuantity} group${serviceQuantity === 1 ? '' : 's'}` : ''}`
-            : pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
+          {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
             ? 'per person'
             : pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP'
               ? 'per group' : 'per package'}
@@ -5999,9 +5943,7 @@ const serviceCityNamesFromIds =
                     ? 'Added to Cart'
                     : checkingCoupons && isClientView
                       ? 'Checking offer…'
-                      : requiresMehndiHeadcount && !validMehndiPeople
-                        ? 'Enter Mehndi headcount'
-                        : cartDisabled
+                      : cartDisabled
                       ? 'Unavailable'
                       : `Book this package · ${selectedPackageDisplayPrice}`}
               </Text>

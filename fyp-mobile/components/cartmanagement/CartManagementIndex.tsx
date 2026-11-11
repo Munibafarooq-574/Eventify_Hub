@@ -337,8 +337,6 @@ if (eventDetailsRaw) {
             ...vendor.packages[packageIndex],
         };
 
-        if (pkg.servicePeople != null) return;
-
         if (pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON') {
             pkg.personCount = Math.max(1, Number(pkg.personCount ?? guests ?? 1) + delta);
         } else {
@@ -1026,7 +1024,7 @@ if (eventDetailsRaw) {
                                                                     </Text>
                                                                 </View>
 
-                                                    <Text style={styles.quantityLabel}>Rate {pricingLabel(pkg, !!isCatering)}{pkg.servicePeople == null && pricingMethod(pkg, !!isCatering) === 'GROUP' ? ` · ${Number(pkg.groupSize) * Number(pkg.quantity || 1)} people included` : ''}</Text>
+                                                    <Text style={styles.quantityLabel}>Rate {pricingLabel(pkg, !!isCatering)}{pricingMethod(pkg, !!isCatering) === 'GROUP' ? ` · ${Number(pkg.groupSize) * Number(pkg.quantity || 1)} people included` : ''}</Text>
                                                     <DeliveryDetails pkg={pkg} quantity={Number(pkg.quantity || 1)} guests={Number(guests || 0)} isCatering={!!isCatering} />
                                                     {pkg.priceBasis === 'custom' &&
                                                         Number(pkg.customDurationRate) > 0 &&
@@ -1064,14 +1062,6 @@ if (eventDetailsRaw) {
 
                                                             {/* Quantity */}
 
-                                                            {pkg.servicePeople != null ? (
-                                                              <View style={styles.quantityRow}>
-                                                                <Text style={styles.quantityLabel}>Mehndi for {pkg.servicePeople} people</Text>
-                                                                {pricingMethod(pkg) === 'GROUP' && (
-                                                                  <Text style={styles.quantityValue}>{pkg.quantity} {Number(pkg.quantity) === 1 ? 'group' : 'groups'}</Text>
-                                                                )}
-                                                              </View>
-                                                            ) : (
                                                             <View style={styles.quantityRow}>
                                                                 <Text style={styles.quantityLabel}>
                                                                     {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' ? 'People' : 'Quantity'}
@@ -1119,7 +1109,6 @@ if (eventDetailsRaw) {
                                                                     </TouchableOpacity>
                                                                 </View>
                                                             </View>
-                                                            )}
                                                         </View>
 
                                                         <TouchableOpacity

@@ -893,9 +893,8 @@ renderItem={({ item }) => {
                       <Text style={styles.expandedText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
                       {service.quantity != null && <Text style={styles.expandedText}>Quantity: {service.quantity}</Text>}
                         {service.pricingMethod && <Text style={styles.expandedText}>Pricing: {pricingLabel(service)}</Text>}
-                        {service.servicePeople != null ? <Text style={styles.expandedText}>Mehndi for {service.servicePeople} people</Text> : null}
-                        {service.personCount != null && service.servicePeople == null && <Text style={styles.expandedText}>People: {service.personCount}</Text>}
-                        {service.servicePeople == null && service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
+                        {service.personCount != null && <Text style={styles.expandedText}>People: {service.personCount}</Text>}
+                        {service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                       {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
                       <Text style={styles.expandedText}>Booking Amount: {displayBookingMoney(total, currencySource)}</Text>

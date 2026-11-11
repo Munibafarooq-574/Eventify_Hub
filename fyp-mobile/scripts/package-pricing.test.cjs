@@ -22,19 +22,3 @@ test('old carts retain catering multiplication, and new participant counts overr
   assert.equal(pricing.packageAmount({ price: 1500, quantity: 1 }, 100, true), 150000);
   assert.equal(pricing.packageAmount({ pricingMethod: 'PER_PERSON', price: 1500, personCount: 50 }, 100, true), 75000);
 });
-
-test('Mehndi only permits eligible headcount and calculates group or per-person totals', () => {
-  assert.equal(pricing.isMehndiCategory({ businessDetailsType: 'MEHNDI' }), true);
-  assert.equal(pricing.isMehndiCategory({ name: 'Catering' }), false);
-  const group = { pricingMethod:'GROUP', groupSize:6, price:230 };
-  assert.equal(pricing.mehndiServiceQuantity(group,6),1);
-  assert.equal(pricing.mehndiServiceQuantity(group,15),null);
-  const configured = { ...group, maxServicePeople:15 };
-  const quantity = pricing.mehndiServiceQuantity(configured,15);
-  assert.equal(quantity,3);
-  assert.equal(pricing.packageAmount({...configured,quantity},15),690);
-  const perPerson = { pricingMethod:'PER_PERSON', maxServicePeople:15, price:15, personCount:6 };
-  assert.equal(pricing.mehndiServiceQuantity(perPerson,6),1);
-  assert.equal(pricing.packageAmount(perPerson,15),90);
-  assert.equal(pricing.mehndiServiceQuantity(perPerson,16),null);
-});

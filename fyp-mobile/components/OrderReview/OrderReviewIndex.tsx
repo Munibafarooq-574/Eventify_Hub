@@ -3,7 +3,7 @@ import { validateCoupon } from '@/services/validateCoupon';
 import { assertSingleCurrency, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { mehndiServiceQuantity, packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
+import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { checkReviewPackageAvailability } from "@/services/checkReviewPackageAvailability";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
@@ -1098,12 +1098,6 @@ const isInvalidCode =
             return { pkg, notice: `${pkg.packageName} no longer offers the selected price or duration.` };
           }
 
-          if (pkg.servicePeople != null && (Number(pkg.servicePeople) > Number(guests) ||
-            mehndiServiceQuantity(latest, Number(pkg.servicePeople)) !== Number(pkg.quantity || 1) ||
-            (latest.pricingMethod ?? pkg.pricingMethod) !== pkg.pricingMethod)) {
-            return { pkg, notice: `${pkg.packageName} can no longer serve your selected Mehndi headcount at this price. Choose a package again.` };
-          }
-
           const selectedWindow = bookingType === 'DURATION_BASED' ||
             (bookingType === 'DELIVERY_BASED' && !latest.deliveryFeeType)
             ? undefined : getResolvedServiceWindow(pkg) ?? undefined;
@@ -1281,7 +1275,6 @@ Current order total: ${currencySymbol(cartCurrency(cartData))} ${formatCurrency(
         price: Number(pkg.price),
         expectedPricingMethod: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
         expectedGroupSize: pkg.groupSize,
-        servicePeople: pkg.servicePeople,
         personCount: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? Number(pkg.personCount ?? guests) : undefined,
         expectedPackageAmount: packageAmount(pkg, Number(guests), !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
         deliveryStartDateTime: pkg.deliveryStartDateTime,
@@ -2160,12 +2153,9 @@ const vendorPackageCount = countPackageUnits(packages);
                             </View>
                           )}
 
-                          {pkg.servicePeople != null && (
-                            <Text style={styles.guestTagText}>Mehndi for {pkg.servicePeople} people</Text>
-                          )}
                           <Text style={styles.guestTagText}>Quantity: {quantity} · {pricingLabel(pkg, !!isCatering)}</Text>
                           {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && <Text style={styles.guestTagText}>People: {pkg.personCount ?? guests}</Text>}
-                          {pkg.servicePeople == null && pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
+                          {pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
                           <Text style={styles.packagePrice}>
                             {currencySymbol(currencyOf(pkg))} {formatCurrency(appliedPromotion?.finalAmount ?? finalPrice)}
                             {appliedPromotion && (
