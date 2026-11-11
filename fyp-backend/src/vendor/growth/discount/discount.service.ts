@@ -1,4 +1,5 @@
 import { countryCurrency, currencyOf, currencySymbol } from '../../../common/utils/currency';
+import { resolvePackageUnitPrice } from '../../../common/utils/package-pricing';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.service.ts
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
@@ -85,7 +86,8 @@ private readonly emailService: EmailService,
   async getPublicCoupons(
   vendorId: string,
   packageId?: string,
-): Promise<VendorDiscount[]> {
+  preview?: { durationMinutes: number },
+) {
   this.assertValidId(vendorId);
 
   const hasAccess =
@@ -124,10 +126,37 @@ private readonly emailService: EmailService,
   // Without packageId, return all active vendor offers for the profile.
   // Checkout passes a packageId and filters eligibility authoritatively.
 
-  return this.discountModel
-    .find(filter)
-    .sort({ createdAt: -1 })
-    .exec();
+  const coupons = await this.discountModel.find(filter).sort({ createdAt: -1 }).exec();
+  if (!preview || !coupons.length) return coupons;
+
+  const vendor = await this.userModel.findById(vendorId).select('packages').lean();
+  const durationMinutes = Number.isFinite(preview.durationMinutes) && preview.durationMinutes > 0
+    ? preview.durationMinutes : null;
+  const packages = (vendor?.packages ?? []).flatMap(pkg => {
+    const id = String((pkg as typeof pkg & { _id: Types.ObjectId })._id);
+    if (pkg.isActive === false || pkg.bookingType === 'CUSTOM' || (packageId && packageId !== id)) return [];
+    const currency = currencyOf(pkg);
+    try {
+      const originalPrice = durationMinutes !== null
+        ? resolvePackageUnitPrice(pkg, durationMinutes, currency)
+        : Number(pkg.price);
+      if (!Number.isFinite(originalPrice) || originalPrice <= 0) return [];
+      return [{ id, currency, originalPrice }];
+    } catch (error) {
+      if (error instanceof BadRequestException) return [];
+      throw error;
+    }
+  });
+
+  return coupons.map(coupon => ({
+    ...coupon.toObject(),
+    packagePricePreviews: Object.fromEntries(packages.flatMap(({ id, currency, originalPrice }) => {
+      if (currency !== currencyOf(coupon) || !this.coversPackage(coupon, id) ||
+        originalPrice < coupon.minimumOrderAmount) return [];
+      const { discountAmount, finalAmount } = this.quoteDiscount(coupon, originalPrice);
+      return discountAmount > 0 ? [[id, { currency, originalPrice, finalAmount }]] : [];
+    })),
+  }));
 }
 
 async getPublicDashboardCoupons(
@@ -740,11 +769,7 @@ async validateCoupon(
     );
   }
 
-  if (
-    (entry.packageIds?.length
-      ? (!packageId || !entry.packageIds.includes(packageId))
-      : entry.packageId && (!packageId || entry.packageId !== packageId))
-  ) {
+  if (!this.coversPackage(entry, packageId)) {
     throw new BadRequestException(
       'This code is not applicable to this package',
     );
@@ -766,23 +791,13 @@ async validateCoupon(
     );
   }
 
-  const discountAmount =
-    this.computeDiscountAmount(
-      entry,
-      orderAmount,
-    );
-
   return {
     valid: true,
     currency: currencyOf(entry),
     discountEntryId: entry._id.toString(),
     code: entry.code,
     discountType: entry.discountType,
-    discountAmount,
-    finalAmount: Math.max(
-      orderAmount - discountAmount,
-      0,
-    ),
+    ...this.quoteDiscount(entry, orderAmount),
   };
 }
 
@@ -1180,6 +1195,16 @@ return {
     }
   }
 }
+  private coversPackage(entry: VendorDiscount, packageId?: string): boolean {
+    if (entry.packageIds?.length) return !!packageId && entry.packageIds.includes(packageId);
+    return !entry.packageId || entry.packageId === packageId;
+  }
+
+  private quoteDiscount(entry: VendorDiscount, orderAmount: number) {
+    const discountAmount = this.computeDiscountAmount(entry, orderAmount);
+    return { discountAmount, finalAmount: Math.max(orderAmount - discountAmount, 0) };
+  }
+
   private computeDiscountAmount(entry: VendorDiscount, orderAmount: number): number {
     if (entry.discountType === DiscountKind.PERCENTAGE) {
       let discount = (orderAmount * entry.discountValue) / 100;

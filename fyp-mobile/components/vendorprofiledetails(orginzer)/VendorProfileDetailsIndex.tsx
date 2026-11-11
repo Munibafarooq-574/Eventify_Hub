@@ -1,4 +1,4 @@
-import { cartCurrencies, currencySymbol, currencyOf, roundForCurrency } from '@/utils/currency';
+import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -517,6 +517,7 @@ const phase6AvailablePackageIds = useMemo(() => {
 
       const [publicCoupons, setPublicCoupons] =
   useState<any[]>([]);
+    const publicCouponRequest = useRef(0);
 
   const [cities, setCities] =
   useState<any[]>([]);
@@ -823,7 +824,9 @@ const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
   'en-US', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit', hour12: true },
 );
 
+const couponPreviewDuration = isEventMode ? Number(durationMinutes) : undefined;
 const fetchPublicCoupons = async () => {
+  const requestId = ++publicCouponRequest.current;
   if (!vendorData?._id) {
     setPublicCoupons([]);
     return;
@@ -832,14 +835,17 @@ const fetchPublicCoupons = async () => {
   try {
     const response = await axios.get(
       `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/public/${vendorData._id}`,
+      { params: { includePackagePrices: true, durationMinutes: couponPreviewDuration } },
     );
 
+    if (requestId !== publicCouponRequest.current) return;
     setPublicCoupons(
       Array.isArray(response.data)
         ? response.data
         : [],
     );
   } catch (error) {
+    if (requestId !== publicCouponRequest.current) return;
     reportMarketplaceLoadError(
       'Public coupons unavailable:',
       error,
@@ -850,10 +856,10 @@ const fetchPublicCoupons = async () => {
 };
 
 useEffect(() => {
-  if (vendorData?._id) {
-    fetchPublicCoupons();
-  }
-}, [vendorData?._id]);
+  setPublicCoupons([]);
+  void fetchPublicCoupons();
+  return () => { publicCouponRequest.current++; };
+}, [vendorData?._id, couponPreviewDuration]);
 
 useEffect(() => {
   const loadCities = async () => {
@@ -2308,26 +2314,37 @@ const serviceCityNamesFromIds =
         : null;
 
     const selectedDurationQuote = getEventDurationQuote(selectedPackage);
-    // Visual offer preview only: checkout keeps authoritative validation and pricing.
-    const selectedPackageDisplayPrice = (() => {
-      if (!selectedPackage || selectedDurationQuote?.price === null) return '—';
-      const price = Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0);
-      const coupon = getApplicablePublicCoupon(String(selectedPackage._id));
-      const openedFromOffer = coupon &&
-        String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
-        String(coupon.code || '').toUpperCase();
-      const percentage = openedFromOffer && String(coupon.discountType).toLowerCase() === 'percentage';
-      const rawDiscount = percentage
-        ? price * Number(coupon.discountValue || 0) / 100
-        : openedFromOffer ? Number(coupon.discountValue || 0) : 0;
-      const cap = percentage && coupon.maximumDiscountAmount != null
-        ? Number(coupon.maximumDiscountAmount) : Infinity;
-      const saving = openedFromOffer && price >= Number(coupon.minimumOrderAmount || 0)
-        ? roundForCurrency(Math.min(price, Math.max(0, rawDiscount), cap), currencyOf(selectedPackage))
-        : 0;
-      const total = roundForCurrency(price - saving, currencyOf(selectedPackage));
-      return `${currencySymbol(currencyOf(selectedPackage))} ${total.toLocaleString(currencyOf(selectedPackage) === 'USD' ? 'en-US' : 'en-PK', { maximumFractionDigits: 2 })}`;
-    })();
+    const formatPackagePrice = (amount: number, pkg: any) => {
+      const currency = currencyOf(pkg);
+      return `${currencySymbol(currency)} ${amount.toLocaleString(
+        currency === 'USD' ? 'en-US' : 'en-PK',
+        { maximumFractionDigits: 2 },
+      )}`;
+    };
+
+    const getPackagePriceDisplay = (pkg: any, durationQuote: ReturnType<typeof getEventDurationQuote>) => {
+      const originalPrice = Number(durationQuote?.price ?? pkg.price ?? 0);
+      const coupon = getApplicablePublicCoupon(String(pkg._id));
+      const preview = coupon?.packagePricePreviews?.[String(pkg._id)];
+      const hasDiscount = durationQuote?.price !== null &&
+        preview?.currency === currencyOf(pkg) && preview.originalPrice === originalPrice &&
+        Number.isFinite(preview.finalAmount) && preview.finalAmount >= 0 && preview.finalAmount < originalPrice;
+      return {
+        originalPrice,
+        price: durationQuote?.price === null ? null : hasDiscount ? Number(preview.finalAmount) : originalPrice,
+        coupon: hasDiscount ? coupon : null,
+      };
+    };
+
+    const selectedPackagePricing = selectedPackage
+      ? getPackagePriceDisplay(selectedPackage, selectedDurationQuote) : null;
+    const routeCouponCode = String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase();
+    const selectedPackageDisplayPrice = selectedPackagePricing?.price != null
+      ? formatPackagePrice(
+        routeCouponCode && routeCouponCode === String(selectedPackagePricing.coupon?.code || '').toUpperCase()
+          ? selectedPackagePricing.price : selectedPackagePricing.originalPrice,
+        selectedPackage,
+      ) : '—';
 
     const durationPriceLabel = (quote: NonNullable<typeof selectedDurationQuote>) =>
       quote.price === null ? 'Duration unavailable' : quote.basis === 'custom' ? 'Custom Duration Price' : 'Price for Selected Duration';
@@ -4396,9 +4413,7 @@ const serviceCityNamesFromIds =
     String(activePackage) === String(pkg._id);
 
   const durationQuote = getEventDurationQuote(pkg);
-  const applicableCoupon = getApplicablePublicCoupon(
-    String(pkg._id),
-  );
+  const { originalPrice, price, coupon: applicableCoupon } = getPackagePriceDisplay(pkg, durationQuote);
 
   const couponBadgeText = applicableCoupon
     ? String(applicableCoupon.discountType).toUpperCase() ===
@@ -4477,45 +4492,25 @@ const serviceCityNamesFromIds =
         <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>Free delivery</Text>
       )}
 
-      {(() => {
-        const basePrice = Number(durationQuote?.price ?? pkg.price ?? 0);
-        const previewCoupon = applicableCoupon && String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
-          String(applicableCoupon.code || '').toUpperCase() ? applicableCoupon : null;
-        const percentage = previewCoupon && String(previewCoupon.discountType).toLowerCase() === 'percentage';
-        const minAmount = Number(previewCoupon?.minimumOrderAmount ?? 0);
-        const savingRaw = percentage
-          ? basePrice * Number(previewCoupon?.discountValue || 0) / 100
-          : Number(previewCoupon?.discountValue || 0);
-        const cap = percentage && previewCoupon?.maximumDiscountAmount != null
-          ? Number(previewCoupon.maximumDiscountAmount) : Infinity;
-        const saved = previewCoupon && basePrice >= minAmount && durationQuote?.price !== null
-          ? roundForCurrency(Math.min(basePrice, Math.max(0, savingRaw), cap), currencyOf(pkg))
-          : 0;
-        const price = roundForCurrency(basePrice - saved, currencyOf(pkg));
-        const money = (amount: number) =>
-          `${currencySymbol(currencyOf(pkg))} ${roundForCurrency(amount, currencyOf(pkg)).toLocaleString(
-            currencyOf(pkg) === 'USD' ? 'en-US' : 'en-PK',
-            { maximumFractionDigits: 2 },
-          )}`;
-        return (
-          <View style={[styles.pkgFooter, isActive && styles.pkgFooterActive]}>
-            <View style={styles.pkgPriceLine}>
-              <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
-                {durationQuote?.price === null ? '—' : money(price)}
-              </Text>
-              {saved > 0 && (
-                <Text style={[styles.pkgStruckPrice, isActive && styles.pkgStruckPriceActive]}>{money(basePrice)}</Text>
-              )}
-            </View>
-            <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
-              {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
-                ? 'per person'
-                : pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP'
-                  ? 'per group' : 'per package'}
+      <View style={[styles.pkgFooter, isActive && styles.pkgFooterActive]}>
+        <View style={styles.pkgPriceLine}>
+          <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
+            {price === null ? '—' : formatPackagePrice(price, pkg)}
+          </Text>
+          {applicableCoupon && (
+            <Text style={[styles.pkgStruckPrice, isActive && styles.pkgStruckPriceActive]}>
+              {formatPackagePrice(originalPrice, pkg)}
             </Text>
-          </View>
-        );
-      })()}
+          )}
+        </View>
+        <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
+          {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
+            ? 'per person'
+            : pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP'
+              ? 'per group' : 'per package'}
+          {applicableCoupon ? ` · With code ${applicableCoupon.code}` : ''}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 })}

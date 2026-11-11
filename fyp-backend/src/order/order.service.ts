@@ -1,5 +1,5 @@
 import { countryCurrency, currencyOf, roundForCurrency, roundMoney } from '../common/utils/currency';
-import { legacyPricingMethod, quotePackage } from '../common/utils/package-pricing';
+import { legacyPricingMethod, quotePackage, resolvePackageUnitPrice } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
 import { ChatGateway } from '../chat/chat.gateway';
 import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
@@ -838,65 +838,7 @@ export class OrderService {
 
                         // Price comes from the current package document,
                         // never from service.price supplied by the client.
-                        let unitPrice:
-                            | number
-                            | null = null;
-
-                        if (packageDoc.bookingType === 'DURATION_BASED') {
-                            const tiers: { minutes: number; price: number }[] = (packageDoc.durations ?? []).map((option: any) => ({
-                                minutes: Number(option.value) * (option.unit === 'DAYS' ? 1440 : 60),
-                                price: Number(option.price),
-                            }));
-                            const included = Number(packageDoc.baseIncludedDurationMinutes);
-                            const basePrice = Number(packageDoc.price);
-                            const hasIncluded = Number.isFinite(included) && included > 0;
-                            const exact = tiers.find((tier) => tier.minutes === selectedDurationMinutes);
-
-                            if (hasIncluded && selectedDurationMinutes === included) {
-                                unitPrice = basePrice;
-                            } else if (exact) {
-                                unitPrice = exact.price;
-                            } else if (packageDoc.allowCustomDuration) {
-                                const unitMinutes = packageDoc.customDurationUnit === 'DAYS' ? 1440 :
-                                    packageDoc.customDurationUnit === 'HOURS' ? 60 : 0;
-                                const rate = Number(packageDoc.customDurationRate);
-                                if (!unitMinutes || !Number.isFinite(rate) || rate <= 0) {
-                                    throw new BadRequestException('Package custom duration pricing is invalid');
-                                }
-                                if (hasIncluded && selectedDurationMinutes < included) {
-                                    if (selectedDurationMinutes % unitMinutes !== 0) {
-                                        throw new BadRequestException('Select a duration in whole units of the vendor’s custom rate.');
-                                    }
-                                    unitPrice = roundForCurrency(Math.min(basePrice, rate * selectedDurationMinutes / unitMinutes), currency);
-                                } else if (hasIncluded) {
-                                    const sortedTiers = [{ minutes: included, price: basePrice }, ...tiers]
-                                        .sort((a, b) => a.minutes - b.minutes);
-                                    const lower = [...sortedTiers].reverse()
-                                        .find((tier) => tier.minutes < selectedDurationMinutes);
-                                    const upper = sortedTiers.find((tier) => tier.minutes > selectedDurationMinutes);
-                                    if (!lower) {
-                                        throw new BadRequestException('Duration is below the package minimum');
-                                    }
-                                    const calculated = basePrice + rate *
-                                        (selectedDurationMinutes - included) / unitMinutes;
-                                    unitPrice = roundForCurrency(Math.max(lower.price,
-                                        upper ? Math.min(calculated, upper.price) : calculated), currency);
-                                } else {
-                                    // Legacy packages: their custom rate covers the full duration.
-                                    if (selectedDurationMinutes % unitMinutes !== 0) {
-                                        throw new BadRequestException('Package custom duration pricing is invalid');
-                                    }
-                                    unitPrice = (selectedDurationMinutes / unitMinutes) * rate;
-                                }
-                            } else if (!hasIncluded) {
-                                // Preserve existing legacy package fallback.
-                                unitPrice = basePrice;
-                            } else {
-                                throw new BadRequestException('This duration is not offered by the vendor');
-                            }
-                        } else {
-                            unitPrice = Number(packageDoc.price);
-                        }
+                        const unitPrice = resolvePackageUnitPrice(packageDoc, selectedDurationMinutes, currency);
 
                         if (
                             !Number.isFinite(

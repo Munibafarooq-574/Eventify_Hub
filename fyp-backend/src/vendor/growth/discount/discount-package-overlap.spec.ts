@@ -111,3 +111,64 @@ describe('DiscountService — coupon package occupancy', () => {
       .rejects.toThrow(BadRequestException);
   });
 });
+
+describe('DiscountService public package price previews', () => {
+  const vendorId = new Types.ObjectId().toString();
+  const packageId = new Types.ObjectId();
+  const otherId = new Types.ObjectId();
+  const basePackage = { _id: packageId, currency: 'USD', price: 200, bookingType: 'DURATION_BASED',
+    baseIncludedDurationMinutes: 300, durations: [{ value: 6, unit: 'HOURS', price: 260 }] };
+  const baseCoupon = { _id: new Types.ObjectId(), code: 'SAVE10', currency: 'USD',
+    discountType: DiscountKind.PERCENTAGE, discountValue: 10, minimumOrderAmount: 0,
+    packageIds: [packageId.toString()] };
+
+  function setup(overrides: object = {}) {
+    const coupon = { ...baseCoupon, ...overrides };
+    const service = Object.create(DiscountService.prototype);
+    service.featureAccessService = { hasActiveSubscription: async () => true };
+    service.discountModel = {
+      find: () => ({ sort: () => ({ exec: async () => [{ ...coupon, toObject: () => coupon }] }) }),
+    };
+    service.userModel = {
+      findById: () => ({ select: () => ({
+        lean: async () => ({ packages: [basePackage, { ...basePackage, _id: otherId }] }),
+      }) }),
+    };
+    service.findActiveEntryByCode = async () => coupon;
+    service.redemptionModel = { exists: async () => false };
+    return service as DiscountService;
+  }
+
+  it('shows $180 alongside the original $200 and matches checkout validation', async () => {
+    const service = setup();
+    const [offer] = await service.getPublicCoupons(vendorId, undefined, { durationMinutes: NaN });
+    const checkout = await service.validateCoupon(
+      vendorId, 'SAVE10', 200, new Types.ObjectId().toString(), packageId.toString(),
+    );
+    expect(checkout.finalAmount).toBe(180);
+    expect(offer).toMatchObject({
+      packagePricePreviews: {
+        [packageId.toString()]: { originalPrice: 200, finalAmount: checkout.finalAmount, currency: 'USD' },
+      },
+    });
+    expect(Object.keys((offer as any).packagePricePreviews)).toEqual([packageId.toString()]);
+  });
+
+  it('uses the duration tier and respects the discount cap', async () => {
+    const [offer] = await setup({ maximumDiscountAmount: 15 }).getPublicCoupons(
+      vendorId, undefined, { durationMinutes: 360 },
+    );
+    expect(offer).toMatchObject({
+      packagePricePreviews: { [packageId.toString()]: { originalPrice: 260, finalAmount: 245 } },
+    });
+  });
+
+  it('omits previews below the minimum or for an unavailable duration', async () => {
+    const [belowMinimum] = await setup({ minimumOrderAmount: 250 }).getPublicCoupons(
+      vendorId, undefined, { durationMinutes: NaN },
+    );
+    const [unavailable] = await setup().getPublicCoupons(vendorId, undefined, { durationMinutes: 420 });
+    expect(belowMinimum).toMatchObject({ packagePricePreviews: {} });
+    expect(unavailable).toMatchObject({ packagePricePreviews: {} });
+  });
+});

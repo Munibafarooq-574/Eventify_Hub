@@ -39,10 +39,13 @@ export class DiscountController {
 getPublicCoupons(
   @Param('vendorId') vendorId: string,
   @Query('packageId') packageId?: string,
+  @Query('includePackagePrices') includePackagePrices?: string,
+  @Query('durationMinutes') durationMinutes?: string,
 ) {
   return this.discountService.getPublicCoupons(
     vendorId,
     packageId,
+    includePackagePrices === 'true' ? { durationMinutes: Number(durationMinutes) } : undefined,
   );
 }
 

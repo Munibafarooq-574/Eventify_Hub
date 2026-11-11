@@ -32,7 +32,8 @@ test('package cards and the Add to Cart footer show the same selected-duration q
   assert.match(source, /const durationQuote = getEventDurationQuote\(pkg\)/);
   assert.match(source, /durationQuote\?\.price \?\? pkg\.price/);
   assert.match(source, /const selectedDurationQuote = getEventDurationQuote\(selectedPackage\)/);
-  assert.match(source, /selectedDurationQuote\?\.price \?\? selectedPackage\.price/);
+  assert.match(source, /getPackagePriceDisplay\(selectedPackage, selectedDurationQuote\)/);
+  assert.match(source, /getPackagePriceDisplay\(pkg, durationQuote\)/);
   assert.match(source, /const cartDisabled = selectedDurationQuote\?\.price === null/);
 });
 
