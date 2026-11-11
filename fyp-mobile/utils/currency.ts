@@ -20,6 +20,21 @@ export function vendorDisplayCurrency(value?: unknown): Currency {
   return currentCurrency();
 }
 
+// Analytics may carry the legacy PKR default when a new US vendor has no
+// completed bookings. Use the signed-in vendor's country only for zero revenue;
+// never relabel an existing non-zero historical payment or booking.
+export function vendorRevenueCurrency(value?: {
+  currency?: 'PKR' | 'USD';
+  totalRevenue?: number;
+  monthlyRevenue?: number;
+  sales?: { totalRevenue?: number; monthlyRevenue?: number };
+} | null): Currency {
+  const total = Number(value?.totalRevenue ?? value?.sales?.totalRevenue ?? 0);
+  const month = Number(value?.monthlyRevenue ?? value?.sales?.monthlyRevenue ?? 0);
+  if (total === 0 && month === 0) return currentCurrency();
+  return vendorDisplayCurrency(value);
+}
+
 export function countryCurrency(country?: string | null): Currency {
   return country === 'US' ? 'USD' : 'PKR';
 }
