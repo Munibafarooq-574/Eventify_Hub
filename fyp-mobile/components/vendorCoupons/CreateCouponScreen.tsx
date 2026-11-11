@@ -1,3 +1,7 @@
+import { getVendorCoupons } from '@/services/getVendorCoupons';
+import { getVendorDiscountCodes } from '@/services/getVendorDiscountCodes';
+import { getOccupiedPromotionPackages } from '@/utils/discountPackageAvailability';
+import { VendorDiscount } from '@/types/discount.types';
 import { currencySymbol } from '@/utils/currency';
 import { getVendorPackagesList, VendorPackageListItem } from '@/services/getVendorPackagesList';
 // fyp-mobile/components/vendorCoupons/CreateCouponScreen.tsx
@@ -69,14 +73,32 @@ export default function CreateCouponScreen() {
   const [packageScope, setPackageScope] = useState<'all' | 'selected'>('all');
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [vendorPackages, setVendorPackages] = useState<VendorPackageListItem[]>([]);
-  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesLoading, setPackagesLoading] = useState(true);
   const [packagesError, setPackagesError] = useState(false);
+  const [existingPromotions, setExistingPromotions] = useState<VendorDiscount[]>([]);
+  const { occupied, allPackagesOffer } = getOccupiedPromotionPackages(existingPromotions);
+  const hasOccupiedPackages = !!allPackagesOffer || occupied.size > 0;
+  const availablePackageIds = vendorPackages
+    .filter(pkg => !allPackagesOffer && !occupied.has(pkg._id))
+    .map(pkg => pkg._id);
+
   useEffect(() => {
-    if (!vendorIdValue) return;
+    if (!vendorIdValue) { setPackagesError(true); setPackagesLoading(false); return; }
     let mounted = true;
     setPackagesLoading(true);
-    getVendorPackagesList(vendorIdValue).then(items => {
-      if (mounted) { setVendorPackages(items); setPackagesError(false); }
+    Promise.all([
+      getVendorPackagesList(vendorIdValue),
+      getVendorCoupons(vendorIdValue),
+      getVendorDiscountCodes(vendorIdValue),
+    ]).then(([items, coupons, codes]) => {
+      if (!mounted) return;
+      setVendorPackages(items);
+      setExistingPromotions([...coupons, ...codes]);
+      setPackagesError(false);
+      const availability = getOccupiedPromotionPackages([...coupons, ...codes]);
+      if (availability.allPackagesOffer || availability.occupied.size > 0) {
+        setPackageScope('selected');
+      }
     }).catch(() => { if (mounted) setPackagesError(true); })
       .finally(() => { if (mounted) setPackagesLoading(false); });
     return () => { mounted = false; };
@@ -132,6 +154,19 @@ export default function CreateCouponScreen() {
 
     if (end <= start) {
       Alert.alert('Invalid date range', 'Expiry date must be after start date');
+      return;
+    }
+
+    if (packagesLoading || packagesError) {
+      Alert.alert('Package availability unavailable', 'Cannot verify existing offers. Reopen this screen and try again.');
+      return;
+    }
+    if (packageScope === 'all' && hasOccupiedPackages) {
+      Alert.alert('Packages already covered', 'Cancel existing coupon or discount code offers before applying a new offer to all packages.');
+      return;
+    }
+    if (packageScope === 'selected' && selectedPackageIds.some(id => !!allPackagesOffer || occupied.has(id))) {
+      Alert.alert('Package already covered', 'Cancel its existing offer before selecting this package.');
       return;
     }
 
@@ -257,13 +292,14 @@ export default function CreateCouponScreen() {
         <TouchableOpacity
           key={opt.key}
           activeOpacity={0.85}
+          disabled={opt.key === 'all' && (hasOccupiedPackages || packagesLoading || packagesError)}
           accessibilityRole="radio"
-          accessibilityState={{ checked: active }}
+          accessibilityState={{ checked: active, disabled: opt.key === 'all' && hasOccupiedPackages }}
           onPress={() => {
             setPackageScope(opt.key);
             if (opt.key === 'all') setSelectedPackageIds([]);
           }}
-          style={[styles.scopeChoice, active && styles.scopeChoiceActive]}
+          style={[styles.scopeChoice, active && styles.scopeChoiceActive, opt.key === 'all' && hasOccupiedPackages && styles.disabledOption]}
         >
           <View style={[styles.scopeCircle, active && styles.scopeCircleActive]}>
             {active && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
@@ -274,6 +310,12 @@ export default function CreateCouponScreen() {
     })}
   </View>
 
+  {hasOccupiedPackages && (
+    <Text style={styles.occupiedHint}>
+      Packages with an active coupon or discount code are locked until the vendor cancels that offer.
+    </Text>
+  )}
+  {packagesError && <Text style={styles.occupiedHint}>Unable to verify existing offers. Creation is unavailable.</Text>}
   <Text style={styles.scopeHint}>
     {packageScope === 'all'
       ? 'This coupon will work on every package you offer.'
@@ -302,20 +344,20 @@ export default function CreateCouponScreen() {
         <>
           <View style={styles.panelHeader}>
             <Text style={styles.panelCount}>
-              {selectedPackageIds.length} of {vendorPackages.length} selected
+              {selectedPackageIds.length} of {availablePackageIds.length} available selected
             </Text>
             <TouchableOpacity
               onPress={() =>
                 setSelectedPackageIds(
-                  selectedPackageIds.length === vendorPackages.length
+                  selectedPackageIds.length === availablePackageIds.length
                     ? []
-                    : vendorPackages.map((p) => p._id),
+                    : availablePackageIds,
                 )
               }
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Text style={styles.panelAction}>
-                {selectedPackageIds.length === vendorPackages.length
+                {selectedPackageIds.length === availablePackageIds.length
                   ? 'Clear all'
                   : 'Select all'}
               </Text>
@@ -323,11 +365,13 @@ export default function CreateCouponScreen() {
           </View>
 
           {vendorPackages.map((pkg, index) => {
+            const blockedBy = allPackagesOffer || occupied.get(pkg._id);
             const selected = selectedPackageIds.includes(pkg._id);
             return (
               <TouchableOpacity
                 key={pkg._id}
                 activeOpacity={0.7}
+                disabled={!!blockedBy}
                 onPress={() =>
                   setSelectedPackageIds((current) =>
                     selected
@@ -339,6 +383,7 @@ export default function CreateCouponScreen() {
                   styles.packageRow,
                   index > 0 && styles.packageRowDivider,
                   selected && styles.packageRowSelected,
+                  !!blockedBy && styles.disabledOption,
                 ]}
               >
                 <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
@@ -346,12 +391,12 @@ export default function CreateCouponScreen() {
                     <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                   ) : null}
                 </View>
-                <Text
-                  style={[styles.packageName, selected && styles.packageNameSelected]}
-                  numberOfLines={2}
-                >
-                  {pkg.packageName}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.packageName, selected && styles.packageNameSelected]} numberOfLines={2}>
+                    {pkg.packageName}
+                  </Text>
+                  {!!blockedBy && <Text style={styles.packageLocked}>Active offer: {blockedBy.code} — cancel it first</Text>}
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -460,6 +505,9 @@ const styles = StyleSheet.create({
   },
   submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
+  disabledOption: { opacity: 0.55 },
+  occupiedHint: { fontSize: 12.5, lineHeight: 18, color: '#935216', marginTop: 10 },
+  packageLocked: { color: '#935216', fontSize: 12, marginTop: 4 },
   scopeChoices: { gap: 10, marginTop: 4 },
   scopeChoice: {
     minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12,
