@@ -20,7 +20,7 @@ describe('Campaign poster display mode', () => {
 
   it('keeps older campaigns valid without a displayMode field', async () => {
     expect(await validate(draft())).toHaveLength(0);
-    expect(VendorCampaignSchema.path('displayMode').getDefault(undefined)).toBe('AUTO');
+    expect(VendorCampaignSchema.path('displayMode').options.default).toBe('AUTO');
   });
 
   it('rejects an unknown presentation mode', async () => {
