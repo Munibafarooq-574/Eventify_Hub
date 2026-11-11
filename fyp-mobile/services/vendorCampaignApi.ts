@@ -18,6 +18,7 @@ export interface VendorCampaign {
 
   title: string;
   image: string;
+  displayMode?: 'POSTER' | 'AUTO';
   description: string;
   offerLabel?: string | null;
 
@@ -50,6 +51,7 @@ export interface CreateCampaignInput {
   title: string;
   description: string;
   offerLabel?: string;
+  displayMode?: 'POSTER' | 'AUTO';
   startDate: string;
   endDate: string;
   image: {
@@ -102,6 +104,7 @@ export async function createVendorCampaign(
   const formData = new FormData();
 
   formData.append("packageId", input.packageId);
+  formData.append("displayMode", input.displayMode ?? "AUTO");
   formData.append("title", input.title.trim());
   formData.append(
     "description",
