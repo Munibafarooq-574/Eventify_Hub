@@ -9,7 +9,7 @@ import { withBookingPaymentLock } from '../common/utils/booking-payment-window';
 describe('acceptance waits for final event schedule', () => {
   let mongo: MongoMemoryReplSet, db: Connection, bookings: any, requests: any;
   beforeAll(async () => {
-    mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, args: ['--nounixsocket'] } });
+    mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     db = await createConnection(mongo.getUri()).asPromise();
     bookings = db.model('AcceptanceBooking', new Schema({ currency: String, price: Number, downPaymentAmount: Number, remainingAmount: Number, downPaymentType: String, downPaymentPercentage: Number, paymentStatus: String, paymentDeadline: Date, status: String, orderId: Schema.Types.ObjectId, vendorId: Schema.Types.ObjectId, eventStartDateTime: Date }, { strict: false }));
     requests = db.model('AcceptanceRequest', new Schema({ orderId: Schema.Types.ObjectId, status: String, resolutionStatus: String }, { strict: false }));
