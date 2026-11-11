@@ -4455,13 +4455,24 @@ const serviceCityNamesFromIds =
           String(applicableCoupon.code || '').toUpperCase();
         const money = (amount: number) => `${currencySymbol(currencyOf(pkg))} ${roundForCurrency(amount, currencyOf(pkg)).toLocaleString(currencyOf(pkg) === 'USD' ? 'en-US' : 'en-PK', { maximumFractionDigits: 2 })}`;
         return <View style={{ marginTop: 8 }}>
-          <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 11, fontWeight: '700' }}>
-            {openedFromOffer && savings > 0
-              ? `Estimated: ${money(basePrice - savings)} (was ${money(basePrice)}, save ${money(savings)})`
-              : `Coupon ${applicableCoupon.code}: ${percentage ? `${applicableCoupon.discountValue}% OFF` : `${money(Number(applicableCoupon.discountValue))} OFF`} available`}
-          </Text>
+          {openedFromOffer && savings > 0 ? (
+            <View>
+              <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 15, fontWeight: '800' }}>
+                {money(basePrice - savings)}
+                {'  '}
+                <Text style={{ textDecorationLine: 'line-through', fontSize: 11, fontWeight: '400' }}>{money(basePrice)}</Text>
+              </Text>
+              <Text style={{ color: isActive ? '#FFFFFF' : '#23754E', fontWeight: '700', fontSize: 11 }}>
+                Save {money(savings)} with {applicableCoupon.code}
+              </Text>
+            </View>
+          ) : (
+            <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 11, fontWeight: '700' }}>
+              Coupon {applicableCoupon.code}: {percentage ? `${applicableCoupon.discountValue}% OFF` : `${money(Number(applicableCoupon.discountValue))} OFF`} available
+            </Text>
+          )}
           <Text style={{ color: isActive ? '#FBE5F8' : '#77667B', fontSize: 10 }}>
-            {openedFromOffer ? 'Final discount confirmed at checkout.' : 'Select this offer at checkout to apply the discount.'}
+            {openedFromOffer ? 'Estimated preview · final discount confirmed at checkout.' : 'Select this offer at checkout to apply the discount.'}
           </Text>
         </View>;
       })()}
