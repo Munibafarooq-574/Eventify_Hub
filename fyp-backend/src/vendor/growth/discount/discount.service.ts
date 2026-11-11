@@ -985,6 +985,30 @@ return {
       throw new BadRequestException(`You already have an active code "${code}"`);
     }
 
+    // One active offer per package across coupons AND discount codes.
+    // Legacy packageId and empty packageIds both remain supported.
+    // CANCELLED/EXPIRED offers do not occupy packages.
+    const requestedIds = [...selectedPackageIds, ...(dto.packageId ? [dto.packageId] : [])];
+    const allPackages = requestedIds.length === 0;
+    const occupiedOffer = await this.discountModel.findOne({
+      vendorId: new Types.ObjectId(vendorId),
+      status: DiscountStatus.ACTIVE,
+      endDate: { $gte: new Date() },
+      ...(allPackages ? {} : {
+        $or: [
+          { packageId: null, $or: [{ packageIds: { $exists: false } }, { packageIds: { $size: 0 } }] },
+          { packageId: { $in: requestedIds } },
+          { packageIds: { $in: requestedIds } },
+        ],
+      }),
+    });
+    if (occupiedOffer) {
+      const scope = allPackages ? 'All Packages' : 'one or more selected packages';
+      throw new BadRequestException(
+        `Cannot create this offer for ${scope}. Active ${occupiedOffer.type === DiscountEntryType.COUPON ? 'coupon' : 'discount code'} "${occupiedOffer.code}" already covers a requested package. Cancel that offer before creating a new one.`,
+      );
+    }
+
     const activeCount = await this.discountModel.countDocuments({
       vendorId: new Types.ObjectId(vendorId),
       type,
