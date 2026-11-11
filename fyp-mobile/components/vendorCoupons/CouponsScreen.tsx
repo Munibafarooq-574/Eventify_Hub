@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, Ticket, Percent, Plus } from 'lucide-react-native';
 
 import { getVendorCoupons } from '../../services/getVendorCoupons';
+import { getVendorPackagesList } from '../../services/getVendorPackagesList';
 import { deleteVendorCoupon } from '../../services/deleteVendorCoupon';
 import { getVendorDiscountCodes } from '../../services/getVendorDiscountCodes';
 import { deleteVendorDiscountCode } from '../../services/deleteVendorDiscountCode';
@@ -109,6 +110,7 @@ const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<EntryTab>(initialTabValue === 'discountCode' ? 'discountCode' : 'coupon');
 
   const [entries, setEntries] = useState<VendorDiscount[]>([]);
+  const [packageNames, setPackageNames] = useState<Record<string, string>>({});
   const [limit, setLimit] = useState(0);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -151,6 +153,25 @@ const insets = useSafeAreaInsets();
   useEffect(() => {
     loadData();
   }, [loadData, refresh]);
+
+  useEffect(() => {
+    if (!vendorIdValue || activeTab !== 'coupon') return;
+    let mounted = true;
+    getVendorPackagesList(vendorIdValue)
+      .then(packages => {
+        if (mounted) setPackageNames(Object.fromEntries(packages.map(pkg => [String(pkg._id), pkg.packageName])));
+      })
+      .catch(() => { if (mounted) setPackageNames({}); });
+    return () => { mounted = false; };
+  }, [vendorIdValue, activeTab, refresh]);
+
+  const couponPackageLabel = (entry: VendorDiscount): string => {
+    const ids = entry.packageIds?.length
+      ? entry.packageIds
+      : entry.packageId ? [entry.packageId] : [];
+    if (!ids.length) return 'All Packages';
+    return ids.map(id => packageNames[String(id)] || 'Package unavailable').join(', ');
+  };
 
   const activeCount = useMemo(() => entries.filter((e) => e.status === DiscountStatus.ACTIVE).length, [entries]);
   const atLimit = activeCount >= limit;
@@ -454,6 +475,12 @@ const Header = () => (
                   </View>
                 </View>
                 <Text style={styles.entryDiscount}>{discountSummary(entry)}</Text>
+                {activeTab === 'coupon' && (
+                  <View style={styles.appliesToRow}>
+                    <Text style={styles.appliesToLabel}>Apply Discount To: </Text>
+                    <Text style={styles.appliesToValue}>{couponPackageLabel(entry)}</Text>
+                  </View>
+                )}
                 {activeTab === 'discountCode' && (
               <Text style={styles.entryMeta}>
                 Audience: {audienceLabel(entry.audience)}
@@ -798,6 +825,10 @@ headerSubtitle: {
 
   entryDiscount: { fontSize: 15, fontWeight: '700', color: COLORS.primary, marginTop: 4 },
   entryMeta: { fontSize: 12.5, color: COLORS.muted, marginTop: 4 },
+  appliesToRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6, alignItems: 'flex-start' },
+  appliesToLabel: { fontSize: 12.5, color: COLORS.muted, fontWeight: '600' },
+  appliesToValue: { fontSize: 12.5, color: COLORS.text, fontWeight: '600', flexShrink: 1 },
+
 
   cancelButton: { marginTop: 12, alignSelf: 'flex-start' },
   cancelButtonText: { color: COLORS.danger, fontSize: 12.5, fontWeight: '700' },
