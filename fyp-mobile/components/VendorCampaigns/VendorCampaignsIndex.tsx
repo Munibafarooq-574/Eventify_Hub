@@ -29,7 +29,6 @@ import {
   Animated,
   LayoutAnimation,
   Share,
-  UIManager,
   useColorScheme,
   Alert,
   Dimensions,
@@ -153,7 +152,6 @@ export default function VendorCampaignsIndex() {
   const insets = useSafeAreaInsets();
   const dark = useColorScheme() === "dark";
   const [filter, setFilter] = useState<"all" | "active" | "pending">("all");
-  const displayedCampaigns = campaigns.filter(c => filter === "all" || c.status === filter);
 
 
   const [vendorId, setVendorId] =
@@ -161,6 +159,7 @@ export default function VendorCampaignsIndex() {
 
   const [campaigns, setCampaigns] =
     useState<VendorCampaign[]>([]);
+  const displayedCampaigns = campaigns.filter(c => filter === "all" || c.status === filter);
 
   const [usage, setUsage] =
     useState<CampaignUsage | null>(null);
