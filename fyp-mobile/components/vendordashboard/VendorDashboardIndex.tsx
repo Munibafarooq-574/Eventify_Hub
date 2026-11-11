@@ -1,4 +1,4 @@
-import { formatMoney, currencySymbol, vendorDisplayCurrency } from '@/utils/currency';
+import { formatMoney, currencySymbol, vendorRevenueCurrency } from '@/utils/currency';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
@@ -99,7 +99,7 @@ const DashboardScreen = () => {
     const [refreshing, setRefreshing] = useState<boolean>(false);
 
     // ---- Analytics state ----
-    const formatPKR = (amount: number) => formatMoney(amount, vendorDisplayCurrency(analytics));
+    const formatPKR = (amount: number) => formatMoney(amount, vendorRevenueCurrency(analytics));
     const [analytics, setAnalytics] = useState<VendorAnalytics | null>(null);
     const [analyticsLoading, setAnalyticsLoading] = useState<boolean>(true);
     const [analyticsError, setAnalyticsError] = useState<boolean>(false);
@@ -1295,7 +1295,7 @@ if (!hasValidSubscription) {
                                 <Text style={styles.revenueValue}>
                                     {formatPKR(analytics?.totalRevenue || 0)}
                                     {!!analytics?.revenueByCurrency && Object.entries(analytics.revenueByCurrency)
-                                      .filter(([code, value]) => code !== vendorDisplayCurrency(analytics) && value > 0)
+                                      .filter(([code, value]) => code !== vendorRevenueCurrency(analytics) && value > 0)
                                       .map(([code, value]) => <Text key={code}>{'\n'}{formatMoney(value, code)}</Text>)}
 
                                 </Text>
