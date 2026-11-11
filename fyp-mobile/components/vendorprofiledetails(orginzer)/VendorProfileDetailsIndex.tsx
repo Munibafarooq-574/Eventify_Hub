@@ -4397,135 +4397,94 @@ const serviceCityNamesFromIds =
       onPress={() => handlePackageSelect(pkg._id)}
       activeOpacity={0.88}
     >
-      {/* Top row: icon + coupon ribbon */}
+      {/* Compact package card — single price block, consistent selected/unselected layout. */}
       <View style={styles.pkgTopRow}>
-        <View
-          style={[
-            styles.packageCardIconWrap,
-            isActive && styles.packageCardIconWrapActive,
-          ]}
-        >
-          <Ionicons
-            name="gift-outline"
-            size={20}
-            color={isActive ? '#FFFFFF' : PRIMARY}
-          />
-        </View>
-
-        {couponBadgeText && (
+        {couponBadgeText ? (
           <View style={styles.packageCouponBadge}>
-            <Ionicons
-              name="pricetag"
-              size={11}
-              color="#5A3A00"
-            />
-            <Text
-              style={styles.packageCouponBadgeText}
-              numberOfLines={1}
-            >
-              {couponBadgeText}
+            <Ionicons name="pricetag" size={11} color="#5A3A00" />
+            <Text style={styles.packageCouponBadgeText} numberOfLines={1}>{couponBadgeText}</Text>
+          </View>
+        ) : <View />}
+        {isActive && (
+          <View style={styles.pkgSelectCircleActive}>
+            <Ionicons name="checkmark" size={15} color="#5E1A50" />
+          </View>
+        )}
+      </View>
+
+      <Text style={[styles.packageCardName, isActive && styles.packageCardNameActive]} numberOfLines={2}>
+        {pkg.packageName || 'Package'}
+      </Text>
+
+      <View style={styles.pkgMetaRow}>
+        {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP' && Number(pkg.groupSize) > 0 ? (
+          <View style={[styles.pkgMetaChip, isActive && styles.pkgMetaChipActive]}>
+            <Ionicons name="people-outline" size={12} color={isActive ? '#FFFFFF' : PRIMARY} />
+            <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>{Number(pkg.groupSize)} people</Text>
+          </View>
+        ) : (
+          <View style={[styles.pkgMetaChip, isActive && styles.pkgMetaChipActive]}>
+            <Ionicons name="person-outline" size={12} color={isActive ? '#FFFFFF' : PRIMARY} />
+            <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>
+              {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? 'Per person' : 'Per package'}
+            </Text>
+          </View>
+        )}
+        {Number(pkg.baseIncludedDurationMinutes) > 0 && (
+          <View style={[styles.pkgMetaChip, isActive && styles.pkgMetaChipActive]}>
+            <Ionicons name="time-outline" size={12} color={isActive ? '#FFFFFF' : PRIMARY} />
+            <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>
+              {Number(pkg.baseIncludedDurationMinutes) % 1440 === 0
+                ? `${Number(pkg.baseIncludedDurationMinutes) / 1440} days`
+                : `${Number(pkg.baseIncludedDurationMinutes) / 60} hrs`}
             </Text>
           </View>
         )}
       </View>
 
-      {/* Name */}
-      <Text
-        style={[
-          styles.packageCardName,
-          isActive && styles.packageCardNameActive,
-        ]}
-        numberOfLines={2}
-      >
-        {pkg.packageName || 'Package'}
-      </Text>
-      <PackagePricingLabel pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
-      {pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType === 'FREE' && <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',padding:6,borderRadius:8,alignSelf:'flex-start',fontWeight:'700'}}>Free Delivery</Text>}
+      {pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType === 'FREE' && (
+        <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>Free delivery</Text>
+      )}
 
-      {applicableCoupon && (() => {
+      {(() => {
         const basePrice = Number(durationQuote?.price ?? pkg.price ?? 0);
-        const minimum = Number(applicableCoupon.minimumOrderAmount || 0);
-        const percentage = String(applicableCoupon.discountType).toLowerCase() === 'percentage';
-        const rawSavings = percentage ? basePrice * Number(applicableCoupon.discountValue || 0) / 100
-          : Number(applicableCoupon.discountValue || 0);
-        const cap = percentage && applicableCoupon.maximumDiscountAmount != null
-          ? Number(applicableCoupon.maximumDiscountAmount) : Infinity;
-        const savings = roundForCurrency(basePrice >= minimum ? Math.min(basePrice, rawSavings, cap) : 0, currencyOf(pkg));
-        const openedFromOffer = String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
-          String(applicableCoupon.code || '').toUpperCase();
-        const money = (amount: number) => `${currencySymbol(currencyOf(pkg))} ${roundForCurrency(amount, currencyOf(pkg)).toLocaleString(currencyOf(pkg) === 'USD' ? 'en-US' : 'en-PK', { maximumFractionDigits: 2 })}`;
-        return <View style={{ marginTop: 8 }}>
-          {openedFromOffer && savings > 0 ? (
-            <View>
-              <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 15, fontWeight: '800' }}>
-                {money(basePrice - savings)}
-                {'  '}
-                <Text style={{ textDecorationLine: 'line-through', fontSize: 11, fontWeight: '400' }}>{money(basePrice)}</Text>
+        const previewCoupon = applicableCoupon && String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
+          String(applicableCoupon.code || '').toUpperCase() ? applicableCoupon : null;
+        const percentage = previewCoupon && String(previewCoupon.discountType).toLowerCase() === 'percentage';
+        const minAmount = Number(previewCoupon?.minimumOrderAmount ?? 0);
+        const savingRaw = percentage
+          ? basePrice * Number(previewCoupon?.discountValue || 0) / 100
+          : Number(previewCoupon?.discountValue || 0);
+        const cap = percentage && previewCoupon?.maximumDiscountAmount != null
+          ? Number(previewCoupon.maximumDiscountAmount) : Infinity;
+        const saved = previewCoupon && basePrice >= minAmount && durationQuote?.price !== null
+          ? roundForCurrency(Math.min(basePrice, Math.max(0, savingRaw), cap), currencyOf(pkg))
+          : 0;
+        const price = roundForCurrency(basePrice - saved, currencyOf(pkg));
+        const money = (amount: number) =>
+          `${currencySymbol(currencyOf(pkg))} ${roundForCurrency(amount, currencyOf(pkg)).toLocaleString(
+            currencyOf(pkg) === 'USD' ? 'en-US' : 'en-PK',
+            { maximumFractionDigits: 2 },
+          )}`;
+        return (
+          <View style={[styles.pkgFooter, isActive && styles.pkgFooterActive]}>
+            <View style={styles.pkgPriceLine}>
+              <Text style={[styles.packageCardPrice, isActive && styles.packageCardPriceActive]}>
+                {durationQuote?.price === null ? '—' : money(price)}
               </Text>
-              <Text style={{ color: isActive ? '#FFFFFF' : '#23754E', fontWeight: '700', fontSize: 11 }}>
-                Save {money(savings)} with {applicableCoupon.code}
-              </Text>
+              {saved > 0 && (
+                <Text style={[styles.pkgStruckPrice, isActive && styles.pkgStruckPriceActive]}>{money(basePrice)}</Text>
+              )}
             </View>
-          ) : (
-            <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 11, fontWeight: '700' }}>
-              Coupon {applicableCoupon.code}: {percentage ? `${applicableCoupon.discountValue}% OFF` : `${money(Number(applicableCoupon.discountValue))} OFF`} available
+            <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
+              {pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON'
+                ? 'per person'
+                : pricingMethod(pkg, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP'
+                  ? 'per group' : 'per package'}
             </Text>
-          )}
-          <Text style={{ color: isActive ? '#FBE5F8' : '#77667B', fontSize: 10 }}>
-            {openedFromOffer ? 'Estimated preview · final discount confirmed at checkout.' : 'Select this offer at checkout to apply the discount.'}
-          </Text>
-        </View>;
+          </View>
+        );
       })()}
-
-      {/* Footer: price + check */}
-      <View
-        style={[
-          styles.pkgFooter,
-          isActive && styles.pkgFooterActive,
-        ]}
-      >
-        <View>
-          <Text
-            style={[
-              styles.pkgFromLabel,
-              isActive && styles.pkgFromLabelActive,
-            ]}
-          >
-            {durationQuote ? durationPriceLabel(durationQuote) : 'Base Price'}
-          </Text>
-          <Text
-            style={[
-              styles.packageCardPrice,
-              isActive && styles.packageCardPriceActive,
-            ]}
-          >
-            {durationQuote?.price === null ? '—' : `${currencySymbol(currencyOf(pkg))} ${Number(durationQuote?.price ?? pkg.price ?? 0).toLocaleString()}`}{durationQuote?.price !== null && <PackagePriceBasis pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
-          </Text>
-          {!durationQuote && pkg.bookingType === 'DURATION_BASED' &&
-            Number(pkg.baseIncludedDurationMinutes) > 0 && (
-              <Text style={[styles.pkgFromLabel, isActive && styles.pkgFromLabelActive]}>
-                Includes {Number(pkg.baseIncludedDurationMinutes) % 1440 === 0
-                  ? `${Number(pkg.baseIncludedDurationMinutes) / 1440} day(s)`
-                  : `${Number(pkg.baseIncludedDurationMinutes) / 60} hour(s)`}
-              </Text>
-            )}
-        </View>
-
-        <View
-          style={[
-            styles.pkgSelectCircle,
-            isActive && styles.pkgSelectCircleActive,
-          ]}
-        >
-          {isActive && (
-            <Ionicons
-              name="checkmark"
-              size={14}
-              color="#FFFFFF"
-            />
-          )}
-        </View>
-      </View>
     </TouchableOpacity>
   );
 })}
@@ -4542,64 +4501,6 @@ const serviceCityNamesFromIds =
                         styles.packageDetailsCreative,
                       ]}
                     >
-                      {/* Header */}
-
-                      <View
-                        style={
-                          styles.packageDetailsHeader
-                        }
-                      >
-                        <View
-                          style={
-                            styles.packageDetailsHeaderLeft
-                          }
-                        >
-                          <View
-                            style={
-                              styles.packageBadgeIcon
-                            }
-                          >
-                            <Ionicons
-                              name="gift-outline"
-                              size={20}
-                              color="#FFFFFF"
-                            />
-                          </View>
-
-                          <View
-                            style={{
-                              flex: 1,
-                            }}
-                          >
-                            <Text
-                              style={
-                                styles.packageDetailsName
-                              }
-                            >
-                              {
-                                selectedPackage.packageName
-                              }
-                            </Text>
-                            <PackagePricingLabel pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
-
-                            <Text
-                              style={
-                                styles.packageDetailsTag
-                              }
-                            >
-                              Vendor
-                              Package
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View
-                        style={
-                          styles.packageDivider
-                        }
-                      />
-
                       {/* Package Images */}
 
                       {Array.isArray(
@@ -7140,7 +7041,8 @@ specialOfferDetailText: {
   },
 
 packageCard: {
-  width: 190,
+  width: 268,
+  minHeight: 215,
   backgroundColor: '#FFFFFF',
   borderRadius: 22,
   padding: 14,
@@ -7155,8 +7057,9 @@ packageCard: {
 },
 
 activePackageCard: {
-  backgroundColor: PRIMARY,
-  borderColor: PRIMARY_LIGHT,
+  backgroundColor: '#76265F',
+  borderColor: '#D8B45A',
+  borderWidth: 2,
   shadowOpacity: 0.3,
   shadowRadius: 14,
   elevation: 8,
@@ -7167,6 +7070,7 @@ pkgTopRow: {
   alignItems: 'center',
   justifyContent: 'space-between',
   marginBottom: 12,
+  minHeight: 24,
 },
 
 packageCardIconWrap: {
@@ -7190,7 +7094,7 @@ packageCouponBadge: {
   paddingHorizontal: 9,
   paddingVertical: 5,
   borderRadius: 999,
-  maxWidth: 110,
+  maxWidth: 120,
 },
 
 packageCouponBadgeText: {
@@ -7201,7 +7105,7 @@ packageCouponBadgeText: {
 },
 
 packageCardName: {
-  fontSize: 17,
+  fontSize: 18,
   fontWeight: '800',
   color: TEXT_DARK,
   lineHeight: 22,
@@ -7213,11 +7117,8 @@ packageCardNameActive: {
 },
 
 pkgFooter: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginTop: 6,
-  paddingTop: 6,
+  marginTop: 'auto',
+  paddingTop: 12,
   borderTopWidth: 1,
   borderTopColor: BORDER,
 },
@@ -7238,7 +7139,7 @@ pkgFromLabelActive: {
 },
 
 packageCardPrice: {
-  fontSize: 17,
+  fontSize: 24,
   fontWeight: '800',
   color: PRIMARY,
 },
@@ -7260,7 +7161,26 @@ pkgSelectCircle: {
 pkgSelectCircleActive: {
   backgroundColor: '#D8B45A',
   borderColor: '#D8B45A',
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  alignItems: 'center',
+  justifyContent: 'center',
 },
+  pkgMetaRow: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',
+    gap: 6, marginTop: 10, marginBottom: 14, minHeight: 23,
+  },
+  pkgMetaChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F9EFF6', borderRadius: 9, paddingHorizontal: 7, paddingVertical: 4,
+  },
+  pkgMetaChipActive: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  pkgMetaText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
+  pkgMetaTextActive: { color: 'rgba(255,255,255,0.85)' },
+  pkgPriceLine: { flexDirection: 'row', alignItems: 'baseline', gap: 9, flexWrap: 'wrap' },
+  pkgStruckPrice: { fontSize: 13, textDecorationLine: 'line-through', color: TEXT_MUTED },
+  pkgStruckPriceActive: { color: 'rgba(255,255,255,0.68)' },
   packageDetailsCreative: {
     marginTop: 4,
     padding: 0,
