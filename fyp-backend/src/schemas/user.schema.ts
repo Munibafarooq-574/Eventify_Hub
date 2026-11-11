@@ -753,6 +753,9 @@ export class Package {
 
   @Prop({ type: Number, min: 1 })
   groupSize?: number | null;
+
+  @Prop({ type: Number, min: 1 })
+  maxServicePeople?: number;
   @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
   @Prop({ min: 0 }) deliveryFee?: number;

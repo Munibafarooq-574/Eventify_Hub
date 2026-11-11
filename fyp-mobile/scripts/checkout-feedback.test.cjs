@@ -242,7 +242,7 @@ test('Cart validates the carried coupon for the current line and includes its sa
    return {currency:'USD',finalAmount:args[2]*0.9};
   },
  };
- const script=ts.transpileModule(source.slice(start,end)+'\n({originalTotal,cartCouponSavings});',{}).outputText;
+ const script=ts.transpileModule('(() => {\n'+source.slice(start,end)+'\nreturn {originalTotal,cartCouponSavings};\n})()',{}).outputText;
  vm.runInNewContext(script,context);
  run();
  await new Promise(resolve=>setImmediate(resolve));

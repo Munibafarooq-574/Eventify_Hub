@@ -1,6 +1,6 @@
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import { allowedPricingMethods, legacyPricingMethod, quotePackage, validatePackagePricing } from './package-pricing';
+import { allowedPricingMethods, legacyPricingMethod, mehndiServiceQuantity, quotePackage, validateMehndiCapacity, validatePackagePricing } from './package-pricing';
 import { CategoryPricingDto } from '../../category/dto/category-pricing.dto';
 
 describe('package pricing methods', () => {
@@ -32,5 +32,32 @@ describe('package pricing methods', () => {
   it.each([0, -1, 1.5, NaN, Infinity])('rejects invalid group sizes and participant counts %s', invalid => {
     expect(() => quotePackage({ pricingMethod: 'GROUP', groupSize: invalid }, 100, 1, 10)).toThrow();
     expect(() => quotePackage({ pricingMethod: 'PER_PERSON' }, 100, 1, invalid)).toThrow();
+  });
+});
+
+describe('Mehndi capacity and service headcount', () => {
+  const group = { pricingMethod: 'GROUP' as const, groupSize: 6 };
+  const category = { businessDetailsType: 'MEHNDI' };
+
+  it('treats a legacy group package as one group until the vendor raises capacity', () => {
+    expect(validateMehndiCapacity(group, category)).toBe(6);
+    expect(mehndiServiceQuantity(group, 6)).toBe(1);
+    expect(() => mehndiServiceQuantity(group, 15)).toThrow('up to 6 people');
+  });
+
+  it('prices three groups for fifteen service guests within the configured limit', () => {
+    const pkg = { ...group, maxServicePeople: 15 };
+    const quantity = mehndiServiceQuantity(pkg, 15);
+    expect(quantity).toBe(3);
+    expect(quotePackage(pkg, 230, quantity, 15).packageAmount).toBe(690);
+    expect(() => mehndiServiceQuantity(pkg, 16)).toThrow('up to 15 people');
+  });
+
+  it('uses the selected people for per-person pricing and validates its separate maximum', () => {
+    const pkg = { pricingMethod: 'PER_PERSON' as const, maxServicePeople: 15 };
+    expect(quotePackage(pkg, 15, mehndiServiceQuantity(pkg, 15), 15).packageAmount).toBe(225);
+    expect(() => mehndiServiceQuantity(pkg, 1.5)).toThrow();
+    expect(() => validateMehndiCapacity({ pricingMethod: 'PER_PERSON' }, category)).toThrow();
+    expect(validateMehndiCapacity({ pricingMethod: 'PER_PERSON' }, { name: 'Catering' })).toBeUndefined();
   });
 });

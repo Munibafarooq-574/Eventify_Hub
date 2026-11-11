@@ -1,5 +1,5 @@
 import { countryCurrency, currencyOf, roundForCurrency, roundMoney } from '../common/utils/currency';
-import { legacyPricingMethod, quotePackage, resolvePackageUnitPrice } from '../common/utils/package-pricing';
+import { isMehndiCategory, legacyPricingMethod, mehndiServiceQuantity, quotePackage, resolvePackageUnitPrice } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
 import { ChatGateway } from '../chat/chat.gateway';
 import { DELIVERY_FIELDS, deliveryDescription, quoteDelivery } from '../common/utils/delivery-booking';
@@ -95,6 +95,7 @@ export class OrderService {
         durationMinutes?: number;
         quantity?: number;
         personCount?: number;
+        servicePeople?: number;
         expectedPackageAmount?: number;
         expectedPricingMethod?: string;
         expectedGroupSize?: number | null;
@@ -595,6 +596,7 @@ export class OrderService {
                         pricingMethod: 'FIXED' | 'PER_PERSON' | 'GROUP';
                         groupSize: number | null;
                         personCount: number | null;
+                        servicePeople?: number;
                         unitPrice: number;
                         originalAmount: number;
                         finalAmount: number;
@@ -856,10 +858,22 @@ export class OrderService {
                                 vendorCategoryId,
                             );
 
-                        const pricing = quotePackage({
-                            pricingMethod: packageDoc.pricingMethod ?? legacyPricingMethod(category),
-                            groupSize: packageDoc.groupSize,
-                        }, Number(unitPrice), quantity, Number(service.personCount ?? guests));
+                        const pricingMethod = packageDoc.pricingMethod ?? legacyPricingMethod(category);
+                        const mehndi = isMehndiCategory(category);
+                        if (mehndi && service.servicePeople == null) {
+                            throw new BadRequestException('Select the package again and enter how many people need Mehndi.');
+                        }
+                        const servicePeople = mehndi ? service.servicePeople : undefined;
+                        if (servicePeople !== undefined) {
+                            if (servicePeople > Number(guests)) {
+                                throw new BadRequestException('Mehndi guests cannot exceed total event guests.');
+                            }
+                            if (quantity !== mehndiServiceQuantity({ pricingMethod, groupSize: packageDoc.groupSize, maxServicePeople: packageDoc.maxServicePeople }, servicePeople)) {
+                                throw new ConflictException('Mehndi quantity has changed. Select the package again and review the total.');
+                            }
+                        }
+                        const pricing = quotePackage({ pricingMethod, groupSize: packageDoc.groupSize },
+                            Number(unitPrice), quantity, servicePeople ?? Number(service.personCount ?? guests));
                         if (service.expectedPricingMethod !== undefined &&
                             (service.expectedPricingMethod !== pricing.pricingMethod ||
                             (pricing.pricingMethod === 'GROUP' && service.expectedGroupSize !== pricing.groupSize))) {
@@ -1047,6 +1061,7 @@ export class OrderService {
                                 pricingMethod: pricing.pricingMethod,
                                 groupSize: pricing.groupSize,
                                 personCount: pricing.personCount,
+                                servicePeople,
                                 unitPrice:
                                     Number(
                                         unitPrice,
@@ -1200,6 +1215,7 @@ export class OrderService {
                                             pricingMethod: validatedService.pricingMethod,
                                             groupSize: validatedService.groupSize,
                                             personCount: validatedService.personCount,
+                                            servicePeople: validatedService.servicePeople,
                                             delivery: validatedService.delivery,
                                             bookingType: validatedService.bookingType,
                                             bookingChatService: validatedService.bookingChatService,

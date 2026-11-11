@@ -32,7 +32,7 @@ const service: GuideSection = {
     'While a date/time change is unresolved, Mark Processing and payment stay unavailable. Accept New Schedule approves the proposed time; it does not accept the booking. Once the whole schedule is finalized, use Mark Processing if available.',
     'Event time is when the event starts. Service time is the booked work or delivery window for this package; these can differ.',
     'Duration-based packages have a booked start and end. Delivery-based packages use delivery timing. Setup-based packages include setup timing and the time needed to set up. Custom packages follow their saved timing details.',
-    'Read the package name, inclusions, price, duration or delivery/setup window, address and service city before acting.',
+    'Read the package name, inclusions, price, duration or delivery/setup window, address and service city before acting. For Mehndi, check the number of people booked for the service.',
     'Booking activity shows action dates and times with its displayed timezone. Use that timezone when comparing deadlines. Older history may say Time not recorded when the original timestamp was not saved.',
   ],
 };

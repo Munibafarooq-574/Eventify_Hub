@@ -57,12 +57,13 @@ getEligibleCoupons(
   @Query('packageId') packageId: string | undefined,
   @Query('includePackagePrices') includePackagePrices: string | undefined,
   @Query('durationMinutes') durationMinutes: string | undefined,
+  @Query('servicePeople') servicePeople: string | undefined,
   @Req() request: { user: { id: string; role: string } },
 ) {
   return this.discountService.getPublicCoupons(
     vendorId,
     packageId,
-    includePackagePrices === 'true' ? { durationMinutes: Number(durationMinutes) } : undefined,
+    includePackagePrices === 'true' ? { durationMinutes: Number(durationMinutes), servicePeople: servicePeople === undefined ? undefined : Number(servicePeople) } : undefined,
     isClientRole(request.user.role) ? request.user.id : undefined,
   );
 }

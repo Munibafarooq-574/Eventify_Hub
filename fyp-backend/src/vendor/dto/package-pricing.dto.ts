@@ -11,4 +11,9 @@ export class PackagePricingDto extends DeliveryPackageDto {
   @IsInt()
   @Min(1)
   groupSize?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxServicePeople?: number;
 }
