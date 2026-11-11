@@ -1,4 +1,5 @@
-import { currencySymbol, vendorDisplayCurrency } from '@/utils/currency';
+import { currencySymbol, vendorRevenueCurrency } from '@/utils/currency';
+import { getUserData } from '@/store';
 // fyp-mobile/components/vendorGrowth/GrowthAnalyticsScreen.tsx
 //
 // Growth vendors see sales/customers/packages/promotions. Premium vendors
@@ -118,6 +119,7 @@ export default function GrowthAnalyticsScreen() {
       }
       try {
         setError(null);
+        await getUserData(); // Keep vendor country currency available on direct navigation.
         const access = await getSubscriptionAccessState(vendorIdValue);
         const features = access.features;
         setHasAnalytics(access.accessAllowed &&
@@ -285,9 +287,9 @@ export default function GrowthAnalyticsScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Sales</Text>
           <View style={styles.statsGrid}>
-            <Stat icon={Wallet} label="Total Revenue" value={`${currencySymbol(vendorDisplayCurrency(data))} ${fmt(data.sales.totalRevenue)}`} />
-            <Stat icon={TrendingUp} label="This Month" value={`${currencySymbol(vendorDisplayCurrency(data))} ${fmt(data.sales.monthlyRevenue)}`} change={data.sales.monthlyRevenueChangePct} />
-            <Stat icon={Receipt} label="Avg Order Value" value={data.sales.averageOrderValue != null ? `${currencySymbol(vendorDisplayCurrency(data))} ${fmt(data.sales.averageOrderValue)}` : '—'} />
+            <Stat icon={Wallet} label="Total Revenue" value={`${currencySymbol(vendorRevenueCurrency(data))} ${fmt(data.sales.totalRevenue)}`} />
+            <Stat icon={TrendingUp} label="This Month" value={`${currencySymbol(vendorRevenueCurrency(data))} ${fmt(data.sales.monthlyRevenue)}`} change={data.sales.monthlyRevenueChangePct} />
+            <Stat icon={Receipt} label="Avg Order Value" value={data.sales.averageOrderValue != null ? `${currencySymbol(vendorRevenueCurrency(data))} ${fmt(data.sales.averageOrderValue)}` : '—'} />
           </View>
         </View>
 
@@ -388,7 +390,7 @@ export default function GrowthAnalyticsScreen() {
                   <Text style={styles.sectionLabel}>Top Performing Packages</Text>
                 </View>
                 {premium.topPerformingPackages.map((pkg) => (
-                  <InfoRow key={pkg.packageId} label={pkg.packageName} value={`${currencySymbol(vendorDisplayCurrency(data))} ${fmt(pkg.revenue)} · ${pkg.bookingCount} bookings`} />
+                  <InfoRow key={pkg.packageId} label={pkg.packageName} value={`${currencySymbol(vendorRevenueCurrency(data))} ${fmt(pkg.revenue)} · ${pkg.bookingCount} bookings`} />
                 ))}
               </View>
             )}
