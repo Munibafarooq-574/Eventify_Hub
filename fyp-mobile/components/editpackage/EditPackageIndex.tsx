@@ -531,7 +531,7 @@ const packageImageLimitReached =
     if (!packageDetails) return;
 
     const method = packageDetails.pricingMethod || 'FIXED';
-    setPricing({ pricingMethod: method, groupSize: packageDetails.groupSize });
+    setPricing({ pricingMethod: method, groupSize: packageDetails.groupSize, capacityUnit: packageDetails.capacityUnit, peopleIncludedPerGroup: packageDetails.peopleIncludedPerGroup, maxPeoplePerBooking: packageDetails.maxPeoplePerBooking, maxUnitsPerBooking: packageDetails.maxUnitsPerBooking, availableParallelUnits: packageDetails.availableParallelUnits });
     setEditableName(
       packageDetails.packageName || "",
     );
@@ -951,6 +951,11 @@ const removeExistingImage = (index: number) => {
     const updatedData = {
   pricingMethod: pricing.pricingMethod,
   groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
+  capacityUnit: pricing.capacityUnit,
+  peopleIncludedPerGroup: pricing.capacityUnit === 'GROUP' ? pricing.groupSize : pricing.peopleIncludedPerGroup,
+  maxPeoplePerBooking: pricing.maxPeoplePerBooking,
+  maxUnitsPerBooking: pricing.maxUnitsPerBooking,
+  availableParallelUnits: pricing.availableParallelUnits,
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: editableName.trim(),
 
