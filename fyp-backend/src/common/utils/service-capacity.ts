@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 /** Capacity is independent of the event's total guest count and package price. */
 export type ServiceCapacity = {
   capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP';
-  peopleIncludedPerGroup?: number | null;
+  groupSize?: number | null;
   maxPeoplePerBooking?: number | null;
   maxUnitsPerBooking?: number | null;
   availableParallelUnits?: number | null;
@@ -18,13 +18,13 @@ export function validateServiceCapacity(capacity: ServiceCapacity): ServiceCapac
   if (capacity.capacityUnit !== undefined && !allowed.includes(capacity.capacityUnit)) {
     throw new BadRequestException('Choose a valid service capacity unit.');
   }
-  for (const field of ['peopleIncludedPerGroup', 'maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
+  for (const field of ['maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
     const value = capacity[field];
     if (value !== undefined && value !== null && !positiveInteger(value)) {
       throw new BadRequestException(`${field} must be a positive whole number.`);
     }
   }
-  if (capacity.capacityUnit === 'GROUP' && !positiveInteger(capacity.peopleIncludedPerGroup)) {
+  if (capacity.capacityUnit === 'GROUP' && !positiveInteger(capacity.groupSize)) {
     throw new BadRequestException('Group capacity requires people included per group.');
   }
   return capacity;
