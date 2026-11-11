@@ -834,10 +834,6 @@ async addPackages(
     }));
         for (const pkg of incomingPackages) {
       validateServiceCapacity(pkg);
-      if (pkg.capacityUnit === 'GROUP' && pkg.pricingMethod === 'GROUP' &&
-          pkg.peopleIncludedPerGroup !== pkg.groupSize) {
-        throw new BadRequestException('Group serving capacity must equal the package group size.');
-      }
       this.validatePackageBookingConfiguration(pkg);
       await this.validateDeliveryWeightBasis(pkg, user);
     }
@@ -849,7 +845,6 @@ async addPackages(
         pricingMethod: pkg.pricingMethod,
         groupSize: pkg.groupSize,
         capacityUnit: pkg.capacityUnit,
-        peopleIncludedPerGroup: pkg.peopleIncludedPerGroup,
         maxPeoplePerBooking: pkg.maxPeoplePerBooking,
         maxUnitsPerBooking: pkg.maxUnitsPerBooking,
         availableParallelUnits: pkg.availableParallelUnits,
@@ -1426,22 +1421,16 @@ async updatePackage(
     }, category, existingPackage);
     validateServiceCapacity({
       capacityUnit: updateDto.capacityUnit ?? existingPackage.capacityUnit,
-      peopleIncludedPerGroup: updateDto.peopleIncludedPerGroup ?? existingPackage.peopleIncludedPerGroup,
       maxPeoplePerBooking: updateDto.maxPeoplePerBooking ?? existingPackage.maxPeoplePerBooking,
       maxUnitsPerBooking: updateDto.maxUnitsPerBooking ?? existingPackage.maxUnitsPerBooking,
       availableParallelUnits: updateDto.availableParallelUnits ?? existingPackage.availableParallelUnits,
     });
-    if ((updateDto.capacityUnit ?? existingPackage.capacityUnit) === 'GROUP' &&
-        pricing.pricingMethod === 'GROUP' &&
-        (updateDto.peopleIncludedPerGroup ?? existingPackage.peopleIncludedPerGroup) !== pricing.groupSize) {
-      throw new BadRequestException('Group serving capacity must equal the package group size.');
-    }
     const updatePayload: Record<string, any> = {
       'packages.$.pricingMethod': pricing.pricingMethod,
       'packages.$.groupSize': pricing.groupSize,
     };
 
-    for (const field of ['capacityUnit', 'peopleIncludedPerGroup', 'maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
+    for (const field of ['capacityUnit', 'maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
       if (updateDto[field] !== undefined) updatePayload[`packages.$.${field}`] = updateDto[field];
     }
 
