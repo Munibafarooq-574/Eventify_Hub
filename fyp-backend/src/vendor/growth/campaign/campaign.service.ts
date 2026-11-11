@@ -1095,6 +1095,9 @@ if (
   );
 
   const eligibleCampaigns: any[] = [];
+  // Evaluate each vendor once per response, then reuse the actual new-order
+  // subscription gate and the campaign feature entitlement.
+  const vendorEligibility = new Map<string, boolean>();
 
   for (const campaign of campaigns as any[]) {
     const vendorId =
@@ -1111,20 +1114,22 @@ if (
       continue;
     }
 
-    /*
-     * Reuse existing campaign subscription eligibility.
-     */
-    const campaignAccessEndDate =
-      await this.featureAccessService
-        .getCampaignAccessEndDate(
-          vendorId,
-        );
+    if (!vendorEligibility.has(vendorId)) {
+      const [bookingAccess, campaignAccessEndDate, campaignFeatureEnabled] = await Promise.all([
+        this.featureAccessService.hasActiveSubscription(vendorId),
+        this.featureAccessService.getCampaignAccessEndDate(vendorId),
+        this.featureAccessService.canCreateCampaign(vendorId),
+      ]);
+      vendorEligibility.set(
+        vendorId,
+        bookingAccess && campaignFeatureEnabled &&
+          !!campaignAccessEndDate && campaignAccessEndDate.getTime() > now.getTime(),
+      );
+    }
 
-    if (
-      !campaignAccessEndDate ||
-      campaignAccessEndDate.getTime() <=
-        now.getTime()
-    ) {
+    // Never advertise a vendor who cannot accept NEW orders.
+    // Renewals and entitlement changes are checked on each public request.
+    if (!vendorEligibility.get(vendorId)) {
       continue;
     }
 
@@ -1139,7 +1144,7 @@ if (
     /*
      * Existing exact sponsored-package eligibility rule.
      */
-    if (!linkedPackage) {
+    if (!linkedPackage || linkedPackage.isActive === false) {
       continue;
     }
 
