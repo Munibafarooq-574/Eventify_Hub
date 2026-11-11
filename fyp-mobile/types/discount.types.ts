@@ -33,6 +33,7 @@ export interface VendorDiscount {
   minimumOrderAmount: number;
   maximumDiscountAmount: number | null;
   packageId: string | null;
+  packageIds?: string[];
 
   // Discount Code audience targeting
   audience: DiscountAudience;
@@ -55,6 +56,7 @@ export interface CreateCouponPayload {
   minimumOrderAmount: number;
   maximumDiscountAmount?: number;
   packageId?: string;
+  packageIds?: string[];
   startDate: string;
   endDate: string;
   usageLimit: number;
