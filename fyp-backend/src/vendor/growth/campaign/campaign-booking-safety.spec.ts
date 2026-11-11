@@ -72,7 +72,7 @@ describe('Sponsored campaign booking safety', () => {
   it.each([
     ['expired subscription', { subscriptionActive: false }],
     ['campaign benefit revoked', { campaignEnabled: false }],
-    ['expired campaign entitlement', { campaignExpiry: new Date(Date.now() - 1) }],
+    ['expired campaign entitlement', { campaignExpiry: new Date('2026-11-10T00:00:00Z') }],
     ['missing campaign entitlement', { campaignExpiry: null }],
     ['removed linked package', { linkedPackage: false }],
     ['inactive linked package', { packageActive: false }],
