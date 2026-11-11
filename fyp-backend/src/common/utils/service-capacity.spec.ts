@@ -6,16 +6,16 @@ describe('Option A service capacity', () => {
     expect(checkServiceCapacity({}, 100)).toEqual({ unitsNeeded: 1, peopleRequested: 100 });
   });
   it('counts partial groups with ceiling rounding', () => {
-    expect(checkServiceCapacity({ capacityUnit: 'GROUP', peopleIncludedPerGroup: 6, availableParallelUnits: 2 }, 7).unitsNeeded).toBe(2);
-    expect(checkServiceCapacity({ capacityUnit: 'GROUP', peopleIncludedPerGroup: 6, availableParallelUnits: 2 }, 12).unitsNeeded).toBe(2);
+    expect(checkServiceCapacity({ capacityUnit: 'GROUP', groupSize: 6, availableParallelUnits: 2 }, 7).unitsNeeded).toBe(2);
+    expect(checkServiceCapacity({ capacityUnit: 'GROUP', groupSize: 6, availableParallelUnits: 2 }, 12).unitsNeeded).toBe(2);
   });
   it('rejects a third group when only two teams exist', () => {
-    expect(() => checkServiceCapacity({ capacityUnit: 'GROUP', peopleIncludedPerGroup: 6, availableParallelUnits: 2 }, 13))
+    expect(() => checkServiceCapacity({ capacityUnit: 'GROUP', groupSize: 6, availableParallelUnits: 2 }, 13))
       .toThrow('Not enough vendor teams');
   });
   it('checks client service requirement rather than total event guests', () => {
-    expect(checkServiceCapacity({ capacityUnit: 'GROUP', peopleIncludedPerGroup: 6, maxPeoplePerBooking: 12 }, 5).unitsNeeded).toBe(1);
-    expect(() => checkServiceCapacity({ capacityUnit: 'GROUP', peopleIncludedPerGroup: 6, maxPeoplePerBooking: 12 }, 13))
+    expect(checkServiceCapacity({ capacityUnit: 'GROUP', groupSize: 6, maxPeoplePerBooking: 12 }, 5).unitsNeeded).toBe(1);
+    expect(() => checkServiceCapacity({ capacityUnit: 'GROUP', groupSize: 6, maxPeoplePerBooking: 12 }, 13))
       .toThrow('at most 12 people');
   });
   it('supports vehicle and team quantities independently', () => {
