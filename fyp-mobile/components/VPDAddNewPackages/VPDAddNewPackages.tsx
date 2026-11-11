@@ -478,7 +478,7 @@ const existingPackage =
           return;
         }
 
-        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize, capacityUnit: existingPackage.capacityUnit, peopleIncludedPerGroup: existingPackage.peopleIncludedPerGroup, maxPeoplePerBooking: existingPackage.maxPeoplePerBooking, maxUnitsPerBooking: existingPackage.maxUnitsPerBooking, availableParallelUnits: existingPackage.availableParallelUnits });
+        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize, capacityUnit: existingPackage.capacityUnit, maxPeoplePerBooking: existingPackage.maxPeoplePerBooking, maxUnitsPerBooking: existingPackage.maxUnitsPerBooking, availableParallelUnits: existingPackage.availableParallelUnits });
         setPackageName(
           existingPackage.packageName || "",
         );
@@ -963,7 +963,6 @@ if (!userId) {
   pricingMethod: pricing.pricingMethod,
   groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
   capacityUnit: pricing.capacityUnit,
-  peopleIncludedPerGroup: pricing.capacityUnit === 'GROUP' ? pricing.groupSize : pricing.peopleIncludedPerGroup,
   maxPeoplePerBooking: pricing.maxPeoplePerBooking,
   maxUnitsPerBooking: pricing.maxUnitsPerBooking,
   availableParallelUnits: pricing.availableParallelUnits,
