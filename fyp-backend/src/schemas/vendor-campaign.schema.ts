@@ -57,6 +57,10 @@ export class VendorCampaign extends Document {
   })
   title: string;
 
+  // Vendor-chosen display mode; older campaigns keep the photo layout.
+  @Prop({ type: String, enum: ['POSTER', 'AUTO'], default: 'AUTO' })
+  displayMode: 'POSTER' | 'AUTO';
+
   // Exactly one campaign image.
   @Prop({
     type: String,
