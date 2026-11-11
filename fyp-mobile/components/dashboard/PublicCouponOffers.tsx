@@ -260,18 +260,24 @@ const PublicCouponOffers: React.FC = () => {
     if (w > 0 && Math.abs(w - sectionW) > 0.5) setSectionW(w);
   };
 
-  const loadCoupons = useCallback(async () => {
-      try {
-        const result = await getPublicDashboardCoupons(HOME_LIMIT);
-        setCoupons(Array.isArray(result) ? result : []);
-      } catch (error) {
-        reportMarketplaceLoadError('Failed to load public coupons:', error);
-        setCoupons([]);
-      } finally {
-        setLoading(false);
-      }
+  const loadCoupons = useCallback(async (signal: AbortSignal, refreshing: boolean) => {
+    if (!refreshing) {
+      setCoupons([]);
+      setModalVisible(false);
+      setLoading(true);
+    }
+    try {
+      const result = await getPublicDashboardCoupons(HOME_LIMIT);
+      if (!signal.aborted) setCoupons(Array.isArray(result) ? result : []);
+    } catch (error) {
+      if (signal.aborted) return;
+      reportMarketplaceLoadError('Failed to load public coupons:', error);
+      setCoupons([]);
+    } finally {
+      if (!signal.aborted) setLoading(false);
+    }
   }, []);
-  useDashboardSectionLoad(loadCoupons);
+  useDashboardSectionLoad(loadCoupons, true);
 
   const stopAutoScroll = useCallback(() => {
     if (intervalRef.current) {

@@ -1,3 +1,4 @@
+import { getEligibleCoupons } from '@/services/getEligibleCoupons';
 import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
@@ -518,6 +519,7 @@ const phase6AvailablePackageIds = useMemo(() => {
       const [publicCoupons, setPublicCoupons] =
   useState<any[]>([]);
     const publicCouponRequest = useRef(0);
+    const [checkingCoupons, setCheckingCoupons] = useState(true);
 
   const [cities, setCities] =
   useState<any[]>([]);
@@ -825,25 +827,21 @@ const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
 );
 
 const couponPreviewDuration = isEventMode ? Number(durationMinutes) : undefined;
-const fetchPublicCoupons = async () => {
+const couponVendorId = vendorData?._id;
+const fetchPublicCoupons = useCallback(async () => {
   const requestId = ++publicCouponRequest.current;
-  if (!vendorData?._id) {
+  if (!couponVendorId) {
     setPublicCoupons([]);
     return;
   }
+  setCheckingCoupons(true);
 
   try {
-    const response = await axios.get(
-      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/public/${vendorData._id}`,
-      { params: { includePackagePrices: true, durationMinutes: couponPreviewDuration } },
-    );
-
+    const coupons = await getEligibleCoupons(String(couponVendorId), {
+      includePackagePrices: true, durationMinutes: couponPreviewDuration,
+    });
     if (requestId !== publicCouponRequest.current) return;
-    setPublicCoupons(
-      Array.isArray(response.data)
-        ? response.data
-        : [],
-    );
+    setPublicCoupons(Array.isArray(coupons) ? coupons : []);
   } catch (error) {
     if (requestId !== publicCouponRequest.current) return;
     reportMarketplaceLoadError(
@@ -852,14 +850,16 @@ const fetchPublicCoupons = async () => {
     );
 
     setPublicCoupons([]);
+  } finally {
+    if (requestId === publicCouponRequest.current) setCheckingCoupons(false);
   }
-};
+}, [couponVendorId, couponPreviewDuration]);
 
-useEffect(() => {
+useFocusEffect(useCallback(() => {
   setPublicCoupons([]);
   void fetchPublicCoupons();
   return () => { publicCouponRequest.current++; };
-}, [vendorData?._id, couponPreviewDuration]);
+}, [fetchPublicCoupons]));
 
 useEffect(() => {
   const loadCities = async () => {
@@ -2349,7 +2349,7 @@ const serviceCityNamesFromIds =
       'DURATION_BASED',
   ).toUpperCase();
     const packageInCart = !!selectedPackage && addedPackages.includes(String(selectedPackage._id));
-    const cartDisabled = selectedDurationQuote?.price === null ||
+    const cartDisabled = selectedDurationQuote?.price === null || (isClientView && checkingCoupons) ||
       (selectedPackage?.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType
         ? !selectedDelivery?.available
         : selectedPackage?.bookingType === 'TIME_SLOT_BASED'
@@ -5941,7 +5941,9 @@ const serviceCityNamesFromIds =
                   ? 'Adding…'
                   : packageInCart
                     ? 'Added to Cart'
-                    : cartDisabled
+                    : checkingCoupons && isClientView
+                      ? 'Checking offer…'
+                      : cartDisabled
                       ? 'Unavailable'
                       : `Book this package · ${selectedPackageDisplayPrice}`}
               </Text>

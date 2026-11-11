@@ -83,10 +83,19 @@ private readonly emailService: EmailService,
     return this.getVendorDiscountEntries(vendorId, DiscountEntryType.COUPON);
   }
 
+  private async getRedeemedCouponIds(clientId?: string, vendorId?: string) {
+    if (!clientId) return [];
+    return this.redemptionModel.distinct('discountId', {
+      clientId: new Types.ObjectId(clientId),
+      ...(vendorId && { vendorId: new Types.ObjectId(vendorId) }),
+    }).exec();
+  }
+
   async getPublicCoupons(
   vendorId: string,
   packageId?: string,
   preview?: { durationMinutes: number },
+  clientId?: string,
 ) {
   this.assertValidId(vendorId);
 
@@ -101,7 +110,9 @@ private readonly emailService: EmailService,
 
   const now = new Date();
 
+  const redeemedIds = await this.getRedeemedCouponIds(clientId, vendorId);
   const filter: any = {
+    ...(redeemedIds.length && { _id: { $nin: redeemedIds } }),
     vendorId: new Types.ObjectId(vendorId),
     type: DiscountEntryType.COUPON,
     status: DiscountStatus.ACTIVE,
@@ -162,6 +173,7 @@ private readonly emailService: EmailService,
 async getPublicDashboardCoupons(
   limit = 10,
   marketplace?: MarketplaceScope,
+  clientId?: string,
 ): Promise<VendorDiscount[]> {
   const safeLimit = Math.min(
     Math.max(Number(limit) || 10, 1),
@@ -174,8 +186,10 @@ async getPublicDashboardCoupons(
     ? await this.userModel.distinct('_id', { role: 'Vendor', businessCityId: { $in: marketplace.businessCityIds } })
     : undefined;
 
+  const redeemedIds = await this.getRedeemedCouponIds(clientId);
   const coupons = await this.discountModel
     .find({
+      ...(redeemedIds.length && { _id: { $nin: redeemedIds } }),
       ...(vendorsInMarket && { vendorId: { $in: vendorsInMarket } }),
       type: DiscountEntryType.COUPON,
       status: DiscountStatus.ACTIVE,

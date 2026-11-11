@@ -154,6 +154,30 @@ describe('DiscountService public package price previews', () => {
     expect(Object.keys((offer as any).packagePricePreviews)).toEqual([packageId.toString()]);
   });
 
+  it('excludes a redeemed coupon for that client in both offer feeds', async () => {
+    const usedClient = new Types.ObjectId();
+    const otherClient = new Types.ObjectId();
+    const service = setup();
+    const distinct = jest.fn((_field, filter) => ({
+      exec: async () => filter.clientId.equals(usedClient) ? [baseCoupon._id] : [],
+    }));
+    const find = jest.fn(filter => {
+      const coupons = filter._id?.$nin?.some((id: Types.ObjectId) => id.equals(baseCoupon._id))
+        ? [] : [{ ...baseCoupon, toObject: () => baseCoupon }];
+      return { sort: () => ({ exec: async () => coupons, limit: () => ({ exec: async () => coupons }) }) };
+    });
+    Object.assign(service, { redemptionModel: { distinct }, discountModel: { find } });
+
+    await expect(service.getPublicCoupons(vendorId, undefined, { durationMinutes: NaN }, usedClient.toString()))
+      .resolves.toEqual([]);
+    await expect(service.getPublicCoupons(vendorId, undefined, { durationMinutes: NaN }, otherClient.toString()))
+      .resolves.toMatchObject([{ packagePricePreviews: { [packageId.toString()]: { finalAmount: 180 } } }]);
+    await expect(service.getPublicDashboardCoupons(1, undefined, usedClient.toString())).resolves.toEqual([]);
+    expect(find.mock.calls[2][0]._id).toEqual({ $nin: [baseCoupon._id] });
+    expect(distinct.mock.calls[0][1].vendorId).toEqual(new Types.ObjectId(vendorId));
+    expect(distinct.mock.calls[2][1]).toEqual({ clientId: usedClient });
+  });
+
   it('uses the duration tier and respects the discount cap', async () => {
     const [offer] = await setup({ maximumDiscountAmount: 15 }).getPublicCoupons(
       vendorId, undefined, { durationMinutes: 360 },

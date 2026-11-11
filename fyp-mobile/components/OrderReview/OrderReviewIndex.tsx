@@ -1,3 +1,4 @@
+import { getEligibleCoupons } from '@/services/getEligibleCoupons';
 import { validateCoupon } from '@/services/validateCoupon';
 import { assertSingleCurrency, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
@@ -643,20 +644,11 @@ const fetchPublicCouponsForPackage = async (
   );
 
   try {
-    const response = await axios.get(
-      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/public/${vendorId}`,
-      {
-        params: {
-          packageId,
-        },
-      },
-    );
-
-    setPublicCoupons((current) => ({
+    const coupons = await getEligibleCoupons(vendorId, { packageId });
+    if (!draft.isCurrent()) return;
+    setPublicCoupons(current => ({
       ...current,
-      [key]: Array.isArray(response.data)
-        ? response.data
-        : [],
+      [key]: Array.isArray(coupons) ? coupons : [],
     }));
   } catch (error) {
     reportMarketplaceLoadError(
@@ -2132,7 +2124,10 @@ const vendorPackageCount = countPackageUnits(packages);
                     );
 
                   const availableCoupons =
-                    publicCoupons[promotionKey] || [];
+                    (publicCoupons[promotionKey] || []).filter(coupon =>
+                      !/already used/i.test(autoCouponErrors[promotionKey] || '') ||
+                      String(coupon.code).toUpperCase() !== String(pkg.pendingCouponCode || '').toUpperCase(),
+                    );
 
                   const appliedPromotion =
                     appliedPromotions[promotionKey];

@@ -24,3 +24,4 @@ DiscountRedemptionSchema.index(
   { discountId: 1, clientId: 1 },
   { unique: true },
 );
+DiscountRedemptionSchema.index({ clientId: 1, vendorId: 1, discountId: 1 });

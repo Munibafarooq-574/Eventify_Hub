@@ -99,7 +99,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     (options.method === 'POST' && path === '/vendor-availability/check');
   const retryProfile = (options.method ?? 'GET') === 'GET' && /^\/vendor(?:\?userId=|\/marketplace-profile\?marketplaceVendorId=)[^&]+$/.test(path);
   const retryRead = retryProfile || retryAvailability || ((options.method ?? 'GET') === 'GET' &&
-    /^\/vendor\/growth\/(?:discount\/coupon\/public|campaign\/public\/active|promotion\/featured-(?:vendor|package)\/active)(?:\?|$)/.test(path));
+    /^\/vendor\/growth\/(?:discount\/coupon\/(?:public|eligible\/[^/?]+)|campaign\/public\/active|promotion\/featured-(?:vendor|package)\/active)(?:\?|$)/.test(path));
   for (let attempt = 0; ; attempt++) {
     try {
       return await requestOnce<T>(path, options);

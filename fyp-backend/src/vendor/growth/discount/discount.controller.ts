@@ -1,6 +1,6 @@
-import { Req, UseGuards } from '@nestjs/common';
+import { Header, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
-import { MarketplaceGuard } from '../../../city/marketplace.guard';
+import { isClientRole, MarketplaceGuard } from '../../../city/marketplace.guard';
 // fyp-backend/src/vendor/growth/discount/discount.controller.ts
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { DiscountService } from './discount.service';
@@ -49,8 +49,27 @@ getPublicCoupons(
   );
 }
 
+@Get('coupon/eligible/:vendorId')
+@UseGuards(JwtAuthGuard)
+@Header('Cache-Control', 'private, no-store')
+getEligibleCoupons(
+  @Param('vendorId') vendorId: string,
+  @Query('packageId') packageId: string | undefined,
+  @Query('includePackagePrices') includePackagePrices: string | undefined,
+  @Query('durationMinutes') durationMinutes: string | undefined,
+  @Req() request: { user: { id: string; role: string } },
+) {
+  return this.discountService.getPublicCoupons(
+    vendorId,
+    packageId,
+    includePackagePrices === 'true' ? { durationMinutes: Number(durationMinutes) } : undefined,
+    isClientRole(request.user.role) ? request.user.id : undefined,
+  );
+}
+
 @Get('coupon/public')
 @UseGuards(JwtAuthGuard, MarketplaceGuard)
+@Header('Cache-Control', 'private, no-store')
 getPublicDashboardCoupons(
   @Query('limit') limit?: string,
   @Req() request?: any,
@@ -58,6 +77,7 @@ getPublicDashboardCoupons(
   return this.discountService.getPublicDashboardCoupons(
     Number(limit) || 10,
     request?.marketplace,
+    isClientRole(request?.user?.role) ? request.user.id : undefined,
   );
 }
 
