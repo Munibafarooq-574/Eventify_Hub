@@ -124,7 +124,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
   useState<Date | null>(null);
 
   const [datePickerMode, setDatePickerMode] =
-    useState<"start" | null>(null);
+    useState<"start" | "end" | null>(null);
 
   const [calendarMonth, setCalendarMonth] =
     useState(new Date());
@@ -319,9 +319,9 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     }
   };
 
-  const openDatePicker = () => {
+  const openDatePicker = (mode: 'start' | 'end' = 'start') => {
     const initialDate =
-      startDate || new Date();
+      (mode === 'end' ? endDate : startDate) || new Date();
 
     setCalendarMonth(
       new Date(
@@ -331,7 +331,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
       ),
     );
 
-    setDatePickerMode("start");
+    setDatePickerMode(mode);
   };
 
   const calculateAutomaticEndDate = (selectedStartDate: Date) => {
@@ -346,6 +346,16 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     );
     const end = new Date(year, month + 1, day);
     end.setHours(23, 59, 59, 999);
+
+    // A scheduled campaign must remain inside the vendor's existing
+    // subscription entitlement. A shorter campaign is valid.
+    if (subscriptionEndDate) {
+      const expiry = new Date(subscriptionEndDate);
+      expiry.setHours(23, 59, 59, 999);
+      if (expiry.getTime() >= selectedStartDate.getTime() && expiry.getTime() < end.getTime()) {
+        return expiry;
+      }
+    }
     return end;
   };
 
@@ -445,7 +455,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     if (campaignExceedsSubscription) {
       Alert.alert(
         "Subscription Expires Before Campaign Ends",
-        `Your selected one-month campaign ends on ${formatDate(endDate)}, but your subscription expires on ${formatDate(subscriptionEndDate)}. Renew or extend your subscription before submitting this campaign.`,
+        `Your campaign ends on ${formatDate(endDate)}, but your subscription expires on ${formatDate(subscriptionEndDate)}. Choose an earlier end date or extend your subscription.`,
       );
       return false;
     }
@@ -888,7 +898,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
                 value={formatDate(startDate)}
                 selected={Boolean(startDate)}
                 icon="calendar-outline"
-                onPress={openDatePicker}
+                onPress={() => openDatePicker('start')}
                 
               />
 
@@ -909,16 +919,17 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
                 }
                 selected={Boolean(endDate)}
                 icon="flag-outline"
-                disabled
+                disabled={!startDate}
+                onPress={() => openDatePicker('end')}
               />
             </View>
 
             <Text style={styles.campaignDurationHelp}>
-              Campaign runs for one calendar month from your selected Start Date.
+              End date defaults to one calendar month from Start Date, or your subscription expiry if earlier. Tap End Date to choose a shorter campaign.
             </Text>
             {campaignExceedsSubscription && (
               <Text style={styles.campaignSubscriptionWarning}>
-                Your subscription expires on {formatDate(subscriptionEndDate)}. Extend it to cover the full campaign through {formatDate(endDate)} before submitting.
+                Your subscription expires on {formatDate(subscriptionEndDate)}. Choose an earlier end date or extend your subscription before submitting.
               </Text>
             )}
             <View style={styles.reviewNotice}>
@@ -1013,8 +1024,19 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
         visible={datePickerMode !== null}
         mode={datePickerMode}
         month={calendarMonth}
-        selectedDate={startDate}
-        minimumDate={new Date()}
+        selectedDate={datePickerMode === 'end' ? endDate : startDate}
+        minimumDate={datePickerMode === 'end' && startDate
+          ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1)
+          : new Date()}
+        maximumDate={datePickerMode === 'end' && startDate
+          ? (() => {
+              const oneMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1,
+                Math.min(startDate.getDate(), new Date(startDate.getFullYear(), startDate.getMonth() + 2, 0).getDate()));
+              if (!subscriptionEndDate) return oneMonthEnd;
+              const expiry = new Date(subscriptionEndDate.getFullYear(), subscriptionEndDate.getMonth(), subscriptionEndDate.getDate());
+              return expiry < oneMonthEnd ? expiry : oneMonthEnd;
+            })()
+          : undefined}
         onMonthChange={setCalendarMonth}
         onClose={() => setDatePickerMode(null)}
         onSelect={(date) => {
@@ -1037,6 +1059,10 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
               );
 
             setEndDate(automaticEnd);
+          } else if (datePickerMode === 'end') {
+            const selectedEnd = new Date(date);
+            selectedEnd.setHours(23, 59, 59, 999);
+            setEndDate(selectedEnd);
           }
 
           setDatePickerMode(null);
@@ -1327,15 +1353,17 @@ function CalendarModal({
   month,
   selectedDate,
   minimumDate,
+  maximumDate,
   onMonthChange,
   onClose,
   onSelect,
 }: {
   visible: boolean;
-  mode: "start" | null;
+  mode: "start" | "end" | null;
   month: Date;
   selectedDate: Date | null;
   minimumDate: Date;
+  maximumDate?: Date;
   onMonthChange: (date: Date) => void;
   onClose: () => void;
   onSelect: (date: Date) => void;
@@ -1377,6 +1405,8 @@ function CalendarModal({
 
   const min = new Date(minimumDate);
   min.setHours(0, 0, 0, 0);
+  const max = maximumDate ? new Date(maximumDate) : null;
+  max?.setHours(23, 59, 59, 999);
 
   const previousMonth = () => {
     onMonthChange(
@@ -1418,11 +1448,11 @@ function CalendarModal({
           <View style={styles.calendarTop}>
             <View>
               <Text style={styles.calendarTitle}>
-                Campaign Start Date
+                Campaign {mode === 'end' ? 'End' : 'Start'} Date
               </Text>
 
               <Text style={styles.calendarSubtitle}>
-  End date will be calculated automatically
+  {mode === 'end' ? 'Select an end date within your subscription' : 'End date is set automatically; you can adjust it'}
 </Text>
             </View>
 
@@ -1505,7 +1535,8 @@ function CalendarModal({
               date.setHours(0, 0, 0, 0);
 
               const disabled =
-                date.getTime() < min.getTime();
+                date.getTime() < min.getTime() ||
+                (max !== null && date.getTime() > max.getTime());
 
               const selected =
                 selectedDate &&
