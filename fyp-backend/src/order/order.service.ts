@@ -1,3 +1,4 @@
+import { checkServiceCapacity } from '../common/utils/service-capacity';
 import { countryCurrency, currencyOf, roundForCurrency, roundMoney } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage, resolvePackageUnitPrice } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
@@ -856,6 +857,18 @@ export class OrderService {
                                 vendorCategoryId,
                             );
 
+                        // Per-service requirements are independent from overall event attendance.
+                        // Apply new capacity rules only to packages that explicitly configured them.
+                        if (packageDoc.capacityUnit) {
+                            const capacityPeople = Number(service.personCount ?? (packageDoc.capacityUnit === 'PERSON' || packageDoc.capacityUnit === 'GROUP' ? NaN : 1));
+                            const capacity = checkServiceCapacity(packageDoc, capacityPeople, quantity);
+                            if (packageDoc.capacityUnit === 'GROUP' && quantity !== capacity.unitsNeeded) {
+                                throw new BadRequestException('Package group count does not match the selected people. Refresh your cart.');
+                            }
+                            if (packageDoc.capacityUnit === 'PERSON' && (packageDoc.pricingMethod === 'PER_PERSON') && quantity !== 1) {
+                                throw new BadRequestException('Per-person packages must use one package quantity with the required people count.');
+                            }
+                        }
                         const pricing = quotePackage({
                             pricingMethod: packageDoc.pricingMethod ?? legacyPricingMethod(category),
                             groupSize: packageDoc.groupSize,
