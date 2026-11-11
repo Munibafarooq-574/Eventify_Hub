@@ -90,7 +90,7 @@ test('pull after reconnect rechecks the saved duration and updates price without
  let reload, notice, updated, checkedDuration;
  let offline = true;
  const context = {assertSingleCurrency:require('./test-currency.cjs').assertSingleCurrency,
-  usePullToRefresh: fn => { reload = fn; return {}; },
+  usePullToRefresh: fn => { reload = fn; return {}; }, useEffect:()=>{},
   eventTimeZone:'Asia/Karachi', PRIMARY:'#780C60', OFFLINE_NOTICE:'No internet connection.',
   cartData, eventDetails:{eventDate:'2026-11-09',startTime:'15:00',eventDurationMinutes:120,eventCityId:'city',durationMinutes:120},
   checkoutLock:{current:false}, applyingCouponId:null, applyingDiscountCodeKey:null, connectivityRequest:{current:0},
@@ -104,6 +104,7 @@ test('pull after reconnect rechecks the saved duration and updates price without
   getPromotionKey:()=> 'vendor:package', getPackageAmount:()=>2400,
   setCartData:value=>{updated=value;}, setRefreshNotice:value=>{notice=value;},
   setAppliedPromotions:()=>{}, setCheckoutError:()=>{}, reportMarketplaceLoadError:()=>{},
+  autoCouponAttempted:{current:new Set()}, setAutoCouponErrors:()=>{}, appliedPromotions:{},
   isConnectionError:error=>error instanceof TypeError,
  };
  vm.runInNewContext(ts.transpileModule(source.slice(start,end), {}).outputText,context);
@@ -138,7 +139,7 @@ test('coupon apply and remove persist the selected offer with the exact reviewed
  const writes = [];
  let revision = 7;
  let promotions;
- const cart = {vendors:[{vendor:{_id:'vendor'},packages:[{packageId:'package'}]}]};
+ const cart = {vendors:[{vendor:{_id:'vendor'},packages:[{packageId:'package',pendingCouponCode:'SAVE10'}]}]};
  const context = {assertSingleCurrency:require('./test-currency.cjs').assertSingleCurrency,
   module:{exports:{}}, promotionWriteLock:{current:false}, checkoutLock:{current:false},
   loadedDraft:{current:{cart:JSON.stringify(cart),event:'event',revision}},
@@ -146,7 +147,8 @@ test('coupon apply and remove persist the selected offer with the exact reviewed
    writes.push([key,JSON.parse(raw),expected]);
    revision++;
   }},
-  setAppliedPromotions:value=>{promotions=value;},
+  setAppliedPromotions:value=>{promotions=value;}, setCartData:()=>{},
+  getPromotionKey:(vendorId,packageId)=>`${vendorId}:${packageId}`,
  };
  vm.runInNewContext(ts.transpileModule(helper + save + 'module.exports=savePromotion;', {}).outputText,context);
  const promotion={promotionId:'coupon',promotionCode:'SAVE10',promotionType:'COUPON'};
@@ -157,6 +159,7 @@ test('coupon apply and remove persist the selected offer with the exact reviewed
  await context.module.exports('vendor:package',null);
  assert.equal(writes[1][2],8);
  assert.equal(writes[1][1].appliedPromotions['vendor:package'],undefined);
+ assert.equal(writes[1][1].vendors[0].packages[0].pendingCouponCode,undefined);
 });
 
 test('a Review Order with an out-of-date coupon does not submit checkout', async () => {
@@ -167,4 +170,90 @@ test('a Review Order with an out-of-date coupon does not submit checkout', async
  await f.run();
  assert.equal(f.requests.length,0);
  assert.equal(f.alerts[0][0],'Cart updated');
+});
+
+test('Review auto-applies the carried coupon through server validation', async () => {
+ const source = fs.readFileSync('components/OrderReview/OrderReviewIndex.tsx', 'utf8');
+ const apply = source.slice(source.indexOf('const handleApplyPublicCoupon'), source.indexOf('const confirmPromotionReplacement'));
+ const effect = source.slice(source.indexOf('// Validate the coupon carried'), source.indexOf('  const handleCheckout'));
+ const requests = [];
+ let task;
+ let saved;
+ const context = {
+  refreshing:false, applyingCouponId:null, applyingDiscountCodeKey:null, checkoutLock:{current:false},
+  appliedPromotions:{}, autoCouponAttempted:{current:new Set()},
+  cartData:{vendors:[{vendor:{_id:'vendor'},packages:[{packageId:'bridal',pendingCouponCode:'MENDHI10',currency:'USD'}]}]},
+  getPromotionKey:(vendorId,packageId)=>`${vendorId}:${packageId}`,
+  getPackageAmount:()=>200, currencyOf:entry=>entry.currency,
+  useEffect:fn=>{task=fn;}, setApplyingCouponId:()=>{}, draft:{getSession:async()=>({userId:'client'})},
+  validateCoupon:async(...args)=>{
+   requests.push(args);
+   return {currency:'USD',discountEntryId:'coupon',code:'MENDHI10',discountAmount:20,finalAmount:180};
+  },
+  savePromotion:async(key,value)=>{saved={key,...value};},
+  Toast:{show:()=>{}}, setAutoCouponErrors:()=>assert.fail('Coupon should apply'),
+ };
+ vm.runInNewContext(ts.transpileModule(apply+effect, {}).outputText,context);
+ task();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(requests,[['vendor','MENDHI10',200,'client','bridal']]);
+ assert.equal(saved.key,'vendor:bridal');
+ assert.equal(saved.originalAmount,200);
+ assert.equal(saved.discountAmount,20);
+ assert.equal(saved.finalAmount,180);
+ task();
+ assert.equal(requests.length,1);
+});
+
+test('an unavailable automatic coupon requires consent before submitting at the higher price', async () => {
+ const f=load();
+ f.context.cartData.vendors[0].packages[0].pendingCouponCode='MENDHI10';
+ Object.assign(f.context,{
+  autoCouponErrors:{key:'You have already used this code'},
+  finalTotal:200, formatCurrency:String, cartCurrency:()=> 'USD', currencySymbol:()=> '$',
+ });
+ const attempt=f.run();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.requests.length,0);
+ assert.equal(f.alerts[0][0],'Continue without the discount?');
+ assert.match(f.alerts[0][1],/MENDHI10.*already used/);
+ assert.match(f.alerts[0][1],/\$ 200/);
+ f.alerts[0][2][0].onPress();
+ await attempt;
+ assert.equal(f.requests.length,0);
+});
+
+test('Cart validates the carried coupon for the current line and includes its savings in the total', async () => {
+ const source = fs.readFileSync('components/cartmanagement/CartManagementIndex.tsx','utf8');
+ const start = source.indexOf('    const getCartLine = useCallback');
+ const end = source.indexOf('    // Checkout',start);
+ const pkg = {packageId:'bridal', pendingCouponCode:'MENDHI10', currency:'USD', price:200, quantity:1};
+ const requests=[];
+ let run;
+ let quotes={};
+ const context={
+  cartData:{vendors:[{vendor:{_id:'vendor'}, packages:[pkg]}]}, guests:1, cateringCategory:null,
+  ...pricingExports, currencyOf:entry=>entry.currency, deliveryFee:()=>({totalFee:0}),
+  useCallback:fn=>fn, useMemo:fn=>fn(), useFocusEffect:fn=>{run=fn;},
+  useState:()=>[quotes,next=>{quotes=next;}],
+  draft:{isCurrent:()=>true,getSession:async()=>({userId:'client'})},
+  validateCoupon:async(...args)=>{
+   requests.push(args);
+   return {currency:'USD',finalAmount:args[2]*0.9};
+  },
+ };
+ const script=ts.transpileModule(source.slice(start,end)+'\n({originalTotal,cartCouponSavings});',{}).outputText;
+ vm.runInNewContext(script,context);
+ run();
+ await new Promise(resolve=>setImmediate(resolve));
+ const first=vm.runInNewContext(script,context);
+ assert.equal(first.originalTotal-first.cartCouponSavings,180);
+ pkg.quantity=2;
+ const beforeQuote=vm.runInNewContext(script,context);
+ assert.equal(beforeQuote.cartCouponSavings,0);
+ run();
+ await new Promise(resolve=>setImmediate(resolve));
+ const second=vm.runInNewContext(script,context);
+ assert.equal(second.originalTotal-second.cartCouponSavings,360);
+ assert.deepEqual(requests.map(args=>args[2]),[200,400]);
 });

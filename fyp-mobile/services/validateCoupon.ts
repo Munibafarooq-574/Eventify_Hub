@@ -12,9 +12,11 @@ export async function validateCoupon(
   vendorId: string,
   code: string,
   orderAmount: number,
+  clientId?: string,
+  packageId?: string,
 ): Promise<CouponValidationResult> {
   return growthApi.post<CouponValidationResult>(
-    `/vendor/growth/discount/coupon/validate?vendorId=${vendorId}`,
-    { code, orderAmount },
+    `/vendor/growth/discount/coupon/validate?vendorId=${encodeURIComponent(vendorId)}`,
+    { code, orderAmount, clientId, packageId },
   );
 }

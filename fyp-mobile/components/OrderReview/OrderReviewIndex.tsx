@@ -1,3 +1,4 @@
+import { validateCoupon } from '@/services/validateCoupon';
 import { assertSingleCurrency, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -89,6 +90,7 @@ const [appliedPromotions, setAppliedPromotions] =
   useState<Record<string, any>>({});
 
 const autoCouponAttempted = useRef<Set<string>>(new Set());
+const [autoCouponErrors, setAutoCouponErrors] = useState<Record<string, string>>({});
 
 const [applyingCouponId, setApplyingCouponId] =
   useState<string | null>(null);
@@ -234,27 +236,26 @@ try {
   // Total calculation
   // -----------------------------------------
 
+  const getPackageAmount = (
+    vendor: any,
+    pkg: any,
+  ) => {
+    const isCatering = !!(cateringCategory?._id && vendor?.vendor?.buisnessCategory === cateringCategory._id) ||
+      !!pkg.categoryName?.toLowerCase().includes('catering');
+
+    const quantity = Math.max(
+      1,
+      Number(pkg?.quantity || 1),
+    );
+
+    return deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee + packageAmount(pkg, Number(guests || 0), !!isCatering);
+  };
+
   const calculateTotalAmount = () => {
-    if (!cartData?.vendors?.length) return 0;
-
     let totalAmount = 0;
-
-    cartData.vendors.forEach((vendor: any) => {
-      vendor?.packages?.forEach((pkg: any) => {
-        const isCatering =
-          cateringCategory?._id &&
-          vendor?.vendor?.buisnessCategory === cateringCategory._id;
-
-            const quantity = Math.max(
-        1,
-        Number(pkg?.quantity || 1),
-      );
-
-      totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
-      totalAmount += packageAmount(pkg, Number(guests || 0), !!isCatering);
-      });
-    });
-
+    for (const vendor of cartData?.vendors || []) {
+      for (const pkg of vendor.packages || []) totalAmount += getPackageAmount(vendor, pkg);
+    }
     return totalAmount;
   };
 
@@ -632,24 +633,6 @@ const getResolvedServiceWindow = (
   packageId: string,
 ) => `${vendorId}:${packageId}`;
 
-const getPackageAmount = (
-  vendor: any,
-  pkg: any,
-) => {
-  const isCatering =
-    cateringCategory?._id &&
-    vendor?.vendor?.buisnessCategory ===
-      cateringCategory._id;
-
-  const quantity = Math.max(
-    1,
-    Number(pkg?.quantity || 1),
-  );
-
-  return deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee + packageAmount(pkg, Number(guests || 0), !!isCatering);
-};
-
-
 const fetchPublicCouponsForPackage = async (
   vendorId: string,
   packageId: string,
@@ -733,13 +716,23 @@ const savePromotion = async (key: string, promotion: any | null) => {
     const cart = JSON.parse(current.cart);
     const promotions = getCartPromotions(cart);
     if (promotion) promotions[key] = promotion;
-    else delete promotions[key];
+    else {
+      delete promotions[key];
+      for (const vendor of cart.vendors || []) {
+        for (const pkg of vendor.packages || []) {
+          if (getPromotionKey(String(vendor.vendor?._id || vendor.vendorId), String(pkg.packageId || pkg._id)) === key) {
+            delete pkg.pendingCouponCode;
+          }
+        }
+      }
+    }
     const updated = JSON.stringify({ ...cart, appliedPromotions: promotions });
     // The bound store writes against the revision read by this screen.
     await draft.save('cartData', updated, current.revision);
     if (!draft.isCurrent()) return;
     loadedDraft.current = { ...current, cart: updated, revision: draft.getRevision() };
     setAppliedPromotions(promotions);
+    if (!promotion) setCartData(JSON.parse(updated));
   } finally {
     promotionWriteLock.current = false;
   }
@@ -749,10 +742,11 @@ const handleApplyPublicCoupon = async (
   vendor: any,
   pkg: any,
   coupon: any,
+  automatic = false,
 ) => {
   if (refreshing || applyingCouponId || applyingDiscountCodeKey || checkoutLock.current) return;
   const vendorId = String(
-    vendor?.vendor?._id || '',
+    vendor?.vendor?._id || vendor?.vendorId || '',
   );
 
   const packageId = String(
@@ -780,7 +774,7 @@ const handleApplyPublicCoupon = async (
   Number(coupon?.minimumOrderAmount || 0);
 
 if (
-  minimumOrderAmount > 0 &&
+  !automatic && minimumOrderAmount > 0 &&
   originalAmount < minimumOrderAmount
 ) {
   Alert.alert(
@@ -816,23 +810,11 @@ if (
 }
 
 try {
-    setApplyingCouponId(
-      String(coupon._id),
-    );
-
-    const user = await getUserData();
-
-    const response = await axios.post(
-      `https://eventify-hub.onrender.com/vendor/growth/discount/coupon/validate?vendorId=${vendorId}`,
-      {
-        code: coupon.code,
-        orderAmount: originalAmount,
-        clientId: user?._id,
-        packageId,
-      },
-    );
-
-    const result = response.data;
+    setApplyingCouponId(String(coupon._id || coupon.code));
+    const session = await draft.getSession();
+    if (!session) throw new Error('Please sign in again to apply this offer.');
+    const result = await validateCoupon(vendorId, coupon.code, originalAmount, session.userId, packageId);
+    if (currencyOf(result) !== currencyOf(pkg)) throw new Error('This offer uses a different currency.');
 
     await savePromotion(key, {
       promotionId: result.discountEntryId,
@@ -850,22 +832,10 @@ try {
       position: 'bottom',
     });
   } catch (error: any) {
-  const rawMessage =
-  error?.response?.data?.message;
-
-const backendMessage =
-  typeof rawMessage === 'string'
-    ? rawMessage
-    : typeof rawMessage?.message === 'string'
-      ? rawMessage.message
-      : error instanceof Error ? error.message : 'This offer could not be applied.';
-
-Alert.alert(
-  'Offer Requirements Not Met',
-  backendMessage,
-  [{ text: 'OK' }],
-);
-} finally {
+    const backendMessage = error instanceof Error ? error.message : 'This offer could not be applied.';
+    if (automatic) setAutoCouponErrors(current => ({ ...current, [key]: backendMessage }));
+    else Alert.alert('Offer Requirements Not Met', backendMessage);
+  } finally {
     setApplyingCouponId(null);
   }
 };
@@ -1192,6 +1162,8 @@ const isInvalidCode =
 
       setCartData({ ...cartData, vendors: results.map(result => result.vendor) });
       setAppliedPromotions(promotions);
+      autoCouponAttempted.current.clear();
+      setAutoCouponErrors({});
       const notice = results.find(result => result.notice)?.notice || '';
       setRefreshNotice(notice);
       if (!notice && !replacementDeadlinePassed) setCheckoutError('');
@@ -1203,7 +1175,7 @@ const isInvalidCode =
     }
   });
 
-// An offer opened from a public coupon card is remembered with the cart item.
+// Validate the coupon carried from package selection, even if it has since expired.
 // Apply it through the same server-validated flow used by the manual Apply button.
 useEffect(() => {
   if (refreshing || checkoutLock.current || applyingCouponId || applyingDiscountCodeKey) return;
@@ -1215,15 +1187,18 @@ useEffect(() => {
       if (!vendorId || !packageId || !code) continue;
       const key = getPromotionKey(vendorId, packageId);
       if (appliedPromotions[key] || autoCouponAttempted.current.has(key + ':' + code)) continue;
-      const coupon = (publicCoupons[key] || []).find((entry: any) =>
-        String(entry.code || '').toUpperCase() === code);
-      if (!coupon) continue;
       autoCouponAttempted.current.add(key + ':' + code);
-      void handleApplyPublicCoupon(vendor, pkg, coupon);
+      if (Object.entries(appliedPromotions).some(([otherKey, promotion]) =>
+        otherKey.startsWith(vendorId + ':') && String(promotion.promotionCode).toUpperCase() === code,
+      )) {
+        setAutoCouponErrors(current => ({ ...current, [key]: 'This coupon is already applied to another package.' }));
+        continue;
+      }
+      void handleApplyPublicCoupon(vendor, pkg, { code }, true);
       return; // One server validation at a time; later renders handle the rest.
     }
   }
-}, [cartData, publicCoupons, appliedPromotions, refreshing, applyingCouponId, applyingDiscountCodeKey]);
+}, [cartData, appliedPromotions, refreshing, applyingCouponId, applyingDiscountCodeKey]);
 
 
   const handleCheckout = async () => {
@@ -1251,6 +1226,35 @@ useEffect(() => {
         throw Object.assign(new Error('Your cart changed or was booked on another device.'), { checkoutConflict: 'BOOKING_DRAFT_CHANGED' });
       }
       submittedEvent = eventDetails;
+
+      const unavailableOffers = cartData.vendors.flatMap((vendor: any) =>
+        (vendor.packages || []).flatMap((pkg: any) => {
+          if (!pkg.pendingCouponCode) return [];
+          const key = getPromotionKey(String(vendor.vendor?._id || vendor.vendorId), String(pkg.packageId || pkg._id));
+          return appliedPromotions[key] ? [] : [{ key, code: pkg.pendingCouponCode }];
+        }),
+      );
+      if (unavailableOffers.length) {
+        if (unavailableOffers.some(({ key }: { key: string }) => !autoCouponErrors[key])) {
+          Alert.alert('Checking your offer', 'Please wait for coupon validation to finish.');
+          return;
+        }
+        const continueWithoutOffers = await new Promise<boolean>(resolve => {
+          Alert.alert(
+            'Continue without the discount?',
+            unavailableOffers.map(({ key, code }: { key: string; code: string }) => `${code}: ${autoCouponErrors[key]}`).join('\n') +
+              `
+
+Current order total: ${currencySymbol(cartCurrency(cartData))} ${formatCurrency(finalTotal)}.`,
+            [
+              { text: 'Go back', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Continue', onPress: () => resolve(true) },
+            ],
+            { cancelable: true, onDismiss: () => resolve(false) },
+          );
+        });
+        if (!continueWithoutOffers) return;
+      }
 
   const services = cartData.vendors.flatMap(
   (vendor: any) =>
@@ -2157,7 +2161,17 @@ const vendorPackageCount = countPackageUnits(packages);
                           <Text style={styles.guestTagText}>Quantity: {quantity} · {pricingLabel(pkg, !!isCatering)}</Text>
                           {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && <Text style={styles.guestTagText}>People: {pkg.personCount ?? guests}</Text>}
                           {pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
-                          <Text style={styles.packagePrice}>{currencySymbol(currencyOf(pkg))} {formatCurrency(finalPrice)}</Text>
+                          <Text style={styles.packagePrice}>
+                            {currencySymbol(currencyOf(pkg))} {formatCurrency(appliedPromotion?.finalAmount ?? finalPrice)}
+                            {appliedPromotion && (
+                              <Text style={{ color: MUTED, fontSize: 12, textDecorationLine: 'line-through' }}>
+                                {'  '}{currencySymbol(currencyOf(pkg))} {formatCurrency(appliedPromotion.originalAmount)}
+                              </Text>
+                            )}
+                          </Text>
+                          {pkg.pendingCouponCode && !appliedPromotion && autoCouponErrors[promotionKey] ? (
+                            <Text style={styles.refreshNoticeText}>{pkg.pendingCouponCode}: {autoCouponErrors[promotionKey]}</Text>
+                          ) : null}
                           <DeliveryDetails pkg={pkg} quantity={quantity} guests={Number(guests || 0)} isCatering={!!isCatering} />
                           {String(
   pkg?.bookingType || 'DURATION_BASED',
@@ -2338,7 +2352,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                     styles.appliedPromotionText
                                   }
                                 >
-                                  Original: {currencySymbol(currencyOf(pkg))}{' '}
+                                  {appliedPromotion.promotionCode} applied · Package: {currencySymbol(currencyOf(pkg))}{' '}
                                   {formatCurrency(
                                     appliedPromotion.originalAmount,
                                   )}
@@ -2360,7 +2374,7 @@ const vendorPackageCount = countPackageUnits(packages);
                                     styles.appliedPromotionFinal
                                   }
                                 >
-                                  Final: {currencySymbol(currencyOf(pkg))}{' '}
+                                  Package subtotal: {currencySymbol(currencyOf(pkg))}{' '}
                                   {formatCurrency(
                                     appliedPromotion.finalAmount,
                                   )}

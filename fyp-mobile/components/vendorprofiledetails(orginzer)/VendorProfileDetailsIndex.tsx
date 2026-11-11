@@ -1800,16 +1800,14 @@ Toast.show({
           cart.vendors = [];
         }
 
+        const cartOffer = getPackagePriceDisplay(pkg, { price: resolvedPrice });
         const cartPackageItem = {
           ...(pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType ? deliverySettings(pkg) : {}),
           deliveryStartDateTime: pkg.bookingType === 'DELIVERY_BASED' ? selectedDelivery?.startDateTime : undefined,
           eventTimeZone,
           deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
-          ...(String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '') &&
-            getApplicablePublicCoupon(String(pkg._id))?.code?.toUpperCase() ===
-            String(Array.isArray(couponCode) ? couponCode[0] : couponCode).toUpperCase()
-            ? { pendingCouponCode: String(Array.isArray(couponCode) ? couponCode[0] : couponCode).toUpperCase() } : {}),
+          pendingCouponCode: cartOffer.coupon?.code,
           currency: currencyOf(pkg),
           packageName: pkg.packageName,
           pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
@@ -1972,7 +1970,7 @@ Toast.show({
         });
         await draft.save('cartData', JSON.stringify(cart));
         setAddedPackages(current => [...current, currentPackageId]);
-        showCartNotice('Added to cart', `${pkg.packageName} · ${currencySymbol(currencyOf(pkg))} ${resolvedPrice.toLocaleString()}`);
+        showCartNotice('Added to cart', `${pkg.packageName} · ${formatPackagePrice(cartOffer.price ?? resolvedPrice, pkg)}`);
       } catch (error) {
         reportMarketplaceLoadError('Could not add package to cart:', error);
         showCartNotice('Could not add to cart', error instanceof Error ? error.message : 'Please try again.', true);
@@ -2322,7 +2320,7 @@ const serviceCityNamesFromIds =
       )}`;
     };
 
-    const getPackagePriceDisplay = (pkg: any, durationQuote: ReturnType<typeof getEventDurationQuote>) => {
+    const getPackagePriceDisplay = (pkg: any, durationQuote: { price: number | null } | null) => {
       const originalPrice = Number(durationQuote?.price ?? pkg.price ?? 0);
       const coupon = getApplicablePublicCoupon(String(pkg._id));
       const preview = coupon?.packagePricePreviews?.[String(pkg._id)];
@@ -2338,13 +2336,8 @@ const serviceCityNamesFromIds =
 
     const selectedPackagePricing = selectedPackage
       ? getPackagePriceDisplay(selectedPackage, selectedDurationQuote) : null;
-    const routeCouponCode = String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase();
     const selectedPackageDisplayPrice = selectedPackagePricing?.price != null
-      ? formatPackagePrice(
-        routeCouponCode && routeCouponCode === String(selectedPackagePricing.coupon?.code || '').toUpperCase()
-          ? selectedPackagePricing.price : selectedPackagePricing.originalPrice,
-        selectedPackage,
-      ) : '—';
+      ? formatPackagePrice(selectedPackagePricing.price, selectedPackage) : '—';
 
     const durationPriceLabel = (quote: NonNullable<typeof selectedDurationQuote>) =>
       quote.price === null ? 'Duration unavailable' : quote.basis === 'custom' ? 'Custom Duration Price' : 'Price for Selected Duration';

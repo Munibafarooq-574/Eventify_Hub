@@ -1,3 +1,4 @@
+import { validateCoupon } from '@/services/validateCoupon';
 import { cartCurrencies, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -7,7 +8,7 @@ import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -342,39 +343,74 @@ if (eventDetailsRaw) {
             pkg.quantity = Math.max(1, Number(pkg.quantity || 1) + delta);
         }
 
+        if (pkg.pendingCouponCode && updatedCart.appliedPromotions) {
+            const key = `${vendor.vendor?._id || vendor.vendorId}:${pkg.packageId || pkg._id}`;
+            const promotion = updatedCart.appliedPromotions[key];
+            if (promotion?.promotionCode === pkg.pendingCouponCode) {
+                updatedCart.appliedPromotions = { ...updatedCart.appliedPromotions };
+                delete updatedCart.appliedPromotions[key];
+            }
+        }
         vendor.packages[packageIndex] = pkg;
         updatedCart.vendors[vendorIndex] = vendor;
 
         if (!await saveCart(updatedCart)) return;
     };
 
-    // -----------------------------------------
-    // Calculate total
-    // -----------------------------------------
+    const getCartLine = useCallback((vendor: any, pkg: any) => {
+        const vendorId = String(vendor.vendor?._id || vendor.vendorId || '');
+        const packageId = String(pkg.packageId || pkg._id || '');
+        const code = String(pkg.pendingCouponCode || '').trim().toUpperCase();
+        const isCatering = !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) ||
+            !!pkg.categoryName?.toLowerCase().includes('catering');
+        const originalAmount = packageAmount(pkg, guests, isCatering) +
+            deliveryFee(pkg, Number(pkg.quantity || 1), guests, isCatering).totalFee;
+        const currency = currencyOf(pkg);
+        return { vendorId, packageId, code, originalAmount, currency,
+            key: JSON.stringify([vendorId, packageId, code, originalAmount, currency]) };
+    }, [cateringCategory?._id, guests]);
 
-    const calculateTotalAmount = () => {
-        if (!cartData?.vendors) return 0;
+    const cartLines = useMemo(() => (cartData?.vendors || []).flatMap((vendor: any) =>
+        (vendor.packages || []).map((pkg: any) => getCartLine(vendor, pkg)),
+    ) as ReturnType<typeof getCartLine>[], [cartData, getCartLine]);
 
-        let totalAmount = 0;
+    const [couponQuotes, setCouponQuotes] = useState<Record<string, number | null>>({});
+    useFocusEffect(useCallback(() => {
+        let active = true;
+        setCouponQuotes({});
+        const offers = cartLines.filter(line => line.code && line.vendorId && line.packageId);
+        if (offers.length) {
+            void (async () => {
+                const session = await draft.getSession().catch(() => null);
+                const results: Record<string, number | null> = {};
+                const quotedCodes = new Set<string>();
+                for (const line of offers) {
+                    if (!active) return;
+                    const codeKey = `${line.vendorId}:${line.code}`;
+                    results[line.key] = null;
+                    if (!session || quotedCodes.has(codeKey)) continue;
+                    try {
+                        const quote = await validateCoupon(
+                            line.vendorId, line.code, line.originalAmount, session.userId, line.packageId,
+                        );
+                        if (currencyOf(quote) === line.currency && Number.isFinite(quote.finalAmount) &&
+                            quote.finalAmount >= 0 && quote.finalAmount < line.originalAmount) {
+                            results[line.key] = quote.finalAmount;
+                            quotedCodes.add(codeKey);
+                        }
+                    } catch {
+                        // Review Order will display the backend's reason and ask before booking.
+                    }
+                }
+                if (active && draft.isCurrent()) setCouponQuotes(results);
+            })();
+        }
+        return () => { active = false; };
+    }, [cartLines, draft]));
 
-        cartData.vendors.forEach((vendor: any) => {
-            if (!vendor?.packages) return;
-
-            vendor.packages.forEach((pkg: any) => {
-                const isCatering =
-                    cateringCategory?._id &&
-                    vendor?.vendor?.buisnessCategory ===
-                        cateringCategory._id;
-
-                const quantity = Number(pkg?.quantity || 1);
-
-                totalAmount += deliveryFee(pkg, quantity, Number(guests || 0), !!isCatering).totalFee;
-                totalAmount += packageAmount(pkg, Number(guests || 0), !!isCatering);
-            });
-        });
-
-        return totalAmount;
-    };
+    const originalTotal = cartLines.reduce((sum, line) => sum + line.originalAmount, 0);
+    const cartCouponSavings = cartLines.reduce((sum, line) =>
+        sum + line.originalAmount - (couponQuotes[line.key] ?? line.originalAmount), 0);
 
     // -----------------------------------------
     // Checkout
@@ -525,7 +561,7 @@ if (eventDetailsRaw) {
     }
 
     const mixedCurrency = cartCurrencies(cartData).length > 1;
-    const totalAmount = mixedCurrency ? 0 : calculateTotalAmount();
+    const totalAmount = mixedCurrency ? 0 : originalTotal - cartCouponSavings;
 
     const vendorCount = cartData?.vendors?.length || 0;
 
@@ -833,8 +869,9 @@ if (eventDetailsRaw) {
 
                                                     const serviceEndText =
                                                         formatServiceTime(serviceWindowEnd);
-                                                const finalPrice = deliveryFee(pkg, Number(pkg.quantity || 1), Number(guests || 0), !!isCatering).totalFee +
-                                                    packageAmount(pkg, Number(guests || 0), !!isCatering);
+                                                const cartLine = getCartLine(vendor, pkg);
+                                                const quotedPrice = couponQuotes[cartLine.key];
+                                                const finalPrice = quotedPrice ?? cartLine.originalAmount;
 
 
                                                 return (
@@ -882,16 +919,18 @@ if (eventDetailsRaw) {
                                                             <Text style={styles.packagePrice}>
                                                                 {currencySymbol(currencyOf(pkg))}{' '}
                                                                 {formatCurrency(finalPrice)}
+                                                                {quotedPrice != null && (
+                                                                    <Text style={{ color: MUTED, fontSize: 12, textDecorationLine: 'line-through' }}>
+                                                                        {'  '}{currencySymbol(currencyOf(pkg))} {formatCurrency(cartLine.originalAmount)}
+                                                                    </Text>
+                                                                )}
                                                             </Text>
-                                                            {pkg?.pendingCouponCode ? (
-                                                              <View style={{ marginTop: 5, alignSelf: 'flex-start', backgroundColor: '#F6E9F5', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 }}>
-                                                                <Text style={{ color: PRIMARY, fontSize: 11, fontWeight: '700' }}>
-                                                                  Offer {pkg.pendingCouponCode} selected
-                                                                </Text>
-                                                                <Text style={{ color: '#796978', fontSize: 10 }}>
-                                                                  Discount will be verified and applied on Review Order.
-                                                                </Text>
-                                                              </View>
+                                                            {cartLine.code ? (
+                                                              <Text style={{ color: PRIMARY, fontSize: 11, fontWeight: '700', marginTop: 4 }}>
+                                                                {cartLine.code}{quotedPrice != null ? ' applied'
+                                                                  : quotedPrice === null ? ' · Check availability on Review Order'
+                                                                    : ' · Checking offer…'}
+                                                              </Text>
                                                             ) : null}
 
                                                             {/* Booking Details */}
@@ -1123,9 +1162,17 @@ if (eventDetailsRaw) {
 
                                 <Text style={styles.priceValue}>
                                     {currencySymbol(cartCurrency(cartData))}{' '}
-                                    {formatCurrency(totalAmount)}
+                                    {formatCurrency(mixedCurrency ? 0 : originalTotal)}
                                 </Text>
                             </View>
+                            {!mixedCurrency && cartCouponSavings > 0 && (
+                                <View style={styles.priceRow}>
+                                    <Text style={styles.priceLabel}>Coupon discount</Text>
+                                    <Text style={styles.priceValue}>
+                                        −{currencySymbol(cartCurrency(cartData))} {formatCurrency(cartCouponSavings)}
+                                    </Text>
+                                </View>
+                            )}
 
                             <View style={styles.priceDivider} />
 
