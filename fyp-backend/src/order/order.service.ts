@@ -81,6 +81,38 @@ export class OrderService {
 ) { }
 
 
+  private async assertPackageResourceBudget(args: {
+    vendorId: string;
+    packageId: string;
+    start: Date;
+    end: Date;
+    requestedUnits: number;
+    maxParallelUnits?: number | null;
+    session: ClientSession;
+    excludeOrderIds?: Types.ObjectId[];
+    additionalUnits?: number;
+  }): Promise<void> {
+    if (args.maxParallelUnits == null) return;
+    if (!Number.isSafeInteger(args.requestedUnits) || args.requestedUnits < 1) {
+      throw new BadRequestException('Invalid service resource quantity.');
+    }
+    const overlapping = await this.vendorOrderModel.find({
+      vendorId: new Types.ObjectId(args.vendorId),
+      packageId: args.packageId,
+      status: { $in: ['pending', 'accepted', 'completed'] },
+      replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+      eventStartDateTime: { $lt: args.end },
+      eventEndDateTime: { $gt: args.start },
+      ...(args.excludeOrderIds?.length ? { _id: { $nin: args.excludeOrderIds } } : {}),
+    }).select('resourceUnits quantity').session(args.session).lean();
+    const reserved = overlapping.reduce((sum, order) =>
+      sum + Math.max(1, Number(order.resourceUnits ?? order.quantity ?? 1)), 0);
+    const planned = Number(args.additionalUnits ?? 0);
+    if (reserved + planned + args.requestedUnits > args.maxParallelUnits) {
+      throw new ConflictException('Not enough service teams or resources remain available for the selected time.');
+    }
+  }
+
             // Create a new order
     async createOrder(
     organizerId: string,
@@ -934,27 +966,22 @@ export class OrderService {
                         // The vendor lock above serializes transactions for this vendor.
                         // A configured resource budget is shared by overlapping bookings
                         // of this package; a booking that uses two teams reserves two units.
-                        if (packageDoc.availableParallelUnits != null) {
-                            const overlappingPackageOrders = await this.vendorOrderModel.find({
-                                vendorId: new Types.ObjectId(String(service.vendorId)),
-                                packageId: String(service.packageId),
-                                status: { $in: ['pending', 'accepted', 'completed'] },
-                                replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
-                                eventStartDateTime: { $lt: finalServiceEndDateTime },
-                                eventEndDateTime: { $gt: finalServiceStartDateTime },
-                            }).select('resourceUnits quantity').session(session).lean();
-                            const reserved = overlappingPackageOrders.reduce(
-                                (sum, order) => sum + Math.max(1, Number(order.resourceUnits ?? order.quantity ?? 1)), 0);
-                            const inThisCart = validatedServices
-                                .filter(previous => previous.vendorId === String(service.vendorId) &&
-                                    previous.packageId === String(service.packageId) &&
-                                    previous.startDateTime < finalServiceEndDateTime &&
-                                    previous.endDateTime > finalServiceStartDateTime)
-                                .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? 1), 0);
-                            if (reserved + inThisCart + resourceUnits > Number(packageDoc.availableParallelUnits)) {
-                                throw new ConflictException('Not enough service teams or resources remain available for the selected time.');
-                            }
-                        }
+                        const inThisCart = validatedServices
+                            .filter(previous => previous.vendorId === String(service.vendorId) &&
+                                previous.packageId === String(service.packageId) &&
+                                previous.startDateTime < finalServiceEndDateTime &&
+                                previous.endDateTime > finalServiceStartDateTime)
+                            .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? 1), 0);
+                        await this.assertPackageResourceBudget({
+                            vendorId: String(service.vendorId),
+                            packageId: String(service.packageId),
+                            start: finalServiceStartDateTime,
+                            end: finalServiceEndDateTime,
+                            requestedUnits: resourceUnits,
+                            maxParallelUnits: packageDoc.availableParallelUnits,
+                            session,
+                            additionalUnits: inThisCart,
+                        });
 
                         // Existing DB overlap is already checked by the
                         // availability service. This extra count covers
@@ -3197,6 +3224,31 @@ async completeVendorOrder(vendorOrderId: string) {
                         );
                     }
 
+                    const rescheduledStart = new Date(availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime);
+                    const rescheduledEnd = new Date(availability.requiredServiceWindow?.endDateTime || req.newServiceEndDateTime);
+                    const vendorWithPackages: any = await this.userModel.findById(req.vendorId)
+                        .select('packages').session(session).lean();
+                    const rescheduledPackage = (vendorWithPackages?.packages || [])
+                        .find((pkg: any) => String(pkg._id) === String(vo.packageId));
+                    if (rescheduledPackage?.availableParallelUnits != null) {
+                        const previouslyPlanned = vendorOrders.slice(0, i)
+                            .filter(previous => String(previous.vendorId) === String(vo.vendorId) &&
+                                String(previous.packageId) === String(vo.packageId) &&
+                                new Date(previous.eventStartDateTime) < rescheduledEnd &&
+                                new Date(previous.eventEndDateTime) > rescheduledStart)
+                            .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? previous.quantity ?? 1), 0);
+                        await this.assertPackageResourceBudget({
+                            vendorId: String(vo.vendorId),
+                            packageId: String(vo.packageId),
+                            start: rescheduledStart,
+                            end: rescheduledEnd,
+                            requestedUnits: Number(vo.resourceUnits ?? vo.quantity ?? 1),
+                            maxParallelUnits: Number(rescheduledPackage.availableParallelUnits),
+                            session,
+                            excludeOrderIds: vendorOrders.map(item => item._id),
+                            additionalUnits: previouslyPlanned,
+                        });
+                    }
                     vo.eventStartDateTime =
                         availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime;
                     vo.eventEndDateTime =
