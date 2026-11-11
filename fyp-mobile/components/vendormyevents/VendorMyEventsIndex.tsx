@@ -1,4 +1,4 @@
-import { currencySymbol, currencyOf } from '@/utils/currency';
+import { displayBookingMoney, getVendorBookingSummary } from '@/utils/vendorBookingAmounts';
 import { bookingTimeZone, formatBookingTime, formatCalendarDate, eventLocalDateTime, bookingDateKey } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
@@ -719,9 +719,8 @@ renderItem={({ item }) => {
   const isExpanded = expandedId === id;
   const ownVendorOrders = getOwnVendorOrders(item);
 
-  const vendorTotal = ownVendorOrders.length > 0
-    ? ownVendorOrders.reduce((sum: number, service: any) => sum + Number(service?.price || 0), 0)
-    : Number(item?.totalAmount || 0);
+  const { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel } =
+    getVendorBookingSummary(ownVendorOrders, item);
 
   const vendorStatus = getVendorStatus(item);
 
@@ -770,6 +769,17 @@ renderItem={({ item }) => {
             </View>
           )}
         </View>
+
+        {ownVendorOrders.length > 0 && (
+          <View style={[styles.eventMeta, styles.bookingPriceRow]}>
+            <Ionicons name="cash-outline" size={15} color={PRIMARY} />
+            <Text style={styles.eventText}>
+              {displayBookingMoney(bookingTotal, item)}
+              {discount > 0 && <Text style={styles.originalBookingPrice}>  {displayBookingMoney(original, item)}</Text>}
+            </Text>
+            {discount > 0 && <Text style={styles.bookingDiscountBadge}>{discountLabel}</Text>}
+          </View>
+        )}
 
         {isExpanded && (
           <View style={styles.expandedBlock}>
@@ -847,10 +857,19 @@ renderItem={({ item }) => {
             )}
 
             <Text style={styles.expandedSubTitle}>Booking & Payment Details</Text>
-            <View style={styles.eventMeta}>
-              <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-              <Text style={styles.expandedText}>Your Earnings: {currencySymbol(currencyOf(item))} {vendorTotal}</Text>
-            </View>
+            {ownVendorOrders.length > 0 && (
+              <>
+                {discount > 0 && <Text style={styles.expandedText}>Original price: {displayBookingMoney(original, item)}</Text>}
+                {ownVendorOrders.map((service: any, index: number) => amounts[index].discount > 0 && (
+                  <Text key={service._id || index} style={styles.expandedText}>
+                    {service.promotionCode ? `Discount (${service.promotionCode})` : "Discount"}: −{displayBookingMoney(amounts[index].discount, item)}
+                  </Text>
+                ))}
+                <Text style={styles.expandedText}>Booking Total: {displayBookingMoney(bookingTotal, item)}</Text>
+                {platformFee > 0 && <Text style={styles.expandedText}>Platform Fee: −{displayBookingMoney(platformFee, item)}</Text>}
+                <Text style={styles.expandedText}>Your Earnings: {displayBookingMoney(earnings, item)}</Text>
+              </>
+            )}
             {!!vendorStatus && (
               <View style={styles.eventMeta}>
                 <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
@@ -866,9 +885,8 @@ renderItem={({ item }) => {
                   const selectedPackage = vendorPackages.find((pkg: any) =>
                     String(pkg?._id || pkg?.id) === String(service?.packageId || "")
                   );
-                  const total = Number(service?.finalAmount ?? service?.price ?? 0);
-                  const remaining = Number(service?.remainingAmount ?? total);
-                  const paid = Math.max(total - remaining, 0);
+                  const { total, paid, remaining } = amounts[index];
+                  const currencySource = service.currency ? service : item;
                   return (
                     <View key={service?._id || `${service?.serviceName}-${index}`} style={styles.vendorDetailCard}>
                       <Text style={styles.vendorDetailTitle}>{service?.serviceName || "Service"}</Text>
@@ -879,9 +897,9 @@ renderItem={({ item }) => {
                         {service.pricingMethod === 'GROUP' && <Text style={styles.expandedText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                       {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.expandedText}>Start Time: {service?.eventStartDateTime ? formatTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
                       <Text style={styles.expandedText}>End Time: {service?.eventEndDateTime ? formatTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
-                      <Text style={styles.expandedText}>Booking Amount: {currencySymbol(currencyOf(service))} {total}</Text>
-                      <Text style={styles.expandedText}>Paid: {currencySymbol(currencyOf(service))} {paid}</Text>
-                      <Text style={styles.expandedText}>Remaining: {currencySymbol(currencyOf(service))} {remaining}</Text>
+                      <Text style={styles.expandedText}>Booking Amount: {displayBookingMoney(total, currencySource)}</Text>
+                      <Text style={styles.expandedText}>Paid: {displayBookingMoney(paid, currencySource)}</Text>
+                      <Text style={styles.expandedText}>Remaining: {displayBookingMoney(remaining, currencySource)}</Text>
                       <Text style={styles.expandedText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
                     </View>
                   );
@@ -1039,6 +1057,12 @@ const styles = StyleSheet.create({
   eventDetails: { flex: 1 },
   eventTopRow: { flexDirection: "row", alignItems: "flex-start" },
   eventDate: { fontSize: 11, color: "#9B9B9B", fontWeight: "600", marginBottom: 2 },
+  bookingPriceRow: { flexWrap: "wrap", columnGap: 5, rowGap: 3 },
+  originalBookingPrice: { textDecorationLine: "line-through", color: "#786B74" },
+  bookingDiscountBadge: {
+    color: "#614100", backgroundColor: "#FFE9AA", borderRadius: 9,
+    fontSize: 10, fontWeight: "800", paddingHorizontal: 6, paddingVertical: 3,
+  },
   eventTitle: { fontSize: 15, fontWeight: "700", color: "#1A1A1A" },
   statusBadge: { flexDirection: "row", alignItems: "center", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 5, marginLeft: 7 },
   statusDotSmall: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },

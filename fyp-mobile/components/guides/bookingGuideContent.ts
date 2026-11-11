@@ -111,6 +111,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       { id: 'calendar', title: 'Find a day and review bookings', summary: 'Use the calendar and the available views.', steps: [
         'Select the date you want to check. Read Working Hours, Booking Notice, available slots and booked slots for that date.',
         'Use Selected Day, Upcoming, This Month or Past Bookings to find the relevant records. Expand a booking to read event, client, package quantity and payment information.',
+        'Booking Total includes the saved discount. Your Earnings subtracts any platform fee. Paid shows payments that have cleared.',
         'Only your vendor bookings are shown here. Another vendor’s acceptance or cancellation does not change your own assignment.',
       ] },
       { id: 'availability', title: 'Edit working hours and notice', summary: 'Save the settings for the intended working day.', steps: [
