@@ -2,7 +2,7 @@ import { currencySymbol, currencyOf } from '@/utils/currency';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 import { getPublicDashboardCoupons } from '@/services/getPublicDashboardCoupons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -277,7 +277,12 @@ const PublicCouponOffers: React.FC = () => {
       if (!signal.aborted) setLoading(false);
     }
   }, []);
-  useDashboardSectionLoad(loadCoupons, true);
+  const [couponSectionFocused, setCouponSectionFocused] = useState(false);
+  useFocusEffect(useCallback(() => {
+    setCouponSectionFocused(true);
+    return () => setCouponSectionFocused(false);
+  }, []));
+  useDashboardSectionLoad(loadCoupons, couponSectionFocused);
 
   const stopAutoScroll = useCallback(() => {
     if (intervalRef.current) {
