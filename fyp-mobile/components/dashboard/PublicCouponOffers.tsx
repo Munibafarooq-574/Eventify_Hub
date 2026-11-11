@@ -143,9 +143,18 @@ const CouponCard: React.FC<CouponCardProps> = ({
 
     onBeforeNavigate?.();
 
+    // A coupon linked to one or more packages opens an eligible package.
+    // The offer code travels with the navigation and is validated at checkout.
+    const targeted = (Array.isArray(coupon.packageIds) && coupon.packageIds.length
+      ? coupon.packageIds : coupon.packageId ? [coupon.packageId] : []) as string[];
     router.push({
       pathname: '/vendorprofiledetails',
-      params: { id: vendorId },
+      params: {
+        id: vendorId,
+        openTab: 'Packages',
+        ...(targeted.length ? { packageId: String(targeted[0]) } : {}),
+        couponCode: String(coupon.code || ''),
+      },
     });
   };
 
