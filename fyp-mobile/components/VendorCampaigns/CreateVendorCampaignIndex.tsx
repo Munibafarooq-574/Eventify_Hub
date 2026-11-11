@@ -334,51 +334,26 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
     setDatePickerMode("start");
   };
 
-  const calculateAutomaticEndDate = (
-    selectedStartDate: Date,
-  ) => {
-    const maximumCampaignEnd =
-      new Date(selectedStartDate);
-
-    // Start date = Day 1.
-    // +29 days gives a maximum
-    // 30-calendar-day campaign.
-    maximumCampaignEnd.setDate(
-      maximumCampaignEnd.getDate() + 29,
+  const calculateAutomaticEndDate = (selectedStartDate: Date) => {
+    // Full calendar month is measured from the selected campaign start,
+    // not from the day the vendor creates the campaign.
+    // E.g. 25 Nov -> 25 Dec. Clamp month-end dates (31 Jan -> 28 Feb).
+    const year = selectedStartDate.getFullYear();
+    const month = selectedStartDate.getMonth();
+    const day = Math.min(
+      selectedStartDate.getDate(),
+      new Date(year, month + 2, 0).getDate(),
     );
-
-    maximumCampaignEnd.setHours(
-      23,
-      59,
-      59,
-      999,
-    );
-
-    // If subscription expiry is not available,
-    // use the normal 30-day campaign limit.
-    if (!subscriptionEndDate) {
-      return maximumCampaignEnd;
-    }
-
-    const subscriptionLastDay =
-      new Date(subscriptionEndDate);
-
-    // Campaigns work with calendar dates.
-    subscriptionLastDay.setHours(
-      23,
-      59,
-      59,
-      999,
-    );
-
-    // Whichever comes first:
-    // 1. Campaign 30-day maximum
-    // 2. Subscription expiry
-    return subscriptionLastDay.getTime() <
-      maximumCampaignEnd.getTime()
-      ? subscriptionLastDay
-      : maximumCampaignEnd;
+    const end = new Date(year, month + 1, day);
+    end.setHours(23, 59, 59, 999);
+    return end;
   };
+
+  const campaignExceedsSubscription = Boolean(
+    endDate && subscriptionEndDate &&
+    new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime() >
+    new Date(subscriptionEndDate.getFullYear(), subscriptionEndDate.getMonth(), subscriptionEndDate.getDate()).getTime(),
+  );
 
   const selectedPackageId = useMemo(
     () =>
@@ -466,6 +441,14 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
 
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
+
+    if (campaignExceedsSubscription) {
+      Alert.alert(
+        "Subscription Expires Before Campaign Ends",
+        `Your selected one-month campaign ends on ${formatDate(endDate)}, but your subscription expires on ${formatDate(subscriptionEndDate)}. Renew or extend your subscription before submitting this campaign.`,
+      );
+      return false;
+    }
 
     if (end.getTime() <= start.getTime()) {
       Alert.alert(
@@ -930,6 +913,14 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
               />
             </View>
 
+            <Text style={styles.campaignDurationHelp}>
+              Campaign runs for one calendar month from your selected Start Date.
+            </Text>
+            {campaignExceedsSubscription && (
+              <Text style={styles.campaignSubscriptionWarning}>
+                Your subscription expires on {formatDate(subscriptionEndDate)}. Extend it to cover the full campaign through {formatDate(endDate)} before submitting.
+              </Text>
+            )}
             <View style={styles.reviewNotice}>
               <View style={styles.reviewNoticeIcon}>
                 <Ionicons
@@ -1562,6 +1553,12 @@ function CalendarModal({
 }
 
 const styles = StyleSheet.create({
+  campaignDurationHelp: { fontSize: 12, color: '#756874', lineHeight: 18, marginTop: 8, marginBottom: 6 },
+  campaignSubscriptionWarning: {
+    fontSize: 12, lineHeight: 18, color: '#9B301C',
+    backgroundColor: '#FFF1ED', borderRadius: 10, padding: 12, marginBottom: 10,
+  },
+
   posterModeChoices: { gap: 10, marginBottom: 14 },
   posterDetailsNote: {
     fontSize: 12, lineHeight: 18, color: '#756874',
