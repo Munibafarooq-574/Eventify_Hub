@@ -46,6 +46,10 @@ export class VendorDiscount extends Document {
   @Prop({ type: String, default: null })
   packageId: string | null;
 
+  // Empty array plus null legacy packageId means all vendor packages.
+  @Prop({ type: [String], default: [] })
+  packageIds: string[];
+
   @Prop({
   type: String,
   enum: DiscountAudience,
