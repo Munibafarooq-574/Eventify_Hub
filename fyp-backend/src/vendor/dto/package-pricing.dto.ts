@@ -19,11 +19,6 @@ export class PackagePricingDto extends DeliveryPackageDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  peopleIncludedPerGroup?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
   maxPeoplePerBooking?: number;
 
   @IsOptional()
