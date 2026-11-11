@@ -7,6 +7,7 @@ import DeliveryDetails from '@/components/booking/DeliveryDetails';
 // fyp-mobile/components/vendorpackages/VendorPackagesIndex.tsx
 import deletePackage from "@/services/deletePackage";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { getPackageCouponOffer, getVendorPackageCouponOffers } from "@/services/getVendorPackageCouponOffers";
 import {
   getUserData,
   saveUserData,
@@ -68,6 +69,7 @@ const PackageScreen = () => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [packageDetails, setPackageDetails] =
     useState<PackageDetails | null>(null);
+  const [packageOffer, setPackageOffer] = useState<ReturnType<typeof getPackageCouponOffer>>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -87,6 +89,7 @@ const PackageScreen = () => {
     let active = true;
     setLoading(true);
     setPackageDetails(null);
+    setPackageOffer(null);
     setLoadError("");
     setNotFound(false);
     const load = async () => {
@@ -101,10 +104,14 @@ const PackageScreen = () => {
           if (active) setLoadError("Please sign in again to view your package.");
           return;
         }
-        const packages = await getVendorPackagesList(String(vendorId));
+        const [packages, coupons] = await Promise.all([
+          getVendorPackagesList(String(vendorId)),
+          getVendorPackageCouponOffers(String(vendorId)),
+        ]);
         if (!active) return;
         const found = packages.find(pkg => String(pkg._id) === String(packageId));
         setPackageDetails(found ?? null);
+        setPackageOffer(found ? getPackageCouponOffer(coupons, found) : null);
         setLoadError("");
         setNotFound(!found);
       } catch {
@@ -470,12 +477,19 @@ const PackageScreen = () => {
                 {packageDetails.pricingMethod === 'PER_PERSON' ? 'Price per person' : packageDetails.pricingMethod === 'GROUP' ? 'Price per group' : 'Base Package Price'}
               </Text>
 
+              {packageOffer && <Text style={styles.priceHeroCoupon}>{packageOffer.label}</Text>}
               <Text style={styles.priceHeroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {currencySymbol(currencyOf(packageDetails))}{" "}
                 {packageDetails.price !== undefined
-                  ? Number(packageDetails.price).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                  ? Number(packageOffer?.price?.finalAmount ?? packageDetails.price).toLocaleString(undefined, { maximumFractionDigits: 2 })
                   : "N/A"}
               </Text>
+              {packageOffer?.price && (
+                <Text style={styles.priceHeroOriginal}>
+                  {currencySymbol(currencyOf(packageDetails))}{" "}
+                  {packageOffer.price.originalPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Text>
+              )}
             </View>
 
             {packageDetails.bookingType === "DURATION_BASED" &&
@@ -1451,6 +1465,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: "uppercase",
     marginBottom: 6,
+  },
+
+  priceHeroCoupon: {
+    backgroundColor: "#FFE8A6",
+    color: "#624000",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 5,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  priceHeroOriginal: {
+    color: "#EAC8DE",
+    textDecorationLine: "line-through",
+    fontSize: 15,
+    fontWeight: "600",
   },
 
   priceHeroValue: {

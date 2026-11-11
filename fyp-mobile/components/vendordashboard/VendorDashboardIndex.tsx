@@ -8,6 +8,7 @@ import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessStat
 import { getSubscriptionHistory } from "@/services/getSubscriptionHistory";
 import { PaymentStatus, VendorSubscription } from "@/types/subscription.types";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
+import { getPackageCouponOffer, getVendorPackageCouponOffers } from "@/services/getVendorPackageCouponOffers";
 import {
     SubscriptionAccessState,
     formatSubscriptionPlanName,
@@ -88,6 +89,7 @@ const DashboardScreen = () => {
     const [monthNameArray, setMonthNameArray] = useState<string[]>([]);
     const [avatar, setAvatar] = useState<string>("");
     const [packages, setPackages] = useState<any[]>([]);
+    const [packageCoupons, setPackageCoupons] = useState<Awaited<ReturnType<typeof getVendorPackageCouponOffers>>>([]);
     const [packagesError, setPackagesError] = useState(false);
     const [hasNotifications, setHasNotifications] = useState<boolean>(true);
     const [loading, setLoading] = useState<boolean>(true);
@@ -273,6 +275,7 @@ const packageLimitReached =
 if (!user?._id) {
     console.warn("No user data found.");
     setPackages([]);
+    setPackageCoupons([]);
     return;
 }
 
@@ -282,6 +285,7 @@ if (!user?._id) {
             return;
         }
 
+        const couponsRequest = getVendorPackageCouponOffers(user._id);
         try {
     const vendorPackages = await getVendorPackagesList(user._id);
     setPackagesError(false);
@@ -302,6 +306,7 @@ if (!user?._id) {
     );
 }
 
+        setPackageCoupons(await couponsRequest);
         await fetchOrderStats(user._id);
 
         const response = await getOrderStatsMonthly(user._id);
@@ -1691,6 +1696,7 @@ if (!hasValidSubscription) {
                         <View style={styles.packageContainer}>
                             {packages.slice(0, 6).map((pkg: any, index) => {
                                 const accent = PACKAGE_ACCENTS[index % PACKAGE_ACCENTS.length];
+                                const offer = getPackageCouponOffer(packageCoupons, pkg);
                                 return (
                                     <TouchableOpacity
                                         key={pkg._id ?? index}
@@ -1703,8 +1709,11 @@ if (!hasValidSubscription) {
                                             })
                                         }
                                     >
-                                        <View style={[styles.packageIconWrap, { backgroundColor: "#fff" }]}>
-                                            <Ionicons name={accent.icon} size={18} color={accent.tint} />
+                                        <View style={styles.packageTopRow}>
+                                            <View style={[styles.packageIconWrap, { backgroundColor: "#fff" }]}>
+                                                <Ionicons name={accent.icon} size={18} color={accent.tint} />
+                                            </View>
+                                            {offer && <Text style={styles.packageCouponBadge}>{offer.label}</Text>}
                                         </View>
                                         <Text style={styles.packageValue}>
                                             {pkg.packageName}
@@ -2667,6 +2676,8 @@ viewAllPackagesText: {
         marginBottom: 12,
         ...cardShadow(0.04),
     },
+    packageTopRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 4 },
+    packageCouponBadge: { backgroundColor: "#FFE8A6", color: "#624000", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 4, fontSize: 10, fontWeight: "800" },
     packageIconWrap: {
         width: 32,
         height: 32,
