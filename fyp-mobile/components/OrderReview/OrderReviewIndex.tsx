@@ -870,28 +870,6 @@ Alert.alert(
   }
 };
 
-// An offer opened from a public coupon card is remembered with the cart item.
-// Apply it through the same server-validated flow used by the manual Apply button.
-useEffect(() => {
-  if (refreshing || checkoutLock.current || applyingCouponId || applyingDiscountCodeKey) return;
-  for (const vendor of cartData?.vendors || []) {
-    const vendorId = String(vendor?.vendor?._id || vendor?.vendorId || '');
-    for (const pkg of vendor?.packages || []) {
-      const packageId = String(pkg?.packageId || pkg?._id || '');
-      const code = String(pkg?.pendingCouponCode || '').toUpperCase();
-      if (!vendorId || !packageId || !code) continue;
-      const key = getPromotionKey(vendorId, packageId);
-      if (appliedPromotions[key] || autoCouponAttempted.current.has(key + ':' + code)) continue;
-      const coupon = (publicCoupons[key] || []).find((entry: any) =>
-        String(entry.code || '').toUpperCase() === code);
-      if (!coupon) continue;
-      autoCouponAttempted.current.add(key + ':' + code);
-      void handleApplyPublicCoupon(vendor, pkg, coupon);
-      return; // One server validation at a time; later renders handle the rest.
-    }
-  }
-}, [cartData, publicCoupons, appliedPromotions, refreshing, applyingCouponId, applyingDiscountCodeKey]);
-
 const confirmPromotionReplacement = (
   currentCode: string,
   newCode: string,
@@ -1224,6 +1202,29 @@ const isInvalidCode =
         : 'Unable to check the latest price and availability. Pull down to try again.');
     }
   });
+
+// An offer opened from a public coupon card is remembered with the cart item.
+// Apply it through the same server-validated flow used by the manual Apply button.
+useEffect(() => {
+  if (refreshing || checkoutLock.current || applyingCouponId || applyingDiscountCodeKey) return;
+  for (const vendor of cartData?.vendors || []) {
+    const vendorId = String(vendor?.vendor?._id || vendor?.vendorId || '');
+    for (const pkg of vendor?.packages || []) {
+      const packageId = String(pkg?.packageId || pkg?._id || '');
+      const code = String(pkg?.pendingCouponCode || '').toUpperCase();
+      if (!vendorId || !packageId || !code) continue;
+      const key = getPromotionKey(vendorId, packageId);
+      if (appliedPromotions[key] || autoCouponAttempted.current.has(key + ':' + code)) continue;
+      const coupon = (publicCoupons[key] || []).find((entry: any) =>
+        String(entry.code || '').toUpperCase() === code);
+      if (!coupon) continue;
+      autoCouponAttempted.current.add(key + ':' + code);
+      void handleApplyPublicCoupon(vendor, pkg, coupon);
+      return; // One server validation at a time; later renders handle the rest.
+    }
+  }
+}, [cartData, publicCoupons, appliedPromotions, refreshing, applyingCouponId, applyingDiscountCodeKey]);
+
 
   const handleCheckout = async () => {
     if (checkoutLock.current || promotionWriteLock.current || applyingCouponId || applyingDiscountCodeKey || bookingSubmitted.current || refreshing || refreshNotice) return;
