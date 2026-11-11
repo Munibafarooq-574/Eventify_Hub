@@ -33,6 +33,7 @@ interface DiscountEntryPayload {
   minimumOrderAmount: number;
   maximumDiscountAmount?: number;
   packageId?: string;
+  packageIds?: string[];
   startDate: string;
   endDate: string;
   usageLimit: number;
@@ -113,13 +114,15 @@ private readonly emailService: EmailService,
     filter.$and = [
       {
         $or: [
-          { packageId: null },
+          { packageId: null, $or: [{ packageIds: { $exists: false } }, { packageIds: { $size: 0 } }] },
           { packageId },
+          { packageIds: packageId },
         ],
       },
     ];
   } else {
     filter.packageId = null;
+    filter.$or = [{ packageIds: { $exists: false } }, { packageIds: { $size: 0 } }];
   }
 
   return this.discountModel
@@ -739,8 +742,9 @@ async validateCoupon(
   }
 
   if (
-    entry.packageId &&
-    (!packageId || entry.packageId !== packageId)
+    (entry.packageIds?.length
+      ? (!packageId || !entry.packageIds.includes(packageId))
+      : entry.packageId && (!packageId || entry.packageId !== packageId))
   ) {
     throw new BadRequestException(
       'This code is not applicable to this package',
@@ -942,8 +946,15 @@ return {
 
     this.validatePayload(dto);
 
-    if (dto.packageId) {
-      await this.assertOwnsPackage(vendorId, dto.packageId);
+    if (dto.packageId && dto.packageIds?.length) {
+      throw new BadRequestException('Choose either a single package or selected packages.');
+    }
+    const selectedPackageIds = [...new Set(dto.packageIds || [])];
+    if (dto.packageIds && selectedPackageIds.length === 0) {
+      throw new BadRequestException('Select at least one package or use All Packages.');
+    }
+    for (const packageId of [...selectedPackageIds, ...(dto.packageId ? [dto.packageId] : [])]) {
+      await this.assertOwnsPackage(vendorId, packageId);
     }
 
     const code = dto.code.trim().toUpperCase();
@@ -1000,6 +1011,7 @@ return {
       minimumOrderAmount: dto.minimumOrderAmount,
       maximumDiscountAmount: dto.maximumDiscountAmount ?? null,
       packageId: dto.packageId ?? null,
+      packageIds: selectedPackageIds,
       startDate: new Date(dto.startDate),
       endDate: new Date(dto.endDate),
       usageLimit: dto.usageLimit,
