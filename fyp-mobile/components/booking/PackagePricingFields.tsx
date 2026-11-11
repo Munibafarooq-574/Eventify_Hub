@@ -27,7 +27,7 @@ export default function PackagePricingFields({ value, allowed, onChange }: {
         {(['PERSON', 'GROUP', 'VEHICLE', 'TEAM', 'SETUP'] as const).map(unit => (
           <TouchableOpacity key={unit} accessibilityRole="radio"
             accessibilityState={{ checked: value.capacityUnit === unit }}
-            onPress={() => onChange({ ...value, capacityUnit: unit, peopleIncludedPerGroup: unit === 'GROUP' ? value.groupSize ?? undefined : undefined })}
+            onPress={() => onChange({ ...value, capacityUnit: unit })}
             style={{ padding: 9, borderWidth: 1, borderColor: '#780C60', borderRadius: 9, backgroundColor: value.capacityUnit === unit ? '#EAD0E2' : '#FFF' }}>
             <Text style={{ color: '#45203D' }}>{unit === 'PERSON' ? 'People' : unit === 'GROUP' ? 'Groups' : unit === 'VEHICLE' ? 'Vehicles' : unit === 'TEAM' ? 'Teams' : 'Setups'}</Text>
           </TouchableOpacity>
@@ -55,7 +55,7 @@ export default function PackagePricingFields({ value, allowed, onChange }: {
       <Text style={{ color: '#45203D', fontWeight: '600' }}>People included per group</Text>
       <TextInput accessibilityLabel="People included per group" keyboardType="number-pad"
         value={value.groupSize == null ? '' : String(value.groupSize)} placeholder="e.g. 10" placeholderTextColor="#8A7F87"
-        onChangeText={text => onChange({ ...value, groupSize: text ? Number(text.replace(/[^0-9]/g, '')) : undefined, peopleIncludedPerGroup: value.capacityUnit === 'GROUP' ? (text ? Number(text.replace(/[^0-9]/g, '')) : undefined) : value.peopleIncludedPerGroup })}
+        onChangeText={text => onChange({ ...value, groupSize: text ? Number(text.replace(/[^0-9]/g, '')) : undefined })}
         style={{ borderWidth: 1, borderColor: '#EBD7E5', borderRadius: 10, padding: 12, color: '#222' }} />
       {!!pricingFieldsError(value) && <Text style={{ color: '#B42318' }}>{pricingFieldsError(value)}</Text>}
     </>}
