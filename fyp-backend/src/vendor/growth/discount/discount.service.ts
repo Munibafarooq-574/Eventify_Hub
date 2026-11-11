@@ -120,10 +120,9 @@ private readonly emailService: EmailService,
         ],
       },
     ];
-  } else {
-    filter.packageId = null;
-    filter.$or = [{ packageIds: { $exists: false } }, { packageIds: { $size: 0 } }];
   }
+  // Without packageId, return all active vendor offers for the profile.
+  // Checkout passes a packageId and filters eligibility authoritatively.
 
   return this.discountModel
     .find(filter)
