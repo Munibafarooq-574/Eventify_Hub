@@ -1,4 +1,4 @@
-import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
+import { cartCurrencies, currencySymbol, currencyOf, roundForCurrency } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -4450,14 +4450,18 @@ const serviceCityNamesFromIds =
           : Number(applicableCoupon.discountValue || 0);
         const cap = percentage && applicableCoupon.maximumDiscountAmount != null
           ? Number(applicableCoupon.maximumDiscountAmount) : Infinity;
-        const savings = basePrice >= minimum ? Math.min(basePrice, rawSavings, cap) : 0;
+        const savings = roundForCurrency(basePrice >= minimum ? Math.min(basePrice, rawSavings, cap) : 0, currencyOf(pkg));
+        const openedFromOffer = String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
+          String(applicableCoupon.code || '').toUpperCase();
+        const money = (amount: number) => `${currencySymbol(currencyOf(pkg))} ${roundForCurrency(amount, currencyOf(pkg)).toLocaleString(currencyOf(pkg) === 'USD' ? 'en-US' : 'en-PK', { maximumFractionDigits: 2 })}`;
         return <View style={{ marginTop: 8 }}>
           <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 11, fontWeight: '700' }}>
-            {savings > 0 ? `Estimated after ${applicableCoupon.code}: ${currencySymbol(currencyOf(pkg))} ${(basePrice - savings).toLocaleString()} (save ${currencySymbol(currencyOf(pkg))} ${savings.toLocaleString()})`
-              : `Coupon ${applicableCoupon.code} available · minimum ${currencySymbol(currencyOf(pkg))} ${minimum.toLocaleString()}`}
+            {openedFromOffer && savings > 0
+              ? `Estimated: ${money(basePrice - savings)} (was ${money(basePrice)}, save ${money(savings)})`
+              : `Coupon ${applicableCoupon.code}: ${percentage ? `${applicableCoupon.discountValue}% OFF` : `${money(Number(applicableCoupon.discountValue))} OFF`} available`}
           </Text>
           <Text style={{ color: isActive ? '#FBE5F8' : '#77667B', fontSize: 10 }}>
-            Final discount confirmed at checkout.
+            {openedFromOffer ? 'Final discount confirmed at checkout.' : 'Select this offer at checkout to apply the discount.'}
           </Text>
         </View>;
       })()}
