@@ -4,6 +4,7 @@
 // DiscountController's createDiscountCode() takes this same DTO instead
 // of a near-identical duplicate.
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
@@ -42,6 +43,11 @@ export class CreateCouponDto {
   @IsOptional()
   @IsMongoId()
   packageId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  packageIds?: string[];
 
   @IsDateString()
   startDate: string;
