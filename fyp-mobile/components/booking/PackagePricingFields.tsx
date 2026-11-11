@@ -51,6 +51,7 @@ export default function PackagePricingFields({ value, allowed, onChange }: {
         </>
       )}
     </View>
+    {value.pricingMethod !== 'GROUP' && !!pricingFieldsError(value) && <Text style={{ color: '#B42318' }}>{pricingFieldsError(value)}</Text>}
     {value.pricingMethod === 'GROUP' && <>
       <Text style={{ color: '#45203D', fontWeight: '600' }}>People included per group</Text>
       <TextInput accessibilityLabel="People included per group" keyboardType="number-pad"
