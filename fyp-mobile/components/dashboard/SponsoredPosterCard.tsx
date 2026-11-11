@@ -65,7 +65,7 @@ export default function SponsoredPosterCard({ campaign, onPress, style }: Props)
               <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
                 {campaign.description.trim()}
               </Text>
-            )
+            )}
           </>
         )}
         <View style={styles.footer}>
