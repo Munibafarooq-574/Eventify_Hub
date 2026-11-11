@@ -934,7 +934,7 @@ export class OrderService {
                         // of this package; a booking that uses two teams reserves two units.
                         const resourceUnits = packageDoc.capacityUnit === 'GROUP'
                             ? Math.ceil(Number(service.personCount) / Number(packageDoc.peopleIncludedPerGroup))
-                            : packageDoc.capacityUnit === 'PERSON' ? Number(service.personCount) : quantity;
+                            : quantity;
                         if (packageDoc.availableParallelUnits != null) {
                             const overlappingPackageOrders = await this.vendorOrderModel.find({
                                 vendorId: new Types.ObjectId(String(service.vendorId)),
