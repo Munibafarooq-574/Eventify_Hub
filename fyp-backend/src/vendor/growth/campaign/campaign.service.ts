@@ -173,6 +173,13 @@ export class CampaignService {
       );
     }
 
+    // Match checkout: a disabled package must not be promoted.
+    if ((selectedPackage as any).isActive === false) {
+      throw new BadRequestException(
+        'This package is no longer active and cannot be advertised',
+      );
+    }
+
     // -------------------------------------------------------
     // 5. Derive category from vendor
     // Never accept categoryId from frontend.
