@@ -563,7 +563,7 @@ export default function VendorCampaignsIndex() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, dark && { backgroundColor: "#17131B" }]}>
       <StatusBar
         barStyle="light-content"
       />
@@ -834,7 +834,7 @@ export default function VendorCampaignsIndex() {
               >
                 <View>
                   <Text
-                    style={styles.sectionTitle}
+                    style={[styles.sectionTitle, dark && { color: "#F5ECF4" }]}
                   >
                     Monthly Campaigns
                   </Text>
@@ -1092,12 +1092,12 @@ export default function VendorCampaignsIndex() {
             {/* QUICK STATS */}
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, dark && { color: "#F5ECF4" }]}>
                 Campaign Overview
               </Text>
 
               <Text
-                style={styles.sectionSubtitle}
+                style={[styles.sectionSubtitle, dark && { color: "#B8AABC" }]}
               >
                 Performance at a glance
               </Text>
@@ -1111,6 +1111,7 @@ export default function VendorCampaignsIndex() {
                   iconColor="#258A52"
                   onPress={() => setFilter(filter === "active" ? "all" : "active")}
                   selected={filter === "active"}
+                  dark={dark}
                 />
 
                 <CampaignStat
@@ -1121,6 +1122,7 @@ export default function VendorCampaignsIndex() {
                   iconColor="#B27316"
                   onPress={() => setFilter(filter === "pending" ? "all" : "pending")}
                   selected={filter === "pending"}
+                  dark={dark}
                 />
 
                 <CampaignStat
@@ -1132,6 +1134,7 @@ export default function VendorCampaignsIndex() {
                   subtitle="All campaigns"
                   onPress={() => setFilter("all")}
                   selected={filter === "all"}
+                  dark={dark}
                 />
               </View>
             </View>
@@ -1143,12 +1146,12 @@ export default function VendorCampaignsIndex() {
         <View style={styles.section}>
           <View style={styles.campaignHeader}>
             <View>
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, dark && { color: "#F5ECF4" }]}>
                 My Campaigns
               </Text>
 
               <Text
-                style={styles.sectionSubtitle}
+                style={[styles.sectionSubtitle, dark && { color: "#B8AABC" }]}
               >
                 {campaigns.length > 0
                   ? `${campaigns.length} campaign${
@@ -1234,6 +1237,7 @@ export default function VendorCampaignsIndex() {
   isCancelling={
     cancellingCampaignId === campaign._id
   }
+  dark={dark}
 />
             ))
           )}
@@ -1252,7 +1256,9 @@ const CampaignStat = ({
   onPress,
   selected,
   subtitle,
+  dark,
 }: {
+  dark?: boolean;
   onPress?: () => void;
   selected?: boolean;
   subtitle?: string;
@@ -1263,7 +1269,7 @@ const CampaignStat = ({
   iconColor: string;
 }) => {
   return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress} accessibilityRole="button" style={[styles.statCard, selected && { borderColor: PRIMARY, borderWidth: 1.5 }]}>
+    <TouchableOpacity onPress={onPress} disabled={!onPress} accessibilityRole="button" style={[styles.statCard, dark && { backgroundColor: "#29212E", borderColor: "#473549" }, selected && { borderColor: PRIMARY, borderWidth: 1.5 }]}>
       <View
         style={[
           styles.statIcon,
@@ -1279,11 +1285,11 @@ const CampaignStat = ({
         />
       </View>
 
-      <Text style={styles.statValue}>
+      <Text style={[styles.statValue, dark && { color: "#F5ECF4" }]}>
         {value.toLocaleString()}
       </Text>
 
-      <Text style={styles.statLabel}>
+      <Text style={[styles.statLabel, dark && { color: "#C3B7C7" }]}>
         {label}
       </Text>
       {subtitle ? <Text style={{ color: MUTED, fontSize: 9, marginTop: 3 }}>{subtitle}</Text> : null}
@@ -1295,7 +1301,9 @@ const CampaignCard = ({
   campaign,
   onCancel,
   isCancelling,
+  dark,
 }: {
+  dark?: boolean;
   campaign: VendorCampaign;
   onCancel: (campaign: VendorCampaign) => void;
   isCancelling: boolean;
@@ -1335,7 +1343,7 @@ const actionLabel =
       : "Cancel Campaign";
 
 return (
-    <View style={styles.campaignCard}>
+    <View style={[styles.campaignCard, dark && { backgroundColor: "#29212E", borderColor: "#423347" }]}>
       <View
         style={styles.campaignImageContainer}
       >
@@ -1405,10 +1413,10 @@ return (
           </View>
         ) : null}
 
-        <Text style={styles.campaignDescription} numberOfLines={expanded ? undefined : 2} onTextLayout={(e) => { if (!expanded && e.nativeEvent.lines.length > 2 && !showFullTextLink) setShowFullTextLink(true); }}>{campaign.description}</Text>
+        <Text style={[styles.campaignDescription, dark && { color: "#D8CBDC" }]} numberOfLines={expanded ? undefined : 2} onTextLayout={(e) => { if (!expanded && e.nativeEvent.lines.length > 2 && !showFullTextLink) setShowFullTextLink(true); }}>{campaign.description}</Text>
         {(showFullTextLink || campaign.description.length > 95) ? <TouchableOpacity onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(v => !v); }} accessibilityRole="button" style={{ alignSelf: "flex-start", marginTop: 4, paddingVertical: 5 }}><Text style={{ color: PRIMARY, fontSize: 12, fontWeight: "800" }}>{expanded ? "Show less" : "Read more"}</Text></TouchableOpacity> : null}
 
-        <View style={styles.dateContainer}>
+        <View style={[styles.dateContainer, dark && { backgroundColor: "#382D3B" }]}>
           <View style={styles.dateItem}>
             <View style={styles.dateIcon}>
               <Ionicons
@@ -1426,7 +1434,7 @@ return (
               </Text>
 
               <Text
-                style={styles.dateValue}
+                style={[styles.dateValue, dark && { color: "#F5EDF6" }]}
               >
                 {formatDate(
                   campaign.startDate,
@@ -1458,7 +1466,7 @@ return (
               </Text>
 
               <Text
-                style={styles.dateValue}
+                style={[styles.dateValue, dark && { color: "#F5EDF6" }]}
               >
                 {formatDate(
                   campaign.endDate,
@@ -1494,7 +1502,7 @@ return (
           {canCancel ? <TouchableOpacity accessibilityRole="button" disabled={isCancelling} onPress={() => onCancel(campaign)} style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 5, borderColor: "#DBBAC3", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12 }}><Ionicons name="stop-circle-outline" size={15} color="#AA4454" /><Text style={{ color: "#AA4454", fontSize: 11, fontWeight: "700" }}>{isCancelling ? "Updating..." : actionLabel}</Text></TouchableOpacity> : null}
         </View>
 
-<View style={styles.metricsDivider} />
+<View style={[styles.metricsDivider, dark && { backgroundColor: "#493A4D" }]} />
 
 {noMetrics ? <View style={{ paddingVertical: 15, alignItems: "center" }}><Ionicons name="analytics-outline" size={24} color={PRIMARY} /><Text style={{ textAlign: "center", marginTop: 8, color: MUTED, fontSize: 12 }}>No views yet. Your campaign will reach users soon.</Text></View> : <View style={styles.metricsRow}>
           <CampaignMetric
