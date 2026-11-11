@@ -7,6 +7,7 @@ import {
   recordCampaignClick,
   recordCampaignImpression,
 } from "@/services/campaignAnalytics";
+import SponsoredPosterCard from "./SponsoredPosterCard";
 import getSponsoredCampaigns, {
   SponsoredCampaign,
   SponsoredCampaignsPage,
@@ -281,84 +282,20 @@ return {
             />
           ) : undefined
         }
-        renderItem={({ item }) => {
-          const price = Number(
-            item.package?.price || 0,
-          );
-
-          return (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.9}
-              onPress={() =>
-                openCampaign(item)
-              }
-            >
-              <Image
-                source={{
-                  uri:
-                    item.image ||
-                    item.package?.images?.[0],
-                }}
-                style={styles.image}
-                resizeMode="cover"
-              />
-
-              <View style={styles.adTag}>
-                <Text style={styles.adTagText}>
-                  Ad
-                </Text>
-              </View>
-
-              {!!item.offerLabel && (
-                <View
-                  style={styles.offerBadge}
-                >
-                  <Text
-                    style={styles.offerText}
-                    numberOfLines={1}
-                  >
-                    {item.offerLabel}
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.details}>
-                <Text
-                  style={styles.title}
-                  numberOfLines={2}
-                >
-                  {item.title}
-                </Text>
-
-                <Text
-                  style={styles.vendor}
-                  numberOfLines={1}
-                >
-                  {item.brandName ||
-                    item.vendorName}
-                </Text>
-
-                <Text style={styles.vendor}>{item.package?.packageName || 'Package'}</Text>
-                <PackagePricingLabel pkg={item.package || {}} />
-                <Text style={styles.price}>
-                  {price > 0
-                    ? `${currencySymbol(currencyOf(item))} ${price.toLocaleString()}`
-                    : item.package
-                        ?.packageName ||
-                      "Package"}
-                  {price > 0 && <PackagePriceBasis pkg={item.package || {}} />}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        }}
+        renderItem={({ item }) => (
+          <SponsoredPosterCard
+            campaign={item}
+            onPress={() => openCampaign(item)}
+            style={styles.posterCard}
+          />
+        )}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  posterCard: { width: '100%', marginBottom: 16 },
   screen: {
     flex: 1,
     backgroundColor: "#FDF2F8",
