@@ -2370,6 +2370,21 @@ const serviceCityNamesFromIds =
       'DURATION_BASED',
   ).toUpperCase();
     const packageInCart = !!selectedPackage && addedPackages.includes(String(selectedPackage._id));
+    const getMehndiCapacityMessage = (pkg: any) => {
+      const capacity = mehndiCapacity(pkg);
+      if (!Number.isSafeInteger(capacity) || Number(capacity) < 1) {
+        return 'The vendor hasn’t set how many people this package can serve.';
+      }
+      if (validMehndiPeople && mehndiPeople > Number(capacity)) {
+        return `You entered ${mehndiPeople} people. This package serves up to ${capacity}.`;
+      }
+      return `Serves up to ${capacity} people per booking.`;
+    };
+    const mehndiBookingBlock = requiresMehndiHeadcount && selectedPackage && getMehndiQuantity(selectedPackage) === null
+      ? !validMehndiPeople && mehndiCapacity(selectedPackage)
+        ? 'Enter how many people need Mehndi above.'
+        : getMehndiCapacityMessage(selectedPackage)
+      : '';
     const cartDisabled = selectedDurationQuote?.price === null || (isClientView && checkingCoupons) ||
       (requiresMehndiHeadcount && (!selectedPackage || getMehndiQuantity(selectedPackage) === null)) ||
       (selectedPackage?.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType
@@ -4341,7 +4356,7 @@ const serviceCityNamesFromIds =
                           }
                         >
                           {availabilityCheck?.available
-                            ? 'Perfect Match'
+                            ? (requiresMehndiHeadcount ? 'Time available' : 'Perfect Match')
                             : 'Not Available'}
                         </Text>
 
@@ -4351,7 +4366,9 @@ const serviceCityNamesFromIds =
                           }
                         >
                           {availabilityCheck?.available
-                            ? 'This vendor can cover your selected event time.'
+                            ? (requiresMehndiHeadcount
+                                ? 'Check the package capacity below for your group.'
+                                : 'This vendor can cover your selected event time.')
                             : availabilityCheck?.reason ||
                               'This vendor cannot cover your selected event time.'}
                         </Text>
@@ -4450,8 +4467,6 @@ const serviceCityNamesFromIds =
     String(activePackage) === String(pkg._id);
 
   const serviceQuantity = requiresMehndiHeadcount ? getMehndiQuantity(pkg) : null;
-  const capacity = requiresMehndiHeadcount ? mehndiCapacity(pkg) : null;
-  const exceedsCapacity = requiresMehndiHeadcount && validMehndiPeople && serviceQuantity === null;
   const durationQuote = getEventDurationQuote(pkg);
   const { originalPrice, price, coupon: applicableCoupon } = getPackagePriceDisplay(pkg, durationQuote);
 
@@ -4535,8 +4550,7 @@ const serviceCityNamesFromIds =
 
       {requiresMehndiHeadcount && (
         <Text style={[styles.pkgMetaText, isActive && styles.pkgMetaTextActive]}>
-          {capacity ? `Serves up to ${capacity} per booking` : 'Serving capacity unavailable'}
-          {exceedsCapacity ? ' · Unavailable for this headcount' : ''}
+          {getMehndiCapacityMessage(pkg)}
         </Text>
       )}
       <View style={[styles.pkgFooter, isActive && styles.pkgFooterActive]}>
@@ -5982,6 +5996,11 @@ const serviceCityNamesFromIds =
         </ScrollView>
         {activeTab === 'Packages' && isEventMode && !isOwnerView && selectedPackage && availabilityCheck && (
           <View style={styles.stickyPackageBar}>
+            {!!mehndiBookingBlock && !packageInCart && (
+              <Text accessibilityLiveRegion="polite" style={{ color: TEXT_DARK, fontSize: 13, marginBottom: 8 }}>
+                {mehndiBookingBlock}
+              </Text>
+            )}
             <TouchableOpacity
               testID={`add-to-cart-${selectedPackage._id}`}
               accessibilityRole="button"
