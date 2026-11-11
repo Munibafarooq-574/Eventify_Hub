@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   photoFrame: { height: 160, backgroundColor: '#F3E8EF' },
   photoImage: { width: '100%', height: '100%' },
-  posterFrame: { height: 340, backgroundColor: '#F7F0E9' },
+  posterFrame: { height: 400, backgroundColor: '#F7F0E9' },
   posterImage: { width: '100%', height: '100%' },
   imageMissing: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   info: { paddingHorizontal: 13, paddingTop: 9, paddingBottom: 12 },
