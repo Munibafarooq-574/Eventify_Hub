@@ -11,4 +11,28 @@ export class PackagePricingDto extends DeliveryPackageDto {
   @IsInt()
   @Min(1)
   groupSize?: number;
+
+  @IsOptional()
+  @IsIn(['PERSON', 'GROUP', 'VEHICLE', 'TEAM', 'SETUP'])
+  capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  peopleIncludedPerGroup?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxPeoplePerBooking?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxUnitsPerBooking?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  availableParallelUnits?: number;
 }
