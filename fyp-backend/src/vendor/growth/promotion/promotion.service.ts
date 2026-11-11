@@ -13,7 +13,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { VendorPromotion } from '../../../schemas/vendor-promotion.schema';
-import { Review } from '../../../schemas/review.schema';
+import { Review, ReviewModerationStatus } from '../../../schemas/review.schema';
 import { VendorOrder } from '../../../schemas/vendor-order.schema';
 import { PromotionStatus, PromotionType } from './promotion.types';
 import { FeatureAccessService } from '../feature-access.service';
@@ -858,35 +858,32 @@ if (hasAvailabilityContext) {
     ]),
   );
 
-  const ratingAgg =
-    packageIds.length > 0
-      ? await this.reviewModel.aggregate([
-          {
-            $match: {
-              packageId: {
-                $in: packageIds,
-              },
-            },
-          },
-          {
-            $group: {
-              _id: '$packageId',
-              averageRating: {
-                $avg: '$rating',
-              },
-              totalReviews: {
-                $sum: 1,
-              },
-            },
-          },
-        ])
-      : [];
+  // Reviews belong to vendors, so each package uses its vendor's public rating.
+  const vendorRatings = await this.reviewModel.aggregate<{
+    _id: Types.ObjectId;
+    averageRating: number;
+    totalReviews: number;
+  }>([
+    {
+      $match: {
+        vendorId: { $in: vendors.map(vendor => vendor._id) },
+        $or: [
+          { status: ReviewModerationStatus.VISIBLE },
+          { status: { $exists: false } },
+        ],
+      },
+    },
+    {
+      $group: {
+        _id: '$vendorId',
+        averageRating: { $avg: '$rating' },
+        totalReviews: { $sum: 1 },
+      },
+    },
+  ]);
 
-  const ratingByPackage = new Map(
-    ratingAgg.map((rating: any) => [
-      rating._id?.toString(),
-      rating,
-    ]),
+  const ratingByVendor = new Map(
+    vendorRatings.map(rating => [rating._id.toString(), rating]),
   );
 
   const orderAgg =
@@ -975,10 +972,7 @@ if (
   }
 }
 
-const ratingInfo =
-  ratingByPackage.get(
-    promotionPackageId,
-  );
+const vendorRating = ratingByVendor.get(vendorId);
 
   const packageOrderCount =
   Number(
@@ -992,20 +986,13 @@ const reliabilityScore =
     new Types.ObjectId(vendorId),
   );
 
-const packageRating =
-  ratingInfo
-    ? Number(ratingInfo.averageRating || 0)
-    : null;
-
-const packageTotalReviews =
-  ratingInfo
-    ? Number(ratingInfo.totalReviews || 0)
-    : 0;
+const rating = vendorRating?.averageRating ?? null;
+const totalReviews = vendorRating?.totalReviews ?? 0;
 
 const featuredScore =
   this.calculateFeaturedScore({
-    rating: packageRating,
-    totalReviews: packageTotalReviews,
+    rating,
+    totalReviews,
     orderCount: packageOrderCount,
     reliabilityScore,
     promotionStartDate:
@@ -1040,8 +1027,8 @@ const featuredScore =
       price:
         Number(pkg.price || 0),
 
-      rating: packageRating,
-      totalReviews: packageTotalReviews,
+      rating,
+      totalReviews,
       orderCount: packageOrderCount,
       reliabilityScore,
       featuredScore,

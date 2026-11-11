@@ -181,8 +181,8 @@ export function FeaturedPackagesSection() {
 
       <Text style={styles.rating}>
         {pkg.rating !== null
-          ? `${Number(pkg.rating).toFixed(1)} (${pkg.totalReviews})`
-          : 'No reviews yet'}
+          ? `Vendor rating: ${Number(pkg.rating).toFixed(1)} (${pkg.totalReviews})`
+          : 'No vendor reviews yet'}
       </Text>
 
       <Text style={styles.orders}>
