@@ -400,6 +400,7 @@ const VendorDetailsScreen: React.FC =
   durationMinutes,
   bookingMode,
   campaignId,
+  couponCode,
   source,
   availablePackageIds,
   packageOnly,
@@ -1019,15 +1020,16 @@ const lowestPackageBasePrice = useMemo(() => {
   return prices.length ? Math.min(...prices) : null;
 }, [vendorData?.packages]);
 
-const getApplicablePublicCoupon = (
-  packageId: string,
-) => {
-  return publicCoupons.find(
-    (coupon: any) =>
-      !coupon.packageId ||
-      String(coupon.packageId) ===
-        String(packageId),
-  );
+const getApplicablePublicCoupon = (packageId: string) => {
+  const offeredCode = String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase();
+  const eligible = publicCoupons.filter((coupon: any) => {
+    const selectedIds = Array.isArray(coupon.packageIds) ? coupon.packageIds : [];
+    return selectedIds.length
+      ? selectedIds.some((id: string) => String(id) === String(packageId))
+      : !coupon.packageId || String(coupon.packageId) === String(packageId);
+  });
+  return eligible.find((coupon: any) => String(coupon.code).toUpperCase() === offeredCode)
+    || eligible[0];
 };
 
   const getSelectedPackage = () => {
@@ -1797,6 +1799,10 @@ Toast.show({
           eventTimeZone,
           deliveryTimeZone: selectedDelivery?.timeZone,
           packageId: String(pkg._id),
+          ...(String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '') &&
+            getApplicablePublicCoupon(String(pkg._id))?.code?.toUpperCase() ===
+            String(Array.isArray(couponCode) ? couponCode[0] : couponCode).toUpperCase()
+            ? { pendingCouponCode: String(Array.isArray(couponCode) ? couponCode[0] : couponCode).toUpperCase() } : {}),
           currency: currencyOf(pkg),
           packageName: pkg.packageName,
           pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
@@ -2770,18 +2776,13 @@ const serviceCityNamesFromIds =
     </View>
 
     {publicCoupons.map((coupon: any) => {
-      const applicablePackage =
-        coupon.packageId
-          ? vendorData?.packages?.find(
-              (pkg: any) =>
-                String(pkg._id) ===
-                String(coupon.packageId),
-            )
-          : null;
+      const couponIds: string[] = Array.isArray(coupon.packageIds) && coupon.packageIds.length
+        ? coupon.packageIds.map(String) : coupon.packageId ? [String(coupon.packageId)] : [];
+      const applicablePackage = couponIds.length === 1
+        ? vendorData?.packages?.find((pkg: any) => String(pkg._id) === couponIds[0]) : null;
 
-      const packageLabel =
-        applicablePackage?.packageName ||
-        'All Packages';
+      const packageLabel = applicablePackage?.packageName ||
+        (couponIds.length ? `${couponIds.length} selected packages` : 'All Packages');
 
       const discountLabel =
   String(coupon.discountType).toLowerCase() ===
@@ -4440,6 +4441,26 @@ const serviceCityNamesFromIds =
       </Text>
       <PackagePricingLabel pkg={pkg} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />
       {pkg.bookingType === 'DELIVERY_BASED' && pkg.deliveryFeeType === 'FREE' && <Text style={{color:'#246C44',backgroundColor:'#E4F6EB',padding:6,borderRadius:8,alignSelf:'flex-start',fontWeight:'700'}}>Free Delivery</Text>}
+
+      {applicableCoupon && (() => {
+        const basePrice = Number(durationQuote?.price ?? pkg.price ?? 0);
+        const minimum = Number(applicableCoupon.minimumOrderAmount || 0);
+        const percentage = String(applicableCoupon.discountType).toLowerCase() === 'percentage';
+        const rawSavings = percentage ? basePrice * Number(applicableCoupon.discountValue || 0) / 100
+          : Number(applicableCoupon.discountValue || 0);
+        const cap = percentage && applicableCoupon.maximumDiscountAmount != null
+          ? Number(applicableCoupon.maximumDiscountAmount) : Infinity;
+        const savings = basePrice >= minimum ? Math.min(basePrice, rawSavings, cap) : 0;
+        return <View style={{ marginTop: 8 }}>
+          <Text style={{ color: isActive ? '#FFFFFF' : PRIMARY, fontSize: 11, fontWeight: '700' }}>
+            {savings > 0 ? `Estimated after ${applicableCoupon.code}: ${currencySymbol(currencyOf(pkg))} ${(basePrice - savings).toLocaleString()} (save ${currencySymbol(currencyOf(pkg))} ${savings.toLocaleString()})`
+              : `Coupon ${applicableCoupon.code} available · minimum ${currencySymbol(currencyOf(pkg))} ${minimum.toLocaleString()}`}
+          </Text>
+          <Text style={{ color: isActive ? '#FBE5F8' : '#77667B', fontSize: 10 }}>
+            Final discount confirmed at checkout.
+          </Text>
+        </View>;
+      })()}
 
       {/* Footer: price + check */}
       <View
