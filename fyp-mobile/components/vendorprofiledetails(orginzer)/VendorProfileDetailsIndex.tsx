@@ -414,6 +414,7 @@ const VendorDetailsScreen: React.FC =
 const cartEventId = String(Array.isArray(eventId) ? eventId[0] : eventId || '');
 const cartVendorId = String(Array.isArray(id) ? id[0] : id || '');
 const [addedPackages, setAddedPackages] = useState<string[]>([]);
+const [servicePeople, setServicePeople] = useState<number | null>(null);
 const [addingToCart, setAddingToCart] = useState(false);
 const addingToCartRef = useRef(false);
 const cartWriteVersion = useRef(0);
@@ -1668,6 +1669,21 @@ Toast.show({
 
 
        const handleAddToCart = async (pkg: any) => {
+       const serviceMethod = pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering'));
+       const selectedPeople = servicePeople ?? (serviceMethod === 'GROUP' ? Number(pkg.groupSize) : serviceMethod === 'PER_PERSON' ? deliveryGuests : 1);
+       if (serviceMethod === 'GROUP' || serviceMethod === 'PER_PERSON') {
+         const maxPeople = Number(pkg.maxPeoplePerBooking);
+         const groupSize = Number(pkg.groupSize);
+         const requiredUnits = serviceMethod === 'GROUP' ? Math.ceil(selectedPeople / groupSize) : selectedPeople;
+         if (!Number.isSafeInteger(selectedPeople) || selectedPeople < 1 ||
+             (serviceMethod === 'GROUP' && (!Number.isSafeInteger(groupSize) || groupSize < 1)) ||
+             (Number.isSafeInteger(maxPeople) && maxPeople > 0 && selectedPeople > maxPeople) ||
+             (Number(pkg.maxUnitsPerBooking) > 0 && requiredUnits > Number(pkg.maxUnitsPerBooking)) ||
+             (Number(pkg.availableParallelUnits) > 0 && requiredUnits > Number(pkg.availableParallelUnits))) {
+           Toast.show({ type: 'error', text1: 'Serving capacity unavailable', text2: 'Change the number of people or choose another package.' });
+           return;
+         }
+       }
       if (addingToCartRef.current) return;
       const currentPackageId = String(pkg._id);
       if (addedPackages.includes(currentPackageId)) {
@@ -1812,7 +1828,11 @@ Toast.show({
           packageName: pkg.packageName,
           pricingMethod: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')),
           groupSize: pkg.groupSize,
-          personCount: pricingMethod(pkg, profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? deliveryGuests : undefined,
+          capacityUnit: pkg.capacityUnit,
+          maxPeoplePerBooking: pkg.maxPeoplePerBooking,
+          maxUnitsPerBooking: pkg.maxUnitsPerBooking,
+          availableParallelUnits: pkg.availableParallelUnits,
+          personCount: serviceMethod === 'GROUP' || serviceMethod === 'PER_PERSON' ? selectedPeople : undefined,
           price: resolvedPrice,
           vendorId: String(vendorData._id),
           categoryId: String(vendorData.buisnessCategory),
@@ -1854,7 +1874,7 @@ Toast.show({
             Array.isArray(endTime) ? endTime[0] : endTime,
           ),
           durationMinutes: selectedDurationMinutes,
-          quantity: 1,
+          quantity: serviceMethod === 'GROUP' ? Math.ceil(selectedPeople / Number(pkg.groupSize)) : 1,
           requiredServiceWindow:
          pkg.bookingType === 'DELIVERY_BASED' && selectedDelivery
     ? { startDateTime:selectedDelivery.startDateTime, endDateTime:selectedDelivery.endDateTime }
@@ -5926,6 +5946,26 @@ const serviceCityNamesFromIds =
         </ScrollView>
         {activeTab === 'Packages' && isEventMode && !isOwnerView && selectedPackage && availabilityCheck && (
           <View style={styles.stickyPackageBar}>
+            {(pricingMethod(selectedPackage, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP' ||
+              pricingMethod(selectedPackage, !!profileCategoryName?.toLowerCase().includes('catering')) === 'PER_PERSON') && (
+              <View style={{ marginBottom: 10, gap: 6 }}>
+                <Text style={{ fontWeight: '600', color: '#45203D' }}>How many people need this service?</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <TouchableOpacity accessibilityLabel="Decrease people" onPress={() => setServicePeople(Math.max(1, (servicePeople ?? (selectedPackage.groupSize || 1)) - 1))} style={{ padding: 9, borderRadius: 8, backgroundColor: '#F3E4EF' }}>
+                    <Ionicons name="remove" size={17} color="#780C60" />
+                  </TouchableOpacity>
+                  <Text style={{ color: '#45203D', fontWeight: '700' }}>{servicePeople ?? (pricingMethod(selectedPackage, false) === 'GROUP' ? selectedPackage.groupSize : deliveryGuests)}</Text>
+                  <TouchableOpacity accessibilityLabel="Increase people" onPress={() => setServicePeople(current => Math.min(Number(selectedPackage.maxPeoplePerBooking) > 0 ? Number(selectedPackage.maxPeoplePerBooking) : 100000, (current ?? (selectedPackage.groupSize || 1)) + 1))} style={{ padding: 9, borderRadius: 8, backgroundColor: '#F3E4EF' }}>
+                    <Ionicons name="add" size={17} color="#780C60" />
+                  </TouchableOpacity>
+                  {pricingMethod(selectedPackage, false) === 'GROUP' && Number(selectedPackage.groupSize) > 0 && (
+                    <Text style={{ fontSize: 12, color: '#695561' }}>
+                      {Math.ceil(Number(servicePeople ?? selectedPackage.groupSize) / Number(selectedPackage.groupSize))} group(s)
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
             <TouchableOpacity
               testID={`add-to-cart-${selectedPackage._id}`}
               accessibilityRole="button"
