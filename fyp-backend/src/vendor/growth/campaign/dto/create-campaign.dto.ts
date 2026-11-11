@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsIn,
   IsMongoId,
   IsNotEmpty,
   IsOptional,
@@ -26,6 +27,10 @@ export class CreateCampaignDto {
   @IsString()
   @MaxLength(80)
   offerLabel?: string;
+
+  @IsOptional()
+  @IsIn(['POSTER', 'AUTO'])
+  displayMode?: 'POSTER' | 'AUTO';
 
   @IsDateString()
   startDate: string;
