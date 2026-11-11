@@ -758,9 +758,6 @@ export class Package {
   capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP';
 
   @Prop({ type: Number, min: 1 })
-  peopleIncludedPerGroup?: number;
-
-  @Prop({ type: Number, min: 1 })
   maxPeoplePerBooking?: number;
 
   @Prop({ type: Number, min: 1 })
