@@ -4,7 +4,7 @@ export const PRICING_OPTIONS = [
   { value: 'GROUP', label: 'Group Package' },
 ] as const;
 export type PricingMethod = typeof PRICING_OPTIONS[number]['value'];
-export type PackagePricing = { currency?: 'PKR' | 'USD'; pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null };
+export type PackagePricing = { currency?: 'PKR' | 'USD'; pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null; capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP'; peopleIncludedPerGroup?: number; maxPeoplePerBooking?: number; maxUnitsPerBooking?: number; availableParallelUnits?: number; };
 
 export function pricingMethod(pkg: PackagePricing, legacyPerPerson = false): PricingMethod {
   return pkg.pricingMethod ?? (legacyPerPerson ? 'PER_PERSON' : 'FIXED');
