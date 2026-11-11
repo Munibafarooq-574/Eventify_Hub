@@ -389,23 +389,22 @@ export default function GrowthAnalyticsScreen() {
                   <Star size={13} color={COLORS.muted} strokeWidth={2.25} />
                   <Text style={styles.sectionLabel}>Top Performing Packages</Text>
                 </View>
-                {premium.topPerformingPackages.map((pkg) => (
-                  <View key={pkg.packageId} style={styles.topPackageRow}>
-                    <Text style={styles.topPackageName}>{pkg.packageName}</Text>
-                    <View style={styles.topPackageMetrics}>
-                      <View style={styles.topPackageMetric}>
-                        <Text style={styles.topPackageMetricLabel}>Revenue</Text>
-                        <Text style={styles.topPackageMetricValue}>
-                          {currencySymbol(vendorRevenueCurrency(data))} {fmt(pkg.revenue)}
-                        </Text>
-                      </View>
-                      <View style={styles.topPackageMetric}>
-                        <Text style={styles.topPackageMetricLabel}>Completed Bookings</Text>
-                        <Text style={styles.topPackageMetricValue}>{pkg.bookingCount}</Text>
-                      </View>
-                    </View>
+                <View style={styles.topPackageTable}>
+                  <View style={styles.topPackageHeaderRow}>
+                    <Text style={[styles.topPackageHeaderText, styles.topPackageNameColumn]}>Package</Text>
+                    <Text style={[styles.topPackageHeaderText, styles.topPackageRevenueColumn]}>Revenue</Text>
+                    <Text style={[styles.topPackageHeaderText, styles.topPackageBookingColumn]}>Completed{"\n"}Bookings</Text>
                   </View>
-                ))}
+                  {premium.topPerformingPackages.map((pkg, index) => (
+                    <View key={pkg.packageId} style={[styles.topPackageRow, index % 2 === 1 && styles.topPackageAlternateRow]}>
+                      <Text style={[styles.topPackageName, styles.topPackageNameColumn]}>{pkg.packageName}</Text>
+                      <Text style={[styles.topPackageValue, styles.topPackageRevenueColumn]}>
+                        {currencySymbol(vendorRevenueCurrency(data))} {fmt(pkg.revenue)}
+                      </Text>
+                      <Text style={[styles.topPackageValue, styles.topPackageBookingColumn]}>{pkg.bookingCount}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
 
@@ -559,36 +558,59 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11.5, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
 
+  topPackageTable: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  topPackageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: COLORS.primaryLight,
+  },
+  topPackageHeaderText: {
+    color: COLORS.primaryDark,
+    fontSize: 10,
+    fontWeight: '700',
+  },
   topPackageRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.card,
+  },
+  topPackageAlternateRow: {
+    backgroundColor: COLORS.background,
+  },
+  topPackageNameColumn: {
+    flex: 1.55,
+    paddingRight: 8,
+  },
+  topPackageRevenueColumn: {
+    flex: 0.9,
+    paddingRight: 6,
+    textAlign: 'right',
+  },
+  topPackageBookingColumn: {
+    flex: 0.85,
+    textAlign: 'center',
   },
   topPackageName: {
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: '600',
     color: COLORS.text,
-    marginBottom: 10,
+    flexShrink: 1,
   },
-  topPackageMetrics: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  topPackageMetric: {
-    flex: 1,
-    minWidth: 0,
-    backgroundColor: COLORS.background,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  topPackageMetricLabel: {
-    fontSize: 11,
-    color: COLORS.muted,
-    marginBottom: 4,
-  },
-  topPackageMetricValue: {
-    fontSize: 15,
+  topPackageValue: {
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.text,
   },
