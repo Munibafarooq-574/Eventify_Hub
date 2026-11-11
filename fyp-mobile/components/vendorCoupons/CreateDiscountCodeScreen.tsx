@@ -1,3 +1,7 @@
+import { getVendorCoupons } from '@/services/getVendorCoupons';
+import { getVendorDiscountCodes } from '@/services/getVendorDiscountCodes';
+import { getOccupiedPromotionPackages } from '@/utils/discountPackageAvailability';
+import { VendorDiscount } from '@/types/discount.types';
 import { currencySymbol } from '@/utils/currency';
 import { getVendorPackagesList, VendorPackageListItem } from '@/services/getVendorPackagesList';
 ﻿// fyp-mobile/components/vendorCoupons/CreateDiscountCodeScreen.tsx
@@ -77,19 +81,33 @@ export default function CreateDiscountCodeScreen() {
   const [packageScope, setPackageScope] = useState<'all' | 'selected'>('all');
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [vendorPackages, setVendorPackages] = useState<VendorPackageListItem[]>([]);
-  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesLoading, setPackagesLoading] = useState(true);
   const [packagesError, setPackagesError] = useState(false);
+  const [existingPromotions, setExistingPromotions] = useState<VendorDiscount[]>([]);
+  const { occupied, allPackagesOffer } = getOccupiedPromotionPackages(existingPromotions);
+  const hasOccupiedPackages = !!allPackagesOffer || occupied.size > 0;
+
   useEffect(() => {
-    if (!vendorIdValue) return;
+    if (!vendorIdValue) { setPackagesError(true); setPackagesLoading(false); return; }
     let mounted = true;
     setPackagesLoading(true);
-    getVendorPackagesList(vendorIdValue).then(items => {
-      if (mounted) { setVendorPackages(items); setPackagesError(false); }
+    Promise.all([
+      getVendorPackagesList(vendorIdValue),
+      getVendorCoupons(vendorIdValue),
+      getVendorDiscountCodes(vendorIdValue),
+    ]).then(([items, coupons, codes]) => {
+      if (!mounted) return;
+      setVendorPackages(items);
+      setExistingPromotions([...coupons, ...codes]);
+      setPackagesError(false);
+      const availability = getOccupiedPromotionPackages([...coupons, ...codes]);
+      if (availability.allPackagesOffer || availability.occupied.size > 0) {
+        setPackageScope('selected');
+      }
     }).catch(() => { if (mounted) setPackagesError(true); })
       .finally(() => { if (mounted) setPackagesLoading(false); });
     return () => { mounted = false; };
   }, [vendorIdValue]);
-
   const [startDate, setStartDate] = useState(todayPlus(0));
   const [endDate, setEndDate] = useState(todayPlus(30));
   const [usageLimit, setUsageLimit] = useState('50');
@@ -280,6 +298,19 @@ useEffect(() => {
       return;
     }
 
+    if (packagesLoading || packagesError) {
+      Alert.alert('Package availability unavailable', 'Cannot verify existing offers. Reopen this screen and try again.');
+      return;
+    }
+    if (packageScope === 'all' && hasOccupiedPackages) {
+      Alert.alert('Packages already covered', 'Cancel existing coupon or discount code offers before applying a new offer to all packages.');
+      return;
+    }
+    if (packageScope === 'selected' && selectedPackageIds.some(id => !!allPackagesOffer || occupied.has(id))) {
+      Alert.alert('Package already covered', 'Cancel its existing offer before selecting this package.');
+      return;
+    }
+
     if (packageScope === 'selected' && (!selectedPackageIds.length || packagesLoading || packagesError)) {
       Alert.alert('Select packages', 'Select at least one available package for this discount.');
       return;
@@ -467,13 +498,14 @@ useEffect(() => {
                 <TouchableOpacity
                   key={opt.key}
                   activeOpacity={0.85}
+                  disabled={opt.key === 'all' && (hasOccupiedPackages || packagesLoading || packagesError)}
                   accessibilityRole="radio"
-                  accessibilityState={{ checked: active }}
+                  accessibilityState={{ checked: active, disabled: opt.key === 'all' && hasOccupiedPackages }}
                   onPress={() => {
                     setPackageScope(opt.key);
                     if (opt.key === 'all') setSelectedPackageIds([]);
                   }}
-                  style={[styles.scopeChoice, active && styles.scopeChoiceActive]}
+                  style={[styles.scopeChoice, active && styles.scopeChoiceActive, opt.key === 'all' && hasOccupiedPackages && styles.disabledOption]}
                 >
                   <View style={[styles.scopeCircle, active && styles.scopeCircleActive]}>
                     {active && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
@@ -483,6 +515,8 @@ useEffect(() => {
               );
             })}
           </View>
+          {hasOccupiedPackages && <Text style={styles.occupiedHint}>Packages with an active coupon or discount code are locked until that offer is cancelled.</Text>}
+          {packagesError && <Text style={styles.occupiedHint}>Unable to verify existing offers. Creation is unavailable.</Text>}
           {packageScope === 'selected' && (
             <View style={styles.packageSelection}>
               {packagesLoading ? (
@@ -493,20 +527,25 @@ useEffect(() => {
                 <Text style={styles.packageHint}>No packages available.</Text>
               ) : (
                 vendorPackages.map(pkg => {
+                  const blockedBy = allPackagesOffer || occupied.get(pkg._id);
                   const selected = selectedPackageIds.includes(pkg._id);
                   return (
                     <TouchableOpacity
                       key={pkg._id}
                       activeOpacity={0.85}
+                      disabled={!!blockedBy}
                       onPress={() => setSelectedPackageIds(current =>
                         current.includes(pkg._id) ? current.filter(id => id !== pkg._id) : [...current, pkg._id]
                       )}
-                      style={[styles.packageOption, selected && styles.packageOptionSelected]}
+                      style={[styles.packageOption, selected && styles.packageOptionSelected, !!blockedBy && styles.disabledOption]}
                     >
                       <View style={[styles.packageCheck, selected && styles.packageCheckSelected]}>
                         {selected && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
                       </View>
-                      <Text numberOfLines={2} style={[styles.packageOptionText, selected && styles.packageOptionTextSelected]}>{pkg.packageName}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text numberOfLines={2} style={[styles.packageOptionText, selected && styles.packageOptionTextSelected]}>{pkg.packageName}</Text>
+                        {!!blockedBy && <Text style={styles.packageLocked}>Active offer: {blockedBy.code} — cancel it first</Text>}
+                      </View>
                     </TouchableOpacity>
                   );
                 })
@@ -715,6 +754,9 @@ const styles = StyleSheet.create({
 
   typeChipTextSelected: { color: '#fff' },
 
+  disabledOption: { opacity: 0.55 },
+  occupiedHint: { fontSize: 12.5, lineHeight: 18, color: '#935216', marginTop: 10 },
+  packageLocked: { color: '#935216', fontSize: 12, marginTop: 4 },
   scopeChoices: { gap: 10, marginTop: 4 },
   scopeChoice: {
     minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12,
