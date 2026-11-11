@@ -115,6 +115,7 @@ export default function CreateVendorCampaignIndex() {
 
   const [campaignImage, setCampaignImage] =
     useState<CampaignImage | null>(null);
+  const [displayMode, setDisplayMode] = useState<'POSTER' | 'AUTO'>('AUTO');
 
   const [startDate, setStartDate] = useState<Date | null>(null);
 const [endDate, setEndDate] = useState<Date | null>(null);
@@ -502,6 +503,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
         startDate: toApiDate(startDate),
         endDate: toApiDate(endDate, true),
         image: campaignImage,
+        displayMode,
       });
 
       Alert.alert(
@@ -712,6 +714,30 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
               subtitle="Choose one attractive image for your promotion"
             />
 
+            <View style={styles.posterModeChoices}>
+              {([
+                { value: 'AUTO', title: 'Auto-designed Photo', detail: 'Your photo gets a clean campaign title and price layout.' },
+                { value: 'POSTER', title: 'Ready-made Poster', detail: 'Your complete poster stays visible without text overlay.' },
+              ] as const).map(option => {
+                const selected = displayMode === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setDisplayMode(option.value)}
+                    style={[styles.posterModeCard, selected && styles.posterModeCardSelected]}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={21} color={PRIMARY} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.posterModeTitle}>{option.title}</Text>
+                      <Text style={styles.posterModeDetail}>{option.detail}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.imagePicker}
@@ -768,7 +794,7 @@ const [subscriptionEndDate, setSubscriptionEndDate] =
                   </Text>
 
                   <Text style={styles.imageHint}>
-                    Recommended ratio: 16:9
+                    {displayMode === 'POSTER' ? 'Portrait poster recommended · entire image stays visible' : 'Wide 16:9 image recommended'}
                   </Text>
                 </View>
               )}
@@ -1528,6 +1554,16 @@ function CalendarModal({
 }
 
 const styles = StyleSheet.create({
+  posterModeChoices: { gap: 10, marginBottom: 14 },
+  posterModeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E8DCE7',
+    borderRadius: 13, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  posterModeCardSelected: { borderColor: PRIMARY, backgroundColor: '#FBF1F8' },
+  posterModeTitle: { color: '#291A26', fontSize: 14, fontWeight: '700' },
+  posterModeDetail: { color: '#756874', fontSize: 12, lineHeight: 17, marginTop: 3 },
+
   container: {
     flex: 1,
     backgroundColor: BACKGROUND,
