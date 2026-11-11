@@ -2307,6 +2307,27 @@ const serviceCityNamesFromIds =
         : null;
 
     const selectedDurationQuote = getEventDurationQuote(selectedPackage);
+    // Visual offer preview only: checkout keeps authoritative validation and pricing.
+    const selectedPackageDisplayPrice = (() => {
+      if (!selectedPackage || selectedDurationQuote?.price === null) return '—';
+      const price = Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0);
+      const coupon = getApplicablePublicCoupon(String(selectedPackage._id));
+      const openedFromOffer = coupon &&
+        String(Array.isArray(couponCode) ? couponCode[0] : couponCode || '').toUpperCase() ===
+        String(coupon.code || '').toUpperCase();
+      const percentage = openedFromOffer && String(coupon.discountType).toLowerCase() === 'percentage';
+      const rawDiscount = percentage
+        ? price * Number(coupon.discountValue || 0) / 100
+        : openedFromOffer ? Number(coupon.discountValue || 0) : 0;
+      const cap = percentage && coupon.maximumDiscountAmount != null
+        ? Number(coupon.maximumDiscountAmount) : Infinity;
+      const saving = openedFromOffer && price >= Number(coupon.minimumOrderAmount || 0)
+        ? roundForCurrency(Math.min(price, Math.max(0, rawDiscount), cap), currencyOf(selectedPackage))
+        : 0;
+      const total = roundForCurrency(price - saving, currencyOf(selectedPackage));
+      return `${currencySymbol(currencyOf(selectedPackage))} ${total.toLocaleString(currencyOf(selectedPackage) === 'USD' ? 'en-US' : 'en-PK', { maximumFractionDigits: 2 })}`;
+    })();
+
     const durationPriceLabel = (quote: NonNullable<typeof selectedDurationQuote>) =>
       quote.price === null ? 'Duration unavailable' : quote.basis === 'custom' ? 'Custom Duration Price' : 'Price for Selected Duration';
 
@@ -4964,80 +4985,7 @@ const serviceCityNamesFromIds =
           )}
 
 
-                      {/* Price + Cart */}
 
-                      <View
-                        style={
-                          styles.packagePriceFooter
-                        }
-                      >
-                        <View style={{ flex: 1, marginRight: 8 }}>
-                          <Text
-                            style={
-                              styles.priceFooterLabel
-                            }
-                          >
-                            {selectedDurationQuote ? durationPriceLabel(selectedDurationQuote) : 'Base Price'}
-                          </Text>
-
-                          <Text
-                            testID="package-price"
-                            style={
-                              styles.priceText
-                            }
-                          >
-                            {selectedDurationQuote?.price === null
-                              ? '—'
-                              : `${currencySymbol(currencyOf(selectedPackage))} ${Number(selectedDurationQuote?.price ?? selectedPackage.price ?? 0).toLocaleString()}`}{selectedDurationQuote?.price !== null && <PackagePriceBasis pkg={selectedPackage} legacyPerPerson={profileCategoryName?.toLowerCase().includes('catering')} />}
-                          </Text>
-                           {selectedDurationQuote?.reason && (
-                             <Text style={styles.priceFooterLabel}>{selectedDurationQuote.reason}</Text>
-                           )}
-                           {!selectedDurationQuote && selectedPackage.bookingType === 'DURATION_BASED' &&
-                             Number(selectedPackage.baseIncludedDurationMinutes) > 0 && (
-                               <Text style={styles.priceFooterLabel}>
-                                 Includes {Number(selectedPackage.baseIncludedDurationMinutes) % 1440 === 0
-                                   ? `${Number(selectedPackage.baseIncludedDurationMinutes) / 1440} day(s)`
-                                   : `${Number(selectedPackage.baseIncludedDurationMinutes) / 60} hour(s)`}
-                               </Text>
-                             )}
-                        </View>
-
-                        {isEventMode && availabilityCheck && (
-                            <TouchableOpacity
-                              testID={`add-to-cart-${selectedPackage._id}`}
-                              disabled={addingToCart || (!packageInCart && cartDisabled)}
-                              accessibilityState={{ disabled: addingToCart || (!packageInCart && cartDisabled), busy: addingToCart }}
-                              style={[
-                                styles.cartButton,
-                                packageInCart && styles.cartButtonAdded,
-                                (addingToCart || (!packageInCart && cartDisabled)) && { opacity: 0.45 },
-                              ]}
-                              onPress={() =>
-                                handleAddToCart(
-                                  selectedPackage,
-                                )
-                              }
-                              activeOpacity={
-                                0.85
-                              }
-                            >
-                              <Ionicons
-                                name={packageInCart ? "checkmark" : "cart-outline"}
-                                size={14}
-                                color={packageInCart ? PRIMARY : "#FFFFFF"}
-                              />
-
-                              <Text
-                                style={
-                                  [styles.cartButtonText, packageInCart && { color: PRIMARY }]
-                                }
-                              >
-                                {addingToCart ? 'Adding…' : packageInCart ? 'Added to Cart' : selectedPackage.bookingType === 'DELIVERY_BASED' && selectedPackage.deliveryFeeType ? selectedDelivery?.available ? 'Add to Cart' : 'Choose delivery time' : availabilityCheck.available ? 'Add to Cart' : 'Unavailable'}
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                      </View>
                     </View>
                   )}
                 </>
@@ -5978,6 +5926,30 @@ const serviceCityNamesFromIds =
             }}
           />
         </ScrollView>
+        {activeTab === 'Packages' && isEventMode && !isOwnerView && selectedPackage && availabilityCheck && (
+          <View style={styles.stickyPackageBar}>
+            <TouchableOpacity
+              testID={`add-to-cart-${selectedPackage._id}`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: addingToCart || (!packageInCart && cartDisabled), busy: addingToCart }}
+              disabled={addingToCart || (!packageInCart && cartDisabled)}
+              activeOpacity={0.85}
+              onPress={() => handleAddToCart(selectedPackage)}
+              style={[styles.stickyPackageButton, (addingToCart || (!packageInCart && cartDisabled)) && styles.stickyPackageButtonDisabled]}
+            >
+              <Ionicons name={packageInCart ? 'checkmark-circle-outline' : 'cart-outline'} size={19} color="#FFFFFF" />
+              <Text style={styles.stickyPackageButtonText} numberOfLines={1}>
+                {addingToCart
+                  ? 'Adding…'
+                  : packageInCart
+                    ? 'Added to Cart'
+                    : cartDisabled
+                      ? 'Unavailable'
+                      : `Book this package · ${selectedPackageDisplayPrice}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
         {cartNotice && (
           <View pointerEvents="none" style={styles.cartNoticeOverlay}>
             <View style={styles.cartNoticeCard} accessibilityLiveRegion="polite">
@@ -6057,6 +6029,18 @@ const Field: React.FC<{
 // ---------------------------------------------------------
 
 const styles = StyleSheet.create({
+  stickyPackageBar: {
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 22 : 12,
+    backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER,
+  },
+  stickyPackageButton: {
+    minHeight: 52, borderRadius: 14, backgroundColor: PRIMARY,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9,
+    paddingHorizontal: 15,
+  },
+  stickyPackageButtonDisabled: { opacity: 0.45 },
+  stickyPackageButtonText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF', flexShrink: 1 },
+
   cartButtonAdded: { backgroundColor: '#F0DCEC' },
   cartNoticeOverlay: {
     ...StyleSheet.absoluteFill,
