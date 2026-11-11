@@ -834,6 +834,10 @@ async addPackages(
     }));
         for (const pkg of incomingPackages) {
       validateServiceCapacity(pkg);
+      if (pkg.capacityUnit === 'GROUP' && pkg.pricingMethod === 'GROUP' &&
+          pkg.peopleIncludedPerGroup !== pkg.groupSize) {
+        throw new BadRequestException('Group serving capacity must equal the package group size.');
+      }
       this.validatePackageBookingConfiguration(pkg);
       await this.validateDeliveryWeightBasis(pkg, user);
     }
@@ -1427,6 +1431,11 @@ async updatePackage(
       maxUnitsPerBooking: updateDto.maxUnitsPerBooking ?? existingPackage.maxUnitsPerBooking,
       availableParallelUnits: updateDto.availableParallelUnits ?? existingPackage.availableParallelUnits,
     });
+    if ((updateDto.capacityUnit ?? existingPackage.capacityUnit) === 'GROUP' &&
+        pricing.pricingMethod === 'GROUP' &&
+        (updateDto.peopleIncludedPerGroup ?? existingPackage.peopleIncludedPerGroup) !== pricing.groupSize) {
+      throw new BadRequestException('Group serving capacity must equal the package group size.');
+    }
     const updatePayload: Record<string, any> = {
       'packages.$.pricingMethod': pricing.pricingMethod,
       'packages.$.groupSize': pricing.groupSize,
