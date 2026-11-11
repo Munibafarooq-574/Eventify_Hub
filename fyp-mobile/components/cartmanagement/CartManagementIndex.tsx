@@ -883,6 +883,16 @@ if (eventDetailsRaw) {
                                                                 {currencySymbol(currencyOf(pkg))}{' '}
                                                                 {formatCurrency(finalPrice)}
                                                             </Text>
+                                                            {pkg?.pendingCouponCode ? (
+                                                              <View style={{ marginTop: 5, alignSelf: 'flex-start', backgroundColor: '#F6E9F5', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6 }}>
+                                                                <Text style={{ color: PRIMARY, fontSize: 11, fontWeight: '700' }}>
+                                                                  Offer {pkg.pendingCouponCode} selected
+                                                                </Text>
+                                                                <Text style={{ color: '#796978', fontSize: 10 }}>
+                                                                  Discount will be verified and applied on Review Order.
+                                                                </Text>
+                                                              </View>
+                                                            ) : null}
 
                                                             {/* Booking Details */}
 
