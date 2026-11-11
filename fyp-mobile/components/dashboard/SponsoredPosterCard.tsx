@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { currencyOf, currencySymbol } from '@/utils/currency';
@@ -18,6 +18,9 @@ type Props = {
  */
 export default function SponsoredPosterCard({ campaign, onPress, style }: Props) {
   const isPoster = campaign.displayMode === 'POSTER';
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const description = campaign.description?.trim() || '';
+  const isLongDescription = description.length > 135;
   const image = campaign.image || campaign.package?.images?.[0];
   const price = Number(campaign.package?.price || 0);
   const money = `${currencySymbol(currencyOf(campaign))} ${price.toLocaleString(
@@ -27,7 +30,7 @@ export default function SponsoredPosterCard({ campaign, onPress, style }: Props)
 
   return (
     <TouchableOpacity
-      style={[styles.card, style]}
+      style={[styles.card, !isPoster && descriptionExpanded && styles.expandedCard, style]}
       activeOpacity={0.9}
       onPress={onPress}
       accessibilityRole="button"
@@ -61,10 +64,34 @@ export default function SponsoredPosterCard({ campaign, onPress, style }: Props)
             <Text style={styles.brand} numberOfLines={1}>{campaign.brandName || campaign.vendorName}</Text>
             <Text style={styles.title} numberOfLines={1}>{campaign.title}</Text>
             <Text style={styles.package} numberOfLines={1}>{campaign.package?.packageName || 'Featured package'}</Text>
-            {!!campaign.description?.trim() && (
-              <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
-                {campaign.description.trim()}
-              </Text>
+            {!!description && (
+              <View style={styles.descriptionBlock}>
+                <Text
+                  style={styles.description}
+                  numberOfLines={!descriptionExpanded && isLongDescription ? 3 : undefined}
+                  ellipsizeMode="tail"
+                >
+                  {description}
+                </Text>
+                {isLongDescription && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={descriptionExpanded ? 'Show less campaign description' : 'Read more campaign description'}
+                    onPress={() => setDescriptionExpanded(value => !value)}
+                    activeOpacity={0.7}
+                    style={styles.descriptionToggle}
+                  >
+                    <Text style={styles.descriptionToggleText}>
+                      {descriptionExpanded ? 'Show less' : 'Read more'}
+                    </Text>
+                    <Ionicons
+                      name={descriptionExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={14}
+                      color="#7D0C72"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </>
         )}
@@ -90,6 +117,7 @@ const styles = StyleSheet.create({
     width: 300, height: 490, borderRadius: 18, overflow: 'hidden',
     backgroundColor: '#FFFDFB', borderColor: '#EADCE5', borderWidth: 1,
   },
+  expandedCard: { height: undefined, minHeight: 490 },
   photoFrame: { height: 245, backgroundColor: '#F3E8EF' },
   photoImage: { width: '100%', height: '100%' },
   posterFrame: { height: 400, backgroundColor: '#F7F0E9' },
@@ -104,7 +132,10 @@ const styles = StyleSheet.create({
   brand: { marginTop: 5, color: '#806B78', fontSize: 11, fontWeight: '600' },
   title: { color: '#2A1B25', fontSize: 15, lineHeight: 19, fontWeight: '800', marginTop: 2 },
   package: { color: '#756772', fontSize: 11, marginTop: 2 },
-  description: { color: '#554953', fontSize: 11.5, lineHeight: 17, marginTop: 10 },
+  descriptionBlock: { marginTop: 10 },
+  description: { color: '#554953', fontSize: 11.5, lineHeight: 17 },
+  descriptionToggle: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start', paddingVertical: 5, marginTop: 3 },
+  descriptionToggleText: { color: '#7D0C72', fontSize: 11.5, fontWeight: '700' },
   footer: { marginTop: 'auto', paddingTop: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   price: { color: '#672052', fontSize: 16, fontWeight: '800', flex: 1 },
   unit: { color: '#756772', fontSize: 10, fontWeight: '500' },
