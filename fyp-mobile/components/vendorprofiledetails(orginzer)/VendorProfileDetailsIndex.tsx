@@ -21,6 +21,7 @@ import postVendorReview from '@/services/postVendorReview';
 import { uploadReviewMedia } from '@/services/uploadReviewMedia';
 import { createBookingDraftStore, getUserData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import { router, useFocusEffect, useGlobalSearchParams } from 'expo-router';
 import React, {
@@ -4418,6 +4419,15 @@ const serviceCityNamesFromIds =
       onPress={() => handlePackageSelect(pkg._id)}
       activeOpacity={0.88}
     >
+      {isActive && (
+        <LinearGradient
+          colors={['#8B2F75', '#5E1A50']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
+      )}
       {/* Compact package card — single price block, consistent selected/unselected layout. */}
       <View style={styles.pkgTopRow}>
         {couponBadgeText ? (
@@ -7026,6 +7036,7 @@ specialOfferDetailText: {
 
 packageCard: {
   width: 268,
+  overflow: 'hidden',
   minHeight: 215,
   backgroundColor: '#FFFFFF',
   borderRadius: 22,
