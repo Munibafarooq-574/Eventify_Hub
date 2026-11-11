@@ -14,6 +14,7 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
 import {
   router,
   useFocusEffect,
@@ -25,6 +26,11 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  LayoutAnimation,
+  Share,
+  UIManager,
+  useColorScheme,
   Alert,
   Dimensions,
   Image,
@@ -145,6 +151,10 @@ const getPlanLabel = (
 
 export default function VendorCampaignsIndex() {
   const insets = useSafeAreaInsets();
+  const dark = useColorScheme() === "dark";
+  const [filter, setFilter] = useState<"all" | "active" | "pending">("all");
+  const displayedCampaigns = campaigns.filter(c => filter === "all" || c.status === filter);
+
 
   const [vendorId, setVendorId] =
     useState<string | null>(null);
@@ -560,6 +570,7 @@ export default function VendorCampaignsIndex() {
       />
 
       <ScrollView
+        style={dark ? { backgroundColor: "#17131B" } : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
@@ -1099,6 +1110,8 @@ export default function VendorCampaignsIndex() {
                   label="Active"
                   background="#E6F6EC"
                   iconColor="#258A52"
+                  onPress={() => setFilter(filter === "active" ? "all" : "active")}
+                  selected={filter === "active"}
                 />
 
                 <CampaignStat
@@ -1107,6 +1120,8 @@ export default function VendorCampaignsIndex() {
                   label="Pending"
                   background="#FFF2D9"
                   iconColor="#B27316"
+                  onPress={() => setFilter(filter === "pending" ? "all" : "pending")}
+                  selected={filter === "pending"}
                 />
 
                 <CampaignStat
@@ -1115,6 +1130,9 @@ export default function VendorCampaignsIndex() {
                   label="Views"
                   background="#F0E5FA"
                   iconColor={PRIMARY}
+                  subtitle="All campaigns"
+                  onPress={() => setFilter("all")}
+                  selected={filter === "all"}
                 />
               </View>
             </View>
@@ -1143,6 +1161,7 @@ export default function VendorCampaignsIndex() {
               </Text>
             </View>
 
+            <TouchableOpacity onPress={handleCreateCampaign} accessibilityRole="button" style={{ backgroundColor: PRIMARY, borderRadius: 15, paddingHorizontal: 12, paddingVertical: 9, marginRight: 8 }}><Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "800" }}>+ New Campaign</Text></TouchableOpacity>
             {campaigns.length > 0 ? (
               <View
                 style={
@@ -1160,6 +1179,7 @@ export default function VendorCampaignsIndex() {
             ) : null}
           </View>
 
+          {filter !== "all" && <TouchableOpacity onPress={() => setFilter("all")} style={{ marginBottom: 12 }}><Text style={{ color: PRIMARY, fontWeight: "700" }}>Showing {filter} · Clear filter</Text></TouchableOpacity>}
           {campaigns.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyIcon}>
@@ -1207,7 +1227,7 @@ export default function VendorCampaignsIndex() {
               ) : null}
             </View>
           ) : (
-            campaigns.map((campaign) => (
+            displayedCampaigns.length === 0 ? <Text style={{ color: dark ? "#EAE0ED" : MUTED, marginBottom: 20 }}>No {filter} campaigns found.</Text> : displayedCampaigns.map((campaign) => (
               <CampaignCard
   key={campaign._id}
   campaign={campaign}
@@ -1230,7 +1250,13 @@ const CampaignStat = ({
   label,
   background,
   iconColor,
+  onPress,
+  selected,
+  subtitle,
 }: {
+  onPress?: () => void;
+  selected?: boolean;
+  subtitle?: string;
   icon: keyof typeof Ionicons.glyphMap;
   value: number;
   label: string;
@@ -1238,7 +1264,7 @@ const CampaignStat = ({
   iconColor: string;
 }) => {
   return (
-    <View style={styles.statCard}>
+    <TouchableOpacity onPress={onPress} disabled={!onPress} accessibilityRole="button" style={[styles.statCard, selected && { borderColor: PRIMARY, borderWidth: 1.5 }]}>
       <View
         style={[
           styles.statIcon,
@@ -1261,7 +1287,8 @@ const CampaignStat = ({
       <Text style={styles.statLabel}>
         {label}
       </Text>
-    </View>
+      {subtitle ? <Text style={{ color: MUTED, fontSize: 9, marginTop: 3 }}>{subtitle}</Text> : null}
+    </TouchableOpacity>
   );
 };
 
@@ -1274,6 +1301,22 @@ const CampaignCard = ({
   onCancel: (campaign: VendorCampaign) => void;
   isCancelling: boolean;
 }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [showFullTextLink, setShowFullTextLink] = useState(false);
+  const activePulse = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    if (campaign.status !== "active") return;
+    const pulse = Animated.loop(Animated.sequence([Animated.timing(activePulse, { toValue: 0.4, duration: 900, useNativeDriver: true }), Animated.timing(activePulse, { toValue: 1, duration: 900, useNativeDriver: true })]));
+    pulse.start();
+    return () => pulse.stop();
+  }, [activePulse, campaign.status]);
+  const start = new Date(campaign.startDate).getTime();
+  const end = new Date(campaign.endDate).getTime();
+  const now = Date.now();
+  const validPeriod = Number.isFinite(start) && Number.isFinite(end) && end > start;
+  const progress = validPeriod ? Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)) : 0;
+  const daysLeft = validPeriod ? Math.max(0, Math.ceil((end - now) / 86400000)) : 0;
+  const noMetrics = !campaign.impressions && !campaign.clicks && !campaign.packageVisits;
   const status =
   getCampaignStatusConfig(
     campaign.status,
@@ -1328,11 +1371,7 @@ return (
             },
           ]}
         >
-          <Ionicons
-            name={status.icon}
-            size={12}
-            color={status.text}
-          />
+          {campaign.status === "active" ? <Animated.View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: "#209A56", opacity: activePulse }} /> : <Ionicons name={status.icon} size={12} color={status.text} />}
 
           <Text
             style={[
@@ -1345,17 +1384,12 @@ return (
             {status.label}
           </Text>
         </View>
+        <LinearGradient pointerEvents="none" colors={["transparent", "rgba(20,7,25,0.84)"]} style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 35, paddingBottom: 12 }}><Text numberOfLines={2} style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 17 }}>{campaign.title}</Text></LinearGradient>
+        {campaign.offerLabel ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy promo code" onPress={() => Clipboard.setStringAsync(campaign.offerLabel || "")} style={{ position: "absolute", left: 12, top: 12, backgroundColor: "#FFFFFF", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", gap: 5, alignItems: "center", maxWidth: "65%" }}><Text numberOfLines={1} style={{ color: PRIMARY, fontWeight: "800", fontSize: 11 }}>Promo Code: {campaign.offerLabel}</Text><Ionicons name="copy-outline" size={13} color={PRIMARY} /></TouchableOpacity> : null}
       </View>
 
       <View style={styles.campaignBody}>
-        <Text
-          style={styles.campaignTitle}
-          numberOfLines={2}
-        >
-          {campaign.title}
-        </Text>
-
-        {campaign.offerLabel ? (
+        {false && campaign.offerLabel ? (
           <View style={styles.offerPill}>
             <Ionicons
               name="pricetag"
@@ -1372,12 +1406,8 @@ return (
           </View>
         ) : null}
 
-        <Text
-          style={styles.campaignDescription}
-          numberOfLines={2}
-        >
-          {campaign.description}
-        </Text>
+        <Text style={styles.campaignDescription} numberOfLines={expanded ? undefined : 2} onTextLayout={(e) => { if (!expanded && e.nativeEvent.lines.length > 2 && !showFullTextLink) setShowFullTextLink(true); }}>{campaign.description}</Text>
+        {(showFullTextLink || campaign.description.length > 95) ? <TouchableOpacity onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(v => !v); }} accessibilityRole="button" style={{ alignSelf: "flex-start", marginTop: 4, paddingVertical: 5 }}><Text style={{ color: PRIMARY, fontSize: 12, fontWeight: "800" }}>{expanded ? "Show less" : "Read more"}</Text></TouchableOpacity> : null}
 
         <View style={styles.dateContainer}>
           <View style={styles.dateItem}>
@@ -1439,6 +1469,7 @@ return (
           </View>
         </View>
 
+        {validPeriod && <View style={{ marginTop: 10 }}><View style={{ flexDirection: "row", justifyContent: "space-between" }}><Text style={{ color: MUTED, fontSize: 11 }}>Campaign progress</Text><Text style={{ color: PRIMARY, fontWeight: "800", fontSize: 11 }}>{now < start ? "Not started" : now > end ? "Ended" : `${daysLeft} days left`}</Text></View><View style={{ height: 6, borderRadius: 5, backgroundColor: "#F1E5F2", marginTop: 7, overflow: "hidden" }}><View style={{ height: "100%", width: `${progress}%`, backgroundColor: PRIMARY, borderRadius: 5 }} /></View></View>}
         {campaign.status ===
           "rejected" &&
         campaign.rejectionReason ? (
@@ -1459,45 +1490,14 @@ return (
           </View>
         ) : null}
 
-        {canCancel ? (
-  <TouchableOpacity
-    activeOpacity={0.8}
-    disabled={isCancelling}
-    onPress={() => onCancel(campaign)}
-    style={[
-      styles.campaignActionButton,
-      isCancelling &&
-        styles.campaignActionButtonDisabled,
-    ]}
-  >
-    {isCancelling ? (
-      <ActivityIndicator
-        size="small"
-        color="#B23A4B"
-      />
-    ) : (
-      <Ionicons
-        name={
-          campaign.status === "active"
-            ? "stop-circle-outline"
-            : "close-circle-outline"
-        }
-        size={18}
-        color="#B23A4B"
-      />
-    )}
-
-    <Text style={styles.campaignActionButtonText}>
-      {isCancelling
-        ? "Updating..."
-        : actionLabel}
-    </Text>
-  </TouchableOpacity>
-) : null}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 13, alignItems: "center" }}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => Share.share({ message: campaign.title + "\n" + campaign.description })} style={{ flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 12, backgroundColor: "#F6E9F5" }}><Ionicons name="share-social-outline" size={16} color={PRIMARY} /><Text style={{ color: PRIMARY, fontWeight: "800", fontSize: 12 }}>Share</Text></TouchableOpacity>
+          {canCancel ? <TouchableOpacity accessibilityRole="button" disabled={isCancelling} onPress={() => onCancel(campaign)} style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 5, borderColor: "#DBBAC3", borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 12 }}><Ionicons name="stop-circle-outline" size={15} color="#AA4454" /><Text style={{ color: "#AA4454", fontSize: 11, fontWeight: "700" }}>{isCancelling ? "Updating..." : actionLabel}</Text></TouchableOpacity> : null}
+        </View>
 
 <View style={styles.metricsDivider} />
 
-<View style={styles.metricsRow}>
+{noMetrics ? <View style={{ paddingVertical: 15, alignItems: "center" }}><Ionicons name="analytics-outline" size={24} color={PRIMARY} /><Text style={{ textAlign: "center", marginTop: 8, color: MUTED, fontSize: 12 }}>No views yet. Your campaign will reach users soon.</Text></View> : <View style={styles.metricsRow}>
           <CampaignMetric
             icon="eye-outline"
             value={
@@ -1527,7 +1527,7 @@ return (
             }
             label="Visits"
           />
-        </View>
+        </View>}
       </View>
     </View>
   );
