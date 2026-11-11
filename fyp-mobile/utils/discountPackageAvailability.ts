@@ -1,4 +1,4 @@
-import { DiscountStatus, VendorDiscount } from '@/types/discount.types';
+import { DiscountEntryType, DiscountStatus, VendorDiscount } from '@/types/discount.types';
 
 export type OccupyingOffer = {
   code: string;
@@ -7,7 +7,7 @@ export type OccupyingOffer = {
 
 /**
  * Vendor-facing availability hint. The backend always rechecks on creation.
- * Active All Packages offers occupy every package, including future packages.
+ * Active COUPONS occupy packages; emailed discount codes do not.\n * All Packages coupons occupy every package, including future packages.
  * Legacy single packageId offers are also supported.
  */
 export function getOccupiedPromotionPackages(entries: VendorDiscount[]) {
@@ -16,7 +16,7 @@ export function getOccupiedPromotionPackages(entries: VendorDiscount[]) {
   const now = Date.now();
 
   for (const entry of entries) {
-    if (entry.status !== DiscountStatus.ACTIVE || new Date(entry.endDate).getTime() < now) continue;
+    if (entry.type !== DiscountEntryType.COUPON || entry.status !== DiscountStatus.ACTIVE || new Date(entry.endDate).getTime() < now) continue;
     const offer = { code: entry.code, type: entry.type };
     const packageIds = entry.packageIds?.length
       ? entry.packageIds
