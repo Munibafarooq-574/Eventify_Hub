@@ -1,9 +1,4 @@
-import { getVendorCoupons } from '@/services/getVendorCoupons';
-import { getVendorDiscountCodes } from '@/services/getVendorDiscountCodes';
-import { getOccupiedPromotionPackages } from '@/utils/discountPackageAvailability';
-import { VendorDiscount } from '@/types/discount.types';
 import { currencySymbol } from '@/utils/currency';
-import { getVendorPackagesList, VendorPackageListItem } from '@/services/getVendorPackagesList';
 ﻿// fyp-mobile/components/vendorCoupons/CreateDiscountCodeScreen.tsx
 //
 // TODO â€” UI-only redesign, no service/data or validation logic changes:
@@ -28,7 +23,6 @@ import {
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Check } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 import { createVendorDiscountCode } from '../../services/createVendorDiscountCode';
 import {
@@ -78,36 +72,6 @@ export default function CreateDiscountCodeScreen() {
   const [discountValue, setDiscountValue] = useState('');
   const [minimumOrderAmount, setMinimumOrderAmount] = useState('');
   const [maximumDiscountAmount, setMaximumDiscountAmount] = useState('');
-  const [packageScope, setPackageScope] = useState<'all' | 'selected'>('all');
-  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
-  const [vendorPackages, setVendorPackages] = useState<VendorPackageListItem[]>([]);
-  const [packagesLoading, setPackagesLoading] = useState(true);
-  const [packagesError, setPackagesError] = useState(false);
-  const [existingPromotions, setExistingPromotions] = useState<VendorDiscount[]>([]);
-  const { occupied, allPackagesOffer } = getOccupiedPromotionPackages(existingPromotions);
-  const hasOccupiedPackages = !!allPackagesOffer || occupied.size > 0;
-
-  useEffect(() => {
-    if (!vendorIdValue) { setPackagesError(true); setPackagesLoading(false); return; }
-    let mounted = true;
-    setPackagesLoading(true);
-    Promise.all([
-      getVendorPackagesList(vendorIdValue),
-      getVendorCoupons(vendorIdValue),
-      getVendorDiscountCodes(vendorIdValue),
-    ]).then(([items, coupons, codes]) => {
-      if (!mounted) return;
-      setVendorPackages(items);
-      setExistingPromotions([...coupons, ...codes]);
-      setPackagesError(false);
-      const availability = getOccupiedPromotionPackages([...coupons, ...codes]);
-      if (availability.allPackagesOffer || availability.occupied.size > 0) {
-        setPackageScope('selected');
-      }
-    }).catch(() => { if (mounted) setPackagesError(true); })
-      .finally(() => { if (mounted) setPackagesLoading(false); });
-    return () => { mounted = false; };
-  }, [vendorIdValue]);
   const [startDate, setStartDate] = useState(todayPlus(0));
   const [endDate, setEndDate] = useState(todayPlus(30));
   const [usageLimit, setUsageLimit] = useState('50');
@@ -298,24 +262,6 @@ useEffect(() => {
       return;
     }
 
-    if (packagesLoading || packagesError) {
-      Alert.alert('Package availability unavailable', 'Cannot verify existing offers. Reopen this screen and try again.');
-      return;
-    }
-    if (packageScope === 'all' && hasOccupiedPackages) {
-      Alert.alert('Packages already covered', 'Cancel existing coupon or discount code offers before applying a new offer to all packages.');
-      return;
-    }
-    if (packageScope === 'selected' && selectedPackageIds.some(id => !!allPackagesOffer || occupied.has(id))) {
-      Alert.alert('Package already covered', 'Cancel its existing offer before selecting this package.');
-      return;
-    }
-
-    if (packageScope === 'selected' && (!selectedPackageIds.length || packagesLoading || packagesError)) {
-      Alert.alert('Select packages', 'Select at least one available package for this discount.');
-      return;
-    }
-
     // -----------------------------
     // Payload
     // -----------------------------
@@ -328,7 +274,6 @@ useEffect(() => {
       discountValue: discountValueNum,
 
       minimumOrderAmount: minimumAmount,
-      ...(packageScope === 'selected' ? { packageIds: selectedPackageIds } : {}),
 
       maximumDiscountAmount: discountType === DiscountKind.PERCENTAGE && maximumDiscountAmount ? parseFloat(maximumDiscountAmount) : undefined,
 
@@ -486,73 +431,6 @@ useEffect(() => {
         {/* ================================
             Start Date
         ================================= */}
-
-        <Field label="Apply Discount To">
-          <View style={styles.scopeChoices}>
-            {([
-              { key: 'all', label: 'All My Packages' },
-              { key: 'selected', label: 'Selected Packages Only' },
-            ] as const).map(opt => {
-              const active = packageScope === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  activeOpacity={0.85}
-                  disabled={opt.key === 'all' && (hasOccupiedPackages || packagesLoading || packagesError)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: active, disabled: opt.key === 'all' && hasOccupiedPackages }}
-                  onPress={() => {
-                    setPackageScope(opt.key);
-                    if (opt.key === 'all') setSelectedPackageIds([]);
-                  }}
-                  style={[styles.scopeChoice, active && styles.scopeChoiceActive, opt.key === 'all' && hasOccupiedPackages && styles.disabledOption]}
-                >
-                  <View style={[styles.scopeCircle, active && styles.scopeCircleActive]}>
-                    {active && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
-                  </View>
-                  <Text style={[styles.scopeChoiceText, active && styles.scopeChoiceTextActive]}>{opt.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {hasOccupiedPackages && <Text style={styles.occupiedHint}>Packages with an active coupon or discount code are locked until that offer is cancelled.</Text>}
-          {packagesError && <Text style={styles.occupiedHint}>Unable to verify existing offers. Creation is unavailable.</Text>}
-          {packageScope === 'selected' && (
-            <View style={styles.packageSelection}>
-              {packagesLoading ? (
-                <ActivityIndicator color={COLORS.primary} />
-              ) : packagesError ? (
-                <Text style={styles.packageError}>Could not load packages. Reopen this screen and try again.</Text>
-              ) : vendorPackages.length === 0 ? (
-                <Text style={styles.packageHint}>No packages available.</Text>
-              ) : (
-                vendorPackages.map(pkg => {
-                  const blockedBy = allPackagesOffer || occupied.get(pkg._id);
-                  const selected = selectedPackageIds.includes(pkg._id);
-                  return (
-                    <TouchableOpacity
-                      key={pkg._id}
-                      activeOpacity={0.85}
-                      disabled={!!blockedBy}
-                      onPress={() => setSelectedPackageIds(current =>
-                        current.includes(pkg._id) ? current.filter(id => id !== pkg._id) : [...current, pkg._id]
-                      )}
-                      style={[styles.packageOption, selected && styles.packageOptionSelected, !!blockedBy && styles.disabledOption]}
-                    >
-                      <View style={[styles.packageCheck, selected && styles.packageCheckSelected]}>
-                        {selected && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text numberOfLines={2} style={[styles.packageOptionText, selected && styles.packageOptionTextSelected]}>{pkg.packageName}</Text>
-                        {!!blockedBy && <Text style={styles.packageLocked}>Active offer: {blockedBy.code} — cancel it first</Text>}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-          )}
-        </Field>
 
         <Field label="Start Date (YYYY-MM-DD)">
           <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-08-29" />
@@ -753,42 +631,6 @@ const styles = StyleSheet.create({
   typeChipText: { fontSize: 12.5, fontWeight: '600', color: COLORS.text },
 
   typeChipTextSelected: { color: '#fff' },
-
-  disabledOption: { opacity: 0.55 },
-  occupiedHint: { fontSize: 12.5, lineHeight: 18, color: '#935216', marginTop: 10 },
-  packageLocked: { color: '#935216', fontSize: 12, marginTop: 4 },
-  scopeChoices: { gap: 10, marginTop: 4 },
-  scopeChoice: {
-    minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12,
-  },
-  scopeChoiceActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  scopeCircle: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
-    borderColor: '#D2C6D5', backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  scopeCircleActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
-  scopeChoiceText: { flex: 1, fontSize: 14.5, fontWeight: '500', color: COLORS.text },
-  scopeChoiceTextActive: { color: COLORS.primary, fontWeight: '700' },
-  packageSelection: { marginTop: 12, gap: 10 },
-  packageOption: {
-    minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1,
-    borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.card,
-  },
-  packageOptionSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  packageCheck: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
-    borderColor: '#D2C6D5', backgroundColor: '#FFFFFF',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  packageCheckSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
-  packageOptionText: { flex: 1, fontSize: 14.5, fontWeight: '500', color: COLORS.text },
-  packageOptionTextSelected: { color: COLORS.primary, fontWeight: '700' },
-  packageHint: { fontSize: 13, color: COLORS.muted },
-  packageError: { fontSize: 13, color: '#B42336' },
 
   /* ================================
      Audience
