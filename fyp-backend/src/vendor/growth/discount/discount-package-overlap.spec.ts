@@ -4,7 +4,7 @@ import { DiscountService } from './discount.service';
 import { DiscountEntryType, DiscountKind, DiscountStatus } from './discount.types';
 
 // Isolated creation-rule tests: no MongoMemoryServer or production database.
-describe('DiscountService — one active promotion per package', () => {
+describe('DiscountService — coupon package occupancy', () => {
   const vendorId = new Types.ObjectId().toString();
   const packageA = new Types.ObjectId().toString();
   const packageB = new Types.ObjectId().toString();
@@ -36,7 +36,7 @@ describe('DiscountService — one active promotion per package', () => {
         entry.status === DiscountStatus.ACTIVE && entry.endDate >= new Date());
       if (filter.code) return active.find(entry => entry.code === filter.code) || null;
       const ids: string[] = filter.$or?.[1]?.packageId?.$in || [];
-      return active.find(entry =>
+      return active.filter(entry => !filter.type || entry.type === filter.type).find(entry =>
         !filter.$or || // Creating an all-packages offer conflicts with any active offer.
         (!entry.packageId && (!entry.packageIds || !entry.packageIds.length)) ||
         (entry.packageId && ids.includes(entry.packageId)) ||
@@ -75,16 +75,16 @@ describe('DiscountService — one active promotion per package', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('blocks a discount code when an active coupon covers all packages', async () => {
-    const { service } = setup([existingOffer({ packageIds: [] })]);
-    await expect(service.createDiscountEntry(vendorId, DiscountEntryType.DISCOUNT_CODE, payload([packageB]), options))
-      .rejects.toThrow(BadRequestException);
+  it('allows an emailed discount code even if a coupon covers all packages', async () => {
+    const { service, create } = setup([existingOffer({ packageIds: [] })]);
+    await service.createDiscountEntry(vendorId, DiscountEntryType.DISCOUNT_CODE, payload(), options);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ packageIds: [], packageId: null }));
   });
 
-  it('blocks All Packages when any package has an active discount code', async () => {
-    const { service } = setup([existingOffer({ type: DiscountEntryType.DISCOUNT_CODE })]);
-    await expect(service.createDiscountEntry(vendorId, DiscountEntryType.COUPON, payload(), options))
-      .rejects.toThrow('Cancel that offer before creating a new one.');
+  it('allows a coupon even when an emailed discount code exists', async () => {
+    const { service, create } = setup([existingOffer({ type: DiscountEntryType.DISCOUNT_CODE })]);
+    await service.createDiscountEntry(vendorId, DiscountEntryType.COUPON, payload(), options);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('allows a different unoccupied package', async () => {
