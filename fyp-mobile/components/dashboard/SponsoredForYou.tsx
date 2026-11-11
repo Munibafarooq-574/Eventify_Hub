@@ -2,6 +2,7 @@ import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
 import { useDashboardSectionLoad } from "./DashboardRefreshContext";
+import SponsoredPosterCard from "./SponsoredPosterCard";
 import type { ComponentRef } from 'react';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // fyp-mobile/components/dashboard/SponsoredForYou.tsx
@@ -686,68 +687,13 @@ const openViewAll = async () => {
     return null;
   }
 
-const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => {
-  const packageName = item.package?.packageName || "Package";
-  const price = Number(item.package?.price || 0);
-
-  return (
-    <TouchableOpacity
-      style={[styles.card, fullWidth && styles.cardFull]}
-      activeOpacity={0.9}
-      onPress={() => openCampaign(item, fullWidth)}
-    >
-      <View style={styles.imageWrapper}>
-        <Image
-          source={{ uri: item.image || item.package?.images?.[0] }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-
-        <View style={styles.adTag}>
-          <Text style={styles.adTagText}>Ad</Text>
-        </View>
-
-        {!!item.offerLabel && (
-          <View style={styles.offerBadge}>
-            <Text style={styles.offerText} numberOfLines={1}>
-              {item.offerLabel}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.details}>
-        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">
-          {item.title}
-        </Text>
-
-        <View style={styles.metaRow}>
-          <Ionicons
-            name="storefront-outline"
-            size={11}
-            color="rgba(255,255,255,0.78)"
-          />
-          <Text style={styles.vendorName} numberOfLines={1}>
-            {item.brandName || item.vendorName}
-          </Text>
-        </View>
-
-        <Text style={styles.vendorName}>{packageName}</Text>
-        <PackagePricingLabel pkg={item.package || {}} />
-        <View style={styles.bottomRow}>
-          <Text style={styles.price}>
-            {price > 0 ? `${currencySymbol(currencyOf(item))} ${price.toLocaleString()}` : packageName}{price > 0 && <PackagePriceBasis pkg={item.package || {}} />}
-          </Text>
-
-          <View style={styles.viewButton}>
-            <Text style={styles.viewButtonText}>View</Text>
-            <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
+const renderCardBody = (item: SponsoredCampaign, fullWidth: boolean) => (
+  <SponsoredPosterCard
+    campaign={item}
+    onPress={() => openCampaign(item, fullWidth)}
+    style={fullWidth ? styles.posterCardFull : styles.posterCard}
+  />
+);
 
 const renderCampaign = ({ item }: { item: SponsoredCampaign }) => (
   <View
@@ -858,6 +804,9 @@ return (
 };
 
 const styles = StyleSheet.create({
+  posterCard: { width: CARD_WIDTH, marginRight: CARD_MARGIN },
+  posterCardFull: { width: '100%', marginRight: 0 },
+
   container: {
     marginBottom: 22,
   },
