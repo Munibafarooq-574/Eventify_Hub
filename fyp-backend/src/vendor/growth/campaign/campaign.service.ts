@@ -654,6 +654,8 @@ if (
       image:
         imageUrl.trim(),
 
+      displayMode: dto.displayMode ?? 'AUTO',
+
       description:
         dto.description.trim(),
 
@@ -1156,6 +1158,7 @@ if (
 
       title: campaign.title,
       image: campaign.image,
+      displayMode: campaign.displayMode ?? 'AUTO',
       description:
         campaign.description,
 
