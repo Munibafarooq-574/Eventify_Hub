@@ -1,0 +1,36 @@
+name: Verify admin service cities
+on:
+  push:
+    branches: [fix/admin-vendor-service-cities]
+  workflow_dispatch:
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fyp-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: fyp-backend/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
+      - run: npx jest src/admin/vendor-service-cities.spec.ts --runInBand
+      - run: npm test -- --runInBand
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fyp-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: fyp-admin/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
