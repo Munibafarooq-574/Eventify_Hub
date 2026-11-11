@@ -45,7 +45,7 @@ describe('Automatic booking chat', () => {
     };
 
     beforeAll(async () => {
-        mongo = await MongoMemoryServer.create({ instance: { args: ['--nounixsocket'] } });
+        mongo = await MongoMemoryServer.create({ instance: {} });
         db = await createConnection(mongo.getUri()).asPromise();
         const messages = db.model(Message.name, MessageSchema);
         const conversations = db.model(Conversation.name, ConversationSchema);
