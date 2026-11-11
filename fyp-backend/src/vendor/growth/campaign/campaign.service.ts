@@ -216,29 +216,19 @@ export class CampaignService {
     }
 
     // -------------------------------------------------------
-// Campaign duration limit
-//
-// Growth / Premium:
-// A single campaign can run for a maximum of 30 days.
-// This prevents one monthly campaign credit from being
-// used for several months of advertising.
+// Campaign duration limit: one full calendar month from start.
+// The end date is chosen by calendar day. Keep this separate from
+// the existing subscription-expiry entitlement check below.
+// For example, 25 Nov -> 25 Dec is valid.
 // -------------------------------------------------------
-
-const MAX_CAMPAIGN_DURATION_DAYS = 30;
-
-const campaignDurationMs =
-  endDate.getTime() - startDate.getTime();
-
-const maxCampaignDurationMs =
-  MAX_CAMPAIGN_DURATION_DAYS *
-  24 *
-  60 *
-  60 *
-  1000;
-
-if (campaignDurationMs > maxCampaignDurationMs) {
+const startYear = startDate.getUTCFullYear();
+const startMonth = startDate.getUTCMonth();
+const nextMonthDays = new Date(Date.UTC(startYear, startMonth + 2, 0)).getUTCDate();
+const endDayOfMonth = Math.min(startDate.getUTCDate(), nextMonthDays);
+const latestCampaignEnd = Date.UTC(startYear, startMonth + 1, endDayOfMonth, 23, 59, 59, 999);
+if (endDate.getTime() > latestCampaignEnd) {
   throw new BadRequestException(
-    `A campaign can run for a maximum of ${MAX_CAMPAIGN_DURATION_DAYS} days.`,
+    'A campaign can run for a maximum of one calendar month from its start date.',
   );
 }
     // -------------------------------------------------------
