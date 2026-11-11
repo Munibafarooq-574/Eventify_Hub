@@ -1,4 +1,5 @@
-import { currencySymbol, vendorDisplayCurrency } from '@/utils/currency';
+import { currencySymbol, vendorRevenueCurrency } from '@/utils/currency';
+import { getUserData } from '@/store';
 import { reportMarketplaceLoadError } from "@/services/reportMarketplaceLoadError";
 
 // fyp-mobile/components/VendorGrowth/VendorGrowthScreen.tsx
@@ -176,6 +177,7 @@ export default function VendorGrowthScreen() {
     try {
       setLoading(true);
       setError(null);
+      await getUserData(); // Hydrate the signed-in vendor's marketplace currency.
 
       const [sub, analyticsSummary] = await Promise.all([
         getSubscriptionAccessState(vendorIdValue),
@@ -691,7 +693,7 @@ export default function VendorGrowthScreen() {
                   />
                 }
                 label="Total Revenue"
-                value={`${currencySymbol(vendorDisplayCurrency(analytics))} ${analytics.totalRevenue.toLocaleString()}`}
+                value={`${currencySymbol(vendorRevenueCurrency(analytics))} ${analytics.totalRevenue.toLocaleString()}`}
               />
 
               <StatBox
@@ -703,7 +705,7 @@ export default function VendorGrowthScreen() {
                   />
                 }
                 label="This Month"
-                value={`${currencySymbol(vendorDisplayCurrency(analytics))} ${analytics.monthlyRevenue.toLocaleString()}`}
+                value={`${currencySymbol(vendorRevenueCurrency(analytics))} ${analytics.monthlyRevenue.toLocaleString()}`}
                 change={
                   analytics.monthlyRevenueChangePct
                 }
