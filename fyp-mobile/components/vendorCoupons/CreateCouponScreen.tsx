@@ -247,31 +247,28 @@ export default function CreateCouponScreen() {
         )}
 
        <Field label="Apply Discount To">
-  {/* Segmented toggle */}
-  <View style={styles.segment}>
+  <View style={styles.scopeChoices}>
     {([
-      { key: 'all', label: 'All Packages', icon: 'layers-outline' },
-      { key: 'selected', label: 'Selected Only', icon: 'pricetags-outline' },
-    ] as const).map((opt) => {
+      { key: 'all', label: 'All My Packages' },
+      { key: 'selected', label: 'Selected Packages Only' },
+    ] as const).map(opt => {
       const active = packageScope === opt.key;
       return (
         <TouchableOpacity
           key={opt.key}
           activeOpacity={0.85}
-          style={[styles.segmentItem, active && styles.segmentItemActive]}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: active }}
           onPress={() => {
             setPackageScope(opt.key);
             if (opt.key === 'all') setSelectedPackageIds([]);
           }}
+          style={[styles.scopeChoice, active && styles.scopeChoiceActive]}
         >
-          <Ionicons
-            name={opt.icon}
-            size={16}
-            color={active ? '#FFFFFF' : COLORS.muted}
-          />
-          <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-            {opt.label}
-          </Text>
+          <View style={[styles.scopeCircle, active && styles.scopeCircleActive]}>
+            {active && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+          </View>
+          <Text style={[styles.scopeChoiceText, active && styles.scopeChoiceTextActive]}>{opt.label}</Text>
         </TouchableOpacity>
       );
     })}
@@ -463,6 +460,22 @@ const styles = StyleSheet.create({
   },
   submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
+  scopeChoices: { gap: 10, marginTop: 4 },
+  scopeChoice: {
+    minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12,
+  },
+  scopeChoiceActive: { borderColor: COLORS.primary, backgroundColor: '#FBF3FA' },
+  scopeCircle: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5,
+    borderColor: '#D2C6D5', backgroundColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  scopeCircleActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
+  scopeChoiceText: { flex: 1, fontSize: 14.5, fontWeight: '500', color: COLORS.text },
+  scopeChoiceTextActive: { color: COLORS.primary, fontWeight: '700' },
+
    // ---- Apply Discount To ----
   segment: {
     flexDirection: 'row',
@@ -540,7 +553,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 6,
+    borderRadius: 11,
     borderWidth: 1.5,
     borderColor: '#D2C6D5',
     backgroundColor: '#FFFFFF',
