@@ -71,7 +71,7 @@ describe('DiscountService — coupon package occupancy', () => {
   it('blocks a new coupon on an occupied selected package', async () => {
     const { service, create } = setup([existingOffer()]);
     await expect(service.createDiscountEntry(vendorId, DiscountEntryType.COUPON, payload([packageA]), options))
-      .rejects.toThrow('Cancel that offer before creating a new one.');
+      .rejects.toThrow('Cancel it before creating a new coupon.');
     expect(create).not.toHaveBeenCalled();
   });
 
