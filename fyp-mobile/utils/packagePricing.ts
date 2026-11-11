@@ -4,7 +4,7 @@ export const PRICING_OPTIONS = [
   { value: 'GROUP', label: 'Group Package' },
 ] as const;
 export type PricingMethod = typeof PRICING_OPTIONS[number]['value'];
-export type PackagePricing = { currency?: 'PKR' | 'USD'; pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null };
+export type PackagePricing = { currency?: 'PKR' | 'USD'; pricingMethod?: PricingMethod; groupSize?: number | null; personCount?: number | null; capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP'; maxPeoplePerBooking?: number; maxUnitsPerBooking?: number; availableParallelUnits?: number; };
 
 export function pricingMethod(pkg: PackagePricing, legacyPerPerson = false): PricingMethod {
   return pkg.pricingMethod ?? (legacyPerPerson ? 'PER_PERSON' : 'FIXED');
@@ -35,6 +35,20 @@ export function pricingLabel(pkg: PackagePricing, legacyPerPerson = false) {
 }
 
 export function pricingFieldsError(pkg: PackagePricing) {
-  return pkg.pricingMethod === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)
-    ? 'Enter the number of people included in one group package.' : '';
+  if (pkg.pricingMethod === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)) {
+    return 'Enter the number of people included in one group package.';
+  }
+  if (pkg.capacityUnit === 'GROUP' && (!Number.isSafeInteger(pkg.groupSize) || Number(pkg.groupSize) < 1)) {
+    return 'Select Group Package pricing and enter its serving size.';
+  }
+  if (pkg.capacityUnit === 'GROUP' && pkg.pricingMethod !== 'GROUP') {
+    return 'Group capacity requires Group Package pricing.';
+  }
+  for (const field of ['maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
+    const value = pkg[field];
+    if (value !== undefined && (!Number.isSafeInteger(value) || Number(value) < 1)) {
+      return 'Capacity values must be positive whole numbers.';
+    }
+  }
+  return '';
 }

@@ -478,7 +478,7 @@ const existingPackage =
           return;
         }
 
-        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize });
+        setPricing({ pricingMethod: existingPackage.pricingMethod || 'FIXED', groupSize: existingPackage.groupSize, capacityUnit: existingPackage.capacityUnit, maxPeoplePerBooking: existingPackage.maxPeoplePerBooking, maxUnitsPerBooking: existingPackage.maxUnitsPerBooking, availableParallelUnits: existingPackage.availableParallelUnits });
         setPackageName(
           existingPackage.packageName || "",
         );
@@ -962,6 +962,10 @@ if (!userId) {
     const payload = {
   pricingMethod: pricing.pricingMethod,
   groupSize: pricing.pricingMethod === 'GROUP' ? pricing.groupSize : null,
+  capacityUnit: pricing.capacityUnit,
+  maxPeoplePerBooking: pricing.maxPeoplePerBooking,
+  maxUnitsPerBooking: pricing.maxUnitsPerBooking,
+  availableParallelUnits: pricing.availableParallelUnits,
   ...(bookingType === "DELIVERY_BASED" ? deliverySettings(delivery) : {}),
   packageName: packageName.trim(),
 

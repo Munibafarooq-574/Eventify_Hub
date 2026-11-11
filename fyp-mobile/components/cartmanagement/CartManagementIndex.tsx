@@ -337,10 +337,18 @@ if (eventDetailsRaw) {
             ...vendor.packages[packageIndex],
         };
 
-        if (pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON') {
-            pkg.personCount = Math.max(1, Number(pkg.personCount ?? guests ?? 1) + delta);
+        const method = pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering'));
+        if (method === 'PER_PERSON' || method === 'GROUP') {
+            const maxPeople = Number(pkg.maxPeoplePerBooking);
+            const next = Math.max(1, Number(pkg.personCount ?? (method === 'GROUP' ? pkg.groupSize : guests) ?? 1) + delta);
+            pkg.personCount = Number.isSafeInteger(maxPeople) && maxPeople > 0 ? Math.min(next, maxPeople) : next;
+            if (method === 'GROUP' && Number(pkg.groupSize) > 0) {
+                pkg.quantity = Math.ceil(Number(pkg.personCount) / Number(pkg.groupSize));
+            }
         } else {
-            pkg.quantity = Math.max(1, Number(pkg.quantity || 1) + delta);
+            const maxUnits = Number(pkg.maxUnitsPerBooking);
+            const next = Math.max(1, Number(pkg.quantity || 1) + delta);
+            pkg.quantity = Number.isSafeInteger(maxUnits) && maxUnits > 0 ? Math.min(next, maxUnits) : next;
         }
 
         if (pkg.pendingCouponCode && updatedCart.appliedPromotions) {
@@ -1064,7 +1072,7 @@ if (eventDetailsRaw) {
 
                                                             <View style={styles.quantityRow}>
                                                                 <Text style={styles.quantityLabel}>
-                                                                    {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' ? 'People' : 'Quantity'}
+                                                                    {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' || pricingMethod(pkg, !!isCatering) === 'GROUP' ? 'People needing service' : pkg.capacityUnit === 'VEHICLE' ? 'Vehicles' : pkg.capacityUnit === 'TEAM' ? 'Teams' : 'Quantity'}
                                                                 </Text>
 
                                                                 <View style={styles.quantityControl}>
@@ -1087,7 +1095,7 @@ if (eventDetailsRaw) {
                                                                     </TouchableOpacity>
 
                                                                     <Text style={styles.quantityValue}>
-                                                                        {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' ? (pkg.personCount ?? guests) : (pkg.quantity || 1)}
+                                                                        {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' || pricingMethod(pkg, !!isCatering) === 'GROUP' ? (pkg.personCount ?? (pricingMethod(pkg, !!isCatering) === 'GROUP' ? pkg.groupSize : guests)) : (pkg.quantity || 1)}
                                                                     </Text>
 
                                                                     <TouchableOpacity
@@ -1109,6 +1117,11 @@ if (eventDetailsRaw) {
                                                                     </TouchableOpacity>
                                                                 </View>
                                                             </View>
+                                                            {pricingMethod(pkg, !!isCatering) === 'GROUP' && Number(pkg.groupSize) > 0 && (
+                                                                <Text style={styles.quantityLabel}>
+                                                                    {Math.ceil(Number(pkg.personCount ?? pkg.groupSize) / Number(pkg.groupSize))} group(s) · {pkg.groupSize} people per group
+                                                                </Text>
+                                                            )}
                                                         </View>
 
                                                         <TouchableOpacity

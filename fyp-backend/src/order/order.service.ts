@@ -1,3 +1,4 @@
+import { checkServiceCapacity } from '../common/utils/service-capacity';
 import { countryCurrency, currencyOf, roundForCurrency, roundMoney } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage, resolvePackageUnitPrice } from '../common/utils/package-pricing';
 import { BOOKING_DRAFT_COLLECTION, BookingDraft } from '../cart/booking-draft';
@@ -79,6 +80,38 @@ export class OrderService {
     private readonly chatGateway: ChatGateway,
 ) { }
 
+
+  private async assertPackageResourceBudget(args: {
+    vendorId: string;
+    packageId: string;
+    start: Date;
+    end: Date;
+    requestedUnits: number;
+    maxParallelUnits?: number | null;
+    session: ClientSession;
+    excludeOrderIds?: Types.ObjectId[];
+    additionalUnits?: number;
+  }): Promise<void> {
+    if (args.maxParallelUnits == null) return;
+    if (!Number.isSafeInteger(args.requestedUnits) || args.requestedUnits < 1) {
+      throw new BadRequestException('Invalid service resource quantity.');
+    }
+    const overlapping = await this.vendorOrderModel.find({
+      vendorId: new Types.ObjectId(args.vendorId),
+      packageId: args.packageId,
+      status: { $in: ['pending', 'accepted', 'completed'] },
+      replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+      eventStartDateTime: { $lt: args.end },
+      eventEndDateTime: { $gt: args.start },
+      ...(args.excludeOrderIds?.length ? { _id: { $nin: args.excludeOrderIds } } : {}),
+    }).select('resourceUnits quantity').session(args.session).lean();
+    const reserved = overlapping.reduce((sum, order) =>
+      sum + Math.max(1, Number(order.resourceUnits ?? order.quantity ?? 1)), 0);
+    const planned = Number(args.additionalUnits ?? 0);
+    if (reserved + planned + args.requestedUnits > args.maxParallelUnits) {
+      throw new ConflictException('Not enough service teams or resources remain available for the selected time.');
+    }
+  }
 
             // Create a new order
     async createOrder(
@@ -592,6 +625,7 @@ export class OrderService {
                         packageId: string;
                         serviceName: string;
                         quantity: number;
+                        resourceUnits?: number;
                         pricingMethod: 'FIXED' | 'PER_PERSON' | 'GROUP';
                         groupSize: number | null;
                         personCount: number | null;
@@ -856,6 +890,20 @@ export class OrderService {
                                 vendorCategoryId,
                             );
 
+                        // Per-service requirements are independent from overall event attendance.
+                        // Apply new capacity rules only to packages that explicitly configured them.
+                        let resourceUnits = quantity;
+                        if (packageDoc.capacityUnit) {
+                            const capacityPeople = Number(service.personCount ?? (packageDoc.capacityUnit === 'PERSON' || packageDoc.capacityUnit === 'GROUP' ? NaN : 1));
+                            const capacity = checkServiceCapacity(packageDoc, capacityPeople, quantity);
+                            resourceUnits = capacity.unitsNeeded;
+                            if (packageDoc.capacityUnit === 'GROUP' && quantity !== capacity.unitsNeeded) {
+                                throw new BadRequestException('Package group count does not match the selected people. Refresh your cart.');
+                            }
+                            if (packageDoc.capacityUnit === 'PERSON' && (packageDoc.pricingMethod === 'PER_PERSON') && quantity !== 1) {
+                                throw new BadRequestException('Per-person packages must use one package quantity with the required people count.');
+                            }
+                        }
                         const pricing = quotePackage({
                             pricingMethod: packageDoc.pricingMethod ?? legacyPricingMethod(category),
                             groupSize: packageDoc.groupSize,
@@ -914,6 +962,26 @@ export class OrderService {
                                         0,
                                 ),
                             );
+
+                        // The vendor lock above serializes transactions for this vendor.
+                        // A configured resource budget is shared by overlapping bookings
+                        // of this package; a booking that uses two teams reserves two units.
+                        const inThisCart = validatedServices
+                            .filter(previous => previous.vendorId === String(service.vendorId) &&
+                                previous.packageId === String(service.packageId) &&
+                                previous.startDateTime < finalServiceEndDateTime &&
+                                previous.endDateTime > finalServiceStartDateTime)
+                            .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? 1), 0);
+                        await this.assertPackageResourceBudget({
+                            vendorId: String(service.vendorId),
+                            packageId: String(service.packageId),
+                            start: finalServiceStartDateTime,
+                            end: finalServiceEndDateTime,
+                            requestedUnits: resourceUnits,
+                            maxParallelUnits: packageDoc.availableParallelUnits,
+                            session,
+                            additionalUnits: inThisCart,
+                        });
 
                         // Existing DB overlap is already checked by the
                         // availability service. This extra count covers
@@ -1044,6 +1112,7 @@ export class OrderService {
                                             service.serviceName,
                                     ),
                                 quantity,
+                                resourceUnits: packageDoc.availableParallelUnits != null ? resourceUnits : undefined,
                                 pricingMethod: pricing.pricingMethod,
                                 groupSize: pricing.groupSize,
                                 personCount: pricing.personCount,
@@ -1197,6 +1266,7 @@ export class OrderService {
                                                     ?.promotionCode ??
                                                 null,
                                             quantity: validatedService.quantity,
+                                            resourceUnits: validatedService.resourceUnits,
                                             pricingMethod: validatedService.pricingMethod,
                                             groupSize: validatedService.groupSize,
                                             personCount: validatedService.personCount,
@@ -3154,6 +3224,31 @@ async completeVendorOrder(vendorOrderId: string) {
                         );
                     }
 
+                    const rescheduledStart = new Date(availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime);
+                    const rescheduledEnd = new Date(availability.requiredServiceWindow?.endDateTime || req.newServiceEndDateTime);
+                    const vendorWithPackages: any = await this.userModel.findById(req.vendorId)
+                        .select('packages').session(session).lean();
+                    const rescheduledPackage = (vendorWithPackages?.packages || [])
+                        .find((pkg: any) => String(pkg._id) === String(vo.packageId));
+                    if (rescheduledPackage?.availableParallelUnits != null) {
+                        const previouslyPlanned = vendorOrders.slice(0, i)
+                            .filter(previous => String(previous.vendorId) === String(vo.vendorId) &&
+                                String(previous.packageId) === String(vo.packageId) &&
+                                new Date(previous.eventStartDateTime) < rescheduledEnd &&
+                                new Date(previous.eventEndDateTime) > rescheduledStart)
+                            .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? previous.quantity ?? 1), 0);
+                        await this.assertPackageResourceBudget({
+                            vendorId: String(vo.vendorId),
+                            packageId: String(vo.packageId),
+                            start: rescheduledStart,
+                            end: rescheduledEnd,
+                            requestedUnits: Number(vo.resourceUnits ?? vo.quantity ?? 1),
+                            maxParallelUnits: Number(rescheduledPackage.availableParallelUnits),
+                            session,
+                            excludeOrderIds: vendorOrders.map(item => item._id),
+                            additionalUnits: previouslyPlanned,
+                        });
+                    }
                     vo.eventStartDateTime =
                         availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime;
                     vo.eventEndDateTime =

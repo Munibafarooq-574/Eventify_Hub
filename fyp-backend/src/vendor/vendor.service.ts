@@ -1,3 +1,4 @@
+import { validateServiceCapacity } from '../common/utils/service-capacity';
 import { countryCurrency, currencyOf } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage, validatePackagePricing } from '../common/utils/package-pricing';
 import type { MarketplaceScope } from '../city/marketplace.guard';
@@ -832,6 +833,10 @@ async addPackages(
       ...pkg, ...validatePackagePricing(pkg, category),
     }));
         for (const pkg of incomingPackages) {
+      validateServiceCapacity(pkg);
+      if (pkg.capacityUnit === 'GROUP' && pkg.pricingMethod !== 'GROUP') {
+        throw new BadRequestException('Group serving capacity requires group pricing.');
+      }
       this.validatePackageBookingConfiguration(pkg);
       await this.validateDeliveryWeightBasis(pkg, user);
     }
@@ -842,6 +847,10 @@ async addPackages(
         ...Object.fromEntries(DELIVERY_FIELDS.map(field => [field, pkg[field]])),
         pricingMethod: pkg.pricingMethod,
         groupSize: pkg.groupSize,
+        capacityUnit: pkg.capacityUnit,
+        maxPeoplePerBooking: pkg.maxPeoplePerBooking,
+        maxUnitsPerBooking: pkg.maxUnitsPerBooking,
+        availableParallelUnits: pkg.availableParallelUnits,
         packageName: pkg.packageName,
         description: pkg.description ?? '',
         price: pkg.price ?? 0,
@@ -1413,10 +1422,24 @@ async updatePackage(
       pricingMethod: updateDto.pricingMethod ?? existingPackage.pricingMethod,
       groupSize: updateDto.groupSize ?? existingPackage.groupSize,
     }, category, existingPackage);
+    validateServiceCapacity({
+      groupSize: pricing.groupSize,
+      capacityUnit: updateDto.capacityUnit ?? existingPackage.capacityUnit,
+      maxPeoplePerBooking: updateDto.maxPeoplePerBooking ?? existingPackage.maxPeoplePerBooking,
+      maxUnitsPerBooking: updateDto.maxUnitsPerBooking ?? existingPackage.maxUnitsPerBooking,
+      availableParallelUnits: updateDto.availableParallelUnits ?? existingPackage.availableParallelUnits,
+    });
+    if ((updateDto.capacityUnit ?? existingPackage.capacityUnit) === 'GROUP' && pricing.pricingMethod !== 'GROUP') {
+      throw new BadRequestException('Group serving capacity requires group pricing.');
+    }
     const updatePayload: Record<string, any> = {
       'packages.$.pricingMethod': pricing.pricingMethod,
       'packages.$.groupSize': pricing.groupSize,
     };
+
+    for (const field of ['capacityUnit', 'maxPeoplePerBooking', 'maxUnitsPerBooking', 'availableParallelUnits'] as const) {
+      if (updateDto[field] !== undefined) updatePayload[`packages.$.${field}`] = updateDto[field];
+    }
 
     if (updateDto.packageName !== undefined) {
         updatePayload['packages.$.packageName'] =

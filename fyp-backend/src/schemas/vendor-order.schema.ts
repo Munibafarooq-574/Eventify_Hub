@@ -104,6 +104,10 @@ export class VendorOrder extends Document {
     @Prop({ type: Number, min: 1 })
     quantity?: number;
 
+    // Reserved teams/vehicles/groups for capacity-aware bookings; legacy orders may omit it.
+    @Prop({ type: Number, min: 1 })
+    resourceUnits?: number;
+
     @Prop({ required: true })
 price: number;
 

@@ -753,6 +753,18 @@ export class Package {
 
   @Prop({ type: Number, min: 1 })
   groupSize?: number | null;
+
+  @Prop({ type: String, enum: ['PERSON', 'GROUP', 'VEHICLE', 'TEAM', 'SETUP'] })
+  capacityUnit?: 'PERSON' | 'GROUP' | 'VEHICLE' | 'TEAM' | 'SETUP';
+
+  @Prop({ type: Number, min: 1 })
+  maxPeoplePerBooking?: number;
+
+  @Prop({ type: Number, min: 1 })
+  maxUnitsPerBooking?: number;
+
+  @Prop({ type: Number, min: 1 })
+  availableParallelUnits?: number;
   @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop({ enum: ['FREE', 'PAID'] }) deliveryFeeType?: 'FREE' | 'PAID';
   @Prop({ min: 0 }) deliveryFee?: number;
