@@ -390,7 +390,21 @@ export default function GrowthAnalyticsScreen() {
                   <Text style={styles.sectionLabel}>Top Performing Packages</Text>
                 </View>
                 {premium.topPerformingPackages.map((pkg) => (
-                  <InfoRow key={pkg.packageId} label={pkg.packageName} value={`${currencySymbol(vendorRevenueCurrency(data))} ${fmt(pkg.revenue)} · ${pkg.bookingCount} bookings`} />
+                  <View key={pkg.packageId} style={styles.topPackageRow}>
+                    <Text style={styles.topPackageName}>{pkg.packageName}</Text>
+                    <View style={styles.topPackageMetrics}>
+                      <View style={styles.topPackageMetric}>
+                        <Text style={styles.topPackageMetricLabel}>Revenue</Text>
+                        <Text style={styles.topPackageMetricValue}>
+                          {currencySymbol(vendorRevenueCurrency(data))} {fmt(pkg.revenue)}
+                        </Text>
+                      </View>
+                      <View style={styles.topPackageMetric}>
+                        <Text style={styles.topPackageMetricLabel}>Completed Bookings</Text>
+                        <Text style={styles.topPackageMetricValue}>{pkg.bookingCount}</Text>
+                      </View>
+                    </View>
+                  </View>
                 ))}
               </View>
             )}
@@ -544,6 +558,40 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 11.5, fontWeight: '700', color: COLORS.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 },
   sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+
+  topPackageRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  topPackageName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 10,
+  },
+  topPackageMetrics: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  topPackageMetric: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: COLORS.background,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  topPackageMetricLabel: {
+    fontSize: 11,
+    color: COLORS.muted,
+    marginBottom: 4,
+  },
+  topPackageMetricValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   statBox: { width: '28%', minWidth: 90 },
