@@ -44,6 +44,11 @@ export class CreateDiscountCodeDto {
   @IsMongoId()
   packageId?: string;
 
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  packageIds?: string[];
+
   @IsDateString()
   startDate: string;
 
