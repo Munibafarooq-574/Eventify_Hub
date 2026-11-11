@@ -593,6 +593,7 @@ export class OrderService {
                         packageId: string;
                         serviceName: string;
                         quantity: number;
+                        resourceUnits?: number;
                         pricingMethod: 'FIXED' | 'PER_PERSON' | 'GROUP';
                         groupSize: number | null;
                         personCount: number | null;
@@ -928,6 +929,34 @@ export class OrderService {
                                 ),
                             );
 
+                        // The vendor lock above serializes transactions for this vendor.
+                        // A configured resource budget is shared by overlapping bookings
+                        // of this package; a booking that uses two teams reserves two units.
+                        const resourceUnits = packageDoc.capacityUnit === 'GROUP'
+                            ? Math.ceil(Number(service.personCount) / Number(packageDoc.peopleIncludedPerGroup))
+                            : packageDoc.capacityUnit === 'PERSON' ? Number(service.personCount) : quantity;
+                        if (packageDoc.availableParallelUnits != null) {
+                            const overlappingPackageOrders = await this.vendorOrderModel.find({
+                                vendorId: new Types.ObjectId(String(service.vendorId)),
+                                packageId: String(service.packageId),
+                                status: { $in: ['pending', 'accepted', 'completed'] },
+                                replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+                                eventStartDateTime: { $lt: finalServiceEndDateTime },
+                                eventEndDateTime: { $gt: finalServiceStartDateTime },
+                            }).select('resourceUnits quantity').session(session).lean();
+                            const reserved = overlappingPackageOrders.reduce(
+                                (sum, order) => sum + Math.max(1, Number(order.resourceUnits ?? order.quantity ?? 1)), 0);
+                            const inThisCart = validatedServices
+                                .filter(previous => previous.vendorId === String(service.vendorId) &&
+                                    previous.packageId === String(service.packageId) &&
+                                    previous.startDateTime < finalServiceEndDateTime &&
+                                    previous.endDateTime > finalServiceStartDateTime)
+                                .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? 1), 0);
+                            if (reserved + inThisCart + resourceUnits > Number(packageDoc.availableParallelUnits)) {
+                                throw new ConflictException('Not enough service teams or resources remain available for the selected time.');
+                            }
+                        }
+
                         // Existing DB overlap is already checked by the
                         // availability service. This extra count covers
                         // multiple items inside THIS same request before
@@ -1057,6 +1086,7 @@ export class OrderService {
                                             service.serviceName,
                                     ),
                                 quantity,
+                                resourceUnits: packageDoc.availableParallelUnits != null ? resourceUnits : undefined,
                                 pricingMethod: pricing.pricingMethod,
                                 groupSize: pricing.groupSize,
                                 personCount: pricing.personCount,
@@ -1210,6 +1240,7 @@ export class OrderService {
                                                     ?.promotionCode ??
                                                 null,
                                             quantity: validatedService.quantity,
+                                            resourceUnits: validatedService.resourceUnits,
                                             pricingMethod: validatedService.pricingMethod,
                                             groupSize: validatedService.groupSize,
                                             personCount: validatedService.personCount,
