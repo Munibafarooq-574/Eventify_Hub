@@ -15,7 +15,7 @@ describe('MessagesModule', () => {
 
   beforeAll(async () => {
     mongod = await MongoMemoryServer.create({
-      instance: { args: ['--nounixsocket'] },
+      instance: {},
     });
     const uri = mongod.getUri();
 
