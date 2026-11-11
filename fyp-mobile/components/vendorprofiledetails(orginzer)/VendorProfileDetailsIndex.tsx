@@ -5967,6 +5967,14 @@ const serviceCityNamesFromIds =
                 </View>
               </View>
             )}
+            {pricingMethod(selectedPackage, !!profileCategoryName?.toLowerCase().includes('catering')) === 'GROUP' &&
+              Number(selectedPackage.groupSize) > 0 && selectedDurationQuote?.price != null && (
+                <Text style={{ color: '#45203D', fontWeight: '600', marginBottom: 8 }}>
+                  Estimated group subtotal: {currencySymbol(currencyOf(selectedPackage))}{' '}
+                  {(Math.ceil(Number(servicePeople ?? selectedPackage.groupSize) / Number(selectedPackage.groupSize)) * Number(selectedDurationQuote.price)).toLocaleString()}
+                  {' '}before promotions
+                </Text>
+              )}
             <TouchableOpacity
               testID={`add-to-cart-${selectedPackage._id}`}
               accessibilityRole="button"
