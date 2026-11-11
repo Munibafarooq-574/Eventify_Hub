@@ -1,4 +1,4 @@
-import { currencySymbol, currencyOf } from '@/utils/currency';
+import { currencySymbol, currencyOf, roundMoney } from '@/utils/currency';
 import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -47,6 +47,32 @@ const { width } = Dimensions.get('window');
 const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
 const ACCENT = "#B84B9A";
+
+function getVendorBookingAmounts(service: {
+    price?: number;
+    originalAmount?: number;
+    discountAmount?: number;
+    finalAmount?: number;
+    commissionAmount?: number;
+    vendorNetAmount?: number | null;
+    currency?: string;
+}) {
+    const original = Number(service.originalAmount ?? service.price ?? service.finalAmount ?? 0);
+    const total = Number(service.finalAmount ?? Math.max(0, original - Number(service.discountAmount ?? 0)));
+    const discount = Number(service.discountAmount ?? Math.max(0, roundMoney(original - total)));
+    const fee = Number(service.commissionAmount ?? 0);
+    const savedNet = service.vendorNetAmount;
+
+    // Legacy net snapshots may still include the discount in the earnings.
+    const matchesBookingTotal = savedNet != null && roundMoney(savedNet + fee) === roundMoney(total);
+    const earnings = matchesBookingTotal ? savedNet : Math.max(0, roundMoney(total - fee));
+    return { original, discount, total, fee, earnings };
+}
+
+const displayBookingMoney = (amount: number, booking: unknown) =>
+    `${currencySymbol(currencyOf(booking))} ${Number(amount).toLocaleString(
+        currencyOf(booking) === "USD" ? "en-US" : "en-PK", { maximumFractionDigits: 2 },
+    )}`;
 
 const getCardColor = (label: string) => {
     switch (label) {
@@ -724,12 +750,16 @@ const OrderSummary = () => {
                         const isExpanded = expandedOrderId === item._id;
                         const scheduleHold = rescheduleHoldReason(item);
                         const acceptanceDisabled = !!scheduleHold || isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId);
-                        // Show only THIS vendor's earnings for the order, not the
-                        // organizer's full bill (which may include other vendors'
-                        // services on the same booking).
-                        const vendorTotal = Array.isArray(item.vendorOrders)
-                            ? item.vendorOrders.reduce((sum: number, s: any) => sum + (s.price || 0), 0)
-                            : item.totalAmount;
+                        const services = Array.isArray(item.vendorOrders) ? item.vendorOrders : [];
+                        const amounts = services.map(getVendorBookingAmounts);
+                        const original = amounts.reduce((sum, amount) => sum + amount.original, 0);
+                        const discount = amounts.reduce((sum, amount) => sum + amount.discount, 0);
+                        const bookingTotal = amounts.reduce((sum, amount) => sum + amount.total, 0);
+                        const earnings = amounts.reduce((sum, amount) => sum + amount.earnings, 0);
+                        const platformFee = amounts.reduce((sum, amount) => sum + amount.fee, 0);
+                        const discountLabel = amounts.length === 1 && original > 0
+                            ? `${Number((discount / original * 100).toFixed(1))}% OFF`
+                            : `Save ${displayBookingMoney(discount, item)}`;
                         return (
                             <TouchableOpacity
                                 activeOpacity={0.85}
@@ -778,7 +808,11 @@ const OrderSummary = () => {
                                         </View>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>{currencySymbol(currencyOf(item))} {vendorTotal}</Text>
+                                            <Text style={styles.detailText}>
+                                                {displayBookingMoney(bookingTotal, item)}
+                                                {discount > 0 && <Text style={styles.originalBookingPrice}>  {displayBookingMoney(original, item)}</Text>}
+                                            </Text>
+                                            {discount > 0 && <Text style={styles.bookingDiscountBadge}>{discountLabel}</Text>}
                                         </View>
 
                                         {(item.vendorOrders || []).map((booking: any) => (
@@ -945,9 +979,21 @@ const OrderSummary = () => {
 
                                                 {/* Booking Details */}
                                                 <Text style={styles.expandedSubTitle}>Booking Details</Text>
+                                                {discount > 0 && (
+                                                    <Text style={styles.detailText}>Original price: {displayBookingMoney(original, item)}</Text>
+                                                )}
+                                                {services.map((service: any, index: number) => amounts[index].discount > 0 && (
+                                                    <Text key={service._id || index} style={styles.detailText}>
+                                                        {service.promotionCode ? `Discount (${service.promotionCode})` : "Discount"}: −{displayBookingMoney(amounts[index].discount, item)}
+                                                    </Text>
+                                                ))}
+                                                <Text style={styles.detailText}>Booking Total: {displayBookingMoney(bookingTotal, item)}</Text>
+                                                {platformFee > 0 && (
+                                                    <Text style={styles.detailText}>Platform Fee: −{displayBookingMoney(platformFee, item)}</Text>
+                                                )}
                                                 <View style={styles.detailRow}>
                                                     <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                    <Text style={styles.detailText}>Your Earnings: {currencySymbol(currencyOf(item))} {vendorTotal}</Text>
+                                                    <Text style={styles.detailText}>Your Earnings: {displayBookingMoney(earnings, item)}</Text>
                                                 </View>
                                                 {!!item.status && (
                                                     <View style={styles.detailRow}>
@@ -963,7 +1009,7 @@ const OrderSummary = () => {
                                                         {item.vendorOrders.map((service: any, idx: number) => {
                                                             const vendorPackages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
                                                             const selectedPackage = vendorPackages.find((pkg: any) => String(pkg?._id || pkg?.id) === String(service?.packageId || ""));
-                                                            const total = Number(service?.finalAmount ?? service?.price ?? 0);
+                                                            const total = amounts[idx].total;
                                                             const paymentStatus = String(service?.paymentStatus || "UNPAID").toUpperCase();
                                                             // remainingAmount is also a pre-payment snapshot, so only
                                                             // secured payment states may contribute to the paid display.
@@ -983,9 +1029,9 @@ const OrderSummary = () => {
                         {service.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
                                                                 {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatBookingTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
                                                                 <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatBookingTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
-                                                                <Text style={styles.serviceDetailText}>Booking Amount: {currencySymbol(currencyOf(service))} {total}</Text>
-                                                                <Text style={styles.serviceDetailText}>Paid: {currencySymbol(currencyOf(service))} {paid}</Text>
-                                                                <Text style={styles.serviceDetailText}>Remaining: {currencySymbol(currencyOf(service))} {remaining}</Text>
+                                                                <Text style={styles.serviceDetailText}>Booking Amount: {displayBookingMoney(total, service.currency ? service : item)}</Text>
+                                                                <Text style={styles.serviceDetailText}>Paid: {displayBookingMoney(paid, service.currency ? service : item)}</Text>
+                                                                <Text style={styles.serviceDetailText}>Remaining: {displayBookingMoney(remaining, service.currency ? service : item)}</Text>
                                                                 <Text style={styles.serviceDetailText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
                                                               </View>
                                                             );
@@ -1397,6 +1443,11 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         marginBottom: 4,
+    },
+    originalBookingPrice: { textDecorationLine: "line-through", color: "#786B74" },
+    bookingDiscountBadge: {
+        color: "#614100", backgroundColor: "#FFE9AA", borderRadius: 9,
+        fontSize: 11, fontWeight: "800", paddingHorizontal: 7, paddingVertical: 3,
     },
     detailText: {
         marginLeft: 6,

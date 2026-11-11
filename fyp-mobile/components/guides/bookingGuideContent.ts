@@ -142,7 +142,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     sections: [
       { id: 'orders', title: 'Find and check the right booking', summary: 'Use status cards, then expand the order.', steps: [
         'Use All or a status card to filter your orders. Expand the booking and check the event, client, package quantity, service timing, address and booking ID.',
-        'Read Paid and Remaining to understand the actual payment position. A package total or earnings label is not proof that payment has been received.',
+        'Booking Total includes the saved discount. Your Earnings subtracts any platform fee. Check Paid and Remaining to see how much the client has actually paid.',
         'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
       ] }, status, service, delivery,
       { id: 'accept', title: 'Accept a new request', summary: 'Mark Processing is your acceptance action.', steps: [

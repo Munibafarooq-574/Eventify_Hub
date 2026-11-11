@@ -2254,12 +2254,13 @@ const commissionPercentage =
 
 vendorOrder.commissionPercentageAtBooking = commissionPercentage;
 
+const commissionBase = Number(vendorOrder.finalAmount ?? vendorOrder.price);
 vendorOrder.commissionAmount = roundForCurrency(
-    (vendorOrder.price * commissionPercentage) / 100, vendorOrder,
+    (commissionBase * commissionPercentage) / 100, vendorOrder,
 );
 
 vendorOrder.vendorNetAmount =
-    roundMoney(vendorOrder.price - vendorOrder.commissionAmount);
+    roundMoney(commissionBase - vendorOrder.commissionAmount);
 }
 
         if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' }, __v: acceptanceVersion == null ? { $exists: false } : acceptanceVersion };
