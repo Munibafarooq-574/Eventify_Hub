@@ -1066,6 +1066,7 @@ const getApplicablePublicCoupon = (packageId: string) => {
     ) => {
       const selectedId = String(selectedPackageId);
       setActivePackage(selectedId);
+      setServicePeople(null);
     };
 
     useEffect(() => {
