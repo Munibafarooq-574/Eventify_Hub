@@ -24,6 +24,7 @@ import {
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { createVendorCoupon } from '../../services/createVendorCoupon';
 import { DiscountKind } from '../../types/discount.types';
@@ -245,37 +246,123 @@ export default function CreateCouponScreen() {
           </Field>
         )}
 
-        <Field label="Apply Discount To">
-          <View style={styles.typeRow}>
-            {(['all', 'selected'] as const).map(scope => (
-              <TouchableOpacity key={scope}
-                style={[styles.typeChip, packageScope === scope && styles.typeChipSelected]}
-                onPress={() => setPackageScope(scope)}>
-                <Text style={[styles.typeChipText, packageScope === scope && styles.typeChipTextSelected]}>
-                  {scope === 'all' ? 'All My Packages' : 'Selected Packages Only'}
+       <Field label="Apply Discount To">
+  {/* Segmented toggle */}
+  <View style={styles.segment}>
+    {([
+      { key: 'all', label: 'All Packages', icon: 'layers-outline' },
+      { key: 'selected', label: 'Selected Only', icon: 'pricetags-outline' },
+    ] as const).map((opt) => {
+      const active = packageScope === opt.key;
+      return (
+        <TouchableOpacity
+          key={opt.key}
+          activeOpacity={0.85}
+          style={[styles.segmentItem, active && styles.segmentItemActive]}
+          onPress={() => {
+            setPackageScope(opt.key);
+            if (opt.key === 'all') setSelectedPackageIds([]);
+          }}
+        >
+          <Ionicons
+            name={opt.icon}
+            size={16}
+            color={active ? '#FFFFFF' : COLORS.muted}
+          />
+          <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+            {opt.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+
+  <Text style={styles.scopeHint}>
+    {packageScope === 'all'
+      ? 'This coupon will work on every package you offer.'
+      : 'Choose the packages this coupon should work on.'}
+  </Text>
+
+  {packageScope === 'selected' && (
+    <View style={styles.packagePanel}>
+      {packagesLoading ? (
+        <View style={styles.panelCenter}>
+          <ActivityIndicator color={COLORS.primary} />
+        </View>
+      ) : packagesError ? (
+        <View style={styles.panelCenter}>
+          <Ionicons name="alert-circle-outline" size={20} color="#B42336" />
+          <Text style={styles.packageHelperError}>
+            Could not load packages. Please try again.
+          </Text>
+        </View>
+      ) : vendorPackages.length === 0 ? (
+        <View style={styles.panelCenter}>
+          <Ionicons name="cube-outline" size={20} color={COLORS.muted} />
+          <Text style={styles.packageHelperText}>No packages available.</Text>
+        </View>
+      ) : (
+        <>
+          <View style={styles.panelHeader}>
+            <Text style={styles.panelCount}>
+              {selectedPackageIds.length} of {vendorPackages.length} selected
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                setSelectedPackageIds(
+                  selectedPackageIds.length === vendorPackages.length
+                    ? []
+                    : vendorPackages.map((p) => p._id),
+                )
+              }
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.panelAction}>
+                {selectedPackageIds.length === vendorPackages.length
+                  ? 'Clear all'
+                  : 'Select all'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {vendorPackages.map((pkg, index) => {
+            const selected = selectedPackageIds.includes(pkg._id);
+            return (
+              <TouchableOpacity
+                key={pkg._id}
+                activeOpacity={0.7}
+                onPress={() =>
+                  setSelectedPackageIds((current) =>
+                    selected
+                      ? current.filter((id) => id !== pkg._id)
+                      : [...current, pkg._id],
+                  )
+                }
+                style={[
+                  styles.packageRow,
+                  index > 0 && styles.packageRowDivider,
+                  selected && styles.packageRowSelected,
+                ]}
+              >
+                <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  ) : null}
+                </View>
+                <Text
+                  style={[styles.packageName, selected && styles.packageNameSelected]}
+                  numberOfLines={2}
+                >
+                  {pkg.packageName}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-          {packageScope === 'selected' && (
-            <View style={{ marginTop: 10, gap: 7 }}>
-              {packagesLoading && <ActivityIndicator color={COLORS.primary} />}
-              {packagesError && <Text style={{ color: '#B42336' }}>Could not load packages. Reopen this screen and try again.</Text>}
-              {!packagesLoading && !packagesError && vendorPackages.length === 0 && <Text style={{ color: COLORS.muted }}>No packages available.</Text>}
-              {vendorPackages.map(pkg => (
-                <TouchableOpacity key={pkg._id}
-                  onPress={() => setSelectedPackageIds(current =>
-                    current.includes(pkg._id) ? current.filter(id => id !== pkg._id) : [...current, pkg._id]
-                  )}
-                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 12,
-                    borderWidth: 1, borderRadius: 10, borderColor: COLORS.border, gap: 9 }}>
-                  <Text style={{ color: COLORS.primary, fontSize: 18 }}>{selectedPackageIds.includes(pkg._id) ? '☑' : '☐'}</Text>
-                  <Text style={{ flex: 1, color: COLORS.text }}>{pkg.packageName}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </Field>
+            );
+          })}
+        </>
+      )}
+    </View>
+  )}
+</Field>
 
         <Field label="Start Date (YYYY-MM-DD)">
           <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-08-29" />
@@ -375,4 +462,104 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+   // ---- Apply Discount To ----
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: '#F3EBF2',
+    borderRadius: 14,
+    padding: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 11,
+  },
+  segmentItemActive: {
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  segmentText: { fontSize: 13.5, fontWeight: '600', color: COLORS.muted },
+  segmentTextActive: { color: '#FFFFFF' },
+
+  scopeHint: {
+    fontSize: 12.5,
+    color: COLORS.muted,
+    marginTop: 8,
+    marginLeft: 2,
+  },
+
+  packagePanel: {
+    marginTop: 12,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: '#FBF7FB',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  panelCount: { fontSize: 12.5, fontWeight: '600', color: COLORS.muted },
+  panelAction: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
+  panelCenter: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 22,
+  },
+
+  packageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: COLORS.card,
+  },
+  packageRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1EBF0',
+  },
+  packageRowSelected: { backgroundColor: '#FBF3FA' },
+
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#D2C6D5',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  packageName: {
+    flex: 1,
+    fontSize: 14.5,
+    lineHeight: 20,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  packageNameSelected: { color: COLORS.primary, fontWeight: '600' },
+
+  packageHelperText: { fontSize: 13, color: COLORS.muted },
+  packageHelperError: { fontSize: 13, color: '#B42336' },
 });
