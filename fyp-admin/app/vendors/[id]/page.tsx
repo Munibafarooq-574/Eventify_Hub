@@ -53,6 +53,7 @@ accountProfileImage: string | null;
   bookingEmail: string;
   phoneNumber: string;
   city: string;
+  serviceCities?: string[];
   officialAddress: string;
   website: string | null;
   instagramLink: string | null;
@@ -656,6 +657,13 @@ export default async function VendorDetailPage({
                   value={
                     vendor.city
                   }
+                />
+
+                <InfoRow
+                  label="Service Coverage Cities"
+                  value={Array.isArray(vendor.serviceCities) && vendor.serviceCities.length
+                    ? vendor.serviceCities.join(" • ")
+                    : "Not configured"}
                 />
 
                 <InfoRow
