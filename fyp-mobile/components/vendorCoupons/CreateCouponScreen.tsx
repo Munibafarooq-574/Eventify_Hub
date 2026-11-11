@@ -1,4 +1,5 @@
 import { currencySymbol } from '@/utils/currency';
+import { getVendorPackagesList, VendorPackageListItem } from '@/services/getVendorPackagesList';
 // fyp-mobile/components/vendorCoupons/CreateCouponScreen.tsx
 //
 // TODO — UI-only redesign, no service/data or validation logic changes:
@@ -8,7 +9,7 @@ import { currencySymbol } from '@/utils/currency';
 //     dependency of expo-router, so it should already be installed).
 //     npm install lucide-react-native react-native-svg
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   View,
@@ -64,6 +65,21 @@ export default function CreateCouponScreen() {
   const [discountValue, setDiscountValue] = useState('');
   const [minimumOrderAmount, setMinimumOrderAmount] = useState('');
   const [maximumDiscountAmount, setMaximumDiscountAmount] = useState('');
+  const [packageScope, setPackageScope] = useState<'all' | 'selected'>('all');
+  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
+  const [vendorPackages, setVendorPackages] = useState<VendorPackageListItem[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [packagesError, setPackagesError] = useState(false);
+  useEffect(() => {
+    if (!vendorIdValue) return;
+    let mounted = true;
+    setPackagesLoading(true);
+    getVendorPackagesList(vendorIdValue).then(items => {
+      if (mounted) { setVendorPackages(items); setPackagesError(false); }
+    }).catch(() => { if (mounted) setPackagesError(true); })
+      .finally(() => { if (mounted) setPackagesLoading(false); });
+    return () => { mounted = false; };
+  }, [vendorIdValue]);
   const [startDate, setStartDate] = useState(todayPlus(0));
   const [endDate, setEndDate] = useState(todayPlus(30));
   const [usageLimit, setUsageLimit] = useState('50');
@@ -118,11 +134,17 @@ export default function CreateCouponScreen() {
       return;
     }
 
+    if (packageScope === 'selected' && (!selectedPackageIds.length || packagesLoading || packagesError)) {
+      Alert.alert('Select packages', 'Select at least one available package for this coupon.');
+      return;
+    }
+
     const payload = {
       code: code.trim().toUpperCase(),
       discountType,
       discountValue: discountValueNum,
       minimumOrderAmount: minimumAmount,
+      ...(packageScope === 'selected' ? { packageIds: selectedPackageIds } : {}),
       maximumDiscountAmount: discountType === DiscountKind.PERCENTAGE && maximumDiscountAmount ? parseFloat(maximumDiscountAmount) : undefined,
       startDate: start.toISOString(),
       endDate: end.toISOString(),
@@ -222,6 +244,38 @@ export default function CreateCouponScreen() {
             <TextInput style={styles.input} placeholder="e.g. 5000" keyboardType="numeric" value={maximumDiscountAmount} onChangeText={setMaximumDiscountAmount} />
           </Field>
         )}
+
+        <Field label="Apply Discount To">
+          <View style={styles.typeRow}>
+            {(['all', 'selected'] as const).map(scope => (
+              <TouchableOpacity key={scope}
+                style={[styles.typeChip, packageScope === scope && styles.typeChipSelected]}
+                onPress={() => setPackageScope(scope)}>
+                <Text style={[styles.typeChipText, packageScope === scope && styles.typeChipTextSelected]}>
+                  {scope === 'all' ? 'All My Packages' : 'Selected Packages Only'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {packageScope === 'selected' && (
+            <View style={{ marginTop: 10, gap: 7 }}>
+              {packagesLoading && <ActivityIndicator color={COLORS.primary} />}
+              {packagesError && <Text style={{ color: '#B42336' }}>Could not load packages. Reopen this screen and try again.</Text>}
+              {!packagesLoading && !packagesError && vendorPackages.length === 0 && <Text style={{ color: COLORS.muted }}>No packages available.</Text>}
+              {vendorPackages.map(pkg => (
+                <TouchableOpacity key={pkg._id}
+                  onPress={() => setSelectedPackageIds(current =>
+                    current.includes(pkg._id) ? current.filter(id => id !== pkg._id) : [...current, pkg._id]
+                  )}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 12,
+                    borderWidth: 1, borderRadius: 10, borderColor: COLORS.border, gap: 9 }}>
+                  <Text style={{ color: COLORS.primary, fontSize: 18 }}>{selectedPackageIds.includes(pkg._id) ? '☑' : '☐'}</Text>
+                  <Text style={{ flex: 1, color: COLORS.text }}>{pkg.packageName}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </Field>
 
         <Field label="Start Date (YYYY-MM-DD)">
           <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-08-29" />
