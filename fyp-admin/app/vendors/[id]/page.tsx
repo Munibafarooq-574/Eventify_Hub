@@ -27,7 +27,6 @@ type VendorPackage = {
   pricingMethod?: string;
   groupSize?: number;
   capacityUnit?: string;
-  peopleIncludedPerGroup?: number;
   maxPeoplePerBooking?: number;
   maxUnitsPerBooking?: number;
   availableParallelUnits?: number;
