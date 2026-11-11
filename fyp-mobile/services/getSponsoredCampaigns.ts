@@ -15,6 +15,7 @@ export interface SponsoredCampaign {
 
   title: string;
   image: string;
+  displayMode?: 'POSTER' | 'AUTO';
   description: string;
   offerLabel?: string | null;
 
