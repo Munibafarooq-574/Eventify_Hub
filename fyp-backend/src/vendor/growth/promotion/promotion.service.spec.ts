@@ -27,6 +27,7 @@ describe('PromotionService featured package ranking', () => {
       { aggregate: async () => [], countDocuments: async () => 0 } as any,
       { canUseFeature: async () => true } as any,
       {} as any,
+      {} as any,
     );
 
     const results = await service.getActiveFeaturedPackages();
@@ -54,5 +55,52 @@ describe('PromotionService featured package ranking', () => {
       { vendorId: newVendorId.toString(), rating: null, totalReviews: 0 },
     ]);
     expect(results[0].featuredScore).toBeGreaterThan(results[1].featuredScore);
+  });
+
+  it.each(['vendor', 'package'] as const)('checks featured %s availability in the event city timezone', async type => {
+    const vendorId = new Types.ObjectId();
+    const packageId = new Types.ObjectId();
+    const cityId = new Types.ObjectId().toString();
+    const vendor = { _id: vendorId, packages: [{ _id: packageId }] };
+    const promotion = { _id: new Types.ObjectId(), vendorId, packageId, startDate: new Date() };
+    const checkVendorAvailability = jest.fn().mockResolvedValue({ available: false });
+    const requireCityTimeZone = jest.fn().mockResolvedValue('America/Los_Angeles');
+    const service = new PromotionService(
+      { find: () => ({ sort: () => ({ lean: async () => [promotion] }) }) } as any,
+      {
+        find: () => ({ select: () => ({ lean: async () => [vendor] }) }),
+        findOne: () => ({
+          select: () => ({ populate: () => ({ populate: () => ({ lean: async () => vendor }) }) }),
+        }),
+      } as any,
+      { aggregate: async () => [] } as any,
+      { aggregate: async () => [] } as any,
+      { canUseFeature: async () => true } as any,
+      { checkVendorAvailability } as any,
+      { requireCityTimeZone } as any,
+    );
+
+    const context = {
+      eventCityId: cityId,
+      eventDate: '2026-11-12',
+      startTime: '14:00',
+      durationMinutes: 60,
+    };
+    const results = type === 'vendor'
+      ? await service.getActiveFeaturedVendors(5, context)
+      : await service.getActiveFeaturedPackages(5, context);
+
+    expect(results).toEqual([]);
+    expect(requireCityTimeZone).toHaveBeenCalledWith(cityId);
+    expect(checkVendorAvailability).toHaveBeenCalledWith(
+      vendorId.toString(),
+      new Date('2026-11-12T22:00:00Z'),
+      new Date('2026-11-12T23:00:00Z'),
+      packageId.toString(),
+      undefined,
+      undefined,
+      false,
+      'America/Los_Angeles',
+    );
   });
 });

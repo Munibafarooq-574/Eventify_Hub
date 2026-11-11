@@ -1,4 +1,6 @@
 import { legacyPricingMethod } from '../../../common/utils/package-pricing';
+import { CityService } from '../../../city/city.service';
+import { eventLocalToUtc } from '../../../common/utils/event-timezone';
 import type { MarketplaceScope } from '../../../city/marketplace.guard';
 
 // fyp-backend/src/vendor/growth/promotion/promotion.service.ts
@@ -91,6 +93,7 @@ private readonly vendorOrderModel: Model<VendorOrder>,
 
 private readonly featureAccessService: FeatureAccessService,
 private readonly availabilityService: VendorAvailabilityService,
+private readonly cityService: CityService,
 ) {}
 
 private async getFeaturedReliabilityScore(
@@ -440,6 +443,20 @@ return this.promotionModel.create({
   // Used by Home / Vendor Search / Package Discovery.
   // ---------------------------------------------------------------
 
+  private async resolveFeaturedEventWindow(context: FeaturedVendorDiscoveryContext) {
+    const { eventDate, startTime, durationMinutes } = context;
+    const cityId = context.eventCityId?.trim() || context.marketplace?.cityId;
+    if (!cityId || !eventDate || !startTime || typeof durationMinutes !== 'number' ||
+      !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      return undefined;
+    }
+
+    const timeZone = await this.cityService.requireCityTimeZone(cityId);
+    const start = eventLocalToUtc(eventDate, startTime, timeZone);
+    const end = new Date(start.getTime() + durationMinutes * 60_000);
+    return { start, end, timeZone };
+  }
+
   async getActiveFeaturedVendors(
   limit = 5,
   context: FeaturedVendorDiscoveryContext = {},
@@ -469,35 +486,7 @@ if (
   return [];
 }
 
-const hasAvailabilityContext =
-  Boolean(context.eventDate) &&
-  Boolean(context.startTime) &&
-  typeof context.durationMinutes === 'number' &&
-  Number.isFinite(context.durationMinutes) &&
-  context.durationMinutes > 0;
-
-let eventStartDateTime: Date | undefined;
-let eventEndDateTime: Date | undefined;
-
-if (hasAvailabilityContext) {
-  const [hours, minutes] =
-    context.startTime!.split(':').map(Number);
-
-  eventStartDateTime =
-    new Date(context.eventDate!);
-
-  eventStartDateTime.setHours(
-    hours,
-    minutes,
-    0,
-    0,
-  );
-
-  eventEndDateTime = new Date(
-    eventStartDateTime.getTime() +
-      context.durationMinutes! * 60000,
-  );
-}
+  const eventWindow = await this.resolveFeaturedEventWindow(context);
 
   // Do NOT limit here.
   // Mandatory eligibility must happen before final limit.
@@ -564,11 +553,7 @@ if (hasAvailabilityContext) {
   continue;
 }
 
-if (
-  hasAvailabilityContext &&
-  eventStartDateTime &&
-  eventEndDateTime
-) {
+if (eventWindow) {
   const packages =
     (vendor as any).packages ?? [];
 
@@ -577,9 +562,13 @@ if (
       packages.map((pkg: any) =>
         this.availabilityService.checkVendorAvailability(
           vendorId,
-          eventStartDateTime!,
-          eventEndDateTime!,
+          eventWindow.start,
+          eventWindow.end,
           pkg._id?.toString(),
+          undefined,
+          undefined,
+          false,
+          eventWindow.timeZone,
         ),
       ),
     );
@@ -726,35 +715,7 @@ async getActiveFeaturedPackages(
   return [];
 }
 
-const hasAvailabilityContext =
-  Boolean(context.eventDate) &&
-  Boolean(context.startTime) &&
-  typeof context.durationMinutes === 'number' &&
-  Number.isFinite(context.durationMinutes) &&
-  context.durationMinutes > 0;
-
-let eventStartDateTime: Date | undefined;
-let eventEndDateTime: Date | undefined;
-
-if (hasAvailabilityContext) {
-  const [hours, minutes] =
-    context.startTime!.split(':').map(Number);
-
-  eventStartDateTime =
-    new Date(context.eventDate!);
-
-  eventStartDateTime.setHours(
-    hours,
-    minutes,
-    0,
-    0,
-  );
-
-  eventEndDateTime = new Date(
-    eventStartDateTime.getTime() +
-      context.durationMinutes! * 60000,
-  );
-}
+  const eventWindow = await this.resolveFeaturedEventWindow(context);
 
   // Do not limit before mandatory eligibility.
   const activePromotions =
@@ -954,17 +915,17 @@ if (hasAvailabilityContext) {
   continue;
 }
 
-if (
-  hasAvailabilityContext &&
-  eventStartDateTime &&
-  eventEndDateTime
-) {
+if (eventWindow) {
   const availability =
     await this.availabilityService.checkVendorAvailability(
       vendorId,
-      eventStartDateTime,
-      eventEndDateTime,
+      eventWindow.start,
+      eventWindow.end,
       promotionPackageId,
+      undefined,
+      undefined,
+      false,
+      eventWindow.timeZone,
     );
 
   if (!availability.available) {
