@@ -17,15 +17,6 @@ export default async function postAddPackages(
     data: packages,
   };
 
-  try {
-    const response = await axios(config);
-    return response.data;
-  } catch (error: any) {
-    console.error(
-      "Error creating vendor packages:",
-      error?.response?.data || error?.message || error
-    );
-
-    throw error;
-  }
+  const response = await axios(config);
+  return response.data;
 }

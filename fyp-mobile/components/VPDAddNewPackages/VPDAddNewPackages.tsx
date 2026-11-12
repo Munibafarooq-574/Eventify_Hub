@@ -782,6 +782,8 @@ const removeImageAsset = (index: number) => {
   // Validation
   // ---------------------------------------------------------
 
+  const hasIncludedServices = services.trim().length > 0;
+
   const isFormValid = useMemo(() => {
   const hasName =
     packageName.trim().length > 0;
@@ -793,7 +795,7 @@ const removeImageAsset = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasIncludedServices) {
     return false;
   }
 
@@ -838,7 +840,7 @@ const removeImageAsset = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions,
+  pricing, pricingOptions, hasIncludedServices,
   packageName,
   price,
   delivery,
@@ -1156,23 +1158,10 @@ if (!userId) {
         },
       ]
     );
-  } catch (err: any) {
-    console.error(
-      "Error saving package:",
-      err?.response?.data ||
-        err?.message ||
-        err
-    );
-
+  } catch {
     Alert.alert(
-      "Error",
-      (typeof err?.response?.data?.message === "string"
-        ? err.response.data.message
-        : typeof err?.response?.data?.message?.message === "string"
-          ? err.response.data.message.message
-          : typeof err?.message === "string"
-            ? err.message
-            : "Could not save package. Try again.")
+      "Could not save package",
+      "Please try again in a moment.",
     );
   } finally {
     setLoading(false);
@@ -1344,6 +1333,11 @@ if (!userId) {
               placeholder="e.g. Photography, Videography, Drone, Album..."
               placeholderTextColor="#9C9CA3"
             />
+            {!hasIncludedServices && (
+              <Text style={{ color: "#B42318", marginTop: 6 }}>
+                Required. Add at least one service or item included in this package.
+              </Text>
+            )}
           </View>
         </View>
 

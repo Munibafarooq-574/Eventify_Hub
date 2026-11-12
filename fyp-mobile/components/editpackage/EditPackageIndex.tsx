@@ -831,6 +831,8 @@ const removeExistingImage = (index: number) => {
   // Validation
   // -------------------------------------------------------
 
+  const hasIncludedServices = editableServices.trim().length > 0;
+
   const isFormValid = useMemo(() => {
   const hasName =
     editableName.trim().length > 0;
@@ -842,7 +844,7 @@ const removeExistingImage = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasIncludedServices) {
     return false;
   }
 
@@ -887,7 +889,7 @@ const removeExistingImage = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions,
+  pricing, pricingOptions, hasIncludedServices,
   editableName,
   editablePrice,
   delivery,
@@ -907,6 +909,11 @@ const removeExistingImage = (index: number) => {
 
  const updatePackageDetails = async () => {
   if (!packageId) return;
+
+  if (!hasIncludedServices) {
+    Alert.alert("What's Included is required", "Add at least one service or item included in this package.");
+    return;
+  }
 
   if (!bookingType || !isFormValid) {
     Alert.alert(
@@ -1153,30 +1160,11 @@ if (user?._id) {
         },
       ],
     );
-  } catch (error: any) {
-    console.error(
-      "Update error:",
-      error?.response?.data ||
-        error?.message ||
-        error,
+  } catch {
+    Alert.alert(
+      "Could not save package",
+      "Please try again in a moment.",
     );
-
-   const rawMessage =
-  error?.response?.data?.message;
-
-const safeMessage =
-  typeof rawMessage === "string"
-    ? rawMessage
-    : typeof rawMessage?.message === "string"
-      ? rawMessage.message
-      : typeof error?.message === "string"
-        ? error.message
-        : "Failed to update package.";
-
-Alert.alert(
-  "Error",
-  safeMessage,
-);
   } finally {
     setUploadingImages(false);
   }
@@ -1693,6 +1681,11 @@ Alert.alert(
                   TEXT_MUTED
                 }
               />
+              {!hasIncludedServices && (
+                <Text style={{ color: "#B42318", marginTop: 6 }}>
+                  Required. Add at least one service or item included in this package.
+                </Text>
+              )}
             </View>
 
             {/* Booking Type */}
