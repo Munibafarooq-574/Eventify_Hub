@@ -1,3 +1,4 @@
+import BookingUserGuide from '@/components/guides/BookingUserGuide';
 import { currencySymbol } from '@/utils/currency';
 import { pricingLabel } from '@/utils/packagePricing';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -1234,6 +1235,7 @@ if (!userId) {
           <View style={{ width: 42 }} />
         </View>
         <Text style={styles.topHeaderSubtitle}>{isEditMode ? "Update the details of this package" : "Build a package clients will love"}</Text>
+        <BookingUserGuide kind="packageCreation" />
         {/* -------------------------------------------------
             Package Basic Information
         ------------------------------------------------- */}

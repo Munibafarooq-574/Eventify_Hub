@@ -1,6 +1,8 @@
-export type BookingGuideKind = 'clientEvents' | 'vendorEvents' | 'vendorOrders';
+import { packageCreationGuide } from './packageCreationGuide';
+
+export type BookingGuideKind = 'clientEvents' | 'vendorEvents' | 'vendorOrders' | 'packageCreation';
 export type GuideSection = { id: string; title: string; summary: string; steps: string[]; note?: string };
-export type BookingGuide = { title: string; introduction: string; quickSteps: string[]; sections: GuideSection[] };
+export type BookingGuide = { title: string; launchTitle?: string; launchHint?: string; footer?: string; introduction: string; quickSteps: string[]; sections: GuideSection[] };
 
 const timing: GuideSection = {
   id: 'payment-time', title: 'Payment deadlines, made simple', summary: 'Read the exact deadline on each vendor booking.',
@@ -59,6 +61,7 @@ const laterClient: GuideSection = {
 };
 
 export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
+  packageCreation: packageCreationGuide,
   clientEvents: {
     title: 'My Events · Client guide',
     introduction: 'Follow each vendor from booking request to service completion. Open a topic below for the steps you need.',

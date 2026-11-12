@@ -15,7 +15,7 @@ export default function BookingUserGuide({ kind, primary = '#780C60' }: Props) {
   return <>
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${guide.title}`} onPress={() => { setExpanded(guide.sections[0].id); setVisible(true); }} style={styles.launch}>
       <View style={[styles.launchIcon, { backgroundColor: primary }]}><Ionicons name="book-outline" size={20} color="#FFFFFF" /></View>
-      <View style={styles.launchCopy}><Text style={[styles.launchTitle, { color: primary }]}>User Guide</Text><Text style={styles.launchHint}>Booking steps, payments &amp; available actions</Text></View>
+      <View style={styles.launchCopy}><Text style={[styles.launchTitle, { color: primary }]}>{guide.launchTitle ?? 'User Guide'}</Text><Text style={styles.launchHint}>{guide.launchHint ?? 'Booking steps, payments & available actions'}</Text></View>
       <Ionicons name="chevron-forward" size={18} color={primary} />
     </TouchableOpacity>
     {visible && <Modal visible transparent animationType="slide" onRequestClose={close} statusBarTranslucent>
@@ -45,7 +45,7 @@ export default function BookingUserGuide({ kind, primary = '#780C60' }: Props) {
                 </View>}
               </View>;
             })}
-            <Text style={styles.footer}>Use the exact status, deadline and timezone shown on your booking. Examples in this guide are illustrations, not new deadlines.</Text>
+            <Text style={styles.footer}>{guide.footer ?? 'Use the exact status, deadline and timezone shown on your booking. Examples in this guide are illustrations, not new deadlines.'}</Text>
           </ScrollView>
         </View>
       </View>
