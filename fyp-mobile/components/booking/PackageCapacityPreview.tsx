@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { PackagePricing } from '@/utils/packagePricing';
 import { packagePreviewStyles as styles } from './packagePreviewStyles';
 
@@ -10,7 +10,10 @@ const unitLabels = {
   SETUP: 'Setups',
 };
 
-export default function PackageCapacityPreview({ pkg }: { pkg: PackagePricing }) {
+export default function PackageCapacityPreview({ pkg, sectionStyle }: {
+  pkg: PackagePricing;
+  sectionStyle?: StyleProp<ViewStyle>;
+}) {
   const { capacityUnit, maxPeoplePerBooking, maxUnitsPerBooking, availableParallelUnits } = pkg;
   if (!capacityUnit) return null;
 
@@ -24,20 +27,27 @@ export default function PackageCapacityPreview({ pkg }: { pkg: PackagePricing })
   ];
 
   return (
-    <View style={styles.previewDurationSection}>
-      <Text accessibilityRole="header" style={styles.previewSectionTitle}>Service Capacity</Text>
-      <View style={styles.previewDurationRow}>
+    <View style={sectionStyle ?? styles.previewDurationSection}>
+      <Text accessibilityRole="header" style={[styles.previewSectionTitle, sectionStyle && detailStyles.title]}>Service Capacity</Text>
+      <View style={[styles.previewDurationRow, sectionStyle && detailStyles.row]}>
         <Text style={styles.previewDurationText}>Capacity unit</Text>
-        <Text style={styles.previewDurationPrice}>{unitLabels[capacityUnit]}</Text>
+        <Text style={[styles.previewDurationPrice, sectionStyle && detailStyles.value]}>{unitLabels[capacityUnit]}</Text>
       </View>
       {limits
         .filter(({ value }) => value != null && Number.isSafeInteger(value) && value > 0)
         .map(({ label, value }) => (
-          <View key={label} style={styles.previewDurationRow}>
+          <View key={label} style={[styles.previewDurationRow, sectionStyle && detailStyles.row]}>
             <Text style={styles.previewDurationText}>{label}</Text>
-            <Text style={styles.previewDurationPrice}>{value}</Text>
+            <Text style={[styles.previewDurationPrice, sectionStyle && detailStyles.value]}>{value}</Text>
           </View>
         ))}
     </View>
   );
 }
+
+
+const detailStyles = StyleSheet.create({
+  title: { marginBottom: 4 },
+  row: { paddingVertical: 5 },
+  value: { flex: 0, maxWidth: '45%' },
+});

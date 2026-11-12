@@ -1262,7 +1262,7 @@ const category =
   </Text>
 </View>
 
-          <PackageCapacityPreview pkg={pkg} />
+          <PackageCapacityPreview pkg={pkg} sectionStyle={styles.packageInfoSection} />
 
 {/* DURATION BASED */}
 {(!pkg.bookingType || pkg.bookingType === "DURATION_BASED") && (

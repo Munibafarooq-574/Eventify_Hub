@@ -4728,7 +4728,7 @@ const serviceCityNamesFromIds =
   </Text>
 </View>
 
-          <PackageCapacityPreview pkg={selectedPackage} />
+          <PackageCapacityPreview pkg={selectedPackage} sectionStyle={styles.packageInfoSection} />
 
           {/* Booking Type Configuration */}
 
