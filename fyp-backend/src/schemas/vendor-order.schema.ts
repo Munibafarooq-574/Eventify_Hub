@@ -1,3 +1,4 @@
+import type { ServiceCapacity } from '../common/utils/service-capacity';
 import { PRICING_METHODS, PricingMethod } from '../common/utils/package-pricing';
 
 // fyp-backend/src/schemas/vendor-order.schema.ts
@@ -75,6 +76,8 @@ export class VendorOrder extends Document {
     @Prop({ type: String, enum: PRICING_METHODS }) pricingMethod?: PricingMethod;
     @Prop({ type: Number }) groupSize?: number | null;
     @Prop({ type: Number }) personCount?: number | null;
+    @Prop({ type: String, enum: ['PERSON', 'GROUP', 'VEHICLE', 'TEAM', 'SETUP'] })
+    capacityUnit?: ServiceCapacity['capacityUnit'];
     @Prop({ type: DeliverySnapshotSchema }) delivery?: DeliverySnapshot;
     @Prop() bookingType?: string;
     @Prop() bookingChatTimeZone?: string;

@@ -3,7 +3,7 @@ import { validateCoupon } from '@/services/validateCoupon';
 import { assertSingleCurrency, currencySymbol, currencyOf, cartCurrency } from '@/utils/currency';
 import { eventLocalDateTime, validTimeZone } from '@/utils/bookingTimezone';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { packageAmount, pricingLabel, pricingMethod } from '@/utils/packagePricing';
+import { packageAmount, pricingMethod } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import { checkReviewPackageAvailability } from "@/services/checkReviewPackageAvailability";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
@@ -2107,11 +2107,21 @@ const vendorPackageCount = countPackageUnits(packages);
                   <View style={styles.vendorDivider} />
 
                   {packages.map((pkg: any, packageIndex: number) => {
-                    const isCatering =
-                      cateringCategory?._id &&
-                      vendor?.vendor?.buisnessCategory === cateringCategory._id;
-
+                    const isCatering = !!(cateringCategory?._id &&
+                      vendor?.vendor?.buisnessCategory === cateringCategory._id) ||
+                      pkg.categoryName?.toLowerCase().includes('catering');
+                    const method = pricingMethod(pkg, !!isCatering);
                     const quantity = Math.max(1, Number(pkg.quantity || 1));
+                    const people = Number(pkg.personCount ?? (method === 'GROUP' ? pkg.groupSize : guests));
+                    const peopleLabel = `${people} ${people === 1 ? 'person' : 'people'}`;
+                    const groupLabel = `${quantity} ${quantity === 1 ? 'group' : 'groups'}`;
+                    const fixedUnit = pkg.capacityUnit === 'VEHICLE' ? 'vehicle' :
+                      pkg.capacityUnit === 'TEAM' ? 'team' : pkg.capacityUnit === 'SETUP' ? 'setup' : 'package';
+                    const selectionLabel = method === 'PER_PERSON'
+                      ? `People receiving this service: ${peopleLabel}`
+                      : method === 'GROUP'
+                        ? `People receiving this service: ${peopleLabel} · ${groupLabel}`
+                        : `Quantity: ${quantity} ${fixedUnit}${quantity === 1 ? '' : 's'}`;
                     const finalPrice = getPackageAmount(vendor, pkg);
 
                     const vendorId = String(
@@ -2153,16 +2163,10 @@ const vendorPackageCount = countPackageUnits(packages);
                           </Text>
                           <PackagePricingLabel pkg={pkg} legacyPerPerson={!!isCatering} />
 
-                          {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && (
-                            <View style={styles.guestTag}>
-                              <Ionicons name="people-outline" size={12} color={GOLD} />
-                              <Text style={styles.guestTagText}>{pkg.personCount ?? guests} people</Text>
-                            </View>
-                          )}
-
-                          <Text style={styles.guestTagText}>Quantity: {quantity} · {pricingLabel(pkg, !!isCatering)}</Text>
-                          {pricingMethod(pkg, !!isCatering) === 'PER_PERSON' && <Text style={styles.guestTagText}>People: {pkg.personCount ?? guests}</Text>}
-                          {pricingMethod(pkg, !!isCatering) === 'GROUP' && <Text style={styles.guestTagText}>People included: {Number(pkg.groupSize) * quantity}</Text>}
+                          <View style={styles.guestTag}>
+                            <Ionicons name={method === 'FIXED' ? 'cube-outline' : 'people-outline'} size={12} color={GOLD} />
+                            <Text style={[styles.guestTagText, { flexShrink: 1 }]}>{selectionLabel}</Text>
+                          </View>
                           <Text style={styles.packagePrice}>
                             {currencySymbol(currencyOf(pkg))} {formatCurrency(appliedPromotion?.finalAmount ?? finalPrice)}
                             {appliedPromotion && (

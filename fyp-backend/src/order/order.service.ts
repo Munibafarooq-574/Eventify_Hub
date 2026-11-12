@@ -626,6 +626,7 @@ export class OrderService {
                         serviceName: string;
                         quantity: number;
                         resourceUnits?: number;
+                        capacityUnit?: VendorOrder['capacityUnit'];
                         pricingMethod: 'FIXED' | 'PER_PERSON' | 'GROUP';
                         groupSize: number | null;
                         personCount: number | null;
@@ -1089,9 +1090,12 @@ export class OrderService {
                                     ),
                                 quantity,
                                 resourceUnits: packageDoc.availableParallelUnits != null ? resourceUnits : undefined,
+                                capacityUnit: packageDoc.capacityUnit,
                                 pricingMethod: pricing.pricingMethod,
                                 groupSize: pricing.groupSize,
-                                personCount: pricing.personCount,
+                                personCount: pricing.pricingMethod === 'GROUP' && Number.isSafeInteger(service.personCount) && Number(service.personCount) > 0
+                                    ? Number(service.personCount)
+                                    : pricing.personCount,
                                 unitPrice:
                                     Number(
                                         unitPrice,
@@ -1243,6 +1247,7 @@ export class OrderService {
                                                 null,
                                             quantity: validatedService.quantity,
                                             resourceUnits: validatedService.resourceUnits,
+                                            capacityUnit: validatedService.capacityUnit,
                                             pricingMethod: validatedService.pricingMethod,
                                             groupSize: validatedService.groupSize,
                                             personCount: validatedService.personCount,
@@ -1366,6 +1371,7 @@ export class OrderService {
                     vendorId: booking.vendorId,
                     serviceName: booking.serviceName,
                     quantity: booking.quantity,
+                    capacityUnit: booking.capacityUnit,
                     pricingMethod: booking.pricingMethod,
                     personCount: booking.personCount,
                     groupSize: booking.groupSize,
