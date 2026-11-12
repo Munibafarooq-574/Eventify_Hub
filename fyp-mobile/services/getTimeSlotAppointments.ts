@@ -1,8 +1,10 @@
+import type { AppointmentTiming } from '@/utils/appointmentTiming';
 import { growthApi } from './growthApiClient';
 
 export type TimeSlotAppointment = {
   startDateTime: string;
   endDateTime: string;
+  timing?: Exclude<AppointmentTiming, 'BOTH'>;
   available: boolean;
   reason?: string;
 };

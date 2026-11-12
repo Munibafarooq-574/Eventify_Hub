@@ -19,7 +19,7 @@ import { FeatureAccessService } from 'src/vendor/growth/feature-access.service';
 import { CityService } from '../city/city.service';
 import { eventLocalToUtc } from '../common/utils/event-timezone';
 import { SetAvailabilityDto } from './dto/set-availability.dto';
-import { buildAppointmentCandidates } from './appointment-candidates';
+import { appointmentConfigurationError, isAppointmentInAllowedWindow, packageAppointmentCandidates } from './appointment-candidates';
 import { minimumWorkingWindowMinutes, workingWindowMinutes } from './working-window';
 
 const DAY_CODES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -305,7 +305,7 @@ if (!hasAccess) {
     replacementMode = false,
     eventTimeZone = 'UTC',
     deliverySelection?: { startDateTime: string | Date; configuration?: any },
-    setupSelection?: { startDateTime: string | Date; endDateTime: string | Date },
+    serviceWindowSelection?: { startDateTime: string | Date; endDateTime: string | Date },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -498,29 +498,29 @@ if (!hasAccess) {
         }
 
         case 'TIME_SLOT_BASED': {
-          const requiredDuration =
-            selectedPackage.requiredServiceDurationMinutes;
+          const error = appointmentConfigurationError(selectedPackage);
+          if (error) return { vendorId, available: false, reason: error };
 
-          if (
-            typeof requiredDuration !== 'number' ||
-            !Number.isFinite(requiredDuration) ||
-            requiredDuration <= 0
-          ) {
-            return {
-              vendorId,
-              available: false,
-              reason:
-                'Package does not have a valid required service duration',
-            };
+          if (serviceWindowSelection) {
+            startDateTime = new Date(serviceWindowSelection.startDateTime);
+            endDateTime = new Date(serviceWindowSelection.endDateTime);
+            if (!isAppointmentInAllowedWindow(selectedPackage, eventStartDateTime, requestedEnd, startDateTime, endDateTime)) {
+              return { vendorId, available: false, reason: 'The appointment must fit an allowed window and match the package duration.' };
+            }
+          } else if (selectedPackage.appointmentTiming) {
+            // Discovery and schedule changes look for a bookable slot in the configured windows.
+            for (const candidate of packageAppointmentCandidates(selectedPackage, eventStartDateTime, requestedEnd)) {
+              const result = await this.checkVendorAvailability(
+                vendorId, eventStartDateTime, requestedEnd, packageId, session,
+                excludeVendorOrderId, replacementMode, eventTimeZone, undefined, candidate,
+              );
+              if (result.available) return result;
+            }
+            return { vendorId, available: false, reason: 'No appointment is available in the allowed window.' };
+          } else {
+            startDateTime = eventStartDateTime;
+            endDateTime = new Date(eventStartDateTime.getTime() + selectedPackage.requiredServiceDurationMinutes * 60_000);
           }
-
-          startDateTime = new Date(eventStartDateTime);
-
-          endDateTime = new Date(
-            eventStartDateTime.getTime() +
-              requiredDuration * 60000,
-          );
-
           break;
         }
 
@@ -573,9 +573,9 @@ if (!hasAccess) {
           const earliest = eventStartDateTime.getTime() + startOffset * 60000;
           const latestEnd = eventStartDateTime.getTime() + endOffset * 60000;
           const durationMs = duration * 60000;
-          if (setupSelection) {
-            const selectedStart = new Date(setupSelection.startDateTime);
-            const selectedEnd = new Date(setupSelection.endDateTime);
+          if (serviceWindowSelection) {
+            const selectedStart = new Date(serviceWindowSelection.startDateTime);
+            const selectedEnd = new Date(serviceWindowSelection.endDateTime);
             if (!Number.isFinite(selectedStart.getTime()) || !Number.isFinite(selectedEnd.getTime()) ||
                 selectedStart.getTime() < earliest || selectedEnd.getTime() > latestEnd ||
                 selectedEnd.getTime() - selectedStart.getTime() !== durationMs) {
@@ -910,25 +910,30 @@ return {
     const selectedPackage: any = (vendor.packages ?? []).find(
       (pkg: any) => String(pkg._id) === packageId,
     );
-    if (!selectedPackage || selectedPackage.bookingType !== 'TIME_SLOT_BASED') {
+    if (!selectedPackage || selectedPackage.isActive === false || selectedPackage.bookingType !== 'TIME_SLOT_BASED') {
       throw new BadRequestException('A Time Slot Based package is required');
     }
     const duration = selectedPackage.requiredServiceDurationMinutes;
-    const candidates = buildAppointmentCandidates(eventStart, eventEnd, duration);
+    const error = appointmentConfigurationError(selectedPackage);
+    if (error) throw new BadRequestException(error);
+    const candidates = packageAppointmentCandidates(selectedPackage, eventStart, eventEnd);
     const results = await Promise.all(candidates.map(async candidate => {
       const result = await this.checkVendorAvailability(
         vendorId,
-        candidate.startDateTime,
-        candidate.endDateTime,
+        eventStart,
+        eventEnd,
         packageId,
         undefined,
         undefined,
         false,
         eventTimeZone,
+        undefined,
+        candidate,
       );
       return {
         startDateTime: candidate.startDateTime,
         endDateTime: candidate.endDateTime,
+        timing: candidate.timing,
         available: result.available,
         reason: result.reason,
       };

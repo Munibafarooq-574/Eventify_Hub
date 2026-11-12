@@ -1,3 +1,4 @@
+import type { AppointmentTiming } from '@/utils/appointmentTiming';
 //fyp-mobile/dto/CreatePackage.dto.ts
 export interface PackageDurationOptionDto {
   value: number;
@@ -26,6 +27,8 @@ export interface PackageDto {
   requiredServiceDurationMinutes?: number;
 
   // Service window relative to event start
+  appointmentTiming?: AppointmentTiming;
+  duringEventDurationMinutes?: number | null;
   serviceWindowStartOffsetMinutes?: number;
   serviceWindowEndOffsetMinutes?: number;
 

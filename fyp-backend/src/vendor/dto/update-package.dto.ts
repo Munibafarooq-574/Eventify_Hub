@@ -1,3 +1,4 @@
+import { APPOINTMENT_TIMINGS, type AppointmentTiming } from '../../vendor-availability/appointment-candidates';
 import { PackagePricingDto } from './package-pricing.dto';
 // src/vendor/dto/update-package.dto.ts
 
@@ -5,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -58,6 +60,15 @@ export class UpdatePackageDto extends PackagePricingDto {
   @IsNumber()
   @Min(1)
   requiredServiceDurationMinutes?: number;
+
+  @IsOptional()
+  @IsEnum([...APPOINTMENT_TIMINGS])
+  appointmentTiming?: AppointmentTiming;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  duringEventDurationMinutes?: number | null;
 
   @IsOptional()
   @IsNumber()

@@ -1,3 +1,4 @@
+import { APPOINTMENT_TIMINGS, type AppointmentTiming } from '../vendor-availability/appointment-candidates';
 import { PRICING_METHODS, PricingMethod } from '../common/utils/package-pricing';
 //fyp-backend/src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
@@ -806,6 +807,12 @@ export class Package {
   // Existing DURATION_BASED packages continue using durations[].
   @Prop({ required: false, min: 1 })
   requiredServiceDurationMinutes?: number;
+
+  @Prop({ type: String, enum: [...APPOINTMENT_TIMINGS] })
+  appointmentTiming?: AppointmentTiming;
+
+  @Prop({ type: Number, min: 1 })
+  duringEventDurationMinutes?: number | null;
 
   // Optional service window relative to the event start.
   // Negative = before event, positive = after event.

@@ -1,3 +1,4 @@
+import { APPOINTMENT_TIMING_LABELS, appointmentTimingSummary } from '@/utils/appointmentTiming';
 import { getEligibleCoupons } from '@/services/getEligibleCoupons';
 import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
@@ -1845,7 +1846,9 @@ Toast.show({
           pkg.bookingType || 'DURATION_BASED',
 
         requiredServiceDurationMinutes:
-          pkg.requiredServiceDurationMinutes,
+          pkg.bookingType === 'TIME_SLOT_BASED' && selectedAppointment
+            ? (Date.parse(selectedAppointment.endDateTime) - Date.parse(selectedAppointment.startDateTime)) / 60_000
+            : pkg.requiredServiceDurationMinutes,
 
         serviceWindowStartOffsetMinutes:
           pkg.serviceWindowStartOffsetMinutes,
@@ -4833,23 +4836,34 @@ const serviceCityNamesFromIds =
               ) : appointmentLoading ? <ActivityIndicator color={PRIMARY} /> : appointmentSlots.length === 0 ? (
                 <Text style={{ color: '#777' }}>No appointment options available for the selected event time.</Text>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {appointmentSlots.map(slot => {
-                    const chosen = selectedAppointment?.startDateTime === slot.startDateTime;
-                    const label = (date: string) => new Date(date).toLocaleTimeString('en-PK', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit' });
-                    return (
-                      <TouchableOpacity
-                        key={slot.startDateTime}
-                        disabled={!slot.available}
-                        onPress={() => setSelectedAppointment(slot)}
-                        style={{ borderWidth: 1, borderColor: chosen ? PRIMARY : '#DDD', backgroundColor: chosen ? '#F9EAF5' : '#FFF', opacity: slot.available ? 1 : 0.45, borderRadius: 12, padding: 12 }}
-                      >
-                        <Text style={{ color: chosen ? PRIMARY : '#333', fontWeight: '600' }}>{label(slot.startDateTime)} – {label(slot.endDateTime)}</Text>
-                        <Text style={{ color: slot.available ? '#328653' : '#A33', fontSize: 12 }}>{slot.available ? 'Available' : 'Unavailable'}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                (['BEFORE_EVENT', 'DURING_EVENT'] as const).map(timing => {
+                  const slots = appointmentSlots.filter(slot => (slot.timing ?? 'DURING_EVENT') === timing);
+                  if (!slots.length) return null;
+                  return (
+                    <View key={timing} style={{ gap: 8, marginBottom: 12 }}>
+                      <Text style={{ color: PRIMARY, fontWeight: '600' }}>{APPOINTMENT_TIMING_LABELS[timing]}</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                        {slots.map(slot => {
+                          const chosen = selectedAppointment?.startDateTime === slot.startDateTime;
+                          const label = (date: string) => new Date(date).toLocaleTimeString('en-PK', { timeZone: eventTimeZone, hour: 'numeric', minute: '2-digit' });
+                          const day = new Date(slot.startDateTime).toLocaleDateString('en-PK', { timeZone: eventTimeZone, month: 'short', day: 'numeric' });
+                          return (
+                            <TouchableOpacity
+                              key={slot.startDateTime}
+                              disabled={!slot.available}
+                              onPress={() => setSelectedAppointment(slot)}
+                              style={{ borderWidth: 1, borderColor: chosen ? PRIMARY : '#DDD', backgroundColor: chosen ? '#F9EAF5' : '#FFF', opacity: slot.available ? 1 : 0.45, borderRadius: 12, padding: 12 }}
+                            >
+                              {timing === 'BEFORE_EVENT' && <Text style={{ color: '#555', fontSize: 12 }}>{day}</Text>}
+                              <Text style={{ color: chosen ? PRIMARY : '#333', fontWeight: '600' }}>{label(slot.startDateTime)} – {label(slot.endDateTime)}</Text>
+                              <Text style={{ color: slot.available ? '#328653' : '#A33', fontSize: 12 }}>{slot.available ? 'Available' : 'Unavailable'}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })
               )}
             </View>
           )}
@@ -4867,6 +4881,7 @@ const serviceCityNamesFromIds =
                 </Text>
               </View>
 
+              <Text style={styles.packageDetailItem}>{appointmentTimingSummary(selectedPackage)}</Text>
               <Text style={styles.packageDetailItem}>
                 Required Slot Duration:{' '}
                 {selectedPackage.requiredServiceDurationMinutes ?? 'N/A'} minutes
@@ -5992,6 +6007,10 @@ const serviceCityNamesFromIds =
                     ? 'Added to Cart'
                     : checkingCoupons && isClientView
                       ? 'Checking offer…'
+                      : selectedPackage.bookingType === 'TIME_SLOT_BASED' && appointmentLoading
+                        ? 'Checking appointment slots…'
+                      : selectedPackage.bookingType === 'TIME_SLOT_BASED' && !selectedAppointment && appointmentSlots.some(slot => slot.available)
+                        ? 'Select an appointment slot'
                       : cartDisabled
                       ? 'Unavailable'
                       : `Book this package · ${selectedPackageDisplayPrice}`}

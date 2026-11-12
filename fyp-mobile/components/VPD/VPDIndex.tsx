@@ -1,3 +1,4 @@
+import { appointmentTimingSummary } from '@/utils/appointmentTiming';
 import { currencySymbol, currencyOf, countryCurrency } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -1412,6 +1413,7 @@ const category =
         Time Slot Configuration
       </Text>
     </View>
+    <Text style={styles.packageDetailItem}>{appointmentTimingSummary(pkg)}</Text>
 
     <Text style={styles.packageDetailItem}>
       Time Needed Per Booking:{" "}

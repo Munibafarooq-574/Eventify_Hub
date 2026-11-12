@@ -1,3 +1,5 @@
+import AppointmentTimingField from '@/components/packageTiming/AppointmentTimingField';
+import { appointmentTimingSummary, beforeEventWindowError, isValidDuringEventDuration, type AppointmentTiming } from '@/utils/appointmentTiming';
 import BookingUserGuide from '@/components/guides/BookingUserGuide';
 import { currencySymbol } from '@/utils/currency';
 import { pricingLabel } from '@/utils/packagePricing';
@@ -208,6 +210,11 @@ export default function VendorPackagesScreen() {
   const [delivery, setDelivery] = useState<DeliverySettings>({...defaultDelivery});
   const [bookingType, setBookingType] =
   useState<BookingType | "">("DURATION_BASED");
+const [appointmentTiming, setAppointmentTiming] = useState<AppointmentTiming>('DURING_EVENT');
+const [duringEventDuration, setDuringEventDuration] = useState('');
+const duringEventDurationMinutes = duringEventDuration ? Number(duringEventDuration) : null;
+const validDuringEventDuration = appointmentTiming !== 'BOTH' || isValidDuringEventDuration(duringEventDurationMinutes);
+const hasBeforeEventWindow = bookingType === 'TIME_SLOT_BASED' && appointmentTiming !== 'DURING_EVENT';
 
 // Friendly (vendor-facing) state — never raw signed minutes.
 // "How long does the task take" (delivery drop-off, setup, a time slot)
@@ -237,13 +244,13 @@ const requiredServiceDurationMinutesValue = useMemo(
 const useCompactTiming = Platform.OS === "ios" &&
   (bookingType === "SETUP_BASED" || bookingType === "DELIVERY_BASED");
 const serviceWindowStartOffsetMinutesValue = useMemo(
-  () => offsetToMinutes(windowStart),
-  [windowStart],
+  () => offsetToMinutes(hasBeforeEventWindow ? { ...windowStart, direction: "BEFORE" } : windowStart),
+  [windowStart, hasBeforeEventWindow],
 );
 
 const serviceWindowEndOffsetMinutesValue = useMemo(
-  () => offsetToMinutes(windowEnd),
-  [windowEnd],
+  () => offsetToMinutes(hasBeforeEventWindow ? { ...windowEnd, direction: "BEFORE" } : windowEnd),
+  [windowEnd, hasBeforeEventWindow],
 );
 
   const [durations, setDurations] = useState<
@@ -501,6 +508,8 @@ const existingPackage =
         );
 
     setDelivery(deliverySettings(existingPackage));
+    setAppointmentTiming(existingPackage.appointmentTiming ?? 'DURING_EVENT');
+    setDuringEventDuration(existingPackage.duringEventDurationMinutes == null ? '' : String(existingPackage.duringEventDurationMinutes));
          setBookingType(
           String(existingPackage.bookingType) === "CUSTOM" ? "" : existingPackage.bookingType || "DURATION_BASED",
         );
@@ -785,6 +794,10 @@ const removeImageAsset = (index: number) => {
   const hasDescription = description.trim().length > 0;
   const hasIncludedServices = services.trim().length > 0;
 
+  const appointmentWindowError = hasBeforeEventWindow
+    ? beforeEventWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, requiredServiceDurationMinutesValue)
+    : '';
+
   const isFormValid = useMemo(() => {
   const hasName =
     packageName.trim().length > 0;
@@ -819,10 +832,8 @@ const removeImageAsset = (index: number) => {
   }
 
   if (bookingType === "TIME_SLOT_BASED") {
-    return (
-      requiredServiceDurationMinutesValue !== undefined &&
-      requiredServiceDurationMinutesValue > 0
-    );
+    return requiredServiceDurationMinutesValue !== undefined &&
+      requiredServiceDurationMinutesValue > 0 && !appointmentWindowError && validDuringEventDuration;
   }
 
   const startOffset = serviceWindowStartOffsetMinutesValue;
@@ -841,7 +852,7 @@ const removeImageAsset = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions, hasDescription, hasIncludedServices,
+  pricing, pricingOptions, hasDescription, hasIncludedServices, appointmentWindowError, validDuringEventDuration,
   packageName,
   price,
   delivery,
@@ -988,15 +999,20 @@ if (!userId) {
       ? requiredServiceDurationMinutesValue
       : undefined,
 
+  appointmentTiming: bookingType === 'TIME_SLOT_BASED' ? appointmentTiming : undefined,
+  duringEventDurationMinutes: bookingType === 'TIME_SLOT_BASED'
+    ? (appointmentTiming === 'BOTH' ? duringEventDurationMinutes : null)
+    : undefined,
+
   serviceWindowStartOffsetMinutes:
     bookingType === "DELIVERY_BASED" ||
-    bookingType === "SETUP_BASED"
+    bookingType === "SETUP_BASED" || hasBeforeEventWindow
       ? serviceWindowStartOffsetMinutesValue
       : undefined,
 
   serviceWindowEndOffsetMinutes:
     bookingType === "DELIVERY_BASED" ||
-    bookingType === "SETUP_BASED"
+    bookingType === "SETUP_BASED" || hasBeforeEventWindow
       ? serviceWindowEndOffsetMinutesValue
       : undefined,
 
@@ -1957,13 +1973,22 @@ if (!userId) {
         Earliest it can happen (window start)
     -------------------------------------------------- */}
 
-    {bookingType !== "TIME_SLOT_BASED" && (
+    {bookingType === "TIME_SLOT_BASED" && (
+      <AppointmentTimingField
+        value={appointmentTiming}
+        onChange={setAppointmentTiming}
+        duringDuration={duringEventDuration}
+        onDuringDurationChange={setDuringEventDuration}
+      />
+    )}
+
+    {(bookingType !== "TIME_SLOT_BASED" || hasBeforeEventWindow) && (
       <>
         <View style={[{ marginTop: 22 }, useCompactTiming && iosTimingStyles.field]}>
           <Text style={styles.smallLabel}>
             {bookingType === "DELIVERY_BASED"
               ? "Earliest delivery time"
-              : "Earliest setup start"}
+              : hasBeforeEventWindow ? "Earliest appointment start" : "Earliest setup start"}
           </Text>
 
           <View style={[styles.friendlyRow, useCompactTiming && iosTimingStyles.amountRow]}>
@@ -2013,7 +2038,7 @@ if (!userId) {
             </View>
           </View>
 
-          {bookingType === "SETUP_BASED" ? (
+          {(bookingType === "SETUP_BASED" || hasBeforeEventWindow) ? (
             <Text style={{ marginTop: 8, color: "#77717A", fontSize: 13 }}>
               Before event start
             </Text>
@@ -2087,7 +2112,7 @@ if (!userId) {
               ? "Latest delivery time"
               : bookingType === "SETUP_BASED"
               ? "Setup completion deadline"
-              : "Service completion deadline"}
+              : "Appointment completion deadline"}
           </Text>
 
           <View style={[styles.friendlyRow, useCompactTiming && iosTimingStyles.amountRow]}>
@@ -2137,6 +2162,11 @@ if (!userId) {
             </View>
           </View>
 
+          {hasBeforeEventWindow ? (
+            <Text style={{ marginTop: 8, color: "#77717A", fontSize: 13 }}>
+              Before event start (enter 0 to finish at event start)
+            </Text>
+          ) : (
           <View style={[styles.friendlyToggleRow, { marginTop: 8 }, useCompactTiming && iosTimingStyles.segments]}>
             {bookingType === "DELIVERY_BASED" && (
               <TouchableOpacity
@@ -2193,8 +2223,12 @@ if (!userId) {
               },
             )}
           </View>
+          )}
 
-          {serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (bookingType !== "DELIVERY_BASED" || !!serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, undefined)) && (
+          {hasBeforeEventWindow && !!appointmentWindowError && (
+            <Text style={{ color: "#B42318", marginTop: 8 }}>{appointmentWindowError}</Text>
+          )}
+          {!hasBeforeEventWindow && serviceWindowStartOffsetMinutesValue !== undefined && serviceWindowEndOffsetMinutesValue !== undefined && (bookingType !== "DELIVERY_BASED" || !!serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, undefined)) && (
             <Text style={[styles.sectionSubtitle, { marginTop: 12 },
               serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ? { color: "#B42318" } : {}]}>
               {serviceWindowError(serviceWindowStartOffsetMinutesValue, serviceWindowEndOffsetMinutesValue, bookingType === "DELIVERY_BASED" ? undefined : requiredServiceDurationMinutesValue) ||
@@ -2202,8 +2236,8 @@ if (!userId) {
             </Text>
           )}
 
-          {bookingType !== "DELIVERY_BASED" && <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
-            {bookingType === "SETUP_BASED" ? 'Tip: choose 0 + "At event start" to finish exactly when the event begins.' : 'Tip: enter 0 + "After event starts" to mean right when the event begins.'}
+          {bookingType === "SETUP_BASED" && <Text style={[styles.sectionSubtitle, { marginTop: 8 }]}>
+            Tip: choose 0 and “At event start” to finish exactly when the event begins.
           </Text>}
         </View>
       </>
@@ -2564,6 +2598,18 @@ if (!userId) {
       )?.label || bookingType}
     </Text>
   </View>
+
+  {bookingType === "TIME_SLOT_BASED" && (
+    <View style={styles.previewDurationRow}>
+      <Text style={styles.previewDurationText}>Appointment timing</Text>
+      <Text style={styles.previewDurationPrice}>{appointmentTimingSummary({
+        appointmentTiming,
+        duringEventDurationMinutes,
+        serviceWindowStartOffsetMinutes: serviceWindowStartOffsetMinutesValue,
+        serviceWindowEndOffsetMinutes: serviceWindowEndOffsetMinutesValue,
+      })}</Text>
+    </View>
+  )}
 
   {bookingType === "TIME_SLOT_BASED" &&
     requiredServiceDurationMinutesValue !== undefined && (

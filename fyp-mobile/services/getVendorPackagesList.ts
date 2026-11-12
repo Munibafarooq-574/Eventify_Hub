@@ -1,3 +1,4 @@
+import type { AppointmentTiming } from '@/utils/appointmentTiming';
 import { PackagePricing } from '@/utils/packagePricing';
 import { DeliverySettings } from '@/utils/deliveryBooking';
 
@@ -35,6 +36,8 @@ export interface VendorPackageListItem extends DeliverySettings, PackagePricing 
 
   requiredServiceDurationMinutes?: number;
 
+  appointmentTiming?: AppointmentTiming;
+  duringEventDurationMinutes?: number | null;
   serviceWindowStartOffsetMinutes?: number;
 
   serviceWindowEndOffsetMinutes?: number;

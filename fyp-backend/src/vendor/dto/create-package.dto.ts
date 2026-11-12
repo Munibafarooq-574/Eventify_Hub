@@ -1,3 +1,4 @@
+import { APPOINTMENT_TIMINGS, type AppointmentTiming } from '../../vendor-availability/appointment-candidates';
 import { PackagePricingDto } from './package-pricing.dto';
 //fyp-backend/src/vendor/dto/create-package.dto.ts
 
@@ -5,6 +6,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -56,6 +58,15 @@ export class PackageDto extends PackagePricingDto {
   @IsNumber()
   @Min(1)
   requiredServiceDurationMinutes?: number;
+
+  @IsOptional()
+  @IsEnum([...APPOINTMENT_TIMINGS])
+  appointmentTiming?: AppointmentTiming;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  duringEventDurationMinutes?: number | null;
 
   @IsOptional()
   @IsNumber()

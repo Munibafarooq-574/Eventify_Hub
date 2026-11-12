@@ -1,3 +1,4 @@
+import { appointmentConfigurationError, type AppointmentTiming } from '../vendor-availability/appointment-candidates';
 import { validateServiceCapacity } from '../common/utils/service-capacity';
 import { countryCurrency, currencyOf } from '../common/utils/currency';
 import { legacyPricingMethod, quotePackage, validatePackagePricing } from '../common/utils/package-pricing';
@@ -712,6 +713,8 @@ user.vendorApprovalStatus =
 private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
   bookingType?: PackageBookingType | typeof RETIRED_PACKAGE_BOOKING_TYPE;
   requiredServiceDurationMinutes?: number;
+  appointmentTiming?: AppointmentTiming;
+  duringEventDurationMinutes?: number | null;
   serviceWindowStartOffsetMinutes?: number;
   serviceWindowEndOffsetMinutes?: number;
 }): void {
@@ -753,13 +756,11 @@ private validatePackageBookingConfiguration(pkg: DeliveryConfiguration & {
       // Existing duration/pricing validation remains unchanged.
       return;
 
-    case PackageBookingType.TIME_SLOT_BASED:
-      if (!hasValidRequiredDuration) {
-        throw new BadRequestException(
-          'TIME_SLOT_BASED packages require a valid requiredServiceDurationMinutes greater than 0.',
-        );
-      }
+    case PackageBookingType.TIME_SLOT_BASED: {
+      const error = appointmentConfigurationError(pkg);
+      if (error) throw new BadRequestException(error);
       return;
+    }
 
     case PackageBookingType.DELIVERY_BASED:
       validateDeliveryConfiguration(pkg);
@@ -857,6 +858,8 @@ async addPackages(
         isActive: pkg.isActive ?? true,
         services: pkg.services,
         bookingType: pkg.bookingType,
+        appointmentTiming: pkg.appointmentTiming,
+        duringEventDurationMinutes: pkg.duringEventDurationMinutes,
         requiredServiceDurationMinutes:
             pkg.requiredServiceDurationMinutes,
         serviceWindowStartOffsetMinutes:
@@ -1385,6 +1388,11 @@ async updatePackage(
         updateDto.bookingType ??
         existingPackage.bookingType,
 
+      appointmentTiming: updateDto.appointmentTiming ?? existingPackage.appointmentTiming,
+      duringEventDurationMinutes: updateDto.duringEventDurationMinutes === undefined
+        ? existingPackage.duringEventDurationMinutes
+        : updateDto.duringEventDurationMinutes,
+
       requiredServiceDurationMinutes:
         updateDto.requiredServiceDurationMinutes ??
         existingPackage.requiredServiceDurationMinutes,
@@ -1469,6 +1477,14 @@ async updatePackage(
     if (updateDto.bookingType !== undefined) {
         updatePayload['packages.$.bookingType'] =
             updateDto.bookingType;
+    }
+
+    if (updateDto.appointmentTiming !== undefined) {
+        updatePayload['packages.$.appointmentTiming'] = updateDto.appointmentTiming;
+    }
+
+    if (updateDto.duringEventDurationMinutes !== undefined) {
+        updatePayload['packages.$.duringEventDurationMinutes'] = updateDto.duringEventDurationMinutes;
     }
 
     if (updateDto.requiredServiceDurationMinutes !== undefined) {

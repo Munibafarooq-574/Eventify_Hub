@@ -1,3 +1,4 @@
+import { appointmentTimingSummary, type AppointmentTiming } from '@/utils/appointmentTiming';
 import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -50,6 +51,8 @@ interface PackageDetails extends PackagePricing {
     | "CUSTOM";
 
   requiredServiceDurationMinutes?: number;
+  appointmentTiming?: AppointmentTiming;
+  duringEventDurationMinutes?: number | null;
 
   serviceWindowStartOffsetMinutes?: number;
 
@@ -1020,6 +1023,7 @@ const PackageScreen = () => {
                       Time Slot Configuration
                     </Text>
                   </View>
+                  <Text style={styles.durationLabel}>{appointmentTimingSummary(packageDetails)}</Text>
 
                   <View style={styles.durationCard}>
                     <View style={styles.durationIcon}>

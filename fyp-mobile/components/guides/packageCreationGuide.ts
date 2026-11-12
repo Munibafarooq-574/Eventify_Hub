@@ -52,7 +52,7 @@ export const packageCreationGuide: BookingGuide = {
       steps: [
         'Duration Based is for services sold by coverage time. In Base Package Included Time, enter how long the base price covers. Use Fixed Duration Options for preset alternatives and enter the full price for each option. Keep prices at least as high as the shorter options.',
         'For flexible coverage, enable Custom Duration and set the rate per extra hour or day. For example, five hours at $200 plus $15 per extra hour gives a seven-hour price of $230 per group when no fixed price applies to seven hours.',
-        'Time Slot Based is for appointments. Enter Time needed per booking, such as 90 minutes for a makeup appointment.',
+        'Time Slot Based is for appointments. Enter Time needed per booking and select Before Event, During Event or Both. For a before-event appointment, set the earliest start and finish deadline. Choose Both to offer both windows. Enter a separate during-event duration only if it differs.',
         'Delivery Based is for orders you drop off. Set the allowed delivery window relative to the event start and review the delivery fee settings.',
         'Setup Based is for work that must be ready by a certain time. Enter the time needed to set up, the earliest start and the latest finish. Keep the setup window at or before the event start and make sure the setup fits inside it.',
       ],
