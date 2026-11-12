@@ -1,3 +1,4 @@
+import PackageCapacityPreview from '@/components/booking/PackageCapacityPreview';
 import { appointmentTimingSummary } from '@/utils/appointmentTiming';
 import { currencySymbol, currencyOf, countryCurrency } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
@@ -1260,6 +1261,8 @@ const category =
       : "Not configured"}
   </Text>
 </View>
+
+          <PackageCapacityPreview pkg={pkg} />
 
 {/* DURATION BASED */}
 {(!pkg.bookingType || pkg.bookingType === "DURATION_BASED") && (

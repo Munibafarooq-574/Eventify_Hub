@@ -1,3 +1,4 @@
+import PackageCapacityPreview from '@/components/booking/PackageCapacityPreview';
 import { APPOINTMENT_TIMING_LABELS, appointmentTimingSummary } from '@/utils/appointmentTiming';
 import { getEligibleCoupons } from '@/services/getEligibleCoupons';
 import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
@@ -4726,6 +4727,8 @@ const serviceCityNamesFromIds =
               : 'N/A'}
   </Text>
 </View>
+
+          <PackageCapacityPreview pkg={selectedPackage} />
 
           {/* Booking Type Configuration */}
 

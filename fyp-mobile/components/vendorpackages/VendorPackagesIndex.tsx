@@ -1,3 +1,4 @@
+import PackageCapacityPreview from '@/components/booking/PackageCapacityPreview';
 import { APPOINTMENT_TIMING_LABELS, type AppointmentTiming } from '@/utils/appointmentTiming';
 import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
@@ -746,6 +747,8 @@ const PackageScreen = () => {
                   </Text>
                 </View>
               </View>
+
+              <PackageCapacityPreview pkg={packageDetails} />
 
               <View style={styles.divider} />
 
