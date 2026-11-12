@@ -1269,14 +1269,21 @@ Current order total: ${currencySymbol(cartCurrency(cartData))} ${formatCurrency(
           )
         ];
 
+      const legacyPerPerson = !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering');
+      const method = pricingMethod(pkg, legacyPerPerson);
+
       return {
         vendorId: vendor.vendor._id,
         serviceName: pkg.packageName,
         price: Number(pkg.price),
-        expectedPricingMethod: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
+        expectedPricingMethod: method,
         expectedGroupSize: pkg.groupSize,
-        personCount: pricingMethod(pkg, !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')) === 'PER_PERSON' ? Number(pkg.personCount ?? guests) : undefined,
-        expectedPackageAmount: packageAmount(pkg, Number(guests), !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) || pkg.categoryName?.toLowerCase().includes('catering')),
+        personCount: method === 'PER_PERSON'
+          ? Number(pkg.personCount ?? guests)
+          : method === 'GROUP'
+            ? Number(pkg.personCount ?? pkg.groupSize)
+            : undefined,
+        expectedPackageAmount: packageAmount(pkg, Number(guests), legacyPerPerson),
         deliveryStartDateTime: pkg.deliveryStartDateTime,
         expectedDeliveryFee: pkg.deliveryFeeType ? deliveryFee(pkg,Number(pkg.quantity || 1),Number(guests || 0),!!(cateringCategory?._id && vendor?.vendor?.buisnessCategory === cateringCategory._id)).totalFee : undefined,
         packageId:
