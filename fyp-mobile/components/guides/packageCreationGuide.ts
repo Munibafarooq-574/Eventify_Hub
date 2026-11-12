@@ -18,8 +18,8 @@ export const packageCreationGuide: BookingGuide = {
       summary: 'Give clients a clear name, description and list of inclusions.',
       steps: [
         'Enter a specific Package Name, such as Event Makeup Package or 4-Hour Photography Coverage.',
-        'In Description, explain who the package is for and what the service covers.',
-        'In What’s Included, list the services or items covered by the price. Mention any extras the client would pay for separately.',
+        'Fill in the required Description field. Explain who the package is for and what the service covers.',
+        'Fill in the required What’s Included field with the services or items covered by the price. Mention any extras the client would pay for separately.',
       ],
     },
     {

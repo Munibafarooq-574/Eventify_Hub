@@ -831,6 +831,7 @@ const removeExistingImage = (index: number) => {
   // Validation
   // -------------------------------------------------------
 
+  const hasDescription = editableDescription.trim().length > 0;
   const hasIncludedServices = editableServices.trim().length > 0;
 
   const isFormValid = useMemo(() => {
@@ -844,7 +845,7 @@ const removeExistingImage = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasIncludedServices) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasDescription || !hasIncludedServices) {
     return false;
   }
 
@@ -889,7 +890,7 @@ const removeExistingImage = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions, hasIncludedServices,
+  pricing, pricingOptions, hasDescription, hasIncludedServices,
   editableName,
   editablePrice,
   delivery,
@@ -909,11 +910,6 @@ const removeExistingImage = (index: number) => {
 
  const updatePackageDetails = async () => {
   if (!packageId) return;
-
-  if (!hasIncludedServices) {
-    Alert.alert("What's Included is required", "Add at least one service or item included in this package.");
-    return;
-  }
 
   if (!bookingType || !isFormValid) {
     Alert.alert(
@@ -1609,6 +1605,11 @@ if (user?._id) {
                   TEXT_MUTED
                 }
               />
+              {!hasDescription && (
+                <Text style={{ color: "#B42318", marginTop: 6 }}>
+                  Required. Describe what this package offers.
+                </Text>
+              )}
             </View>
 
             {/* -------------------------------------------
@@ -3159,6 +3160,7 @@ if (user?._id) {
             <TouchableOpacity
               style={[
                 styles.saveButton,
+                !isFormValid && { opacity: 0.5 },
                 {
                   bottom:
                     insets.bottom + 12,
@@ -3167,6 +3169,8 @@ if (user?._id) {
               onPress={
                 updatePackageDetails
               }
+              disabled={!isFormValid}
+              accessibilityState={{ disabled: !isFormValid }}
               activeOpacity={0.85}
             >
               <Ionicons

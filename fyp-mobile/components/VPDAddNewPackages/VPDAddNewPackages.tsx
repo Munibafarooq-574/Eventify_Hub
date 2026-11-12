@@ -782,6 +782,7 @@ const removeImageAsset = (index: number) => {
   // Validation
   // ---------------------------------------------------------
 
+  const hasDescription = description.trim().length > 0;
   const hasIncludedServices = services.trim().length > 0;
 
   const isFormValid = useMemo(() => {
@@ -795,7 +796,7 @@ const removeImageAsset = (index: number) => {
     Number.isFinite(numericPrice) &&
     numericPrice >= 0;
 
-  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasIncludedServices) {
+  if (!pricingOptions.length || pricingFieldsError(pricing) || !bookingType || !hasName || !hasPrice || !hasDescription || !hasIncludedServices) {
     return false;
   }
 
@@ -840,7 +841,7 @@ const removeImageAsset = (index: number) => {
 
   return validRequiredDuration && validWindow;
 }, [
-  pricing, pricingOptions, hasIncludedServices,
+  pricing, pricingOptions, hasDescription, hasIncludedServices,
   packageName,
   price,
   delivery,
@@ -1303,6 +1304,11 @@ if (!userId) {
               placeholder="Describe what this package offers..."
               placeholderTextColor="#9C9CA3"
             />
+            {!hasDescription && (
+              <Text style={{ color: "#B42318", marginTop: 6 }}>
+                Required. Describe what this package offers.
+              </Text>
+            )}
           </View>
 
           {/* Services */}
