@@ -2,6 +2,7 @@ import BookingUserGuide from '@/components/guides/BookingUserGuide';
 import { currencySymbol } from '@/utils/currency';
 import { pricingLabel } from '@/utils/packagePricing';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
+import PackageCapacityPreview from '@/components/booking/PackageCapacityPreview';
 import PackagePricingFields from '@/components/booking/PackagePricingFields';
 import { PackagePricing, PricingMethod, pricingFieldsError, } from '@/utils/packagePricing';
 import getVendorPricingOptions from '@/services/getVendorPricingOptions';
@@ -2543,6 +2544,8 @@ if (!userId) {
     {bookingType === "DURATION_BASED" && includedMinutes > 0 && Number.isFinite(includedMinutes) && (
       <View style={styles.previewDurationRow}><Text style={styles.previewDurationText}>Base price includes</Text><Text style={styles.previewDurationPrice}>{baseIncludedHours} {baseIncludedUnit === "DAYS" ? "day(s)" : "hour(s)"}</Text></View>
     )}
+    <PackageCapacityPreview pkg={pricing} />
+
     {/* Booking Type Preview — shown exactly once */}
 
 <View style={styles.previewDurationSection}>
