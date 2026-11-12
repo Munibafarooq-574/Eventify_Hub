@@ -1,4 +1,4 @@
-import { appointmentTimingSummary, type AppointmentTiming } from '@/utils/appointmentTiming';
+import { APPOINTMENT_TIMING_LABELS, type AppointmentTiming } from '@/utils/appointmentTiming';
 import { currencySymbol, currencyOf } from '@/utils/currency';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
@@ -337,6 +337,13 @@ const PackageScreen = () => {
       Math.abs(minutes)
     )} ${direction}`;
   };
+
+  const appointmentTiming = packageDetails?.appointmentTiming ?? 'DURING_EVENT';
+  const duringEventDuration = appointmentTiming === 'BOTH' ? packageDetails?.duringEventDurationMinutes : null;
+  const earliestAppointmentStart = packageDetails?.serviceWindowStartOffsetMinutes;
+  const appointmentDeadline = packageDetails?.serviceWindowEndOffsetMinutes;
+  const showBeforeEventWindow = appointmentTiming !== 'DURING_EVENT' &&
+    earliestAppointmentStart != null && appointmentDeadline != null;
 
   // ---------------------------------------------------------
   // No package ID
@@ -1023,28 +1030,44 @@ const PackageScreen = () => {
                       Time Slot Configuration
                     </Text>
                   </View>
-                  <Text style={styles.durationLabel}>{appointmentTimingSummary(packageDetails)}</Text>
-
-                  <View style={styles.durationCard}>
-                    <View style={styles.durationIcon}>
-                      <Ionicons
-                        name="hourglass-outline"
-                        size={18}
-                        color="#780C60"
-                      />
-                    </View>
-
-                    <View style={styles.durationInfo}>
-                      <Text style={styles.durationLabel}>
-                        Time Needed Per Booking
-                      </Text>
-
-                      <Text style={styles.durationValue}>
-                        {formatServiceDuration(
-                          packageDetails.requiredServiceDurationMinutes
-                        )}
+                  <View style={[styles.durationCard, styles.appointmentCard]}>
+                    <View style={styles.appointmentRow}>
+                      <Text style={styles.appointmentLabel}>Appointment timing</Text>
+                      <Text style={styles.appointmentTimingBadge}>
+                        {appointmentTiming === 'BOTH' ? 'Before & During Event' : APPOINTMENT_TIMING_LABELS[appointmentTiming]}
                       </Text>
                     </View>
+
+                    <View style={styles.appointmentRow}>
+                      <Text style={styles.appointmentLabel}>
+                        {duringEventDuration != null ? 'Before-event duration' : 'Time per booking'}
+                      </Text>
+                      <Text style={styles.appointmentValue}>
+                        {formatServiceDuration(packageDetails.requiredServiceDurationMinutes)}
+                      </Text>
+                    </View>
+
+                    {duringEventDuration != null && (
+                      <View style={styles.appointmentRow}>
+                        <Text style={styles.appointmentLabel}>During-event duration</Text>
+                        <Text style={styles.appointmentValue}>{formatServiceDuration(duringEventDuration)}</Text>
+                      </View>
+                    )}
+
+                    {showBeforeEventWindow && (
+                      <View style={styles.appointmentWindow}>
+                        <View style={styles.appointmentRow}>
+                          <Text style={styles.appointmentLabel}>Earliest start</Text>
+                          <Text style={styles.appointmentValue}>{formatServiceOffset(earliestAppointmentStart)}</Text>
+                        </View>
+                        <View style={styles.appointmentRow}>
+                          <Text style={styles.appointmentLabel}>Finish by</Text>
+                          <Text style={styles.appointmentValue}>
+                            {appointmentDeadline === 0 ? 'At event start' : formatServiceOffset(appointmentDeadline)}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
               )}
@@ -1595,6 +1618,52 @@ const styles = StyleSheet.create({
     borderColor: "#F0DDE9",
     borderRadius: 16,
     padding: 13,
+  },
+
+  appointmentCard: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 12,
+  },
+
+  appointmentRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+
+  appointmentLabel: {
+    color: "#6F5866",
+    fontSize: 13,
+    fontWeight: "500",
+    flexShrink: 1,
+  },
+
+  appointmentValue: {
+    color: "#3D1633",
+    fontSize: 14,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+
+  appointmentTimingBadge: {
+    backgroundColor: "#F3D9EC",
+    borderRadius: 10,
+    color: "#780C60",
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexShrink: 1,
+  },
+
+  appointmentWindow: {
+    borderTopWidth: 1,
+    borderTopColor: "#EBD7E5",
+    paddingTop: 12,
+    gap: 10,
   },
 
   durationIcon: {
