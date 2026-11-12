@@ -371,10 +371,21 @@ if (eventDetailsRaw) {
         const code = String(pkg.pendingCouponCode || '').trim().toUpperCase();
         const isCatering = !!(cateringCategory?._id && vendor.vendor?.buisnessCategory === cateringCategory._id) ||
             !!pkg.categoryName?.toLowerCase().includes('catering');
-        const originalAmount = packageAmount(pkg, guests, isCatering) +
-            deliveryFee(pkg, Number(pkg.quantity || 1), guests, isCatering).totalFee;
+        const quantity = Math.max(1, Number(pkg.quantity || 1));
+        const method = pricingMethod(pkg, isCatering);
+        const billedCount = method === 'PER_PERSON' ? Number(pkg.personCount ?? guests) : quantity;
+        const unit = method === 'PER_PERSON' ? (billedCount === 1 ? 'person' : 'people') :
+            method === 'GROUP' ? 'group' : pkg.capacityUnit === 'VEHICLE' ? 'vehicle' :
+            pkg.capacityUnit === 'TEAM' ? 'team' : pkg.capacityUnit === 'SETUP' ? 'setup' : 'package';
+        const packageSubtotal = packageAmount(pkg, guests, isCatering);
+        const deliverySubtotal = deliveryFee(pkg, Number(pkg.quantity || 1), guests, isCatering).totalFee;
+        const originalAmount = packageSubtotal + deliverySubtotal;
         const currency = currencyOf(pkg);
         return { vendorId, packageId, code, originalAmount, currency,
+            name: String(pkg.packageName || 'Package'),
+            unitPrice: Number(pkg.price || 0), quantity, method, billedCount,
+            billedUnit: method === 'PER_PERSON' || billedCount === 1 ? unit : `${unit}s`,
+            packageSubtotal, deliverySubtotal,
             key: JSON.stringify([vendorId, packageId, code, originalAmount, currency]) };
     }, [cateringCategory?._id, guests]);
 
@@ -416,6 +427,8 @@ if (eventDetailsRaw) {
         return () => { active = false; };
     }, [cartLines, draft]));
 
+    const packagesSubtotal = cartLines.reduce((sum, line) => sum + line.packageSubtotal, 0);
+    const deliverySubtotal = cartLines.reduce((sum, line) => sum + line.deliverySubtotal, 0);
     const originalTotal = cartLines.reduce((sum, line) => sum + line.originalAmount, 0);
     const cartCouponSavings = cartLines.reduce((sum, line) =>
         sum + line.originalAmount - (couponQuotes[line.key] ?? line.originalAmount), 0);
@@ -1168,16 +1181,42 @@ if (eventDetailsRaw) {
                                 </Text>
                             </View>
 
-                            <View style={styles.priceRow}>
-                                <Text style={styles.priceLabel}>
-                                    Packages
-                                </Text>
+                            {cartLines.map((line, index) => {
+                                const symbol = currencySymbol(line.currency);
+                                return (
+                                    <View key={`${line.vendorId}:${line.packageId}:${index}`} style={styles.summaryPackageRow}>
+                                        <View style={styles.summaryPackageInfo}>
+                                            <Text style={styles.summaryPackageName}>{line.name}</Text>
+                                            <Text style={styles.summaryPackageRate}>
+                                                {symbol} {formatCurrency(line.unitPrice)} × {line.billedCount} {line.billedUnit}
+                                                {line.method === 'PER_PERSON' && line.quantity > 1 ? ` × ${line.quantity} packages` : ''}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.priceValue}>{symbol} {formatCurrency(line.packageSubtotal)}</Text>
+                                    </View>
+                                );
+                            })}
 
-                                <Text style={styles.priceValue}>
-                                    {currencySymbol(cartCurrency(cartData))}{' '}
-                                    {formatCurrency(mixedCurrency ? 0 : originalTotal)}
-                                </Text>
-                            </View>
+                            <View style={styles.priceDivider} />
+
+                            {!mixedCurrency && (
+                                <>
+                                    <View style={styles.priceRow}>
+                                        <Text style={styles.priceLabel}>Packages subtotal</Text>
+                                        <Text style={styles.priceValue}>
+                                            {currencySymbol(cartCurrency(cartData))} {formatCurrency(packagesSubtotal)}
+                                        </Text>
+                                    </View>
+                                    {deliverySubtotal > 0 && (
+                                        <View style={styles.priceRow}>
+                                            <Text style={styles.priceLabel}>Delivery fees</Text>
+                                            <Text style={styles.priceValue}>
+                                                {currencySymbol(cartCurrency(cartData))} {formatCurrency(deliverySubtotal)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </>
+                            )}
                             {!mixedCurrency && cartCouponSavings > 0 && (
                                 <View style={styles.priceRow}>
                                     <Text style={styles.priceLabel}>Coupon discount</Text>
@@ -1196,7 +1235,7 @@ if (eventDetailsRaw) {
                                     </Text>
 
                                     <Text style={styles.totalSubLabel}>
-                                        Payable at checkout
+                                        After delivery fees and discounts
                                     </Text>
                                 </View>
 
@@ -1681,7 +1720,33 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
 
+    summaryPackageRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        gap: 12,
+    },
+
+    summaryPackageInfo: {
+        flex: 1,
+        minWidth: 0,
+        gap: 3,
+    },
+
+    summaryPackageName: {
+        color: TEXT,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+
+    summaryPackageRate: {
+        color: MUTED,
+        fontSize: 12,
+    },
+
     priceRow: {
+        marginBottom: 6,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
