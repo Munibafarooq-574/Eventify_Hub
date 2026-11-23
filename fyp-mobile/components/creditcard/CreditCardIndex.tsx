@@ -344,7 +344,7 @@ const CreditCardPaymentScreen = () => {
         Alert.alert('Test payment request created',
           'Your request is awaiting Admin confirmation. No real card has been charged.' + saveNotice,
           [{ text: 'OK', onPress: () => isSubscription
-            ? router.replace({ pathname: '/subscriptionscreen', params: { vendorId: subscriptionVendorId! } } as any)
+            ? router.dismissTo('/vendordashboard')
             : router.replace('/myevents') }]);
       }
     } catch (error: any) {

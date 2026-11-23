@@ -4,3 +4,21 @@ const payload={organizerId:'client',eventId:'event',eventDate:'2026-11-10',event
 for(const status of [404,520,503,undefined,401])test('checkout safely handles '+status+' without retrying writes or changing cart',async()=>{const c=load(status,{message:'<html>proxy stack trace</html>'});const before=JSON.stringify(payload);await assert.rejects(c.submit(payload),e=>!/404|520|503|html|AxiosError|stack trace/.test(e.message));assert.equal(c.calls(),1);assert.equal(c.writes.length,0);assert.equal(JSON.stringify(payload),before)});
 test('subscription checkout conflict preserves clear backend message and cart',async()=>{const message='This vendor is currently unavailable for new bookings. Please choose another vendor. Your existing bookings remain valid.';const c=load(409,{message});await assert.rejects(c.submit(payload),e=>e.message===message);assert.equal(c.calls(),1);assert.equal(c.writes.length,0)});
 test('expired dashboard retains existing booking and communication routes',()=>{const text=fs.readFileSync('components/vendordashboard/VendorDashboardIndex.tsx','utf8');const restricted=text.slice(text.indexOf('if (!hasValidSubscription)'),text.indexOf('    return (\n        <View style={styles.container}>',text.indexOf('if (!hasValidSubscription)')));for(const route of ['/vendorordersummary','/vendormyevents','/vendormessages'])assert.ok(restricted.includes(route));});
+
+test('successful subscription card payment dismisses the plan and payment screens to the dashboard', () => {
+  const source = fs.readFileSync('components/creditcard/CreditCardIndex.tsx', 'utf8');
+  const handler = source.match(/onPress: \(\) => isSubscription\s*\? ([^\n]+)\s*: ([^}]+)/);
+  assert.ok(handler);
+  const calls = [];
+  const router = {
+    dismissTo: route => calls.push(['dismissTo', route]),
+    replace: route => calls.push(['replace', route]),
+  };
+  for (const isSubscription of [true, false]) {
+    vm.runInNewContext(`isSubscription ? ${handler[1]} : ${handler[2]}`, { isSubscription, router });
+  }
+  assert.deepEqual(calls, [
+    ['dismissTo', '/vendordashboard'],
+    ['replace', '/myevents'],
+  ]);
+});
