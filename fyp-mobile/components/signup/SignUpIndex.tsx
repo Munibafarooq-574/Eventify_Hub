@@ -33,6 +33,7 @@ const [avatar, setAvatar] = useState("");
 const [email, setEmail] = useState("");
 const [name, setName] = useState("");
 const [phone, setPhone] = useState("");
+const [showPhoneError, setShowPhoneError] = useState(false);
 const [password, setPassword] = useState("");
 const [confirmPassword, setConfirmPassword] = useState("");
 
@@ -127,9 +128,9 @@ const compactPhone = phone.replace(/[\s().-]/g, "");
 const validPhone = isUSPhone
   ? /^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)
   : /^(?:0|\+?92)3\d{9}$/.test(compactPhone);
-const phoneError = phone && !validPhone
+const phoneError = showPhoneError && !validPhone
   ? isUSPhone
-    ? "Enter a 10-digit US number, such as (415) 555-0123."
+    ? "Enter a valid 10-digit US phone number, including area code."
     : "Enter a Pakistani mobile number starting with 03 or +92 3."
   : "";
 
@@ -195,7 +196,6 @@ useEffect(() => {
     password &&
     confirmPassword &&
     !emailError &&
-    !phoneError &&
     !confirmError
   ) {
     setIsDisabled(false);
@@ -210,7 +210,6 @@ useEffect(() => {
   password,
   confirmPassword,
   emailError,
-  phoneError,
   confirmError,
 ]);
 
@@ -257,7 +256,7 @@ const handleRegister = async () => {
   name,
   role,
   categoryId,
-  compactPhone,
+  isUSPhone ? `+1${compactPhone.slice(-10)}` : compactPhone,
   countryCode,
 );
 
@@ -338,6 +337,7 @@ const reset = () => {
   setName("");
   setEmail("");
   setPhone("");
+  setShowPhoneError(false);
   setPassword("");
   setConfirmPassword("");
 };
@@ -483,6 +483,7 @@ return (
             if (code === countryCode) return;
             setCountryCode(code);
             setPhone("");
+            setShowPhoneError(false);
           }}>
           <Text>{countryCode === code ? "✓ " : ""}{label}</Text>
         </TouchableOpacity>
@@ -496,11 +497,11 @@ return (
       </Text>
 
       <View style={styles.inputCard}>
-        <Ionicons
-          name="call-outline"
-          size={20}
-          color="#780C60"
-        />
+        {isUSPhone ? (
+          <Text style={styles.phonePrefix}>+1</Text>
+        ) : (
+          <Ionicons name="call-outline" size={20} color="#780C60" />
+        )}
 
         <TextInput
           style={styles.input}
@@ -510,12 +511,17 @@ return (
           maxLength={24}
           editable={phoneReady}
           value={phone}
-          onChangeText={setPhone}
+          onFocus={() => setShowPhoneError(false)}
+          onBlur={() => setShowPhoneError(Boolean(phone.trim()))}
+          onChangeText={(value) => {
+            const compact = value.replace(/[\s().-]/g, "");
+            setPhone(isUSPhone && /^\+?1\d{10}$/.test(compact) ? compact.slice(-10) : value);
+          }}
         />
       </View>
 
         <Text style={{ color: "#666", marginTop: 6 }}>
-          {phoneReady ? (isUSPhone ? "US country code +1" : "Pakistan country code +92") : "Select your country first."}
+          {phoneReady ? (isUSPhone ? "Enter your 10-digit US phone number, including area code." : "Pakistan country code +92") : "Select your country first."}
         </Text>
 
       {phoneError !== "" && (
@@ -832,6 +838,12 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
 
     elevation: 4,
+  },
+
+  phonePrefix: {
+    color: "#780C60",
+    fontSize: 16,
+    fontWeight: "600",
   },
 
   input: {
