@@ -757,8 +757,16 @@ const OrderSummary = () => {
                         const zone = bookingTimeZone(item);
                         const slotLabel = (start?: string, end?: string) => {
                             if (!start) return 'Unavailable';
-                            const formattedStart = formatBookingActivityTime(start, zone);
-                            return end ? `${formattedStart} – ${formatBookingActivityTime(end, zone)}` : formattedStart;
+                            const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: zone });
+                            const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: zone });
+                            const startDate = new Date(start);
+                            const startLabel = `${dateFormat.format(startDate)} · ${timeFormat.format(startDate)}`;
+                            if (!end) return startLabel;
+                            const endDate = new Date(end);
+                            const endLabel = dateFormat.format(startDate) === dateFormat.format(endDate)
+                                ? timeFormat.format(endDate)
+                                : `${dateFormat.format(endDate)} · ${timeFormat.format(endDate)}`;
+                            return `${startLabel} – ${endLabel}`;
                         };
                         const pending = services.filter((booking: any) => booking.status === 'pending' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED');
                         const proposalBooking = services.find((booking: any) => booking.vendorScheduleProposal?.status === 'PENDING')
