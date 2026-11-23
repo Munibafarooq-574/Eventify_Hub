@@ -659,85 +659,6 @@ if (eventDetailsRaw) {
                 </View>
             </View>
 
-            {/* =====================================
-                CART SUMMARY
-            ===================================== */}
-
-            <View style={styles.summaryBanner}>
-                <View style={styles.summaryIcon}>
-                    <Ionicons
-                        name="bag-handle-outline"
-                        size={25}
-                        color={PRIMARY}
-                    />
-                </View>
-
-                <View style={styles.summaryTextContainer}>
-                    <Text style={styles.summaryTitle}>
-                        Your Event Cart
-                    </Text>
-
-                    <Text style={styles.summarySubtitle}>
-                        {vendorCount} vendor
-                        {vendorCount !== 1 ? 's' : ''} • {packageCount}{' '}
-                        package
-                        {packageCount !== 1 ? 's' : ''}
-                    </Text>
-                </View>
-
-        <View style={styles.goldDot} />
-</View>
-
-{/* Event Location */}
-{(eventCityName || eventAddress) && (
-    <View style={styles.eventLocationCard}>
-        <View style={styles.eventLocationIcon}>
-            <Ionicons
-                name="location-outline"
-                size={20}
-                color={PRIMARY}
-            />
-        </View>
-
-        <View style={styles.eventLocationContent}>
-            <Text style={styles.eventLocationTitle}>
-                Event Location
-            </Text>
-
-            {!!eventCityName && (
-                <View style={styles.eventLocationRow}>
-                    <Text style={styles.eventLocationLabel}>
-                        City
-                    </Text>
-
-                    <Text style={styles.eventLocationValue}>
-                        {eventCityName} · {eventTimeZone}
-                    </Text>
-                </View>
-            )}
-
-            {!!eventAddress && (
-                <View style={styles.eventLocationRow}>
-                    <Text style={styles.eventLocationLabel}>
-                        Address
-                    </Text>
-
-                    <Text
-                        style={styles.eventLocationValue}
-                        numberOfLines={3}
-                    >
-                        {eventAddress}
-                    </Text>
-                </View>
-            )}
-        </View>
-    </View>
-)}
-
-{/* =====================================
-    CART CONTENT
-===================================== */}
-
             <ScrollView
                 refreshControl={refreshControl}
                 alwaysBounceVertical
@@ -745,6 +666,83 @@ if (eventDetailsRaw) {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* =====================================
+                    CART SUMMARY
+                ===================================== */}
+
+                <View style={styles.summaryBanner}>
+                    <View style={styles.summaryIcon}>
+                        <Ionicons
+                            name="bag-handle-outline"
+                            size={25}
+                            color={PRIMARY}
+                        />
+                    </View>
+
+                    <View style={styles.summaryTextContainer}>
+                        <Text style={styles.summaryTitle}>
+                            Your Event Cart
+                        </Text>
+
+                        <Text style={styles.summarySubtitle}>
+                            {vendorCount} vendor
+                            {vendorCount !== 1 ? 's' : ''} • {packageCount}{' '}
+                            package
+                            {packageCount !== 1 ? 's' : ''}
+                        </Text>
+                    </View>
+
+                    <View style={styles.goldDot} />
+                </View>
+
+                {/* Event Location */}
+                {(eventCityName || eventAddress) && (
+                    <View style={styles.eventLocationCard}>
+                        <View style={styles.eventLocationIcon}>
+                            <Ionicons
+                                name="location-outline"
+                                size={20}
+                                color={PRIMARY}
+                            />
+                        </View>
+
+                        <View style={styles.eventLocationContent}>
+                            <Text style={styles.eventLocationTitle}>
+                                Event Location
+                            </Text>
+
+                            {!!eventCityName && (
+                                <View style={styles.eventLocationRow}>
+                                    <Text style={styles.eventLocationLabel}>
+                                        City
+                                    </Text>
+
+                                    <Text style={styles.eventLocationValue}>
+                                        {eventCityName} · {eventTimeZone}
+                                    </Text>
+                                </View>
+                            )}
+
+                            {!!eventAddress && (
+                                <View style={styles.eventLocationRow}>
+                                    <Text style={styles.eventLocationLabel}>
+                                        Address
+                                    </Text>
+
+                                    <Text
+                                        style={styles.eventLocationValue}
+                                        numberOfLines={3}
+                                    >
+                                        {eventAddress}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+                )}
+
+                {/* Cart content */}
+
                 {vendorCount === 0 ? (
 
                     /* =================================
@@ -1502,8 +1500,7 @@ const styles = StyleSheet.create({
     // ==========================================
 
     summaryBanner: {
-        marginHorizontal: 16,
-        marginTop: 16,
+        marginTop: 8,
         marginBottom: 8,
         backgroundColor: '#FFFFFF',
         borderRadius: 18,
@@ -2105,8 +2102,8 @@ const styles = StyleSheet.create({
         color: TEXT,
     },
     eventLocationCard: {
-    marginHorizontal: 16,
     marginTop: 12,
+    marginBottom: 8,
     padding: 14,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
