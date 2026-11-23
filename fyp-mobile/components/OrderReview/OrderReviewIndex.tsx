@@ -1427,7 +1427,10 @@ Current order total: ${currencySymbol(cartCurrency(cartData))} ${formatCurrency(
     setCheckoutError(feedback);
     Alert.alert('Booking not submitted', feedback, [
       { text: 'OK', style: 'cancel' },
-      { text: 'My Cart', onPress: () => router.replace('/cartmanagement') },
+      { text: 'View in Cart', onPress: () => router.replace({
+        pathname: '/cartmanagement',
+        params: { conflict: JSON.stringify({ code: availability.code, vendorIds, packageIds }) },
+      }) },
     ]);
     return;
   }

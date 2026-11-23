@@ -51,6 +51,14 @@ export default function App() {
   durationMinutes: number;
 } | null>(null);
   const routeParams = useLocalSearchParams();
+  const cartSwapParams = routeParams.cartSwapPackageId ? {
+    cartSwapVendorId: routeParams.cartSwapVendorId || "",
+    cartSwapPackageId: routeParams.cartSwapPackageId || "",
+    cartSwapEventId: routeParams.cartSwapEventId || "",
+    cartSwapConflict: routeParams.cartSwapConflict || "",
+    cartSwapStart: routeParams.cartSwapStart || "",
+    cartSwapEnd: routeParams.cartSwapEnd || "",
+  } : {};
   const routeParamsKey = JSON.stringify(routeParams);
   const isReplacementMode = String(Array.isArray(routeParams.replacementMode) ? routeParams.replacementMode[0] : routeParams.replacementMode || '') === 'true';
   const isBrowseMode = (Array.isArray(routeParams.bookingMode)
@@ -481,6 +489,7 @@ router.push({
   replacementMode: Array.isArray(routeParams?.replacementMode) ? routeParams.replacementMode[0] : routeParams?.replacementMode || "",
   replacementOrderId: Array.isArray(routeParams?.replacementOrderId) ? routeParams.replacementOrderId[0] : routeParams?.replacementOrderId || "",
   replacementRequestId: Array.isArray(routeParams?.replacementRequestId) ? routeParams.replacementRequestId[0] : routeParams?.replacementRequestId || "",
+  ...cartSwapParams,
   availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
@@ -577,6 +586,7 @@ router.push({
   replacementMode: Array.isArray(routeParams?.replacementMode) ? routeParams.replacementMode[0] : routeParams?.replacementMode || "",
   replacementOrderId: Array.isArray(routeParams?.replacementOrderId) ? routeParams.replacementOrderId[0] : routeParams?.replacementOrderId || "",
   replacementRequestId: Array.isArray(routeParams?.replacementRequestId) ? routeParams.replacementRequestId[0] : routeParams?.replacementRequestId || "",
+  ...cartSwapParams,
   availablePackageIds: JSON.stringify(availablePackageIds),
 },
 })
@@ -612,7 +622,9 @@ const renderEmptyState = () => {
         <Ionicons name="calendar-outline" size={scale(34)} color={COLORS.primary} />
       </View>
       <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : !isBrowseMode && eventTiming ? "No vendors available for your event" : "No vendors match these filters"}</Text>
-      <Text style={styles.emptySubtitle}>{isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? (unavailableReason || 'No vendors are available for this event. Try another date or time, or adjust your search filters.') : 'Try adjusting your search or filters.'}</Text>
+      <Text style={styles.emptySubtitle}>{routeParams.cartSwapPackageId
+        ? 'Try clearing filters, changing the event time, or return to My Cart to remove the unavailable package.'
+        : isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? (unavailableReason || 'No vendors are available for this event. Try another date or time, or adjust your search filters.') : 'Try adjusting your search or filters.'}</Text>
       {!isBrowseMode && !isReplacementMode && eventTiming && (
         <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/EventDetailsForm", params: { editDateTime: "true" } })} style={{ padding: 14 }}>
           <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Change Event Date & Time</Text>
@@ -678,6 +690,9 @@ return (
         </View>
       )}
 
+      {typeof routeParams.cartSwapWindowLabel === 'string' && !!routeParams.cartSwapWindowLabel && (
+        <Text style={styles.subtitle}>Original service time: {routeParams.cartSwapWindowLabel}</Text>
+      )}
       <FlatList
         data={sortVendorResults(data, preferences.sort, vendorReviews, vendorPackages)}
         renderItem={renderItem}

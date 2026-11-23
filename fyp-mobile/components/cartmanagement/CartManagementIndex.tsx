@@ -7,7 +7,7 @@ import { usePullToRefresh } from '@/components/refresh/usePullToRefresh';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { deliveryFee } from '@/utils/deliveryBooking';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -66,6 +66,15 @@ const CartManagementIndexScreen: React.FC = () => {
   const [syncingCart, setSyncingCart] = useState(false);
   const [syncError, setSyncError] = useState('');
 const router = useRouter();
+const { conflict } = useLocalSearchParams<{ conflict?: string }>();
+const checkoutConflict = useMemo(() => {
+    try {
+        const parsed = JSON.parse(conflict || 'null');
+        return Array.isArray(parsed?.vendorIds) && Array.isArray(parsed?.packageIds) ? parsed : null;
+    } catch {
+        return null;
+    }
+}, [conflict]);
 const navigation = useNavigation();
 
 const [cartData, setCartData] = useState<any>(null);
@@ -891,6 +900,10 @@ if (eventDetailsRaw) {
                                                     const serviceEndText =
                                                         formatServiceTime(serviceWindowEnd);
                                                 const cartLine = getCartLine(vendor, pkg);
+                                                const vendorUnavailable = checkoutConflict?.code === 'CHECKOUT_VENDOR_UNAVAILABLE';
+                                                const affected = checkoutConflict?.vendorIds.includes(cartLine.vendorId) &&
+                                                    (vendorUnavailable || checkoutConflict.packageIds.includes(cartLine.packageId));
+                                                const packageUnavailable = checkoutConflict?.code === 'CHECKOUT_PACKAGE_UNAVAILABLE';
                                                 const quotedPrice = couponQuotes[cartLine.key];
                                                 const finalPrice = quotedPrice ?? cartLine.originalAmount;
 
@@ -898,7 +911,7 @@ if (eventDetailsRaw) {
                                                 return (
                                                     <View
                                                         key={`${packageIndex}-${pkg?.packageName || 'package'}`}
-                                                        style={styles.packageCard}
+                                                        style={[styles.packageCard, affected && { borderColor: "#B54752", backgroundColor: "#FFF4F4" }]}
                                                     >
                                                         <View style={styles.packageIcon}>
                                                             <Ionicons
@@ -1080,6 +1093,37 @@ if (eventDetailsRaw) {
                                                             </View>
                                                         )}
                                                             </View>
+
+                                                            {affected && (
+                                                                <View style={{ marginVertical: 10, gap: 8 }}>
+                                                                    <Text accessibilityRole="alert" style={{ color: '#9B2335', fontWeight: '700' }}>
+                                                                        {vendorUnavailable ? 'Unavailable for new bookings' : packageUnavailable ? 'Package unavailable' : 'Selected time unavailable'}
+                                                                    </Text>
+                                                                    {category.id && (
+                                                                        <TouchableOpacity
+                                                                            accessibilityRole="button"
+                                                                            onPress={() => router.push({
+                                                                                pathname: '/categoryvendorlisting',
+                                                                                params: {
+                                                                                    bookingMode: 'event',
+                                                                                    categoryIds: JSON.stringify([category.id]),
+                                                                                    categoryNames: JSON.stringify([categoryName || '']),
+                                                                                    excludedVendorId: cartLine.vendorId,
+                                                                                    cartSwapVendorId: cartLine.vendorId,
+                                                                                    cartSwapPackageId: cartLine.packageId,
+                                                                                    cartSwapEventId: String(eventDetails?.eventId || ''),
+                                                                                    cartSwapConflict: conflict || '',
+                                                                                    cartSwapWindowLabel: serviceStartText && serviceEndText ? `${serviceStartText} – ${serviceEndText}` : '',
+                                                                                    cartSwapStart: serviceStartText ? serviceWindowStart?.toISOString() || '' : '',
+                                                                                    cartSwapEnd: serviceEndText ? serviceWindowEnd?.toISOString() || '' : '',
+                                                                                },
+                                                                            })}
+                                                                        >
+                                                                            <Text style={{ color: PRIMARY, fontWeight: '700' }}>Find another vendor</Text>
+                                                                        </TouchableOpacity>
+                                                                    )}
+                                                                </View>
+                                                            )}
 
                                                             {/* Quantity */}
 

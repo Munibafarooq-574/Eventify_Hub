@@ -5,11 +5,11 @@ import { cartCurrencies, currencySymbol, currencyOf } from '@/utils/currency';
 import { validTimeZone } from '@/utils/bookingTimezone';
 import PackagePriceBasis from '@/components/booking/PackagePriceBasis';
 import PackagePricingLabel from '@/components/booking/PackagePricingLabel';
-import { pricingMethod, } from '@/utils/packagePricing';
+import { packageAmount, pricingMethod } from '@/utils/packagePricing';
 import { resolvePackagePrice } from "@/utils/resolvePackagePrice";
 import DeliveryTimePicker, { DeliveryChoice } from '@/components/booking/DeliveryTimePicker';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
-import { deliverySettings } from '@/utils/deliveryBooking';
+import { deliveryFee, deliverySettings } from '@/utils/deliveryBooking';
 import { growthApi } from '@/services/growthApiClient';
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import BookingReviewNotice from './BookingReviewNotice';
@@ -26,7 +26,7 @@ import { createBookingDraftStore, getUserData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
-import { router, useFocusEffect, useGlobalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import React, {
   useCallback,
   useEffect,
@@ -50,6 +50,7 @@ import  getActiveCities  from '@/services/getActiveCities';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -412,6 +413,18 @@ const VendorDetailsScreen: React.FC =
   replacementOrderId,
   replacementRequestId,
 } = useGlobalSearchParams();
+const { cartSwapVendorId, cartSwapPackageId, cartSwapEventId, cartSwapStart, cartSwapEnd, cartSwapConflict } =
+  useLocalSearchParams<{
+    cartSwapVendorId?: string; cartSwapPackageId?: string; cartSwapEventId?: string;
+    cartSwapStart?: string; cartSwapEnd?: string; cartSwapConflict?: string;
+  }>();
+const isCartSwap = Boolean(cartSwapVendorId && cartSwapPackageId && cartSwapEventId);
+const matchesCartSwapWindow = useCallback((slot: { available?: boolean; startDateTime: string; endDateTime: string }) =>
+  isCartSwap && slot.available === true &&
+  Date.parse(slot.startDateTime) === Date.parse(cartSwapStart || '') &&
+  Date.parse(slot.endDateTime) === Date.parse(cartSwapEnd || ''),
+[isCartSwap, cartSwapStart, cartSwapEnd]);
+
 
 const cartEventId = String(Array.isArray(eventId) ? eventId[0] : eventId || '');
 const cartVendorId = String(Array.isArray(id) ? id[0] : id || '');
@@ -778,7 +791,10 @@ useEffect(() => {
       eventDurationMinutes: Number(durationMinutes),
     });
   })().then(result => {
-    if (active) setAppointmentSlots(result.slots || []);
+    if (!active) return;
+    const choices = result.slots || [];
+    setAppointmentSlots(choices);
+    setSelectedAppointment(choices.find(matchesCartSwapWindow) || null);
   }).catch(error => {
     reportMarketplaceLoadError('Appointment availability unavailable:', error);
     if (active) setAppointmentSlots([]);
@@ -786,7 +802,7 @@ useEffect(() => {
     if (active) setAppointmentLoading(false);
   });
   return () => { active = false; };
-}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
+}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode, matchesCartSwapWindow]);
 
 // Setup choices are fetched from the same backend authority used by checkout.
 useEffect(() => {
@@ -814,7 +830,7 @@ useEffect(() => {
     if (!active) return;
     const choices = Array.isArray(data?.slots) ? data.slots : [];
     setSetupSlots(choices);
-    const first = choices.find((item: any) => item.available);
+    const first = choices.find(matchesCartSwapWindow) || choices.find((item: any) => item.available);
     setSelectedSetup(first ? { startDateTime: first.startDateTime, endDateTime: first.endDateTime } : null);
   }).catch(error => {
     if (!active) return;
@@ -822,7 +838,7 @@ useEffect(() => {
     setSetupSlotsError('Unable to load setup times. Please refresh and try again.');
   }).finally(() => { if (active) setSetupSlotsLoading(false); });
   return () => { active = false; };
-}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode]);
+}, [activePackage, vendorData?._id, eventDate, startTime, eventCityId, durationMinutes, isEventMode, matchesCartSwapWindow]);
 
 const eventTimeZone = validTimeZone(cities.find((city: any) => String(city._id) === deliveryCity)?.timeZone);
 const formatSetupChoice = (value: string) => new Date(value).toLocaleTimeString(
@@ -1809,7 +1825,14 @@ Toast.show({
       cartWriteVersion.current++;
       setAddingToCart(true);
       try {
+        const swapEvent = isCartSwap ? JSON.parse(await draft.get('eventDetails') || 'null') : null;
+        const swapRevision = draft.getRevision();
         const existingCartData = await draft.get('cartData');
+        const cartRevision = draft.getRevision();
+        if (isCartSwap && (String(swapEvent?.eventId || '') !== cartSwapEventId ||
+            swapRevision !== cartRevision || cartRevision === undefined)) {
+          throw new Error('Your event or cart changed. Return to My Cart and select the package again.');
+        }
 
         let cart = existingCartData
           ? JSON.parse(existingCartData)
@@ -1905,6 +1928,16 @@ Toast.show({
         : 'Service',
         };
 
+        const sourceVendor = isCartSwap ? cart.vendors.find((entry: any) =>
+          String(entry.vendorId || entry.vendor?._id || '') === cartSwapVendorId) : null;
+        const sourceIndex = sourceVendor?.packages?.findIndex((item: any) =>
+          String(item.packageId || item._id || '') === cartSwapPackageId &&
+          (!item.eventId || String(item.eventId) === cartSwapEventId)) ?? -1;
+        if (isCartSwap && (sourceIndex < 0 || resolvedVendorId === cartSwapVendorId ||
+            cartPackageItem.eventId !== cartSwapEventId)) {
+          throw new Error('This replacement no longer matches your cart. Return to My Cart and try again.');
+        }
+
         // Match strictly on the resolved vendor id — never on a nested
         // object that might be stale or undefined.
         const vendorIndex = cart.vendors.findIndex(
@@ -1916,6 +1949,37 @@ Toast.show({
           showCartNotice('Different currency', 'Remove packages in the other currency before adding this package.');
           return;
         }
+        if (isCartSwap) {
+          const oldPackage = sourceVendor.packages[sourceIndex];
+          const existing = cart.vendors[vendorIndex]?.packages?.some((item: any) =>
+            String(item.packageId || item._id || '') === cartPackageItem.packageId);
+          if (existing) {
+            showCartNotice('Already in your cart', 'Choose another replacement package.', true);
+            return;
+          }
+          const guests = Number(swapEvent.guests || 1);
+          const subtotal = (item: any) => {
+            const legacyPerPerson = Boolean(item.categoryName?.toLowerCase().includes('catering'));
+            return formatPackagePrice(
+              packageAmount(item, guests, legacyPerPerson) +
+                deliveryFee(item, Number(item.quantity || 1), guests, legacyPerPerson).totalFee,
+              item,
+            );
+          };
+          const confirmed = await new Promise<boolean>(resolve => {
+            Alert.alert(
+              'Replace package?',
+              `${oldPackage.packageName}: ${subtotal(oldPackage)}\n${cartPackageItem.packageName}: ${subtotal(cartPackageItem)}\n\nPrices include delivery fees where applicable, before discounts.`,
+              [
+                { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                { text: 'Replace Package', onPress: () => resolve(true) },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) },
+            );
+          });
+          if (!confirmed || !draft.isCurrent()) return;
+        }
+
         if (vendorIndex !== -1) {
           if (!Array.isArray(cart.vendors[vendorIndex].packages)) {
             cart.vendors[vendorIndex].packages = [];
@@ -1946,13 +2010,18 @@ Toast.show({
           });
         }
 
+        if (isCartSwap) {
+          sourceVendor.packages.splice(sourceIndex, 1);
+          cart.vendors = cart.vendors.filter((entry: any) => entry !== sourceVendor || entry.packages.length);
+        }
+
         // Keep replacement checkout context attached to the cart as well.
         // This does not alter normal bookings; it only gives downstream
         // checkout a durable fallback if eventDetails is unavailable.
         const isReplacementBooking =
           String(Array.isArray(replacementMode) ? replacementMode[0] : replacementMode || '') === 'true';
 
-        if (isReplacementBooking) {
+        if (isReplacementBooking && !isCartSwap) {
           const existingEventDetailsRaw = await draft.get('eventDetails');
           let existingEventDetails: any = null;
           try {
@@ -1993,7 +2062,13 @@ Toast.show({
           eventCityId: String(Array.isArray(eventCityId) ? eventCityId[0] : eventCityId || ''),
           services: cart.vendors.map((entry: any) => ({ vendorId: entry.vendorId || entry.vendor?._id })),
         });
-        await draft.save('cartData', JSON.stringify(cart));
+        await draft.save('cartData', JSON.stringify(cart), isCartSwap ? cartRevision : undefined);
+        if (isCartSwap) {
+          if (draft.isCurrent()) router.dismissTo({
+            pathname: '/cartmanagement', params: { conflict: cartSwapConflict || '' },
+          });
+          return;
+        }
         setAddedPackages(current => [...current, currentPackageId]);
         showCartNotice('Added to cart', `${pkg.packageName} · ${formatPackagePrice(cartOffer.price ?? resolvedPrice, pkg)}`);
       } catch (error) {
@@ -6016,7 +6091,7 @@ const serviceCityNamesFromIds =
                         ? 'Select an appointment slot'
                       : cartDisabled
                       ? 'Unavailable'
-                      : `Book this package · ${selectedPackageDisplayPrice}`}
+                      : `${isCartSwap ? 'Review replacement' : 'Book this package'} · ${selectedPackageDisplayPrice}`}
               </Text>
             </TouchableOpacity>
           </View>

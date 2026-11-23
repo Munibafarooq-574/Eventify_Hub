@@ -269,8 +269,9 @@ test('unavailable vendor feedback names the affected vendor and offers My Cart',
   await fixture.run();
   assert.match(fixture.errors.at(-1), /Photo19 — Package/);
   assert.match(fixture.alerts[0][1], /Choose a different vendor/);
-  fixture.alerts[0][2].find(button => button.text === 'My Cart').onPress();
-  assert.equal(fixture.navigation.at(-1), '/cartmanagement');
+  fixture.alerts[0][2].find(button => button.text === 'View in Cart').onPress();
+  assert.equal(fixture.navigation.at(-1).pathname, '/cartmanagement');
+  assert.deepEqual(JSON.parse(fixture.navigation.at(-1).params.conflict).vendorIds, ['vendor']);
   assert.equal(fixture.deleted.length, 0);
 });
 
