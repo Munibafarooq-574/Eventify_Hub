@@ -761,7 +761,7 @@ const OrderSummary = () => {
                             const status = String(booking.status || 'pending');
                             statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
                         }
-                        const { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel } =
+                        const { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel, totalPaid, totalRemaining } =
                             getVendorBookingSummary(services, item);
                         return (
                             <TouchableOpacity
@@ -798,9 +798,7 @@ const OrderSummary = () => {
                                             <Text style={styles.paidInFullText}>Paid in Full</Text>
                                         </View>
                                     )}
-                                    {(item.vendorOrders || []).map((booking: any) => (
-                                        <BookingActivity key={booking._id} booking={booking} timeZone={bookingTimeZone(item)} cancellationDetailsVisible />
-                                    ))}
+                                    <BookingActivity bookings={services} timeZone={bookingTimeZone(item)} cancellationDetailsVisible />
                                     <View style={styles.detailsBlock}>
                                         <View style={styles.detailRow}>
                                             <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
@@ -815,7 +813,7 @@ const OrderSummary = () => {
                                         <View style={styles.detailRow}>
                                             <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
                                             <Text style={styles.detailText}>
-                                                {displayBookingMoney(bookingTotal, item)}
+                                                Total for {services.length} {services.length === 1 ? "package" : "packages"} · {displayBookingMoney(bookingTotal, item)}
                                                 {discount > 0 && <Text style={styles.originalBookingPrice}>  {displayBookingMoney(original, item)}</Text>}
                                             </Text>
                                             {discount > 0 && <Text style={styles.bookingDiscountBadge}>{discountLabel}</Text>}
@@ -972,31 +970,6 @@ const OrderSummary = () => {
                                                     </View>
                                                 )}
 
-                                                {/* Booking Details */}
-                                                <Text style={styles.expandedSubTitle}>Booking Details</Text>
-                                                {discount > 0 && (
-                                                    <Text style={styles.detailText}>Original price: {displayBookingMoney(original, item)}</Text>
-                                                )}
-                                                {services.map((service: any, index: number) => amounts[index].discount > 0 && (
-                                                    <Text key={service._id || index} style={styles.detailText}>
-                                                        {service.promotionCode ? `Discount (${service.promotionCode})` : "Discount"}: −{displayBookingMoney(amounts[index].discount, item)}
-                                                    </Text>
-                                                ))}
-                                                <Text style={styles.detailText}>Booking Total: {displayBookingMoney(bookingTotal, item)}</Text>
-                                                {platformFee > 0 && (
-                                                    <Text style={styles.detailText}>Platform Fee: −{displayBookingMoney(platformFee, item)}</Text>
-                                                )}
-                                                <View style={styles.detailRow}>
-                                                    <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                    <Text style={styles.detailText}>Your Earnings: {displayBookingMoney(earnings, item)}</Text>
-                                                </View>
-                                                {!!item.status && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
-                                                    </View>
-                                                )}
-
                                                 {/* Services */}
                                                 {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
                                                     <>
@@ -1024,6 +997,35 @@ const OrderSummary = () => {
                                                         })}
                                                     </>
                                                 )}
+                                                <View style={styles.serviceDetailCard}>
+                                                    {/* Package totals */}
+                                                    <Text style={styles.expandedSubTitle}>Package totals</Text>
+                                                    {discount > 0 && (
+                                                        <Text style={styles.detailText}>Original price: {displayBookingMoney(original, item)}</Text>
+                                                    )}
+                                                    {services.map((service: any, index: number) => amounts[index].discount > 0 && (
+                                                        <Text key={service._id || index} style={styles.detailText}>
+                                                            {service.promotionCode ? `Discount (${service.promotionCode})` : "Discount"}: −{displayBookingMoney(amounts[index].discount, item)}
+                                                        </Text>
+                                                    ))}
+                                                    <Text style={styles.serviceDetailTitle}>Total for {services.length} {services.length === 1 ? "package" : "packages"} · {displayBookingMoney(bookingTotal, item)}</Text>
+                                                    <Text style={styles.detailText}>Total paid: {displayBookingMoney(totalPaid, item)}</Text>
+                                                    <Text style={styles.detailText}>Total remaining: {displayBookingMoney(totalRemaining, item)}</Text>
+                                                    {platformFee > 0 && (
+                                                        <Text style={styles.detailText}>Platform Fee: −{displayBookingMoney(platformFee, item)}</Text>
+                                                    )}
+                                                    <View style={styles.detailRow}>
+                                                        <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
+                                                        <Text style={styles.detailText}>Your Earnings: {displayBookingMoney(earnings, item)}</Text>
+                                                    </View>
+                                                    {!!item.status && (
+                                                        <View style={styles.detailRow}>
+                                                            <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
+                                                            <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
+                                                        </View>
+                                                    )}
+
+                                                </View>
                                             </View>
                                         )}
                                     </View>

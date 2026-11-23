@@ -1,16 +1,20 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { bookingActivity, formatBookingActivityTime, type BookingActivityRecord } from '@/utils/bookingActivity';
+import { groupedBookingActivity, formatBookingActivityTime, type BookingActivityRecord } from '@/utils/bookingActivity';
 
-export default function BookingActivity({ booking, timeZone, cancellationDetailsVisible = false }: {
-  booking: BookingActivityRecord; timeZone?: string; cancellationDetailsVisible?: boolean;
+export default function BookingActivity({ booking, bookings, timeZone, cancellationDetailsVisible = false }: {
+  booking?: BookingActivityRecord;
+  bookings?: (BookingActivityRecord & { serviceName?: string })[];
+  timeZone?: string;
+  cancellationDetailsVisible?: boolean;
 }) {
-  const rows = bookingActivity(booking, cancellationDetailsVisible);
+  const rows = groupedBookingActivity(bookings ?? (booking ? [booking] : []), cancellationDetailsVisible);
   if (!rows.length) return null;
   return <View style={styles.box}>
     <Text style={styles.title}>Booking activity</Text>
-    {rows.map(row => <Text key={row.label} style={styles.row}>
+    {rows.map(row => <Text key={row.key} style={styles.row}>
       <Text style={styles.label}>{row.label}: </Text>{formatBookingActivityTime(row.at, timeZone)}
+      {row.packages.length > 0 && <Text>{` · ${row.packages.join(', ')}`}</Text>}
     </Text>)}
     {!!timeZone && <Text style={styles.zone}>Times shown in {timeZone.replace(/_/g, ' ')}</Text>}
   </View>;

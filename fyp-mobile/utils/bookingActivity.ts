@@ -27,3 +27,23 @@ export function bookingActivity(booking: BookingActivityRecord, cancellationDeta
 export function formatBookingActivityTime(value: string | null, timeZone?: string): string {
   return formatBookingDateTime(value, timeZone, 'Time not recorded');
 }
+
+export function groupedBookingActivity(bookings: (BookingActivityRecord & { serviceName?: string })[], cancellationDetailsVisible = false) {
+  const groups = new Map<string, { label: string; at: string | null; packages: string[] }>();
+  for (const booking of bookings) {
+    for (const row of bookingActivity(booking, cancellationDetailsVisible)) {
+      const minute = row.at ? Math.floor(Date.parse(row.at) / 60_000) : 'unknown';
+      const key = `${row.label}-${minute}`;
+      const group = groups.get(key) ?? { ...row, packages: [] };
+      group.packages.push(booking.serviceName || 'Package');
+      groups.set(key, group);
+    }
+  }
+  return Array.from(groups, ([key, group]) => ({
+    key,
+    ...group,
+    packages: bookings.length > 1 && (group.packages.length !== bookings.length || !group.at)
+      ? group.packages
+      : [],
+  }));
+}

@@ -45,5 +45,7 @@ export function getVendorBookingSummary(services: Parameters<typeof getVendorBoo
     const discountLabel = amounts.length === 1 && original > 0
         ? `${Number((discount / original * 100).toFixed(1))}% OFF`
         : `Save ${displayBookingMoney(discount, booking)}`;
-    return { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel };
+    const totalPaid = roundMoney(amounts.reduce((sum, amount) => sum + amount.paid, 0));
+    const totalRemaining = roundMoney(amounts.reduce((sum, amount) => sum + amount.remaining, 0));
+    return { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel, totalPaid, totalRemaining };
 }

@@ -14,3 +14,14 @@ test('timezone and twelve hour format preserve exact instant, invalid dates are 
  assert.match(format(t,'Asia/Karachi'),/8:18 pm/i);assert.match(format(t,'America/New_York'),/11:18 am/i);assert.match(format(t,'Asia/Karachi'),/26 Oct 2026/);assert.equal(format('bad'),'Time not recorded');assert.doesNotThrow(()=>format(t,'bad-zone'));
 });
 test('all three screens reuse shared component and compile',()=>{for(const p of ['components/myevents/MyEventsIndex.tsx','components/vendorordersummary/VendorOrderSummaryIndex.tsx','components/vendormyevents/VendorMyEventsIndex.tsx','components/booking/BookingActivity.tsx']){const s=fs.readFileSync(p,'utf8');assert.equal(ts.transpileModule(s,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true}).diagnostics.length,0);assert.match(s,/BookingActivity/);}});
+
+test('order activity merges shared minutes and names the package for individual changes', () => {
+ const activity = m.exports.groupedBookingActivity([
+  { serviceName: 'Portraits', createdAt: t, acceptedAt: '2026-10-26T15:22:00Z' },
+  { serviceName: 'Photography', createdAt: '2026-10-26T15:18:01Z' },
+ ]);
+ assert.equal(activity.length, 2);
+ assert.equal(activity[0].label, 'Requested');
+ assert.equal(activity[0].packages.length, 0);
+ assert.equal(activity[1].packages.join(','), 'Portraits');
+});
