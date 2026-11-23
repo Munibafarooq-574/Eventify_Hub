@@ -136,13 +136,14 @@ const MyEventsScreen = () => {
       if (!user?._id) throw new Error("Vendor user not found");
       setVendorId(String(user._id));
 
-      const [ordersData, availabilityData] = await Promise.all([
-        getVendorOrders("Vendor", user._id),
-        getVendorAvailability(user._id),
+      await Promise.all([
+        getVendorOrders("Vendor", user._id).then(data => {
+          setOrders(Array.isArray(data) ? data : []);
+        }).catch(error => console.error("Error fetching vendor orders:", error)),
+        getVendorAvailability(user._id).then(data => {
+          setAvailability(data || {});
+        }).catch(error => console.error("Error fetching vendor availability:", error)),
       ]);
-
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setAvailability(availabilityData || {});
     } catch (error) {
       console.error("Error fetching vendor events:", error);
     } finally {
@@ -576,17 +577,15 @@ return (
     </View>
   </View>
 
-  {availability && (
-    <View style={styles.workingHoursCard}>
+  <View style={styles.workingHoursCard}>
       <View style={styles.workingHoursIcon}>
         <Ionicons name="people-outline" size={18} color={PRIMARY} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.bookingLimitLabel}>Maximum bookings at the same time</Text>
-        <Text style={styles.bookingLimitValue}>{availability.maxConcurrentBookings ?? 1}</Text>
+        <Text style={styles.bookingLimitValue}>{availability ? availability.maxConcurrentBookings ?? 1 : availabilityLoading ? "Loading…" : "Could not load"}</Text>
       </View>
-    </View>
-  )}
+  </View>
 
   {availabilityLoading || dayLoading ? (
     <View style={styles.loadingAvailability}>
