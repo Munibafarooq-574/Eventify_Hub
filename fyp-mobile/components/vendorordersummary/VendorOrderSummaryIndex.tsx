@@ -4,7 +4,6 @@ import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
-import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { formatBookingActivityTime } from '@/utils/bookingActivity';
 import BookingUserGuide from '../guides/BookingUserGuide';
@@ -747,6 +746,20 @@ const OrderSummary = () => {
                         const isExpanded = expandedOrderId === item._id;
                         const scheduleHold = rescheduleHoldReason(item);
                         const services = Array.isArray(item.vendorOrders) ? item.vendorOrders : [];
+                        const requestGroups = new Map<string, any[]>();
+                        for (const request of rescheduleRequests) {
+                            if (String(request.orderId) !== String(item._id)) continue;
+                            const key = `${request.vendorId}:${request.requestGroupId || request._id}`;
+                            const group = requestGroups.get(key) ?? [];
+                            group.push(request);
+                            requestGroups.set(key, group);
+                        }
+                        const zone = bookingTimeZone(item);
+                        const slotLabel = (start?: string, end?: string) => {
+                            if (!start) return 'Unavailable';
+                            const formattedStart = formatBookingActivityTime(start, zone);
+                            return end ? `${formattedStart} – ${formatBookingActivityTime(end, zone)}` : formattedStart;
+                        };
                         const pending = services.filter((booking: any) => booking.status === 'pending' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED');
                         const proposalBooking = services.find((booking: any) => booking.vendorScheduleProposal?.status === 'PENDING')
                             ?? services.find((booking: any) => booking.vendorScheduleProposal);
@@ -894,13 +907,13 @@ const OrderSummary = () => {
                                                     );
                                                 })()}
 
-                                                {!["cancelled", "no_longer_assigned"].includes(getVendorStatus(item)) && rescheduleRequests
-                                                    .filter((request: any) => String(request.orderId) === String(item._id) && !(item.vendorOrders || []).some((booking: any) => String(booking._id) === String(request.vendorOrderId) && booking.laterTimeRequest?.clientAcceptedSuggestion))
-                                                    .map((request: any) => {
-                                                        const pending = request.status === "CHANGE_REQUESTED";
+                                                {!["cancelled", "no_longer_assigned"].includes(getVendorStatus(item)) && Array.from(requestGroups, ([key, group]) => {
+                                                        const actionable = group.find(row => row.status === "CHANGE_REQUESTED" && (!row.resolutionStatus || row.resolutionStatus === "PENDING"));
+                                                        const request = actionable ?? group[0];
+                                                        if (!actionable && group.every(row => services.some((booking: any) => String(booking._id) === String(row.vendorOrderId) && booking.laterTimeRequest?.clientAcceptedSuggestion))) return null;
                                                         const busy = respondingRequestId === request._id;
                                                         return (
-                                                            <View key={request._id} style={styles.rescheduleCard}>
+                                                            <View key={key} style={styles.rescheduleCard}>
                                                                 <View style={styles.rescheduleHeader}>
                                                                     <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
                                                                     <Text style={styles.rescheduleTitle}>Review Reschedule Request</Text>
@@ -911,36 +924,43 @@ const OrderSummary = () => {
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New start time: {formatScheduleTime(request.newStartTime)}
                                                                 </Text>
-                                                                {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleLine}>New delivery date &amp; time: {deliveryDateTime(request.newServiceStartDateTime,bookingTimeZone(item))}</Text>}
                                                                 <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
                                                                 <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, bookingTimeZone(item))}</Text>
                                                                 <Text style={styles.rescheduleReason}>Times shown in {bookingTimeZone(item)}</Text>
-                                                                {request.availabilityPrecheckPassed === false && (
-                                                                    <Text style={styles.rescheduleWarning}>
-                                                                        Availability pre-check found a conflict. Review carefully.
-                                                                    </Text>
-                                                                )}
-                                                                {pending ? (
+                                                                <Text style={styles.rescheduleTitle}>Affected packages ({group.length})</Text>
+                                                                {group.map(row => {
+                                                                    const booking = services.find((service: any) => String(service._id) === String(row.vendorOrderId));
+                                                                    return (
+                                                                        <View key={row._id} style={styles.serviceDetailCard}>
+                                                                            <Text style={styles.serviceDetailTitle}>{booking?.serviceName || 'Package'}</Text>
+                                                                            <Text style={styles.rescheduleLine}>Current slot · {slotLabel(row.oldServiceStartDateTime, row.oldServiceEndDateTime)}</Text>
+                                                                            <Text style={styles.rescheduleLine}>Proposed slot · {slotLabel(row.newServiceStartDateTime, row.newServiceEndDateTime)}</Text>
+                                                                            {row.availabilityPrecheckPassed === false && row.status === "CHANGE_REQUESTED" && (
+                                                                                <Text style={styles.rescheduleWarning}>{row.availabilityPrecheckReason || 'Availability pre-check found a conflict.'}</Text>
+                                                                            )}
+                                                                            {(!actionable || row.status !== "CHANGE_REQUESTED") && <Text style={styles.rescheduleResolved}>
+                                                                                {row.status === "ACCEPTED" ? "New schedule accepted" : row.status === "REJECTED" ? "Unable to accommodate" : row.status === "EXPIRED" ? "Request expired" : "Request closed"}
+                                                                            </Text>}
+                                                                        </View>
+                                                                    );
+                                                                })}
+                                                                {actionable && (
                                                                     <View style={styles.rescheduleActions}>
                                                                         <TouchableOpacity
-                                                                            disabled={busy}
+                                                                            disabled={respondingRequestId !== null}
                                                                             style={styles.rejectRescheduleButton}
                                                                             onPress={() => handleRescheduleResponse(request._id, "REJECTED")}
                                                                         >
                                                                             <Text style={styles.rescheduleActionText}>Unable to Accommodate</Text>
                                                                         </TouchableOpacity>
                                                                         <TouchableOpacity
-                                                                            disabled={busy}
+                                                                            disabled={respondingRequestId !== null}
                                                                             style={styles.acceptRescheduleButton}
                                                                             onPress={() => handleRescheduleResponse(request._id, "ACCEPTED")}
                                                                         >
                                                                             {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.rescheduleActionText}>Accept New Schedule</Text>}
                                                                         </TouchableOpacity>
                                                                     </View>
-                                                                ) : (
-                                                                    <Text style={styles.rescheduleResolved}>
-                                                                        {request.status === "ACCEPTED" ? "New schedule accepted" : request.status === "REJECTED" ? "Unable to accommodate" : "Request expired"}
-                                                                    </Text>
                                                                 )}
                                                             </View>
                                                         );

@@ -3254,6 +3254,8 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new BadRequestException('Invalid request or vendor ID');
         }
 
+        if (!['ACCEPTED', 'REJECTED'].includes(dto?.status)) throw new BadRequestException('Unsupported schedule response');
+
         await this.expireRescheduleRequests();
 
         const request: any = await this.rescheduleRequestModel.findById(requestId);
@@ -3263,59 +3265,39 @@ async completeVendorOrder(vendorOrderId: string) {
             throw new BadRequestException('This rescheduling request belongs to another vendor');
         }
 
-        if (request.status !== 'CHANGE_REQUESTED') {
-            throw new ConflictException('This rescheduling request has already been resolved');
+        const session = await this.connection.startSession();
+        try {
+            await session.withTransaction(async () => {
+                // Serialize responses across vendors so the last response can apply the event in this transaction.
+                const lock = await this.orderModel.updateOne({ _id: request.orderId }, { $inc: { __v: 1 } }, { session });
+                if (!lock.matchedCount) throw new NotFoundException('Original booking not found');
+                const group = await this.rescheduleRequestModel.find(request.requestGroupId
+                    ? { orderId: request.orderId, vendorId: request.vendorId, requestGroupId: request.requestGroupId }
+                    : { _id: request._id }).session(session);
+                const pending = group.filter(row => row.status === 'CHANGE_REQUESTED' && (!row.resolutionStatus || row.resolutionStatus === 'PENDING'));
+                if (!pending.length || pending.some(row => new Date(row.expiresAt).getTime() <= Date.now())) {
+                    throw new ConflictException('This rescheduling request has already been resolved or expired');
+                }
+                if (dto.status === 'ACCEPTED') {
+                    await this.userModel.updateOne({ _id: request.vendorId }, { $inc: { bookingConcurrencyVersion: 1 } }, { session });
+                    const order = await this.orderModel.findById(request.orderId).session(session);
+                    const zone = await this.cityService.requireCityTimeZone(String(order!.eventCityId));
+                    await this.validateRescheduleSlots(group.filter(row => ['ACCEPTED', 'CHANGE_REQUESTED'].includes(row.status)), zone, session);
+                }
+                const respondedAt = new Date();
+                for (const row of pending) {
+                    row.status = dto.status;
+                    row.respondedAt = respondedAt;
+                    row.responseMessage = dto.message?.trim() || null;
+                    await row.save({ session });
+                }
+                if (dto.status === 'ACCEPTED') await this.applyRescheduleIfAllAccepted(String(request.orderId), session, request.requestGroupId);
+            });
+        } finally {
+            await session.endSession();
         }
-
-        if (dto.status === 'ACCEPTED') {
-            const vendorOrder: any = await this.vendorOrderModel.findById(request.vendorOrderId).lean();
-            if (!vendorOrder || !['pending', 'accepted'].includes(vendorOrder.status)) {
-                throw new ConflictException('Vendor booking is no longer active');
-            }
-
-            const requestOrder = await this.orderModel.findById(request.orderId).lean();
-            if (!requestOrder) throw new NotFoundException('Original booking not found');
-            const requestTimeZone = await this.cityService.requireCityTimeZone(String(requestOrder.eventCityId));
-            const requestedStart = eventLocalToUtc(
-                new Date(request.newEventDate).toISOString().slice(0, 10),
-                String(request.newStartTime), requestTimeZone,
-            );
-
-            const availability = await this.availabilityService.checkVendorAvailability(
-                String(request.vendorId),
-                requestedStart,
-                new Date(request.newEndTime),
-                vendorOrder.packageId || undefined,
-                undefined,
-                String(vendorOrder._id), false, requestTimeZone,
-                vendorOrder.delivery ? { startDateTime: request.newServiceStartDateTime, configuration: vendorOrder.delivery } : undefined,
-                vendorOrder.bookingType === 'TIME_SLOT_BASED' && request.newServiceStartDateTime && request.newServiceEndDateTime
-                    ? { startDateTime: request.newServiceStartDateTime, endDateTime: request.newServiceEndDateTime }
-                    : undefined,
-            );
-
-            if (!availability.available) {
-                throw new ConflictException(
-                    availability.reason || 'Vendor is no longer available for the requested time',
-                );
-            }
-
-            request.newServiceStartDateTime =
-                availability.requiredServiceWindow?.startDateTime || request.newServiceStartDateTime;
-            request.newServiceEndDateTime =
-                availability.requiredServiceWindow?.endDateTime || request.newServiceEndDateTime;
-        }
-
-        request.status = dto.status;
-        request.respondedAt = new Date();
-        request.responseMessage = dto.message?.trim() || null;
-        await request.save();
 
         const order: any = await this.orderModel.findById(request.orderId).lean();
-
-        if (dto.status === 'ACCEPTED') {
-            await this.applyRescheduleIfAllAccepted(String(request.orderId));
-        }
 
         if (order) {
             try {
@@ -3358,147 +3340,139 @@ async completeVendorOrder(vendorOrderId: string) {
             }
         }
 
-        return request;
+        return this.rescheduleRequestModel.findById(requestId);
     }
 
-    private async applyRescheduleIfAllAccepted(orderId: string) {
-        const latest: any = await this.rescheduleRequestModel
-            .findOne({ orderId: new Types.ObjectId(orderId) })
-            .sort({ createdAt: -1 })
-            .lean();
-
-        if (!latest) return { applied: false };
-
-        const batch: any[] = await this.rescheduleRequestModel
-            .find({ requestGroupId: latest.requestGroupId })
-            .lean();
-
-        if (!batch.length || batch.some((r: any) => r.status !== 'ACCEPTED')) {
-            return { applied: false };
+    private async validateRescheduleSlots(requests: any[], zone: string, session: ClientSession) {
+        const excludedIds = requests.map(request => new Types.ObjectId(request.vendorOrderId));
+        const slots: { request: any; booking: any; start: Date; end: Date; existing: number; limit: number }[] = [];
+        for (const request of requests) {
+            const booking = await this.vendorOrderModel.findById(request.vendorOrderId).session(session);
+            const name = booking?.serviceName || 'Package';
+            if (!booking || !['pending', 'accepted'].includes(booking.status)) {
+                throw new ConflictException(`${name}: the booking is no longer active.`);
+            }
+            const eventStart = eventLocalToUtc(new Date(request.newEventDate).toISOString().slice(0, 10), request.newStartTime, zone);
+            const proposed = request.newServiceStartDateTime && request.newServiceEndDateTime
+                ? { startDateTime: request.newServiceStartDateTime, endDateTime: request.newServiceEndDateTime } : undefined;
+            const availability = await this.availabilityService.checkVendorAvailability(
+                String(request.vendorId), eventStart, new Date(request.newEndTime), booking.packageId || undefined,
+                session, String(booking._id), false, zone,
+                booking.delivery ? { startDateTime: request.newServiceStartDateTime, configuration: booking.delivery } : undefined,
+                ['TIME_SLOT_BASED', 'SETUP_BASED'].includes(booking.bookingType || request.bookingType) ? proposed : undefined,
+                { excludeBookingIds: excludedIds },
+            );
+            if (!availability.available) throw new ConflictException(`${name}: ${availability.reason || 'the proposed slot is unavailable.'}`);
+            const start = new Date(availability.requiredServiceWindow?.startDateTime || request.newServiceStartDateTime);
+            const end = new Date(availability.requiredServiceWindow?.endDateTime || request.newServiceEndDateTime);
+            if (!Number.isFinite(start.getTime()) || !(end > start)) throw new ConflictException(`${name}: the proposed slot is unavailable.`);
+            request.newServiceStartDateTime = start;
+            request.newServiceEndDateTime = end;
+            slots.push({ request, booking, start, end, existing: availability.overlapCount ?? 0, limit: availability.maxConcurrentBookings ?? 1 });
         }
+        for (const slot of slots) {
+            const { booking, start, end } = slot;
+            const overlapping = slots.filter(other => other !== slot && String(other.booking.vendorId) === String(booking.vendorId) && other.start < end && other.end > start);
+            if (slot.existing + overlapping.length >= slot.limit) {
+                throw new ConflictException(`${booking.serviceName}: the proposed slots exceed vendor capacity.`);
+            }
+            const vendor = await this.userModel.findById(booking.vendorId).select('packages').session(session).lean();
+            const pkg = vendor?.packages?.find(pkg => String((pkg as any)._id) === String(booking.packageId));
+            try {
+                await this.assertPackageResourceBudget({
+                    vendorId: String(booking.vendorId), packageId: String(booking.packageId), start, end, session,
+                    requestedUnits: Number(booking.resourceUnits ?? booking.quantity ?? 1), maxParallelUnits: pkg?.availableParallelUnits,
+                    excludeOrderIds: excludedIds,
+                    additionalUnits: overlapping.filter(other => String(other.booking.packageId) === String(booking.packageId))
+                        .reduce((sum, other) => sum + Number(other.booking.resourceUnits ?? other.booking.quantity ?? 1), 0),
+                });
+            } catch (error) {
+                if (error instanceof ConflictException || error instanceof BadRequestException) throw new ConflictException(`${booking.serviceName}: ${error.message}`);
+                throw error;
+            }
+        }
+        return slots;
+    }
 
-        const session = await this.connection.startSession();
-        try {
-            await session.withTransaction(async () => {
-                const order: any = await this.orderModel.findById(orderId).session(session);
-                if (!order) throw new NotFoundException('Booking not found');
-                const rescheduleTimeZone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+    private async applyRescheduleIfAllAccepted(orderId: string, activeSession?: ClientSession, requestGroupId?: Types.ObjectId) {
+        const apply = async (session: ClientSession) => {
+            const latest: any = await this.rescheduleRequestModel
+                .findOne({ orderId: new Types.ObjectId(orderId), ...(requestGroupId ? { requestGroupId } : {}) })
+                .sort({ createdAt: -1 }).session(session)
+                .lean();
 
-                const vendorOrders: any[] = [];
-                for (const req of batch) {
-                    const vo: any = await this.vendorOrderModel.findById(req.vendorOrderId).session(session);
-                    if (!vo || !['pending', 'accepted'].includes(vo.status)) {
-                        throw new ConflictException('A vendor booking is no longer active');
-                    }
-                    vendorOrders.push(vo);
-                }
+            if (!latest) return { applied: false };
 
-                const vendorIds = [...new Set(batch.map((r: any) => String(r.vendorId)))].sort();
-                for (const id of vendorIds) {
-                    await this.userModel.updateOne(
-                        { _id: new Types.ObjectId(id), role: 'Vendor' },
-                        { $inc: { bookingConcurrencyVersion: 1 } },
-                        { session },
-                    );
-                }
+            const batch: any[] = await this.rescheduleRequestModel
+                .find({ orderId, requestGroupId: latest.requestGroupId }).session(session)
+                .lean();
 
-                for (let i = 0; i < batch.length; i++) {
-                    const req: any = batch[i];
-                    const vo: any = vendorOrders[i];
+            if (!batch.length || batch.some((r: any) => r.status !== 'ACCEPTED' || !['PENDING', 'REPLACEMENT_REQUIRED'].includes(r.resolutionStatus || 'PENDING'))) {
+                return { applied: false };
+            }
 
-                    const requestedStart = eventLocalToUtc(
-                        new Date(req.newEventDate).toISOString().slice(0, 10),
-                        String(req.newStartTime), rescheduleTimeZone,
-                    );
+            const order = await this.orderModel.findById(orderId).session(session);
+            if (!order) throw new NotFoundException('Booking not found');
+            const rescheduleTimeZone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
 
-                    const availability = await this.availabilityService.checkVendorAvailability(
-                        String(req.vendorId),
-                        requestedStart,
-                        new Date(req.newEndTime),
-                        vo.packageId || undefined,
-                        session,
-                        String(vo._id), false, rescheduleTimeZone,
-                        vo.delivery ? { startDateTime: req.newServiceStartDateTime, configuration: vo.delivery } : undefined,
-                        vo.bookingType === 'TIME_SLOT_BASED' && req.newServiceStartDateTime && req.newServiceEndDateTime
-                            ? { startDateTime: req.newServiceStartDateTime, endDateTime: req.newServiceEndDateTime }
-                            : undefined,
-                    );
-
-                    if (!availability.available) {
-                        throw new ConflictException(
-                            availability.reason || 'Final rescheduling availability validation failed',
-                        );
-                    }
-
-                    const rescheduledStart = new Date(availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime);
-                    const rescheduledEnd = new Date(availability.requiredServiceWindow?.endDateTime || req.newServiceEndDateTime);
-                    const vendorWithPackages: any = await this.userModel.findById(req.vendorId)
-                        .select('packages').session(session).lean();
-                    const rescheduledPackage = (vendorWithPackages?.packages || [])
-                        .find((pkg: any) => String(pkg._id) === String(vo.packageId));
-                    if (rescheduledPackage?.availableParallelUnits != null) {
-                        const previouslyPlanned = vendorOrders.slice(0, i)
-                            .filter(previous => String(previous.vendorId) === String(vo.vendorId) &&
-                                String(previous.packageId) === String(vo.packageId) &&
-                                new Date(previous.eventStartDateTime) < rescheduledEnd &&
-                                new Date(previous.eventEndDateTime) > rescheduledStart)
-                            .reduce((sum, previous) => sum + Number(previous.resourceUnits ?? previous.quantity ?? 1), 0);
-                        await this.assertPackageResourceBudget({
-                            vendorId: String(vo.vendorId),
-                            packageId: String(vo.packageId),
-                            start: rescheduledStart,
-                            end: rescheduledEnd,
-                            requestedUnits: Number(vo.resourceUnits ?? vo.quantity ?? 1),
-                            maxParallelUnits: Number(rescheduledPackage.availableParallelUnits),
-                            session,
-                            excludeOrderIds: vendorOrders.map(item => item._id),
-                            additionalUnits: previouslyPlanned,
-                        });
-                    }
-                    vo.eventStartDateTime =
-                        availability.requiredServiceWindow?.startDateTime || req.newServiceStartDateTime;
-                    vo.eventEndDateTime =
-                        availability.requiredServiceWindow?.endDateTime || req.newServiceEndDateTime;
-                    await vo.save({ session });
-
-                    await this.rescheduleRequestModel.updateOne(
-                        { _id: req._id },
-                        {
-                            $set: {
-                                newServiceStartDateTime: vo.eventStartDateTime,
-                                newServiceEndDateTime: vo.eventEndDateTime,
-                                appliedAt: new Date(),
-                            },
-                        },
-                        { session },
-                    );
-                }
-
-                const first: any = batch[0];
-                const newStart = eventLocalToUtc(
-                    new Date(first.newEventDate).toISOString().slice(0, 10),
-                    String(first.newStartTime), rescheduleTimeZone,
-                );
-
-                order.eventDate = new Date(first.newEventDate);
-                order.eventTime = first.newStartTime;
-                order.eventStartDateTime = newStart;
-                order.eventEndDateTime = new Date(first.newEndTime);
-                order.eventDurationMinutes =
-                    Math.round((new Date(first.newEndTime).getTime() - newStart.getTime()) / 60000);
-                await order.save({ session });
-
-                await this.rescheduleRequestModel.updateMany(
-                    { requestGroupId: first.requestGroupId },
-                    { $set: { resolutionStatus: 'APPLIED', resolvedAt: new Date() } },
+            const vendorIds = [...new Set(batch.map((r: any) => String(r.vendorId)))].sort();
+            for (const id of vendorIds) {
+                await this.userModel.updateOne(
+                    { _id: new Types.ObjectId(id), role: 'Vendor' },
+                    { $inc: { bookingConcurrencyVersion: 1 } },
                     { session },
                 );
-            });
+            }
+
+            const slots = await this.validateRescheduleSlots(batch, rescheduleTimeZone, session);
+            for (const { request: req, booking: vo, start, end } of slots) {
+                vo.eventStartDateTime = start;
+                vo.eventEndDateTime = end;
+                await vo.save({ session });
+
+                await this.rescheduleRequestModel.updateOne(
+                    { _id: req._id },
+                    {
+                        $set: {
+                            newServiceStartDateTime: vo.eventStartDateTime,
+                            newServiceEndDateTime: vo.eventEndDateTime,
+                            appliedAt: new Date(),
+                        },
+                    },
+                    { session },
+                );
+            }
+
+            const first: any = batch[0];
+            const newStart = eventLocalToUtc(
+                new Date(first.newEventDate).toISOString().slice(0, 10),
+                String(first.newStartTime), rescheduleTimeZone,
+            );
+
+            order.eventDate = new Date(first.newEventDate);
+            order.eventTime = first.newStartTime;
+            order.eventStartDateTime = newStart;
+            order.eventEndDateTime = new Date(first.newEndTime);
+            order.eventDurationMinutes =
+                Math.round((new Date(first.newEndTime).getTime() - newStart.getTime()) / 60000);
+            await order.save({ session });
+
+            await this.rescheduleRequestModel.updateMany(
+                { requestGroupId: first.requestGroupId },
+                { $set: { resolutionStatus: 'APPLIED', resolvedAt: new Date() } },
+                { session },
+            );
+            return { applied: true };
+        };
+        if (activeSession) return apply(activeSession);
+        const session = await this.connection.startSession();
+        try {
+            let result = { applied: false };
+            await session.withTransaction(async () => { result = await apply(session); });
+            return result;
         } finally {
             await session.endSession();
         }
-
-        return { applied: true };
     }
 
     async resolvePartialReschedule(orderId: string, requesterId: string, action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE') {

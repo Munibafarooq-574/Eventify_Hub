@@ -306,7 +306,7 @@ if (!hasAccess) {
     eventTimeZone = 'UTC',
     deliverySelection?: { startDateTime: string | Date; configuration?: any },
     serviceWindowSelection?: { startDateTime: string | Date; endDateTime: string | Date },
-    options?: { existingBooking?: boolean },
+    options?: { existingBooking?: boolean; excludeBookingIds?: Types.ObjectId[] },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -513,7 +513,7 @@ if (!hasAccess) {
             for (const candidate of packageAppointmentCandidates(selectedPackage, eventStartDateTime, requestedEnd)) {
               const result = await this.checkVendorAvailability(
                 vendorId, eventStartDateTime, requestedEnd, packageId, session,
-                excludeVendorOrderId, replacementMode, eventTimeZone, undefined, candidate,
+                excludeVendorOrderId, replacementMode, eventTimeZone, undefined, candidate, options,
               );
               if (result.available) return result;
             }
@@ -546,7 +546,7 @@ if (!hasAccess) {
             for (const date of dates) {
               for (const slot of buildDeliveryCandidates(configuration, eventStartDateTime, date, zone).slots) {
                 if (slot.startDateTime.getTime() <= Date.now()) continue;
-                const result = await this.checkVendorAvailability(vendorId, eventStartDateTime, requestedEnd, packageId, session, excludeVendorOrderId, true, zone, { startDateTime: slot.startDateTime, configuration });
+                const result = await this.checkVendorAvailability(vendorId, eventStartDateTime, requestedEnd, packageId, session, excludeVendorOrderId, true, zone, { startDateTime: slot.startDateTime, configuration }, undefined, options);
                 if (result.available) return result;
               }
             }
@@ -594,7 +594,7 @@ if (!hasAccess) {
             const result = await this.checkVendorAvailability(
               vendorId, eventStartDateTime, requestedEnd, packageId, session,
               excludeVendorOrderId, replacementMode, eventTimeZone, undefined,
-              { startDateTime: new Date(candidate), endDateTime: new Date(candidate + durationMs) },
+              { startDateTime: new Date(candidate), endDateTime: new Date(candidate + durationMs) }, options,
             );
             if (result.available) return result;
           }
@@ -605,7 +605,7 @@ if (!hasAccess) {
             const result = await this.checkVendorAvailability(
               vendorId, eventStartDateTime, requestedEnd, packageId, session,
               excludeVendorOrderId, replacementMode, eventTimeZone, undefined,
-              { startDateTime: new Date(lastStart), endDateTime: new Date(latestEnd) },
+              { startDateTime: new Date(lastStart), endDateTime: new Date(latestEnd) }, options,
             );
             if (result.available) return result;
           }
@@ -842,7 +842,9 @@ if (!hasAccess) {
         },
       };
 
-    if (excludeVendorOrderId && Types.ObjectId.isValid(excludeVendorOrderId)) {
+    if (options?.excludeBookingIds?.length) {
+      overlapFilter._id = { $nin: options.excludeBookingIds };
+    } else if (excludeVendorOrderId && Types.ObjectId.isValid(excludeVendorOrderId)) {
       overlapFilter._id = { $ne: new Types.ObjectId(excludeVendorOrderId) };
     }
 
