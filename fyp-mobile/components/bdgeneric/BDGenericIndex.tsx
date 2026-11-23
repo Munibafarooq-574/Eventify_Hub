@@ -21,6 +21,8 @@ import {
     ActivityIndicator,
     Alert,
     Keyboard,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -109,17 +111,19 @@ const SectionTitle = ({
 
 const BDGenericIndex = () => {
     const formScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
-    const additionalInfoInput = useRef<React.ComponentRef<typeof TextInput>>(null);
-    const revealAdditionalInfo = useCallback(() => {
-        if (additionalInfoInput.current?.isFocused()) {
-            formScroll.current?.scrollToEnd({ animated: true });
-        }
+    const revealFocusedInput = useCallback(() => {
+        requestAnimationFrame(() => {
+            const input = TextInput.State.currentlyFocusedInput();
+            if (input) {
+                formScroll.current?.scrollResponderScrollNativeHandleToKeyboard(input, 24, true);
+            }
+        });
     }, []);
 
     useEffect(() => {
-        const keyboard = Keyboard.addListener("keyboardDidShow", revealAdditionalInfo);
+        const keyboard = Keyboard.addListener("keyboardDidShow", revealFocusedInput);
         return () => keyboard.remove();
-    }, [revealAdditionalInfo]);
+    }, [revealFocusedInput]);
     const { edit, userId } =
         useLocalSearchParams();
 
@@ -388,10 +392,11 @@ router.replace("/vendorprofilepending");
     };
 
     return (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "android" ? "height" : undefined}>
         <ScrollView
             ref={formScroll}
             automaticallyAdjustKeyboardInsets
-            onLayout={revealAdditionalInfo}
+            onLayout={revealFocusedInput}
             contentContainerStyle={
                 styles.container
             }
@@ -476,6 +481,7 @@ router.replace("/vendorprofilepending");
                     Write the services you offer, e.g. wedding photography, pre-wedding shoots, or event decoration.
                 </Text>
                 <TextInput
+                    onFocus={revealFocusedInput}
                     style={[styles.input, styles.textAreaSmall]}
                     multiline
                     textAlignVertical="top"
@@ -524,6 +530,7 @@ router.replace("/vendorprofilepending");
                 <SectionTitle icon="award" title="Years of Experience" required />
                 <Text style={styles.hint}>Enter how many years your business has been providing these services.</Text>
                 <TextInput
+                    onFocus={revealFocusedInput}
                     style={styles.input}
                     keyboardType="number-pad"
                     placeholder="e.g. 3"
@@ -551,6 +558,7 @@ router.replace("/vendorprofilepending");
                 </Text>
 
                 <TextInput
+                    onFocus={revealFocusedInput}
                     style={[
                         styles.input,
                         styles.textArea,
@@ -760,6 +768,7 @@ router.replace("/vendorprofilepending");
                     </Text>
 
                     <TextInput
+                        onFocus={revealFocusedInput}
                         style={
                             styles.inputFlex
                         }
@@ -885,14 +894,13 @@ router.replace("/vendorprofilepending");
                 </Text>
 
                 <TextInput
+                    onFocus={revealFocusedInput}
                     style={[
                         styles.input,
                         styles.textAreaSmall,
                     ]}
                     multiline
                     textAlignVertical="top"
-                    ref={additionalInfoInput}
-                    onFocus={() => requestAnimationFrame(revealAdditionalInfo)}
                     placeholder="Anything else clients should know..."
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}
@@ -940,6 +948,7 @@ router.replace("/vendorprofilepending");
                 )}
             </TouchableOpacity>
         </ScrollView>
+        </KeyboardAvoidingView>
     );
 };
 
