@@ -576,6 +576,18 @@ return (
     </View>
   </View>
 
+  {availability && (
+    <View style={styles.workingHoursCard}>
+      <View style={styles.workingHoursIcon}>
+        <Ionicons name="people-outline" size={18} color={PRIMARY} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.bookingLimitLabel}>Maximum bookings at the same time</Text>
+        <Text style={styles.bookingLimitValue}>{availability.maxConcurrentBookings ?? 1}</Text>
+      </View>
+    </View>
+  )}
+
   {availabilityLoading || dayLoading ? (
     <View style={styles.loadingAvailability}>
       <ActivityIndicator size="small" color={PRIMARY} />
@@ -1004,6 +1016,8 @@ const styles = StyleSheet.create({
   availabilityHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   availabilityHeaderRight: { alignItems: "flex-end", gap: 7 },
   availabilityTitle: { fontSize: 16, fontWeight: "800", color: "#1A1A1A" },
+  bookingLimitLabel: { fontSize: 12, color: "#685A66" },
+  bookingLimitValue: { fontSize: 16, fontWeight: "800", color: PRIMARY, marginTop: 3 },
   availabilityDate: { fontSize: 12, color: "#8A8A8A", marginTop: 3 },
   availabilityStatus: { flexDirection: "row", alignItems: "center", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7 },
   availableStatus: { backgroundColor: "#E7F7EC" },

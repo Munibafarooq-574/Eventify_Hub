@@ -119,7 +119,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'availability', title: 'Edit working hours and notice', summary: 'Save the settings for the intended working day.', steps: [
         'Use Edit on Your Availability. Check the day, enabled/disabled working days, working windows, blocked dates and booking notice before saving.',
-        'Set Maximum bookings at the same time to the number of bookings your team can handle at once. The limit applies across all your packages.',
+        'Set Maximum bookings at the same time to the number of bookings your team can handle at once. Your Availability shows the saved limit, which applies across all your packages.',
         'Booking Notice is at least 1 full day (24 hours) before the service starts, not necessarily the event start. Choose 1, 2, 3, 5, 7, 14 or 30 days in availability settings; a specific day can have its own notice. Save and recheck the selected day.',
         'Normal working windows must be at least one hour; a start such as 6:30 PM is allowed if the window is long enough. Vendors with eligible active delivery/setup packages can use shorter minute-based windows.',
         'A remaining 30-minute segment on the calendar does not mean a one-hour package can fit there. The package’s complete required window must fit inside working hours.',
