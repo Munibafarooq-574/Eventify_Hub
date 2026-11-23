@@ -119,12 +119,16 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'availability', title: 'Edit working hours and notice', summary: 'Save the settings for the intended working day.', steps: [
         'Use Edit on Your Availability. Check the day, enabled/disabled working days, working windows, blocked dates and booking notice before saving.',
-        'Set Maximum bookings at the same time to the number of bookings your team can handle at once. Your Availability shows the saved limit, which applies across all your packages.',
         'Booking Notice is at least 1 full day (24 hours) before the service starts, not necessarily the event start. Choose 1, 2, 3, 5, 7, 14 or 30 days in availability settings; a specific day can have its own notice. Save and recheck the selected day.',
         'Normal working windows must be at least one hour; a start such as 6:30 PM is allowed if the window is long enough. Vendors with eligible active delivery/setup packages can use shorter minute-based windows.',
         'A remaining 30-minute segment on the calendar does not mean a one-hour package can fit there. The package’s complete required window must fit inside working hours.',
         'Availability is checked again when booking. Legacy notice values below 1 day do not override the 24-hour minimum. Existing reservations, blocked dates, working hours and simultaneous-booking limits can also affect availability.',
       ], note: 'Changing availability does not cancel an existing customer booking. Accepted bookings keep their saved payment deadline; changing notice is not a way to extend it.' },
+      { id: 'booking-limit', title: 'Maximum bookings at the same time', summary: 'Set how many overlapping bookings your team can handle.', steps: [
+        'Go to Your Availability and tap Edit. Find Maximum bookings at the same time above Working Days.',
+        'Use the minus and plus buttons to set your limit. Choose 1 for one booking at a time, or 2 if your team can handle two bookings during the same hours.',
+        'Tap Save Availability. Your Availability shows the saved number. This limit applies across all your packages.',
+      ] },
       service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
         'Tap a booking in My Events to open and expand that order in Order Summary. Use the arrow to show or hide details in My Events.',
