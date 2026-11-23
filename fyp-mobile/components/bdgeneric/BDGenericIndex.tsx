@@ -12,12 +12,15 @@ import {
     useLocalSearchParams,
 } from "expo-router";
 import React, {
+    useCallback,
     useEffect,
+    useRef,
     useState,
 } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Keyboard,
     ScrollView,
     StyleSheet,
     Text,
@@ -105,6 +108,18 @@ const SectionTitle = ({
 };
 
 const BDGenericIndex = () => {
+    const formScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+    const additionalInfoInput = useRef<React.ComponentRef<typeof TextInput>>(null);
+    const revealAdditionalInfo = useCallback(() => {
+        if (additionalInfoInput.current?.isFocused()) {
+            formScroll.current?.scrollToEnd({ animated: true });
+        }
+    }, []);
+
+    useEffect(() => {
+        const keyboard = Keyboard.addListener("keyboardDidShow", revealAdditionalInfo);
+        return () => keyboard.remove();
+    }, [revealAdditionalInfo]);
     const { edit, userId } =
         useLocalSearchParams();
 
@@ -374,6 +389,9 @@ router.replace("/vendorprofilepending");
 
     return (
         <ScrollView
+            ref={formScroll}
+            automaticallyAdjustKeyboardInsets
+            onLayout={revealAdditionalInfo}
             contentContainerStyle={
                 styles.container
             }
@@ -873,6 +891,8 @@ router.replace("/vendorprofilepending");
                     ]}
                     multiline
                     textAlignVertical="top"
+                    ref={additionalInfoInput}
+                    onFocus={() => requestAnimationFrame(revealAdditionalInfo)}
                     placeholder="Anything else clients should know..."
                     placeholderTextColor="#B99DAF"
                     value={additionalInfo}

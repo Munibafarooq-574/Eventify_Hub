@@ -120,6 +120,7 @@ export default function RootLayout() {
         <Stack.Screen name="bdsalon" options={{ headerShown: false }} />
         <Stack.Screen name="bdcatering" options={{ headerShown: false }} />
         <Stack.Screen name="bdvenue" options={{ headerShown: false }} />
+        <Stack.Screen name="bdgeneric" options={{ headerShown: false }} />
         <Stack.Screen name="bdcakes" options={{ headerShown: false }} />
         <Stack.Screen name="bdmehndi" options={{ headerShown: false }} />
         <Stack.Screen name="bdsounds" options={{ headerShown: false }} />
