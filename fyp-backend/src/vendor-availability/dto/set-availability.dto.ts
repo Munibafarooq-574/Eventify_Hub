@@ -8,6 +8,8 @@ import {
   IsOptional,
   IsString,
   Min,
+  Max,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -117,9 +119,10 @@ export class SetAvailabilityDto {
   /**
    * Maximum number of concurrent bookings.
    */
+  @ValidateIf((_, value) => value !== undefined)
   @IsInt()
-  @IsOptional()
   @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
   maxConcurrentBookings?: number;
 
 }

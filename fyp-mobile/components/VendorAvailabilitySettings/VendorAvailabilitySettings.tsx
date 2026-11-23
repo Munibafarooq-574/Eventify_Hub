@@ -91,6 +91,7 @@ const [workingHoursEnd, setWorkingHoursEnd] = useState('18:00');
 
 const [daySlots, setDaySlots] = useState<DaySlotConfig[]>([]);
 
+const [maxConcurrentBookings, setMaxConcurrentBookings] = useState(1);
 const [blockedDates, setBlockedDates] = useState<string[]>([]);
  const [minimumAdvanceMinutes, setMinimumAdvanceMinutes] = useState(1440);
  const [minimumWorkingWindow, setMinimumWorkingWindow] = useState(60);
@@ -129,6 +130,8 @@ const [draftSlotEnd, setDraftSlotEnd] = useState<Date>(timeToDate('13:00'));
 
     const data = await getVendorAvailability(user._id);
     setMinimumWorkingWindow(data.minimumWorkingWindowMinutes ?? 60);
+    const savedLimit = data.maxConcurrentBookings ?? 1;
+    setMaxConcurrentBookings(Number.isSafeInteger(savedLimit) && savedLimit >= 1 ? savedLimit : 1);
 
     const hasExistingAvailability =
   !!data &&
@@ -411,7 +414,8 @@ const toggleBlockedDate = (dateStr: string) => {
       // NEW: multiple working windows per day.
       daySlots,
 
-            blockedDates,
+      blockedDates,
+      maxConcurrentBookings,
       minimumAdvanceMinutes: 1440,
       advanceNoticeOptionsMinutes: advanceNoticeOptionsMinutes.length ? advanceNoticeOptionsMinutes : [1440],
     });
@@ -472,6 +476,7 @@ const handleResetAvailability = () => {
             setWorkingHoursEnd('18:00');
             setDaySlots([]);
             setBlockedDates([]);
+            setMaxConcurrentBookings(1);
             setMinimumAdvanceMinutes(1440);
             setAdvanceNoticeOptionsMinutes([1440]);
             setShowBlockCalendar(false);
@@ -871,6 +876,32 @@ if (loadError) {
     })}
   </View>
 </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Maximum bookings at the same time</Text>
+          <Text style={styles.cardSubtitle}>How many bookings can your team handle at once?</Text>
+          <View style={[styles.chipsWrap, { alignItems: 'center', marginTop: 8 }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Decrease maximum bookings"
+              style={styles.chip}
+              disabled={saving || resetting || maxConcurrentBookings <= 1}
+              onPress={() => setMaxConcurrentBookings(count => Math.max(1, count - 1))}
+            >
+              <Text style={styles.chipText}>−</Text>
+            </TouchableOpacity>
+            <Text accessibilityLiveRegion="polite" style={styles.cardTitle}>{maxConcurrentBookings}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Increase maximum bookings"
+              style={styles.chip}
+              disabled={saving || resetting || maxConcurrentBookings >= Number.MAX_SAFE_INTEGER}
+              onPress={() => setMaxConcurrentBookings(count => Math.min(Number.MAX_SAFE_INTEGER, count + 1))}
+            >
+              <Text style={styles.chipText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Blocked Dates */}
         <View style={styles.card}>

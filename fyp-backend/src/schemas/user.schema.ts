@@ -690,7 +690,7 @@ export class VendorAvailabilitySettings {
   })
   minimumAdvanceMinutes: number;
 
-  @Prop({ default: 1, min: 1 })
+  @Prop({ default: 1, min: 1, validate: Number.isSafeInteger })
   maxConcurrentBookings: number;
 
   // Vendor-wide default maximum event duration.
