@@ -47,6 +47,25 @@ export class LaterTimeRequest {
 const LaterTimeRequestSchema = SchemaFactory.createForClass(LaterTimeRequest);
 
 @Schema({ _id: false })
+class VendorScheduleSlot {
+    @Prop({ type: Types.ObjectId, required: true }) bookingId: Types.ObjectId;
+    @Prop({ required: true }) name: string;
+    @Prop({ type: Date, required: true }) currentStart: Date;
+    @Prop({ type: Date, required: true }) currentEnd: Date;
+    @Prop({ type: Date, required: true }) proposedStart: Date;
+    @Prop({ type: Date, required: true }) proposedEnd: Date;
+}
+@Schema({ _id: false })
+class VendorScheduleProposal {
+    @Prop({ required: true }) id: string;
+    @Prop({ required: true, enum: ['PENDING', 'ACCEPTED', 'DECLINED'] }) status: string;
+    @Prop({ required: true }) reason: string;
+    @Prop({ type: Date, required: true }) requestedAt: Date;
+    @Prop({ type: Date }) resolvedAt?: Date;
+    @Prop({ type: [SchemaFactory.createForClass(VendorScheduleSlot)], required: true }) slots: VendorScheduleSlot[];
+}
+
+@Schema({ _id: false })
 export class DeliverySnapshot {
   @Prop({ enum: ['kg', 'g', 'lb', 'oz'] }) deliveryWeightUnit?: 'kg' | 'g' | 'lb' | 'oz';
   @Prop() timeZone: string;
@@ -85,6 +104,9 @@ export class VendorOrder extends Document {
 
     @Prop({ type: LaterTimeRequestSchema })
     laterTimeRequest?: LaterTimeRequest;
+
+    @Prop({ type: SchemaFactory.createForClass(VendorScheduleProposal) })
+    vendorScheduleProposal?: VendorScheduleProposal;
 
     // Server-generated once at booking creation. Absent on legacy bookings.
     // Acceptance, payment and rescheduling must not replace these terms.

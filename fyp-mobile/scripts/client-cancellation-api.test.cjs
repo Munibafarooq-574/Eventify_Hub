@@ -17,6 +17,7 @@ function load(name, token = 'session-token') {
   vm.runInNewContext(code, { module, exports: module.exports, console, require: dependency => {if (/currency/.test(dependency)) return require('./test-currency.cjs');
     if (/bookingTimezone/.test(dependency)) return require('./test-timezone.cjs');
     if (dependency === 'axios') return axios;
+    if (dependency === './apiConfig') return { API_BASE_URL: 'https://example.test' };
     if (dependency === './bookingActionError') return load('bookingActionError').api;
     if (dependency === '../store') return { getSecureData: async key => { assert.equal(key, 'token'); return token; } };
     throw new Error(`Unexpected dependency: ${dependency}`);
@@ -49,6 +50,17 @@ test('vendor helper preserves its existing payload while authenticating', async 
 test('legacy vendor status helper authenticates before its backend ownership check', async () => {
   const { api, calls } = load('patchUpdateOrderStatus'); await api.patchUpdateVendorOrderStatus('booking', 'completed');
   assert.equal(calls[0].headers.Authorization, 'Bearer session-token'); assert.equal(calls[0].data.status, 'completed');
+});
+
+test('bulk acceptance sends one authenticated request with every reviewed booking ID', async () => {
+  const { api, calls } = load('patchUpdateOrderStatus');
+  const ids = ['first-booking', 'second-booking'];
+  await api.acceptPendingVendorPackages(ids);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'PATCH');
+  assert.equal(calls[0].headers.Authorization, 'Bearer session-token');
+  assert.match(calls[0].url, /first-booking\/accept-pending$/);
+  assert.deepEqual(calls[0].data.bookingIds, ids);
 });
 
 for (const [actor, expected] of [['organizer', 'Client'], ['client', 'Client'], ['vendor', 'Vendor'], ['admin', 'Admin'], [undefined, 'Not recorded']]) {

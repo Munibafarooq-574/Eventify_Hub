@@ -2151,9 +2151,205 @@ async getOrderStats(type: string, userId: string) {
     return vendorOrder;
 }
 
+    private async assertVendorPackageSlot(booking: VendorOrder, start: Date, end: Date, zone: string, session: ClientSession, existingBooking = true) {
+        const availability = await this.availabilityService.checkVendorAvailability(
+            String(booking.vendorId), start, end, undefined, session, String(booking._id),
+            false, zone, undefined, undefined, { existingBooking },
+        );
+        if (!availability.available) throw new ConflictException(availability.reason || 'The service slot is unavailable.');
+        const vendor = await this.userModel.findById(booking.vendorId).select('packages').session(session).lean();
+        const pkg = vendor?.packages?.find(pkg => String((pkg as any)._id) === String(booking.packageId));
+        await this.assertPackageResourceBudget({
+            vendorId: String(booking.vendorId), packageId: String(booking.packageId),
+            start, end, session, excludeOrderIds: [booking._id],
+            requestedUnits: Number(booking.resourceUnits ?? booking.quantity ?? 1),
+            maxParallelUnits: pkg?.availableParallelUnits,
+        });
+    }
+
+    private async withVendorScheduleGroup<T>(anchor: VendorOrder, run: (session: ClientSession) => Promise<T>) {
+        const session = await this.connection.startSession();
+        try {
+            let result!: T;
+            await session.withTransaction(async () => {
+                await this.userModel.updateOne({ _id: anchor.vendorId }, { $inc: { bookingConcurrencyVersion: 1 } }, { session });
+                result = await run(session);
+            });
+            return result;
+        } finally {
+            await session.endSession();
+        }
+    }
+
+    private async pendingProposalBookings(anchor: VendorOrder, session: ClientSession) {
+        const bookings = await this.vendorOrderModel.find({
+            orderId: anchor.orderId, vendorId: anchor.vendorId, status: 'pending', paymentStatus: 'UNPAID',
+            replacementOutcome: { $in: [null, ''] }, replacementRescheduleRequestId: null,
+            'laterTimeRequest.status': { $ne: 'PENDING' },
+            eventStartDateTime: { $gt: new Date() },
+        }).sort({ _id: 1 }).session(session);
+        const payments = await this.connection.model(Payment.name).distinct('vendorOrderId', {
+            vendorOrderId: { $in: bookings.map(booking => booking._id) }, status: { $in: ['PENDING', 'SUCCESS'] },
+        }).session(session);
+        const paidIds = new Set(payments.map(String));
+        return bookings.filter(booking => !paidIds.has(String(booking._id)));
+    }
+
+    private async assertNoEventReschedule(orderId: unknown, session: ClientSession) {
+        if (await this.rescheduleRequestModel.exists({
+            orderId, resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] },
+        }).session(session)) {
+            throw new ConflictException('Resolve the existing event date/time change first.');
+        }
+    }
+
+    async proposeVendorSchedule(id: string, actor: CancellationActor, body: any) {
+        const anchor = await this.assertVendorBookingOwner(id, actor);
+        const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+        if (!reason || reason.length > 500 || !/^\d{4}-\d{2}-\d{2}$/.test(body?.date || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body?.time || '')) {
+            throw new BadRequestException('Enter a reason and a valid date and time.');
+        }
+        const result = await this.withVendorScheduleGroup(anchor, async session => {
+            const order = await this.orderModel.findById(anchor.orderId).session(session);
+            if (!order || ['completed', 'cancelled'].includes(order.status)) throw new ConflictException('This order is closed.');
+            await this.assertNoEventReschedule(order._id, session);
+            if (await this.vendorOrderModel.exists({ orderId: anchor.orderId, vendorId: anchor.vendorId, 'vendorScheduleProposal.status': 'PENDING' }).session(session)) {
+                throw new ConflictException('This vendor already has a date/time request awaiting the client.');
+            }
+            const zone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+            const bookings = await this.pendingProposalBookings(anchor, session);
+            if (!bookings.length) throw new ConflictException('There are no eligible pending packages.');
+            const startsAt = Math.min(...bookings.map(booking => new Date(booking.eventStartDateTime as any).getTime()));
+            const shift = eventLocalToUtc(body.date, body.time, zone).getTime() - startsAt;
+            if (!Number.isFinite(shift) || !shift || startsAt + shift <= Date.now()) throw new BadRequestException('Choose a different future date and time.');
+            const slots = bookings.map(booking => {
+                const currentStart = new Date(booking.eventStartDateTime as any);
+                const currentEnd = new Date(booking.eventEndDateTime as any);
+                if (!booking.eventEndDateTime || !(currentEnd > currentStart)) throw new ConflictException(`${booking.serviceName}: the original slot is invalid.`);
+                return { bookingId: booking._id, name: booking.serviceName, currentStart, currentEnd,
+                    proposedStart: new Date(currentStart.getTime() + shift), proposedEnd: new Date(currentEnd.getTime() + shift) };
+            });
+            if (!body.slots) return { slots };
+            if (!Array.isArray(body.slots) || body.slots.length !== slots.length || slots.some((slot, index) => {
+                const preview = body.slots[index];
+                return String(slot.bookingId) !== preview?.bookingId ||
+                    slot.currentStart.toISOString() !== preview.currentStart || slot.currentEnd.toISOString() !== preview.currentEnd ||
+                    slot.proposedStart.toISOString() !== preview.proposedStart || slot.proposedEnd.toISOString() !== preview.proposedEnd;
+            })) throw new ConflictException('The packages or their slots changed. Preview the request again.');
+            const proposal = { id: String(new Types.ObjectId()), status: 'PENDING', reason, requestedAt: new Date(), slots };
+            await this.vendorOrderModel.updateMany(
+                { _id: { $in: bookings.map(booking => booking._id) } },
+                { $inc: { __v: 1 } },
+                { session },
+            );
+            await this.vendorOrderModel.updateOne(
+                { _id: bookings[0]._id }, { $set: { vendorScheduleProposal: proposal } }, { session },
+            );
+            return { order, proposal, slots };
+        });
+        if (result?.proposal) await this.notifyLaterTimeDecision(result.order, anchor, 'Your vendor proposed a new date/time for their packages. Open My Events to review it.', 'Your date/time request was sent to the client.');
+        return result?.proposal ?? { slots: result?.slots };
+    }
+
+    async respondToVendorSchedule(id: string, actor: CancellationActor, proposalId: string, accept: boolean) {
+        if (typeof accept !== 'boolean' || !Types.ObjectId.isValid(proposalId)) throw new BadRequestException('Choose a valid request and response.');
+        const { vendorOrder: anchor } = await this.cancellationService.assertClientBookingOwner(id, actor);
+        const result = await this.withVendorScheduleGroup(anchor, async session => {
+            const { vendorOrder, order } = await this.cancellationService.assertClientBookingOwner(id, actor, session);
+            const proposal = vendorOrder.vendorScheduleProposal;
+            if (!proposal || proposal.id !== proposalId) throw new NotFoundException('Date/time request not found.');
+            if (proposal.status !== 'PENDING') return { status: proposal.status };
+            if (accept) {
+                if (['completed', 'cancelled'].includes(order.status)) throw new ConflictException('This order is closed.');
+                await this.assertNoEventReschedule(order._id, session);
+                const bookings = await this.pendingProposalBookings(anchor, session);
+                if (bookings.length !== proposal.slots.length) throw new ConflictException('The eligible packages changed. Decline this request and ask for an updated one.');
+                const zone = await this.cityService.requireCityTimeZone(String(order.eventCityId));
+                for (const slot of proposal.slots) {
+                    const booking = bookings.find(item => String(item._id) === String(slot.bookingId));
+                    if (!booking || new Date(booking.eventStartDateTime as any).getTime() !== slot.currentStart.getTime() ||
+                        new Date(booking.eventEndDateTime as any).getTime() !== slot.currentEnd.getTime()) {
+                        throw new ConflictException(`${slot.name}: the booking changed. Decline this request and ask for an updated one.`);
+                    }
+                    await this.vendorOrderModel.updateOne({ _id: booking._id }, {
+                        $set: { eventStartDateTime: slot.proposedStart, eventEndDateTime: slot.proposedEnd },
+                        $inc: { __v: 1 },
+                    }, { session });
+                }
+                for (const slot of proposal.slots) {
+                    const booking = bookings.find(item => String(item._id) === String(slot.bookingId))!;
+                    try {
+                        await this.assertVendorPackageSlot(booking, slot.proposedStart, slot.proposedEnd, zone, session, false);
+                    } catch (error) {
+                        if (error instanceof ConflictException || error instanceof BadRequestException) throw new ConflictException(`${slot.name}: ${error.message}`);
+                        throw error;
+                    }
+                }
+            }
+            await this.vendorOrderModel.updateOne({ _id: vendorOrder._id }, { $set: {
+                'vendorScheduleProposal.status': accept ? 'ACCEPTED' : 'DECLINED',
+                'vendorScheduleProposal.resolvedAt': new Date(),
+            } }, { session });
+            return { order, status: accept ? 'ACCEPTED' : 'DECLINED' };
+        });
+        if (result.order) await this.notifyLaterTimeDecision(result.order, anchor, accept ? 'The proposed vendor package times were updated.' : 'The client declined the proposed vendor package times.');
+        return { status: result.status };
+    }
+
+    async acceptPendingVendorPackages(anchorId: string, actor: CancellationActor, bookingIds: string[]) {
+        const anchor = await this.assertVendorBookingOwner(anchorId, actor);
+        if (!Array.isArray(bookingIds) || !bookingIds.length || bookingIds.some(id => typeof id !== 'string' || !Types.ObjectId.isValid(id))) {
+            throw new BadRequestException('Select the pending packages to accept.');
+        }
+        const expectedIds = [...new Set(bookingIds)].sort();
+        const accepted = await this.withVendorScheduleGroup(anchor, async session => {
+            const pending = await this.vendorOrderModel.find({
+                orderId: anchor.orderId,
+                vendorId: anchor.vendorId,
+                status: 'pending',
+                replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+            }).session(session);
+            if (pending.map(booking => String(booking._id)).sort().join(',') !== expectedIds.join(',')) {
+                throw new ConflictException('The pending packages changed. Refresh the order before accepting.');
+            }
+            const order = await this.orderModel.findById(anchor.orderId).session(session);
+            if (!order) throw new NotFoundException('Order not found.');
+            const zone = order.eventCityId ? await this.cityService.requireCityTimeZone(String(order.eventCityId)) : 'UTC';
+            for (const booking of pending) {
+                try {
+                    if (booking.replacementRescheduleRequestId) throw new ConflictException('Respond to the linked schedule request first.');
+                    const start = new Date(booking.eventStartDateTime as any);
+                    const end = new Date(booking.eventEndDateTime as any);
+                    await this.assertVendorPackageSlot(booking, start, end, zone, session);
+                    await this.updateVendorResponse(String(booking._id), 'accepted', undefined, session);
+                } catch (error) {
+                    if (error instanceof ConflictException || error instanceof BadRequestException) {
+                        throw new ConflictException(`${booking.serviceName}: ${error.message}`);
+                    }
+                    throw error;
+                }
+            }
+            return pending.map(booking => String(booking._id));
+        });
+        const order = await this.orderModel.findById(anchor.orderId);
+        if (order) {
+            try {
+                await this.sendPushNotification('Booking request accepted', 'The vendor accepted all pending packages in your request.', String(order.organizerId), 'VENDOR_RESPONSE');
+                const confirmed = await this.vendorOrderModel.find({ _id: { $in: accepted }, downPaymentAmount: 0 });
+                for (const booking of confirmed) {
+                    if (booking.bookingChatTimeZone && booking.confirmationTime) await this.chatGateway?.sendBookingNotice(order, booking, 'confirmed');
+                }
+            } catch (error) {
+                console.log(error);
+            }
+        }
+        return { accepted };
+    }
+
     // Update vendor order status (accepted/rejected)
-    async updateVendorResponse(vendorOrderId: string, status: 'accepted' | 'rejected', message?: string) {
-        const vendorOrder = await this.vendorOrderModel.findById(vendorOrderId);
+    async updateVendorResponse(vendorOrderId: string, status: 'accepted' | 'rejected', message?: string, session?: ClientSession) {
+        const inTransaction = <T>(query: T): T => session ? (query as T & { session(value: ClientSession): T }).session(session) : query;
+        const vendorOrder = await inTransaction(this.vendorOrderModel.findById(vendorOrderId));
 
         if (!vendorOrder) {
             throw new NotFoundException(`Vendor Order with ID ${vendorOrderId} not found`);
@@ -2168,7 +2364,7 @@ async getOrderStats(type: string, userId: string) {
         }
 
         if (status === 'accepted' && vendorOrder.replacesVendorOrderId && !vendorOrder.replacementRescheduleRequestId) {
-            const event = await this.orderModel.findById(vendorOrder.orderId);
+            const event = await inTransaction(this.orderModel.findById(vendorOrder.orderId));
             const start = event?.eventStartDateTime ? new Date(event.eventStartDateTime).getTime() : NaN;
             if (!Number.isFinite(start) || start <= Date.now()) throw new ConflictException('A replacement cannot be accepted after the event starts.');
         }
@@ -2180,12 +2376,15 @@ async getOrderStats(type: string, userId: string) {
         // Replacement acceptance is already coordinated by its linked reschedule
         // request below. Original assignments must wait for the whole event.
         if (status === 'accepted' && !vendorOrder.replacementRescheduleRequestId &&
-            await this.rescheduleRequestModel.exists({
+            await inTransaction(this.rescheduleRequestModel.exists({
                 orderId: vendorOrder.orderId,
                 resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] },
-            })) {
+            }))) {
             throw new ConflictException('Resolve the date/time change before accepting this booking. Refresh to review the latest schedule.');
         }
+        if (status === 'accepted' && await inTransaction(this.vendorOrderModel.exists({
+            orderId: vendorOrder.orderId, vendorId: vendorOrder.vendorId, 'vendorScheduleProposal.status': 'PENDING',
+        }))) throw new ConflictException('A vendor date/time request is awaiting the client’s decision.');
         const acceptanceVersion = vendorOrder.__v;
         vendorOrder.status = status;
         if (status === 'rejected' && previousStatus !== 'rejected') vendorOrder.rejectedAt = new Date();
@@ -2197,8 +2396,7 @@ async getOrderStats(type: string, userId: string) {
     const now = new Date();
 
     // ===== NEW (Phase 6): compute + snapshot down payment =====
-    const vendorUser = await this.userModel
-        .findById(vendorOrder.vendorId)
+    const vendorUser = await inTransaction(this.userModel.findById(vendorOrder.vendorId))
         .lean();
 
     const downPaymentConfig =
@@ -2310,14 +2508,14 @@ if (downPaymentAmount === 0) {
     vendorOrder.paymentStatus =
         'PAYMENT_REQUIRED';
 
-    const parent = await this.orderModel.findById(vendorOrder.orderId).lean();
+    const parent = await inTransaction(this.orderModel.findById(vendorOrder.orderId)).lean();
     const zone = parent?.eventCityId ? await this.cityService.requireCityTimeZone(String(parent.eventCityId)) : 'UTC';
     snapshotDownPaymentWindow(vendorOrder, (vendorUser as any)?.availabilitySettings, now, zone);
 }
 
     // ===== Phase 13: commission snapshot =====
 // Current platform commission is 0%, so vendor receives 100%.
-const commissionConfig = await this.commissionConfigModel.findOne();
+const commissionConfig = await inTransaction(this.commissionConfigModel.findOne());
 
 const commissionPercentage =
     commissionConfig?.platformCommissionPercentage ?? 0;
@@ -2335,12 +2533,14 @@ vendorOrder.vendorNetAmount =
 
         if (status === 'accepted') vendorOrder.$where = { status: previousStatus, 'laterTimeRequest.status': { $ne: 'PENDING' }, __v: acceptanceVersion == null ? { $exists: false } : acceptanceVersion };
         let saved;
-        try { saved = await vendorOrder.save(); }
+        try { saved = await (session ? vendorOrder.save({ session }) : vendorOrder.save()); }
         catch(error) {
             if (error instanceof Error && error.name === 'DocumentNotFoundError') throw new ConflictException('This booking changed while accepting. Refresh before trying again.');
             throw error;
         }
 
+
+        if (session) return saved;
 
         if (vendorOrder.replacementRescheduleRequestId) {
             const replacementRequest: any = await this.rescheduleRequestModel.findById(

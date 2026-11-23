@@ -1,3 +1,4 @@
+import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { displayBookingMoney, getVendorBookingSummary } from '@/utils/vendorBookingAmounts';
 import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
@@ -22,6 +23,7 @@ import getVendorOrders from "@/services/getVendorOrders";
 import { getRescheduleRequests, respondToRescheduleRequest } from "@/services/rescheduleBooking";
 import patchUpdateOrderStatus, {
     patchUpdateVendorOrderStatus,
+    acceptPendingVendorPackages,
 } from "@/services/patchUpdateOrderStatus";
 import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -477,6 +479,27 @@ const OrderSummary = () => {
         Alert.alert('Booking could not be updated', error?.message || 'Please refresh and try again.');
     }
 };
+    const acceptingPackages = useRef(false);
+    const confirmAcceptPackages = (order: any, pending: any[]) => {
+        const zone = bookingTimeZone(order);
+        const summary = pending.map(booking => `${booking.serviceName} · ${formatBookingActivityTime(booking.eventStartDateTime, zone)} – ${formatBookingTime(booking.eventEndDateTime, zone)}`).join('\n');
+        Alert.alert('Accept pending packages?', summary, [
+            { text: 'Back', style: 'cancel' },
+            { text: 'Accept', onPress: async () => {
+                if (acceptingPackages.current) return;
+                acceptingPackages.current = true;
+                try {
+                    await acceptPendingVendorPackages(pending.map(booking => String(booking._id)));
+                } catch (error: any) {
+                    Alert.alert('Packages could not be accepted', error?.message || 'Please refresh and try again.');
+                } finally {
+                    acceptingPackages.current = false;
+                    await refreshScreenData().catch(() => {});
+                }
+            } },
+        ]);
+    };
+
     const confirmCompletion = (orderId: string, booking: any) => {
         if (completionLock.current || !canCompleteVendorBooking(booking)) return;
         completionLock.current = true;
@@ -723,8 +746,21 @@ const OrderSummary = () => {
                     renderItem={({ item }) => {
                         const isExpanded = expandedOrderId === item._id;
                         const scheduleHold = rescheduleHoldReason(item);
-                        const acceptanceDisabled = !!scheduleHold || isAcceptanceDisabled(item.vendorOrders?.[0], lateAcceptanceId);
                         const services = Array.isArray(item.vendorOrders) ? item.vendorOrders : [];
+                        const pending = services.filter((booking: any) => booking.status === 'pending' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED');
+                        const proposalBooking = services.find((booking: any) => booking.vendorScheduleProposal?.status === 'PENDING')
+                            ?? services.find((booking: any) => booking.vendorScheduleProposal);
+                        const proposalAnchor = pending.find((booking: any) =>
+                            String(booking.paymentStatus || 'UNPAID') === 'UNPAID' &&
+                            !booking.replacementOutcome && !booking.replacementRescheduleRequestId &&
+                            booking.laterTimeRequest?.status !== 'PENDING' && new Date(booking.eventStartDateTime).getTime() > Date.now());
+                        const acceptanceDisabled = !!scheduleHold || proposalBooking?.vendorScheduleProposal?.status === 'PENDING'
+                            || pending.some((booking: any) => isAcceptanceDisabled(booking, lateAcceptanceId));
+                        const statusCounts = new Map<string, number>();
+                        for (const booking of services) {
+                            const status = String(booking.status || 'pending');
+                            statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+                        }
                         const { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel } =
                             getVendorBookingSummary(services, item);
                         return (
@@ -754,6 +790,9 @@ const OrderSummary = () => {
                                         />
                                     </View>
 
+                                    {services.length > 1 && (
+                                        <Text style={styles.detailText}>{Array.from(statusCounts, ([status, count]) => `${count} ${status.replace(/_/g, ' ')}`).join(' · ')}</Text>
+                                    )}
                                     {fullyPaidOrders.some(order => order._id === item._id) && (
                                         <View style={styles.paidInFullBadge}>
                                             <Text style={styles.paidInFullText}>Paid in Full</Text>
@@ -828,17 +867,6 @@ const OrderSummary = () => {
                                                 <Text style={[styles.detailText, { fontSize: 11 }]}>Times shown in {bookingTimeZone(item).replace(/_/g, ' ')}</Text>
                                                 {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatBookingTime(item.eventStartDateTime, bookingTimeZone(item))}</Text></View>}
                                                 {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatBookingTime(item.eventEndDateTime, bookingTimeZone(item))}</Text></View>}
-                                                {(item.vendorOrders || []).filter((service: any) => {
-                                                    const packages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
-                                                    const pkg = packages.find((p: any) => String(p?._id || p?.id) === String(service?.packageId || ''));
-                                                    return String(pkg?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED'
-                                                        && service?.eventStartDateTime && service?.eventEndDateTime;
-                                                }).map((service: any, index: number) => (
-                                                    <View key={String(service?._id || index)} style={styles.detailRow}>
-                                                        <Ionicons name="time-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Appointment Time: {formatBookingTime(service.eventStartDateTime, bookingTimeZone(item))} - {formatBookingTime(service.eventEndDateTime, bookingTimeZone(item))}</Text>
-                                                    </View>
-                                                ))}
                                                 {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
 
                                                 {getVendorStatus(item) === "no_longer_assigned" && (() => {
@@ -980,7 +1008,7 @@ const OrderSummary = () => {
                                                             return (
                                                               <View key={service?._id || idx} style={styles.serviceDetailCard}>
                                                                 <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
-                                                                <Text style={styles.serviceDetailText}>Package: {selectedPackage?.packageName || service?.packageName || "Not provided"}</Text>
+                                                                <Text style={styles.serviceDetailText}>Status: {String(service?.status || "pending").replace(/_/g, " ")}</Text>
                                                                 {service.quantity != null && <Text style={styles.serviceDetailText}>Quantity: {service.quantity}</Text>}
                         {service.pricingMethod && <Text style={styles.serviceDetailText}>Pricing: {pricingLabel(service)}</Text>}
                         {service.personCount != null && <Text style={styles.serviceDetailText}>People: {service.personCount}</Text>}
@@ -1000,7 +1028,17 @@ const OrderSummary = () => {
                                         )}
                                     </View>
 
-                                    {(item.vendorOrders || []).map((booking: any) => (
+                                    {!!(proposalBooking || proposalAnchor) && (
+                                        <VendorScheduleProposal
+                                            key={proposalBooking?.vendorScheduleProposal?.id || proposalAnchor._id}
+                                            anchorId={proposalAnchor?._id || proposalBooking?._id}
+                                            proposal={proposalBooking?.vendorScheduleProposal}
+                                            canPropose={!!proposalAnchor && !scheduleHold}
+                                            timeZone={bookingTimeZone(item)}
+                                            onUpdated={refreshScreenData}
+                                        />
+                                    )}
+                                    {services.filter((booking: any) => booking.laterTimeRequest).map((booking: any) => (
                                         <VendorLaterTimeRequest key={`later-${booking._id}`} booking={booking} event={item} available={isAcceptanceDisabled(booking, lateAcceptanceId)} onUpdated={refreshScreenData} />
                                     ))}
                                     {(isClosedVendorStatus(getVendorStatus(item)) || getVendorStatus(item) === 'cancelled') && <View style={styles.actionButtons}>
@@ -1030,25 +1068,19 @@ const OrderSummary = () => {
                                     ) : (
                                     <View style={styles.bookingActions}>
                                         {!!scheduleHold && <Text accessibilityRole="alert" style={styles.rescheduleReason}>{scheduleHold}</Text>}
-                                        {getVendorStatus(item) !== "completed" && getVendorStatus(item) !== "cancelled" && (
-                                            getVendorStatus(item) === "pending" ? (
-                                                <TouchableOpacity
-                                                    disabled={acceptanceDisabled}
-                                                    accessibilityState={{ disabled: acceptanceDisabled }}
-                                                    style={[styles.completeButton, acceptanceDisabled && { opacity: 0.45 }]}
-                                                   // onPress={() => mark(item._id, "confirmed")}
-                                                   onPress={() =>
-                                                        mark(
-                                                            item._id,
-                                                            item.vendorOrders?.[0]?._id,
-                                                            "confirmed"
-                                                        )
-                                                    }
-                                                >
-                                                    <Ionicons name="time-outline" size={14} color="#fff" />
-                                                    <Text style={styles.buttonText}>Mark Processing</Text>
-                                                </TouchableOpacity>
-                                            ) : (item.vendorOrders || [])
+                                        {pending.length > 0 && (
+                                            <TouchableOpacity
+                                                disabled={acceptanceDisabled}
+                                                style={[styles.completeButton, acceptanceDisabled && styles.disabledAction]}
+                                                onPress={() => pending.length === 1
+                                                    ? mark(item._id, pending[0]._id, "confirmed")
+                                                    : confirmAcceptPackages(item, pending)}
+                                            >
+                                                <Ionicons name="checkmark-outline" size={14} color="#fff" />
+                                                <Text style={styles.buttonText}>{pending.length === 1 ? 'Accept Package' : 'Accept All Pending Packages'}</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        {services
                                                 .filter((booking: any) => booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')
                                                 .map((booking: any) => {
                                                     const canComplete = canCompleteVendorBooking(booking);
@@ -1076,8 +1108,7 @@ const OrderSummary = () => {
                                                             {!canComplete && <Text style={styles.completionHint}>{hint}</Text>}
                                                         </View>
                                                     );
-                                                })
-                                        )}
+                                                })}
 
                                         {getVendorStatus(item) !== "cancelled" && (
                                             <View style={styles.actionButtons}>

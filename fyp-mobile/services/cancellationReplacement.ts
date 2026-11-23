@@ -22,3 +22,25 @@ export async function getCancellationReplacement(id: string): Promise<Cancellati
 export async function continueWithoutCancelledVendor(id: string): Promise<void> {
   await axios.patch(`${API_BASE_URL}/orders/vendor-order/${encodeURIComponent(id)}/continue-without`, {}, await auth());
 }
+
+export type VendorScheduleSlot = {
+  bookingId: string;
+  name: string;
+  currentStart: string;
+  currentEnd: string;
+  proposedStart: string;
+  proposedEnd: string;
+};
+
+export async function proposeVendorSchedule(id: string, body: {
+  reason: string;
+  date: string;
+  time: string;
+  slots?: VendorScheduleSlot[];
+}) {
+  return (await axios.post(`${API_BASE_URL}/orders/vendor-order/${encodeURIComponent(id)}/schedule-proposal`, body, await auth())).data;
+}
+
+export async function respondToVendorSchedule(id: string, proposalId: string, accept: boolean) {
+  return (await axios.patch(`${API_BASE_URL}/orders/vendor-order/${encodeURIComponent(id)}/schedule-proposal`, { proposalId, accept }, await auth())).data;
+}

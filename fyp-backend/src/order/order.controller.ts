@@ -26,6 +26,18 @@ import { CreateRescheduleRequestDto, RespondRescheduleRequestDto, ResolveResched
 export class OrderController {
     constructor(private readonly orderService: OrderService) { }
 
+    @Post('vendor-order/:id/schedule-proposal')
+    @UseGuards(JwtAuthGuard)
+    proposeVendorSchedule(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+        return this.orderService.proposeVendorSchedule(id, req.user, body);
+    }
+
+    @Patch('vendor-order/:id/schedule-proposal')
+    @UseGuards(JwtAuthGuard)
+    respondToVendorSchedule(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+        return this.orderService.respondToVendorSchedule(id, req.user, body?.proposalId, body?.accept);
+    }
+
     @Post('vendor-order/:id/later-time-request')
     @UseGuards(JwtAuthGuard)
     requestLaterTime(@Param('id') id: string, @Request() req: any, @Body() body: any) {
@@ -151,6 +163,16 @@ async placeOrder(
             }
             throw new InternalServerErrorException('Failed to place order');
         }
+    }
+
+    @Patch('vendor-order/:id/accept-pending')
+    @UseGuards(JwtAuthGuard)
+    acceptPendingVendorPackages(
+        @Param('id') id: string,
+        @Body() body: { bookingIds: string[] },
+        @Request() req: any,
+    ) {
+        return this.orderService.acceptPendingVendorPackages(id, req.user, body?.bookingIds);
     }
 
     @Patch('vendor-response/:id')

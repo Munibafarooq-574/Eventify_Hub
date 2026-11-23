@@ -1,3 +1,4 @@
+import { API_BASE_URL } from './apiConfig';
 import { bookingActionError } from './bookingActionError';
 //fyp-mobile/services/patchUpdateOrderStatus.ts
 /*import axios, { AxiosRequestConfig } from "axios";
@@ -76,5 +77,18 @@ export async function patchUpdateVendorOrderStatus(
         return response.data;
     } catch (error) {
         throw bookingActionError(error, "Unable to update this booking. Please refresh and try again.");
+    }
+}
+export async function acceptPendingVendorPackages(bookingIds: string[]) {
+    const token = await getSecureData("token");
+    if (!token) throw new Error("Please sign in again.");
+    try {
+        await axios.patch(
+            `${API_BASE_URL}/orders/vendor-order/${bookingIds[0]}/accept-pending`,
+            { bookingIds },
+            { headers: { Authorization: `Bearer ${token}` } },
+        );
+    } catch (error) {
+        throw bookingActionError(error, "Unable to accept the packages. Please refresh and try again.");
     }
 }

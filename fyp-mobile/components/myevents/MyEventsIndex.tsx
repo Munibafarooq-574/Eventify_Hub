@@ -1,3 +1,4 @@
+import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { currencySymbol, currencyOf } from '@/utils/currency';
 import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
@@ -51,6 +52,18 @@ const getCategoryId = (vendor: any): string => {
 
 const getBookingVendorId = (booking: any): string =>
   String(booking?.vendorId?._id ?? (typeof booking?.vendorId === 'string' ? booking.vendorId : ''));
+
+const groupBookingsByVendor = (bookings: any[]) => {
+  const groups = new Map<string, any[]>();
+  for (const booking of bookings) {
+    const key = getBookingVendorId(booking) || `booking-${booking._id}`;
+    const packages = groups.get(key) ?? [];
+    packages.push(booking);
+    groups.set(key, packages);
+  }
+  return groups;
+};
+
 
 async function resolveBookingCategories(events: Awaited<ReturnType<typeof getVendorOrders>>) {
   const bookings = events.flatMap(event => event.vendorOrders || []);
@@ -475,7 +488,7 @@ const MyEventsScreen = () => {
     (sum, e) =>
       sum +
       (Array.isArray(e.vendorOrders)
-        ? e.vendorOrders.filter(isActiveVendorOrder).length
+        ? groupBookingsByVendor(e.vendorOrders.filter(isActiveVendorOrder)).size
         : 0),
     0,
   );
@@ -618,6 +631,7 @@ const MyEventsScreen = () => {
               const inactiveVendorOrders = allVendorOrders.filter(
                 (vendor: any) => !isActiveVendorOrder(vendor),
               );
+              const vendorGroups = groupBookingsByVendor(vendorOrders);
               const activeEventTotal = vendorOrders.reduce(
                 (sum: number, vendor: any) =>
                   sum + Number(vendor?.finalAmount ?? vendor?.price ?? 0),
@@ -1032,14 +1046,24 @@ const MyEventsScreen = () => {
                     <View style={styles.sectionHeaderRow}>
                       <Text style={styles.sectionTitle}>Vendors</Text>
                       <View style={styles.countBubble}>
-                        <Text style={styles.countBubbleText}>{vendorOrders.length}</Text>
+                        <Text style={styles.countBubbleText}>{vendorGroups.size}</Text>
                       </View>
                     </View>
 
                     {/* ───── Vendors ───── */}
-                    {vendorOrders.map((vendor: any, index: number) => {
-                      const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
-
+                    {Array.from(vendorGroups, ([key, packages]) => {
+                      const [vendor] = packages;
+                      const groupKey = `vendor-${event._id}-${key}`;
+                      const vendorExpanded = !!expandedVendors[groupKey];
+                      const proposalBooking = allVendorOrders.find((booking: any) => {
+                        return getBookingVendorId(booking) === key && booking.vendorScheduleProposal?.status === 'PENDING';
+                      })
+                        ?? packages.find(booking => booking.vendorScheduleProposal);
+                      const counts = new Map<string, number>();
+                      for (const booking of packages) {
+                        const status = String(booking.status || 'pending').toLowerCase();
+                        counts.set(status, (counts.get(status) ?? 0) + 1);
+                      }
                       const vendorData = vendor?.vendorId || {};
 
                       const vendorBrandName =
@@ -1078,69 +1102,11 @@ const MyEventsScreen = () => {
                         vendorData?.businessAddress ||
                         'N/A';
 
-                      const vendorExpanded = !!expandedVendors[vendor._id];
-
-                      const bookedPackage = Array.isArray(vendorData?.packages)
-                        ? vendorData.packages.find(
-                            (pkg: any) => String(pkg?._id) === String(vendor?.packageId || ''),
-                          )
-                        : null;
-
-                      const bookingType = String(
-                        vendor?.bookingType || bookedPackage?.bookingType || 'DURATION_BASED',
-                      ).toUpperCase();
-
-                      const vStatus =
-                        vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
-
-                      const paymentStatus = String(vendor?.paymentStatus || 'UNPAID').toUpperCase();
-
-                      const finalAmount = Number(vendor?.finalAmount ?? vendor?.price ?? 0);
-
-                      const downPaymentAmount = Number(vendor?.downPaymentAmount ?? 0);
-
-                      const remainingAmount = Number(
-                        vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
-                      );
-
-                      const paymentBreakdown = paymentBreakdowns[vendor._id];
-                      const isRemainingDue = paymentStatus === 'PARTIALLY_PAID' && vendorStatus === 'completed';
-                      const deadlineValue = isRemainingDue ? vendor?.remainingPaymentDeadline
-                        : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(paymentStatus) ? (paymentBreakdown?.paymentDeadline ?? vendor?.paymentDeadline) : null;
-                      const paymentDeadline = deadlineValue && Number.isFinite(new Date(deadlineValue).getTime())
-                        ? new Date(deadlineValue) : null;
-                      const paymentOverdue = !!paymentDeadline && paymentDeadline.getTime() <= paymentNow;
-
-                      const pendingPayment = paymentBreakdown?.pendingPayment;
-
-                      const hasPendingPayment = !!pendingPayment;
-
-                      const successfulPayment = paymentBreakdown?.latestSuccessfulPayment;
-
-                      const hasSuccessfulPayment = !!successfulPayment;
-
-                      // Progress bar (display only)
-                      const paidSoFar =
-                        paymentStatus === 'PAID'
-                          ? finalAmount
-                          : paymentStatus === 'PARTIALLY_PAID'
-                            ? downPaymentAmount
-                            : 0;
-                      const paidPercent =
-                        finalAmount > 0
-                          ? Math.min(100, Math.round((paidSoFar / finalAmount) * 100))
-                          : 0;
-
-                      const payChip = paymentChipMap[paymentStatus] || {
-                        bg: COLORS.primarySoft,
-                        text: COLORS.primary,
-                      };
-
                       return (
-                        <View key={vendor._id || index} style={styles.vendorCard}>
+                        <View key={groupKey} style={styles.vendorCard}>
                           {/* Vendor header */}
                           <TouchableOpacity
-                            onPress={() => toggleVendorDetails(vendor._id)}
+                            onPress={() => toggleVendorDetails(groupKey)}
                             activeOpacity={0.8}
                           >
                             <View style={styles.vendorHeaderRow}>
@@ -1155,7 +1121,7 @@ const MyEventsScreen = () => {
                                   {vendorBrandName}
                                 </Text>
                                 <Text style={styles.packageText} numberOfLines={1}>
-                                  {vendor.serviceName}
+                                  {packages.length} {packages.length === 1 ? 'package' : 'packages'}
                                 </Text>
                                 {!!vendorCategory && (
                                   <Text style={styles.vendorCategoryText} numberOfLines={1}>
@@ -1172,46 +1138,7 @@ const MyEventsScreen = () => {
                             </View>
                           </TouchableOpacity>
 
-                          {/* Price block */}
-                          {vendor?.promotionCode && Number(vendor?.discountAmount || 0) > 0 ? (
-                            <View style={styles.promotionSnapshot}>
-                              <View style={styles.amountRow}>
-                                <Text style={styles.amountLabel}>Original Amount</Text>
-                                <Text style={styles.amountValueStrike}>
-                                  {currencySymbol(currencyOf(vendor))}{' '}
-                                  {Number(
-                                    vendor?.originalAmount ?? vendor?.price ?? 0,
-                                  ).toLocaleString()}
-                                </Text>
-                              </View>
-
-                              <View style={styles.amountRow}>
-                                <View style={styles.promoTag}>
-                                  <Ionicons name="pricetag" size={10} color={COLORS.success} />
-                                  <Text style={styles.discountLabel}>{vendor.promotionCode}</Text>
-                                </View>
-                                <Text style={styles.discountValue}>
-                                  - {currencySymbol(currencyOf(vendor))} {Number(vendor?.discountAmount || 0).toLocaleString()}
-                                </Text>
-                              </View>
-
-                              <View style={styles.amountDivider} />
-
-                              <View style={styles.amountRow}>
-                                <Text style={styles.finalAmountLabel}>Final Amount</Text>
-                                <Text style={styles.finalAmountValue}>
-                                  {currencySymbol(currencyOf(vendor))}{' '}
-                                  {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
-                                </Text>
-                              </View>
-                            </View>
-                          ) : (
-                            <Text style={styles.priceText}>
-                              {currencySymbol(currencyOf(vendor))} {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
-                            </Text>
-                          )}
-
-                          {/* Vendor expanded details */}
+                          <Text style={styles.packageText}>{Array.from(counts, ([status, count]) => `${count} ${status}`).join(' · ')}</Text>
                           {vendorExpanded && (
                             <View style={styles.vendorDetailsPanel}>
                               <Text style={styles.detailsSectionTitle}>Vendor details</Text>
@@ -1239,83 +1166,9 @@ const MyEventsScreen = () => {
                                 <Text style={styles.detailValueLeft}>{vendorOfficeAddress}</Text>
                               </View>
 
-                              <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
-                              {vendor.quantity != null && <DetailRow label="Quantity" value={String(vendor.quantity)} />}
-                              {vendor.pricingMethod && <DetailRow label="Pricing" value={pricingLabel(vendor)} />}
-                              {vendor.personCount != null && <DetailRow label="People" value={String(vendor.personCount)} />}
-                              {vendor.pricingMethod === 'GROUP' && <DetailRow label="People included" value={String(Number(vendor.groupSize) * Number(vendor.quantity || 1))} />}
-                              <DeliveryDetails pkg={vendor} timeZone={timeZone} />
-
-                              {bookingType !== 'DELIVERY_BASED' && (
-                                <DetailRow
-                                  label="Service date"
-                                  value={vendor?.eventStartDateTime ? formatBookingDate(vendor.eventStartDateTime, timeZone) : formatCalendarDate(event.eventDate)}
-                                />
-                              )}
-
-                              {bookingType === 'DELIVERY_BASED' ? (vendor.delivery ? null : (
-                                <DetailRow
-                                  label="Delivered at"
-                                  value={
-                                    vendor?.eventStartDateTime
-                                      ? `${formatBookingDate(vendor.eventStartDateTime, timeZone)} • ${formatBookingTime(vendor.eventStartDateTime, timeZone)}`
-                                      : 'N/A'
-                                  }
-                                />
-                              )) : bookingType === 'SETUP_BASED' ? (
-                                <>
-                                  <DetailRow
-                                    label="Setup start"
-                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
-                                  />
-                                  <DetailRow
-                                    label="Setup end"
-                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
-                                  />
-                                </>
-                              ) : bookingType === 'TIME_SLOT_BASED' ? (
-                                <>
-                                  <DetailRow
-                                    label="Appointment start"
-                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
-                                  />
-                                  <DetailRow
-                                    label="Appointment end"
-                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
-                                  />
-                                </>
-                              ) : (
-                                <>
-                                  <DetailRow
-                                    label="Service start"
-                                    value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
-                                  />
-                                  <DetailRow
-                                    label="Service end"
-                                    value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
-                                  />
-                                </>
-                              )}
                             </View>
                           )}
-
-                          {!!vendor.laterTimeRequest && <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData}
-                            canReschedule={!hasSuccessfulVendorPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id))} />}
-                          <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
-                          {/* Status + message row */}
                           <View style={styles.vendorFooterRow}>
-                            <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
-                              <Ionicons name={vStatus.icon} size={12} color={vStatus.text} />
-                              <Text
-                                style={[
-                                  styles.statusPillText,
-                                  { color: vStatus.text, textTransform: 'capitalize' },
-                                ]}
-                              >
-                                {vendorStatus}
-                              </Text>
-                            </View>
-
                             <TouchableOpacity
                               style={styles.messageButton}
                               activeOpacity={0.85}
@@ -1325,183 +1178,385 @@ const MyEventsScreen = () => {
                               <Text style={styles.messageButtonText}>Message</Text>
                             </TouchableOpacity>
                           </View>
-
-                          {vendorStatus === 'accepted' && paymentStatus === 'PARTIALLY_PAID' && (
-                            <TouchableOpacity
-                              accessibilityRole="button"
-                              style={[styles.receiptButton, { borderColor: COLORS.danger, marginTop: 12 }]}
-                              onPress={() => setCancellingBooking({ id: vendor._id, name: vendorBrandName })}
-                            >
-                              <Ionicons name="close-circle-outline" size={15} color={COLORS.danger} />
-                              <Text style={[styles.receiptButtonText, { color: COLORS.danger }]}>Cancel Booking</Text>
-                            </TouchableOpacity>
+                          {!!proposalBooking && (
+                            <VendorScheduleProposal
+                              key={proposalBooking.vendorScheduleProposal.id}
+                              anchorId={proposalBooking._id}
+                              proposal={proposalBooking.vendorScheduleProposal}
+                              timeZone={timeZone}
+                              onUpdated={fetchData}
+                              canRespond
+                            />
                           )}
+                          {packages.map((vendor, index) => {
+                            const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
+                            const vendorData = vendor?.vendorId || {};
+                            const vendorExpanded = !!expandedVendors[vendor._id];
+                            const bookedPackage = Array.isArray(vendorData?.packages)
+                              ? vendorData.packages.find(
+                                  (pkg: any) => String(pkg?._id) === String(vendor?.packageId || ''),
+                                )
+                              : null;
 
-                          {/* ───── Payment panel ───── */}
-                          {(vendorStatus === 'accepted' || vendorStatus === 'completed') && (
-                            <View style={styles.paymentBox}>
-                              <View style={styles.paymentHeaderRow}>
-                                <View style={styles.paymentTitleWrap}>
-                                  <Ionicons name="wallet-outline" size={14} color={COLORS.primary} />
-                                  <Text style={styles.paymentTitle}>Payment</Text>
-                                </View>
+                            const bookingType = String(
+                              vendor?.bookingType || bookedPackage?.bookingType || 'DURATION_BASED',
+                            ).toUpperCase();
 
-                                <View style={[styles.paymentChip, { backgroundColor: payChip.bg }]}>
-                                  <Text style={[styles.paymentStatusText, { color: payChip.text }]}>
-                                    {paymentStatus.replace(/_/g, ' ')}
-                                  </Text>
-                                </View>
-                              </View>
+                            const vStatus =
+                              vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
 
-                              {/* Progress */}
-                              <View style={styles.progressTrack}>
-                                <View
-                                  style={[styles.progressFill, { width: `${paidPercent}%` }]}
-                                />
-                              </View>
+                            const paymentStatus = String(vendor?.paymentStatus || 'UNPAID').toUpperCase();
 
-                              <View style={styles.paymentFigures}>
-                                <View style={styles.paymentFigure}>
-                                  <Text style={styles.paymentLabel}>Total</Text>
-                                  <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    {currencySymbol(currencyOf(vendor))} {finalAmount.toLocaleString()}
-                                  </Text>
-                                </View>
+                            const finalAmount = Number(vendor?.finalAmount ?? vendor?.price ?? 0);
 
-                                <View style={styles.paymentFigure}>
-                                  <Text style={styles.paymentLabel}>Down payment</Text>
-                                  <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
-                                  </Text>
-                                </View>
+                            const downPaymentAmount = Number(vendor?.downPaymentAmount ?? 0);
 
-                                <View style={[styles.paymentFigure, { alignItems: 'flex-end' }]}>
-                                  <Text style={styles.paymentLabel}>Remaining</Text>
-                                  <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                    {currencySymbol(currencyOf(vendor))} {remainingAmount.toLocaleString()}
-                                  </Text>
-                                </View>
-                              </View>
+                            const remainingAmount = Number(
+                              vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
+                            );
 
-                              {paymentDeadline && (
-                                <View style={styles.deadlineRow}>
-                                  <Ionicons name="alarm-outline" size={12} color="#B8860B" />
-                                  <Text style={styles.paymentDeadlineText}>
-                                    {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
-                                    {paymentDeadline.toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
-                                  </Text>
-                                </View>
-                              )}
+                            const paymentBreakdown = paymentBreakdowns[vendor._id];
+                            const isRemainingDue = paymentStatus === 'PARTIALLY_PAID' && vendorStatus === 'completed';
+                            const deadlineValue = isRemainingDue ? vendor?.remainingPaymentDeadline
+                              : ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(paymentStatus) ? (paymentBreakdown?.paymentDeadline ?? vendor?.paymentDeadline) : null;
+                            const paymentDeadline = deadlineValue && Number.isFinite(new Date(deadlineValue).getTime())
+                              ? new Date(deadlineValue) : null;
+                            const paymentOverdue = !!paymentDeadline && paymentDeadline.getTime() <= paymentNow;
 
-                              {paymentOverdue && !isRemainingDue && !hasPendingPayment && (
-                                <View style={styles.paymentPendingBox}><Text style={styles.paymentPendingText}>The down-payment deadline has passed. This unpaid vendor booking is no longer available for payment.</Text></View>
-                              )}
+                            const pendingPayment = paymentBreakdown?.pendingPayment;
 
-                              {hasPendingPayment && (
-                                <View style={styles.paymentPendingBox}>
-                                  <Text style={styles.paymentPendingText}>
-                                    {String(pendingPayment?.type || '').toUpperCase() === 'REMAINING'
-                                      ? 'Remaining payment is awaiting confirmation.'
-                                      : (paymentBreakdown?.paymentVerificationOverdue || vendor?.paymentVerificationOverdue || (paymentBreakdown?.paymentServiceCutoff && new Date(paymentBreakdown.paymentServiceCutoff).getTime() <= paymentNow)) ? 'Payment verification overdue — service not secured. Awaiting Admin review.' : 'Down payment is awaiting confirmation.'}
-                                  </Text>
+                            const hasPendingPayment = !!pendingPayment;
 
-                                  <Text style={styles.paymentPendingSubtext}>
-                                    {currencySymbol(currencyOf(vendor))} {Number(pendingPayment?.amount || 0).toLocaleString()}
-                                    {' • '}
-                                    {String(pendingPayment?.method || '').toUpperCase()}
-                                  </Text>
-                                </View>
-                              )}
+                            const successfulPayment = paymentBreakdown?.latestSuccessfulPayment;
 
-                              {paymentStatus === 'PAYMENT_REQUIRED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
-                                <TouchableOpacity
-                                  style={styles.payNowButton}
-                                  activeOpacity={0.85}
-                                  onPress={() => goToPayment(vendor._id)}
-                                >
-                                  <Ionicons name="card-outline" size={15} color="#fff" />
-                                  <Text style={styles.payNowButtonText}>Pay Down Payment</Text>
+                            const hasSuccessfulPayment = !!successfulPayment;
+
+                            // Progress bar (display only)
+                            const paidSoFar =
+                              paymentStatus === 'PAID'
+                                ? finalAmount
+                                : paymentStatus === 'PARTIALLY_PAID'
+                                  ? downPaymentAmount
+                                  : 0;
+                            const paidPercent =
+                              finalAmount > 0
+                                ? Math.min(100, Math.round((paidSoFar / finalAmount) * 100))
+                                : 0;
+
+                            const payChip = paymentChipMap[paymentStatus] || {
+                              bg: COLORS.primarySoft,
+                              text: COLORS.primary,
+                            };
+
+                            return (
+                              <View key={vendor._id || index} style={styles.vendorCard}>
+                                <TouchableOpacity onPress={() => toggleVendorDetails(vendor._id)} accessibilityRole="button" accessibilityState={{ expanded: vendorExpanded }}>
+                                  <View style={styles.vendorHeaderRow}>
+                                    <Text style={[styles.vendorText, { flex: 1 }]}>{vendor.serviceName}</Text>
+                                    <Ionicons name={vendorExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.primary} />
+                                  </View>
                                 </TouchableOpacity>
-                              )}
+                                {/* Price block */}
+                                {vendor?.promotionCode && Number(vendor?.discountAmount || 0) > 0 ? (
+                                  <View style={styles.promotionSnapshot}>
+                                    <View style={styles.amountRow}>
+                                      <Text style={styles.amountLabel}>Original Amount</Text>
+                                      <Text style={styles.amountValueStrike}>
+                                        {currencySymbol(currencyOf(vendor))}{' '}
+                                        {Number(
+                                          vendor?.originalAmount ?? vendor?.price ?? 0,
+                                        ).toLocaleString()}
+                                      </Text>
+                                    </View>
 
-                              {paymentStatus === 'PAYMENT_FAILED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
-                                <>
-                                  <View style={styles.paymentFailedBox}>
-                                    <Ionicons name="warning-outline" size={13} color="#DC3545" />
-                                    <Text style={styles.paymentFailedText}>
-                                      Previous payment attempt failed.
+                                    <View style={styles.amountRow}>
+                                      <View style={styles.promoTag}>
+                                        <Ionicons name="pricetag" size={10} color={COLORS.success} />
+                                        <Text style={styles.discountLabel}>{vendor.promotionCode}</Text>
+                                      </View>
+                                      <Text style={styles.discountValue}>
+                                        - {currencySymbol(currencyOf(vendor))} {Number(vendor?.discountAmount || 0).toLocaleString()}
+                                      </Text>
+                                    </View>
+
+                                    <View style={styles.amountDivider} />
+
+                                    <View style={styles.amountRow}>
+                                      <Text style={styles.finalAmountLabel}>Final Amount</Text>
+                                      <Text style={styles.finalAmountValue}>
+                                        {currencySymbol(currencyOf(vendor))}{' '}
+                                        {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <Text style={styles.priceText}>
+                                    {currencySymbol(currencyOf(vendor))} {Number(vendor?.finalAmount ?? vendor?.price ?? 0).toLocaleString()}
+                                  </Text>
+                                )}
+
+                                {/* Vendor expanded details */}
+                                {vendorExpanded && (
+                                  <View style={styles.vendorDetailsPanel}>
+                                    <DetailRow label="Package" value={vendor.serviceName || 'N/A'} />
+                                    {vendor.quantity != null && <DetailRow label="Quantity" value={String(vendor.quantity)} />}
+                                    {vendor.pricingMethod && <DetailRow label="Pricing" value={pricingLabel(vendor)} />}
+                                    {vendor.personCount != null && <DetailRow label="People" value={String(vendor.personCount)} />}
+                                    {vendor.pricingMethod === 'GROUP' && <DetailRow label="People included" value={String(Number(vendor.groupSize) * Number(vendor.quantity || 1))} />}
+                                    <DeliveryDetails pkg={vendor} timeZone={timeZone} />
+
+                                    {bookingType !== 'DELIVERY_BASED' && (
+                                      <DetailRow
+                                        label="Service date"
+                                        value={vendor?.eventStartDateTime ? formatBookingDate(vendor.eventStartDateTime, timeZone) : formatCalendarDate(event.eventDate)}
+                                      />
+                                    )}
+
+                                    {bookingType === 'DELIVERY_BASED' ? (vendor.delivery ? null : (
+                                      <DetailRow
+                                        label="Delivered at"
+                                        value={
+                                          vendor?.eventStartDateTime
+                                            ? `${formatBookingDate(vendor.eventStartDateTime, timeZone)} • ${formatBookingTime(vendor.eventStartDateTime, timeZone)}`
+                                            : 'N/A'
+                                        }
+                                      />
+                                    )) : bookingType === 'SETUP_BASED' ? (
+                                      <>
+                                        <DetailRow
+                                          label="Setup start"
+                                          value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
+                                        />
+                                        <DetailRow
+                                          label="Setup end"
+                                          value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
+                                        />
+                                      </>
+                                    ) : bookingType === 'TIME_SLOT_BASED' ? (
+                                      <>
+                                        <DetailRow
+                                          label="Appointment start"
+                                          value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
+                                        />
+                                        <DetailRow
+                                          label="Appointment end"
+                                          value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
+                                        />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <DetailRow
+                                          label="Service start"
+                                          value={formatBookingTime(vendor.eventStartDateTime, timeZone)}
+                                        />
+                                        <DetailRow
+                                          label="Service end"
+                                          value={formatBookingTime(vendor.eventEndDateTime, timeZone)}
+                                        />
+                                      </>
+                                    )}
+                                  </View>
+                                )}
+
+                                {!!vendor.laterTimeRequest && <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData}
+                                  canReschedule={!hasSuccessfulVendorPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id))} />}
+                                <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
+                                {/* Status + message row */}
+                                <View style={styles.vendorFooterRow}>
+                                  <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
+                                    <Ionicons name={vStatus.icon} size={12} color={vStatus.text} />
+                                    <Text
+                                      style={[
+                                        styles.statusPillText,
+                                        { color: vStatus.text, textTransform: 'capitalize' },
+                                      ]}
+                                    >
+                                      {vendorStatus}
                                     </Text>
                                   </View>
 
-                                  <TouchableOpacity
-                                    style={styles.payNowButton}
-                                    activeOpacity={0.85}
-                                    onPress={() => goToPayment(vendor._id)}
-                                  >
-                                    <Ionicons name="refresh" size={15} color="#fff" />
-                                    <Text style={styles.payNowButtonText}>Retry Down Payment</Text>
-                                  </TouchableOpacity>
-                                </>
-                              )}
 
-                              {paymentStatus === 'PARTIALLY_PAID' && vendorStatus !== 'completed' && (
-                                <View style={styles.paidInfoBox}>
-                                  <Ionicons name="information-circle-outline" size={14} color="#278A4B" />
-                                  <Text style={styles.paidInfoText}>
-                                    Down payment paid. Remaining amount will be due after service
-                                    completion.
-                                  </Text>
                                 </View>
-                              )}
 
-                              {paymentStatus === 'PARTIALLY_PAID' &&
-                                vendorStatus === 'completed' &&
-                                !hasPendingPayment && (
+                                {vendorStatus === 'accepted' && paymentStatus === 'PARTIALLY_PAID' && (
                                   <TouchableOpacity
-                                    style={styles.payNowButton}
-                                    activeOpacity={0.85}
-                                    onPress={() => goToPayment(vendor._id)}
+                                    accessibilityRole="button"
+                                    style={[styles.receiptButton, { borderColor: COLORS.danger, marginTop: 12 }]}
+                                    onPress={() => setCancellingBooking({ id: vendor._id, name: vendorBrandName })}
                                   >
-                                    <Ionicons name="card-outline" size={15} color="#fff" />
-                                    <Text style={styles.payNowButtonText}>Pay Remaining Amount</Text>
+                                    <Ionicons name="close-circle-outline" size={15} color={COLORS.danger} />
+                                    <Text style={[styles.receiptButtonText, { color: COLORS.danger }]}>Cancel Booking</Text>
                                   </TouchableOpacity>
                                 )}
 
-                              {paymentStatus === 'PAID' && (
-                                <View style={styles.paidInfoBox}>
-                                  <Ionicons name="checkmark-circle" size={14} color="#278A4B" />
-                                  <Text style={styles.paidInfoText}>Payment completed</Text>
-                                </View>
-                              )}
+                                {/* ───── Payment panel ───── */}
+                                {(vendorStatus === 'accepted' || vendorStatus === 'completed') && (
+                                  <View style={styles.paymentBox}>
+                                    <View style={styles.paymentHeaderRow}>
+                                      <View style={styles.paymentTitleWrap}>
+                                        <Ionicons name="wallet-outline" size={14} color={COLORS.primary} />
+                                        <Text style={styles.paymentTitle}>Payment</Text>
+                                      </View>
 
-                              {hasSuccessfulPayment && (
-                                <TouchableOpacity
-                                  style={styles.receiptButton}
-                                  activeOpacity={0.8}
-                                  onPress={() =>
-                                    router.push({
-                                      pathname: '/paymentconfirmation',
-                                      params: {
-                                        vendorOrderId: vendor._id,
-                                      },
-                                    })
-                                  }
-                                >
-                                  <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
-                                  <Text style={styles.receiptButtonText}>View Receipt</Text>
-                                </TouchableOpacity>
-                              )}
+                                      <View style={[styles.paymentChip, { backgroundColor: payChip.bg }]}>
+                                        <Text style={[styles.paymentStatusText, { color: payChip.text }]}>
+                                          {paymentStatus.replace(/_/g, ' ')}
+                                        </Text>
+                                      </View>
+                                    </View>
 
-                              {paymentStatus === 'PAYMENT_EXPIRED' && (
-                                <View style={styles.paymentExpiredBox}>
-                                  <Ionicons name="time-outline" size={13} color="#9A6B00" />
-                                  <Text style={styles.paymentExpiredText}>
-                                    Payment window expired.
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                          )}
+                                    {/* Progress */}
+                                    <View style={styles.progressTrack}>
+                                      <View
+                                        style={[styles.progressFill, { width: `${paidPercent}%` }]}
+                                      />
+                                    </View>
+
+                                    <View style={styles.paymentFigures}>
+                                      <View style={styles.paymentFigure}>
+                                        <Text style={styles.paymentLabel}>Total</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {currencySymbol(currencyOf(vendor))} {finalAmount.toLocaleString()}
+                                        </Text>
+                                      </View>
+
+                                      <View style={styles.paymentFigure}>
+                                        <Text style={styles.paymentLabel}>Down payment</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
+                                        </Text>
+                                      </View>
+
+                                      <View style={[styles.paymentFigure, { alignItems: 'flex-end' }]}>
+                                        <Text style={styles.paymentLabel}>Remaining</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {currencySymbol(currencyOf(vendor))} {remainingAmount.toLocaleString()}
+                                        </Text>
+                                      </View>
+                                    </View>
+
+                                    {paymentDeadline && (
+                                      <View style={styles.deadlineRow}>
+                                        <Ionicons name="alarm-outline" size={12} color="#B8860B" />
+                                        <Text style={styles.paymentDeadlineText}>
+                                          {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
+                                          {paymentDeadline.toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                                        </Text>
+                                      </View>
+                                    )}
+
+                                    {paymentOverdue && !isRemainingDue && !hasPendingPayment && (
+                                      <View style={styles.paymentPendingBox}><Text style={styles.paymentPendingText}>The down-payment deadline has passed. This unpaid vendor booking is no longer available for payment.</Text></View>
+                                    )}
+
+                                    {hasPendingPayment && (
+                                      <View style={styles.paymentPendingBox}>
+                                        <Text style={styles.paymentPendingText}>
+                                          {String(pendingPayment?.type || '').toUpperCase() === 'REMAINING'
+                                            ? 'Remaining payment is awaiting confirmation.'
+                                            : (paymentBreakdown?.paymentVerificationOverdue || vendor?.paymentVerificationOverdue || (paymentBreakdown?.paymentServiceCutoff && new Date(paymentBreakdown.paymentServiceCutoff).getTime() <= paymentNow)) ? 'Payment verification overdue — service not secured. Awaiting Admin review.' : 'Down payment is awaiting confirmation.'}
+                                        </Text>
+
+                                        <Text style={styles.paymentPendingSubtext}>
+                                          {currencySymbol(currencyOf(vendor))} {Number(pendingPayment?.amount || 0).toLocaleString()}
+                                          {' • '}
+                                          {String(pendingPayment?.method || '').toUpperCase()}
+                                        </Text>
+                                      </View>
+                                    )}
+
+                                    {paymentStatus === 'PAYMENT_REQUIRED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
+                                      <TouchableOpacity
+                                        style={styles.payNowButton}
+                                        activeOpacity={0.85}
+                                        onPress={() => goToPayment(vendor._id)}
+                                      >
+                                        <Ionicons name="card-outline" size={15} color="#fff" />
+                                        <Text style={styles.payNowButtonText}>Pay Down Payment</Text>
+                                      </TouchableOpacity>
+                                    )}
+
+                                    {paymentStatus === 'PAYMENT_FAILED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
+                                      <>
+                                        <View style={styles.paymentFailedBox}>
+                                          <Ionicons name="warning-outline" size={13} color="#DC3545" />
+                                          <Text style={styles.paymentFailedText}>
+                                            Previous payment attempt failed.
+                                          </Text>
+                                        </View>
+
+                                        <TouchableOpacity
+                                          style={styles.payNowButton}
+                                          activeOpacity={0.85}
+                                          onPress={() => goToPayment(vendor._id)}
+                                        >
+                                          <Ionicons name="refresh" size={15} color="#fff" />
+                                          <Text style={styles.payNowButtonText}>Retry Down Payment</Text>
+                                        </TouchableOpacity>
+                                      </>
+                                    )}
+
+                                    {paymentStatus === 'PARTIALLY_PAID' && vendorStatus !== 'completed' && (
+                                      <View style={styles.paidInfoBox}>
+                                        <Ionicons name="information-circle-outline" size={14} color="#278A4B" />
+                                        <Text style={styles.paidInfoText}>
+                                          Down payment paid. Remaining amount will be due after service
+                                          completion.
+                                        </Text>
+                                      </View>
+                                    )}
+
+                                    {paymentStatus === 'PARTIALLY_PAID' &&
+                                      vendorStatus === 'completed' &&
+                                      !hasPendingPayment && (
+                                        <TouchableOpacity
+                                          style={styles.payNowButton}
+                                          activeOpacity={0.85}
+                                          onPress={() => goToPayment(vendor._id)}
+                                        >
+                                          <Ionicons name="card-outline" size={15} color="#fff" />
+                                          <Text style={styles.payNowButtonText}>Pay Remaining Amount</Text>
+                                        </TouchableOpacity>
+                                      )}
+
+                                    {paymentStatus === 'PAID' && (
+                                      <View style={styles.paidInfoBox}>
+                                        <Ionicons name="checkmark-circle" size={14} color="#278A4B" />
+                                        <Text style={styles.paidInfoText}>Payment completed</Text>
+                                      </View>
+                                    )}
+
+                                    {hasSuccessfulPayment && (
+                                      <TouchableOpacity
+                                        style={styles.receiptButton}
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                          router.push({
+                                            pathname: '/paymentconfirmation',
+                                            params: {
+                                              vendorOrderId: vendor._id,
+                                            },
+                                          })
+                                        }
+                                      >
+                                        <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
+                                        <Text style={styles.receiptButtonText}>View Receipt</Text>
+                                      </TouchableOpacity>
+                                    )}
+
+                                    {paymentStatus === 'PAYMENT_EXPIRED' && (
+                                      <View style={styles.paymentExpiredBox}>
+                                        <Ionicons name="time-outline" size={13} color="#9A6B00" />
+                                        <Text style={styles.paymentExpiredText}>
+                                          Payment window expired.
+                                        </Text>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
                         </View>
                       );
                     })}
@@ -1570,6 +1625,15 @@ const MyEventsScreen = () => {
                               </View>
                               <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
                               <BookingCancellationDetails timeZone={timeZone} booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
+                              {!!vendor.vendorScheduleProposal && !vendorGroups.has(getBookingVendorId(vendor)) && (
+                                <VendorScheduleProposal
+                                  anchorId={vendor._id}
+                                  proposal={vendor.vendorScheduleProposal}
+                                  timeZone={timeZone}
+                                  onUpdated={fetchData}
+                                  canRespond
+                                />
+                              )}
                               <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData} />
                             </View>
                           );
@@ -1582,7 +1646,7 @@ const MyEventsScreen = () => {
                       <View>
                         <Text style={styles.totalLabel}>Total Event Price</Text>
                         <Text style={styles.totalHint}>
-                          {vendorOrders.length} {vendorOrders.length === 1 ? 'vendor' : 'vendors'}
+                          {vendorGroups.size} {vendorGroups.size === 1 ? 'vendor' : 'vendors'}
                         </Text>
                       </View>
                       <Text style={styles.totalPrice}>

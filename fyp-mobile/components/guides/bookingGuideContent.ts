@@ -31,7 +31,7 @@ const service: GuideSection = {
   id: 'service-time', title: 'Event time and service time', summary: 'Check when this particular package is needed.',
   steps: [
     'Event dates, service times, requests, cancellation/refund updates and payment timestamps use the event city timezone shown on the booking, even when your phone is in another country.',
-    'While a date/time change is unresolved, Mark Processing and payment stay unavailable. Accept New Schedule approves the proposed time; it does not accept the booking. Once the whole schedule is finalized, use Mark Processing if available.',
+    'While a date/time change is unresolved, booking acceptance and payment stay unavailable. Accept New Schedule approves the proposed time; it does not accept the booking. Once the whole schedule is finalized, use Accept Package or Accept All Pending Packages if available.',
     'Event time is when the event starts. Service time is the booked work or delivery window for this package; these can differ.',
     'Duration-based packages have a booked start and end. Delivery-based packages use delivery timing. Setup-based packages include setup timing and the time needed to set up. Custom packages follow their saved timing details.',
     'Read the package name, inclusions, price, duration or delivery/setup window, address and service city before acting.',
@@ -69,7 +69,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     sections: [
       { id: 'start', title: 'Open and check your event', summary: 'Find the correct event and expand its vendor cards.', steps: [
         'Open My Events and expand the event. Check its date, time, city, address, guests and desired services.',
-        'Each vendor card shows the package and its category when available. Expand the card to review quantity, service timing, price, booking activity and payment status.',
+        'Each vendor appears once per event. Expand the vendor details for contact information and each package for its quantity, time, price, activity and payment status.',
         'Pull down to refresh after a payment, vendor response or schedule decision. Check notifications for updates, then open the booking to see its latest state.',
       ] }, status, service, delivery,
       { id: 'pay', title: 'Pay the down payment and remaining balance', summary: 'Use only the payment action shown on that booking.', steps: [
@@ -86,7 +86,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'If the failed/unpaid booking expires, its old Pay and Retry actions are unavailable and the record stays in history. Confirmed paid bookings are not expired simply because their old advance deadline passed.',
       ] },
       { id: 'reschedule', title: 'Request a different date or time', summary: 'Send a request, then follow each vendor’s response.', steps: [
-        'Before the event starts, use Request Date/Time Change when available. The current flow permits one date/time request per event and only before any successful down payment.',
+        'When a vendor proposes new times for their pending packages, review each current and proposed slot in their card. Accept or decline the whole request there. For an entire event, use Request Date/Time Change before the event starts when available. The current flow permits one date/time request per event and only before any successful down payment.',
         'Choose the new date, time and duration, enter a reason, review and submit. The current booking does not change simply because the request was sent.',
         'Follow the response from every affected vendor. Their availability is checked for the requested schedule. When the required approvals are complete, refresh to see the resulting schedule.',
         'If a vendor is unavailable or a response expires, follow the choices shown: keep the original schedule, or continue with the requested schedule and replace unavailable vendors. Replacement must complete its own checks before the schedule is finalized.',
@@ -154,10 +154,10 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Booking Total includes the saved discount. Your Earnings subtracts any platform fee. Check Paid and Remaining to see how much the client has actually paid.',
         'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
       ] }, status, service, delivery,
-      { id: 'accept', title: 'Accept a new request', summary: 'Mark Processing is your acceptance action.', steps: [
-        'On a Pending booking, check whether you can provide the booked service, then use Mark Processing. The app checks that there is enough time for payment and preparation.',
+      { id: 'accept', title: 'Accept a new request', summary: 'Review the slots before accepting pending packages.', steps: [
+        'Use Accept Package for one pending package or Accept All Pending Packages for several. Review the slots in the confirmation. If any package fails the check, the entire acceptance is rolled back.',
         'If successful, your booking becomes Processing / Accepted. The client sees the required advance and its exact deadline. Acceptance alone does not mean money has been paid.',
-        'If too little time remains, acceptance is blocked and the booking stays Pending. Use Request later service time when offered. Do not promise fulfilment on the assumption that a blocked acceptance succeeded.',
+        'If too little time remains, acceptance is blocked and the booking stays Pending. Use Request new date & time to preview each eligible package’s old and new slot and send one request to the client. The client can approve or decline in My Events.',
       ] }, timing,
       { id: 'payment', title: 'Understand payment and expiry', summary: 'Confirm the booking’s status before providing service.', steps: [
         'Payment Required means the client still needs to secure the advance. Awaiting confirmation means a payment was submitted but has not become successful.',

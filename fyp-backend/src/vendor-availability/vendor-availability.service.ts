@@ -306,6 +306,7 @@ if (!hasAccess) {
     eventTimeZone = 'UTC',
     deliverySelection?: { startDateTime: string | Date; configuration?: any },
     serviceWindowSelection?: { startDateTime: string | Date; endDateTime: string | Date },
+    options?: { existingBooking?: boolean },
    ): Promise<AvailabilityResult> {
     // ---------------------------------------------------------
     // Phase 3 Step 4:
@@ -810,7 +811,7 @@ if (!hasAccess) {
       ? Math.min(...validNoticeOptions)
       : 1440;
     const minutesUntilService = (startDateTime.getTime() - Date.now()) / 60000;
-    if (minutesUntilService < minimumNotice) {
+    if (!options?.existingBooking && minutesUntilService < minimumNotice) {
       return {
         vendorId,
         available: false,
