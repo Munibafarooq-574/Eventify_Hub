@@ -902,6 +902,19 @@ if (eventDetailsRaw) {
                                                 const affected = checkoutConflict?.vendorIds.includes(cartLine.vendorId) &&
                                                     (vendorUnavailable || checkoutConflict.packageIds.includes(cartLine.packageId));
                                                 const packageUnavailable = checkoutConflict?.code === 'CHECKOUT_PACKAGE_UNAVAILABLE';
+                                                const removePackageAction = (
+                                                    <TouchableOpacity
+                                                        accessibilityRole="button"
+                                                        accessibilityLabel={affected ? 'Remove unavailable package' : 'Remove package'}
+                                                        style={affected ? undefined : styles.removeButton}
+                                                        onPress={() => handleDeletePackage(vendorIndex, packageIndex)}
+                                                        activeOpacity={0.75}
+                                                    >
+                                                        {affected
+                                                            ? <Text style={{ color: '#9B2335', fontWeight: '700' }}>Remove unavailable package</Text>
+                                                            : <Ionicons name="trash-outline" size={18} color="#C44D5C" />}
+                                                    </TouchableOpacity>
+                                                );
                                                 const quotedPrice = couponQuotes[cartLine.key];
                                                 const finalPrice = quotedPrice ?? cartLine.originalAmount;
 
@@ -1120,6 +1133,7 @@ if (eventDetailsRaw) {
                                                                             <Text style={{ color: PRIMARY, fontWeight: '700' }}>Find another vendor</Text>
                                                                         </TouchableOpacity>
                                                                     )}
+                                                                    {removePackageAction}
                                                                 </View>
                                                             )}
 
@@ -1179,22 +1193,7 @@ if (eventDetailsRaw) {
                                                             )}
                                                         </View>
 
-                                                        <TouchableOpacity
-                                                            style={styles.removeButton}
-                                                            onPress={() =>
-                                                                handleDeletePackage(
-                                                                    vendorIndex,
-                                                                    packageIndex
-                                                                )
-                                                            }
-                                                            activeOpacity={0.75}
-                                                        >
-                                                            <Ionicons
-                                                                name="trash-outline"
-                                                                size={18}
-                                                                color="#C44D5C"
-                                                            />
-                                                        </TouchableOpacity>
+                                                        {!affected && removePackageAction}
                                                     </View>
                                                 );
                                             }

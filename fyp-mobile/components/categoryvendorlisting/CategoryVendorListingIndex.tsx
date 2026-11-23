@@ -51,7 +51,8 @@ export default function App() {
   durationMinutes: number;
 } | null>(null);
   const routeParams = useLocalSearchParams();
-  const cartSwapParams = routeParams.cartSwapPackageId ? {
+  const isCartSwap = Boolean(routeParams.cartSwapPackageId);
+  const cartSwapParams = isCartSwap ? {
     cartSwapVendorId: routeParams.cartSwapVendorId || "",
     cartSwapPackageId: routeParams.cartSwapPackageId || "",
     cartSwapEventId: routeParams.cartSwapEventId || "",
@@ -607,10 +608,10 @@ const activeChips = [
   ...preferences.ratingBands.map(value => ({ key: 'ratingBands' as const, value, label: value === 'unrated' ? 'Not rated' : value === '5' ? '5 ★' : `${value}–<${Number(value) + 1} ★` })),
   ...(preferences.sort !== 'default' ? [{ key: 'sort' as const, value: preferences.sort, label: SORT_OPTIONS.find(([value]) => value === preferences.sort)?.[1] || '' }] : []),
 ];
-const updateFilters = async (next: VendorSearchPreferences) => {
+const updateFilters = async (next: VendorSearchPreferences, query = searchQuery) => {
   try {
     await saveVendorFilters(next);
-    await fetchData(searchQuery, next);
+    await fetchData(query, next);
   } catch { setSearchError(true); }
 };
 
@@ -622,15 +623,23 @@ const renderEmptyState = () => {
         <Ionicons name="calendar-outline" size={scale(34)} color={COLORS.primary} />
       </View>
       <Text style={styles.emptyTitle}>{isReplacementMode ? "No replacement is available for this time" : !isBrowseMode && eventTiming ? "No vendors available for your event" : "No vendors match these filters"}</Text>
-      <Text style={styles.emptySubtitle}>{routeParams.cartSwapPackageId
-        ? 'Try clearing filters, changing the event time, or return to My Cart to remove the unavailable package.'
+      <Text style={styles.emptySubtitle}>{isCartSwap
+        ? 'No replacement was found for your current event date and time. You can return to My Cart and remove the unavailable package.'
         : isReplacementMode ? 'Check your filters, or return to My Events to choose a later time or continue without this vendor.' : eventTiming ? (unavailableReason || 'No vendors are available for this event. Try another date or time, or adjust your search filters.') : 'Try adjusting your search or filters.'}</Text>
-      {!isBrowseMode && !isReplacementMode && eventTiming && (
+      {isCartSwap && (
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={{ padding: 14 }}>
+          <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Back to My Cart</Text>
+        </TouchableOpacity>
+      )}
+      {!isCartSwap && !isBrowseMode && !isReplacementMode && eventTiming && (
         <TouchableOpacity accessibilityRole="button" onPress={() => router.push({ pathname: "/EventDetailsForm", params: { editDateTime: "true" } })} style={{ padding: 14 }}>
           <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Change Event Date & Time</Text>
         </TouchableOpacity>
       )}
-      {activeChips.length > 0 && <TouchableOpacity disabled={checkingAvailability} onPress={() => updateFilters(emptyVendorFilters())} style={{ padding: 14 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear filters</Text></TouchableOpacity>}
+      {(activeChips.length > 0 || (isCartSwap && Boolean(searchQuery.trim()))) && <TouchableOpacity accessibilityRole="button" disabled={checkingAvailability} onPress={() => {
+        if (isCartSwap) setSearchQuery('');
+        void updateFilters(emptyVendorFilters(), isCartSwap ? '' : searchQuery);
+      }} style={{ padding: 14 }}><Text style={{ color: COLORS.primary, fontWeight: '700' }}>Clear filters</Text></TouchableOpacity>}
     </View>
   );
 };
