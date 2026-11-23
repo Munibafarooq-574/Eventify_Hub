@@ -1400,6 +1400,37 @@ Current order total: ${currencySymbol(cartCurrency(cartData))} ${formatCurrency(
     ]);
     return;
   }
+  const availability = error?.bookingAvailability;
+  if (availability) {
+    const vendorUnavailable = availability.code === 'CHECKOUT_VENDOR_UNAVAILABLE';
+    const packageUnavailable = availability.code === 'CHECKOUT_PACKAGE_UNAVAILABLE';
+    const vendorIds = vendorUnavailable ? availability.vendorIds || [] : [availability.vendorId];
+    const packageIds = [availability.packageId, ...(availability.overlappingPackageIds || [])];
+    const affected = cartData.vendors
+      .filter(({ vendor, vendorId }: any) => vendorIds.includes(String(vendor?._id || vendorId)))
+      .map(({ vendor, vendorName, packages }: any) => {
+        const name = vendor?.contactDetails?.brandName || vendor?.brandName || vendorName || vendor?.name || 'Vendor';
+        const names = packages
+          .filter((pkg: any) => vendorUnavailable || packageIds.includes(String(pkg.packageId || pkg._id)))
+          .map((pkg: any) => pkg.packageName);
+        return names.length ? `${name} — ${names.join(', ')}` : name;
+      });
+    let nextStep = 'Go back to My Cart and choose a different time or vendor.';
+    if (vendorUnavailable) {
+        nextStep = 'Choose a different vendor for these services in My Cart.';
+    } else if (packageUnavailable) {
+        nextStep = 'Remove or replace this package in My Cart.';
+    } else if (availability.code === 'CHECKOUT_CART_OVERLAP') {
+        nextStep = 'Change the time of one of these packages or remove it in My Cart.';
+    }
+    const feedback = [...affected, message, nextStep].join('\n\n');
+    setCheckoutError(feedback);
+    Alert.alert('Booking not submitted', feedback, [
+      { text: 'OK', style: 'cancel' },
+      { text: 'My Cart', onPress: () => router.replace('/cartmanagement') },
+    ]);
+    return;
+  }
   if (submittedEvent?.replacementVendorOrderId && /replacement.*only.*before.*event.*starts/i.test(message)) {
     try {
       await clearExpiredReplacementCart(draft, cartData, submittedEvent);

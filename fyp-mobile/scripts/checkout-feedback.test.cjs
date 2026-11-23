@@ -257,3 +257,38 @@ test('Cart validates the carried coupon for the current line and includes its sa
  assert.equal(second.originalTotal-second.cartCouponSavings,360);
  assert.deepEqual(requests.map(args=>args[2]),[200,400]);
 });
+
+test('unavailable vendor feedback names the affected vendor and offers My Cart', async () => {
+  const fixture = load();
+  fixture.cartData.vendors[0].vendorName = 'Photo19';
+  fixture.context.postPlaceOrder = async () => {
+    throw Object.assign(new Error('Unavailable for new bookings.'), {
+      bookingAvailability: { code: 'CHECKOUT_VENDOR_UNAVAILABLE', vendorIds: ['vendor'] },
+    });
+  };
+  await fixture.run();
+  assert.match(fixture.errors.at(-1), /Photo19 — Package/);
+  assert.match(fixture.alerts[0][1], /Choose a different vendor/);
+  fixture.alerts[0][2].find(button => button.text === 'My Cart').onPress();
+  assert.equal(fixture.navigation.at(-1), '/cartmanagement');
+  assert.equal(fixture.deleted.length, 0);
+});
+
+test('overlap feedback identifies both conflicting services', async () => {
+  const fixture = load();
+  fixture.cartData.vendors[0].vendorName = 'Photo19';
+  fixture.cartData.vendors[0].packages.push({
+    _id: 'portraits', packageName: 'Guest Portrait Sessions', price: 450, quantity: 1,
+  });
+  fixture.context.postPlaceOrder = async () => {
+    throw Object.assign(new Error('These services overlap in your cart.'), {
+      bookingAvailability: {
+        code: 'CHECKOUT_CART_OVERLAP', vendorId: 'vendor',
+        packageId: 'portraits', overlappingPackageIds: ['package'],
+      },
+    });
+  };
+  await fixture.run();
+  assert.match(fixture.alerts[0][1], /Photo19 — Package, Guest Portrait Sessions/);
+  assert.match(fixture.alerts[0][1], /Change the time/);
+});

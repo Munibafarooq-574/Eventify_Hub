@@ -263,6 +263,13 @@ if (!orderData.eventAddress?.trim()) {
       if (status === 409 && (code === 'EVENT_ALREADY_BOOKED' || code === 'BOOKING_DRAFT_CHANGED')) {
         throw Object.assign(new Error(String(message)), { checkoutConflict: code });
       }
+      const details = typeof data?.message === 'object' ? data.message : data;
+      if (status === 409 && [
+        'CHECKOUT_VENDOR_UNAVAILABLE', 'CHECKOUT_PACKAGE_UNAVAILABLE',
+        'CHECKOUT_SCHEDULE_UNAVAILABLE', 'CHECKOUT_RESOURCE_CAPACITY', 'CHECKOUT_CART_OVERLAP',
+      ].includes(code)) {
+        throw Object.assign(new Error(message), { bookingAvailability: details });
+      }
       if (!status || status >= 500 || (status === 409 && /already been booked|replacement/i.test(String(message)))) {
         const existing = await findSubmittedBooking(orderData, token).catch(() => undefined);
         if (existing) return existing;

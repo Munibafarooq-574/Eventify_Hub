@@ -91,6 +91,7 @@ export class OrderService {
     session: ClientSession;
     excludeOrderIds?: Types.ObjectId[];
     additionalUnits?: number;
+    checkoutService?: { vendorId: string; packageId: string };
   }): Promise<void> {
     if (args.maxParallelUnits == null) return;
     if (!Number.isSafeInteger(args.requestedUnits) || args.requestedUnits < 1) {
@@ -109,7 +110,10 @@ export class OrderService {
       sum + Math.max(1, Number(order.resourceUnits ?? order.quantity ?? 1)), 0);
     const planned = Number(args.additionalUnits ?? 0);
     if (reserved + planned + args.requestedUnits > args.maxParallelUnits) {
-      throw new ConflictException('Not enough service teams or resources remain available for the selected time.');
+      const message = 'Not enough service teams or resources remain available for the selected time.';
+      throw new ConflictException(args.checkoutService
+        ? { message, code: 'CHECKOUT_RESOURCE_CAPACITY', ...args.checkoutService }
+        : message);
     }
   }
 
@@ -603,16 +607,16 @@ export class OrderService {
                             ),
                         );
 
-                    const restrictedVendor =
-                        vendorAccessResults.find(
-                            (result) =>
-                                !result.hasAccess,
-                        );
+                    const unavailableVendorIds = vendorAccessResults
+                        .filter(result => !result.hasAccess)
+                        .map(result => result.vendorId);
 
-                    if (restrictedVendor) {
-                        throw new ConflictException(
-                            'This vendor is currently unavailable for new bookings. Please choose another vendor. Your existing bookings remain valid.',
-                        );
+                    if (unavailableVendorIds.length) {
+                        throw new ConflictException({
+                            code: 'CHECKOUT_VENDOR_UNAVAILABLE',
+                            message: 'One or more vendors are unavailable for new bookings. Choose another vendor in My Cart.',
+                            vendorIds: unavailableVendorIds,
+                        });
                     }
 
                     type ValidatedService = {
@@ -659,6 +663,10 @@ export class OrderService {
                             service,
                         ] of services.entries()
                     ) {
+                        const checkoutService = {
+                            vendorId: String(service.vendorId),
+                            packageId: String(service.packageId),
+                        };
                         const vendor =
                             vendorMap.get(
                                 String(
@@ -715,9 +723,11 @@ export class OrderService {
                             packageDoc.isActive ===
                             false
                         ) {
-                            throw new ConflictException(
-                                'Package is no longer active',
-                            );
+                            throw new ConflictException({
+                                code: 'CHECKOUT_PACKAGE_UNAVAILABLE',
+                                message: 'This package is no longer available for new bookings.',
+                                ...checkoutService,
+                            });
                         }
 
                         if (
@@ -812,10 +822,12 @@ export class OrderService {
                             !availability
                                 .requiredServiceWindow
                         ) {
-                            throw new ConflictException(
-                                availability.reason ||
-                                    'Vendor is no longer available for the selected time',
-                            );
+                            throw new ConflictException({
+                                code: 'CHECKOUT_SCHEDULE_UNAVAILABLE',
+                                message: availability.reason ||
+                                    'This vendor is no longer available for the selected time.',
+                                ...checkoutService,
+                            });
                         }
 
                         const finalServiceStartDateTime =
@@ -958,13 +970,14 @@ export class OrderService {
                             maxParallelUnits: packageDoc.availableParallelUnits,
                             session,
                             additionalUnits: inThisCart,
+                            checkoutService,
                         });
 
                         // Existing DB overlap is already checked by the
                         // availability service. This extra count covers
                         // multiple items inside THIS same request before
                         // any VendorOrder has been inserted.
-                        const sameRequestOverlapCount =
+                        const overlappingCartServices =
                             validatedServices.filter(
                                 (
                                     previous,
@@ -977,16 +990,21 @@ export class OrderService {
                                         finalServiceEndDateTime &&
                                     previous.endDateTime >
                                         finalServiceStartDateTime,
-                            ).length;
+                            );
 
                         if (
                             existingOverlapCount +
-                                sameRequestOverlapCount >=
+                                overlappingCartServices.length >=
                             maxConcurrentBookings
                         ) {
-                            throw new ConflictException(
-                                'This vendor does not have enough remaining capacity for the selected time',
-                            );
+                            throw new ConflictException({
+                                code: 'CHECKOUT_CART_OVERLAP',
+                                message: existingOverlapCount
+                                    ? 'These services overlap in your cart, and existing bookings also use this vendor’s capacity.'
+                                    : 'These services overlap in your cart and exceed this vendor’s capacity for that time.',
+                                ...checkoutService,
+                                overlappingPackageIds: overlappingCartServices.map(previous => previous.packageId),
+                            });
                         }
 
                         let finalAmount =
