@@ -24,6 +24,11 @@ import Toast from "react-native-toast-message";
 import * as ImagePicker from "expo-image-picker"; 
 import patchUpdateProfile from "@/services/patchUpdateProfile"; 
 
+function normalizeUSPhoneInput(value: string) {
+  const compact = value.normalize("NFKC").replace(/[\s\p{Cf}\p{Dash_Punctuation}().]/gu, "");
+  return /^\+?1\d{10}$/.test(compact) ? compact.slice(-10) : compact;
+}
+
 export default function SignUpIndex() {
 
 // States
@@ -124,7 +129,7 @@ const validateEmail = (text: string) => {
 
 const isUSPhone = countryCode === "US";
 const phoneReady = Boolean(countryCode);
-const compactPhone = phone.replace(/[\s().-]/g, "");
+const compactPhone = isUSPhone ? normalizeUSPhoneInput(phone) : phone.replace(/[\s().-]/g, "");
 const validPhone = isUSPhone
   ? /^(?:\+?1)?[2-9]\d{2}[2-9]\d{6}$/.test(compactPhone)
   : /^(?:0|\+?92)3\d{9}$/.test(compactPhone);
@@ -513,10 +518,9 @@ return (
           value={phone}
           onFocus={() => setShowPhoneError(false)}
           onBlur={() => setShowPhoneError(Boolean(phone.trim()))}
-          onChangeText={(value) => {
-            const compact = value.replace(/[\s().-]/g, "");
-            setPhone(isUSPhone && /^\+?1\d{10}$/.test(compact) ? compact.slice(-10) : value);
-          }}
+          onChangeText={(value) => setPhone(isUSPhone
+            ? normalizeUSPhoneInput(value)
+            : value)}
         />
       </View>
 
