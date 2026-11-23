@@ -1,3 +1,4 @@
+import BookingLimitStepper from '@/components/booking/BookingLimitStepper';
 import { toggleBookingNotice } from '@/utils/bookingNoticeSelection';
 //fyp-mobile/components/VendorAvailabilitySettings/VendorAvailabilitySettings.tsx
 import getVendorAvailability from '@/services/getVendorAvailability';
@@ -878,29 +879,7 @@ if (loadError) {
 </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Maximum bookings at the same time</Text>
-          <Text style={styles.cardSubtitle}>How many bookings can your team handle at once?</Text>
-          <View style={[styles.chipsWrap, { alignItems: 'center', marginTop: 8 }]}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Decrease maximum bookings"
-              style={styles.chip}
-              disabled={saving || resetting || maxConcurrentBookings <= 1}
-              onPress={() => setMaxConcurrentBookings(count => Math.max(1, count - 1))}
-            >
-              <Text style={styles.chipText}>−</Text>
-            </TouchableOpacity>
-            <Text accessibilityLiveRegion="polite" style={styles.cardTitle}>{maxConcurrentBookings}</Text>
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Increase maximum bookings"
-              style={styles.chip}
-              disabled={saving || resetting || maxConcurrentBookings >= Number.MAX_SAFE_INTEGER}
-              onPress={() => setMaxConcurrentBookings(count => Math.min(Number.MAX_SAFE_INTEGER, count + 1))}
-            >
-              <Text style={styles.chipText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          <BookingLimitStepper value={maxConcurrentBookings} onChange={setMaxConcurrentBookings} disabled={saving || resetting} />
         </View>
 
         {/* Blocked Dates */}

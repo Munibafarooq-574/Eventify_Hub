@@ -1,3 +1,4 @@
+import BookingLimitStepper from '@/components/booking/BookingLimitStepper';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -47,6 +48,7 @@ export type DaySlotConfig = {
 };
 
 type AvailabilitySettings = {
+  maxConcurrentBookings?: number;
   minimumWorkingWindowMinutes?: number;
   workingDays?: { day: string; enabled: boolean }[];
   workingHoursStart?: string;
@@ -106,6 +108,7 @@ type Props = {
   selectedDate: string;
   onClose: () => void;
   onSaved: (data: {
+    maxConcurrentBookings: number;
     daySlots: DaySlotConfig[];
     blockedDates: string[];
   }) => void;
@@ -119,6 +122,7 @@ const VendorAvailabilityEditor = ({
   onClose,
   onSaved,
 }: Props) => {
+  const [maxConcurrentBookings, setMaxConcurrentBookings] = useState(1);
   const [editorSaving, setEditorSaving] = useState(false);
   const [editorDaySlots, setEditorDaySlots] = useState<DaySlotConfig[]>([]);
   const [editorBlockedDates, setEditorBlockedDates] = useState<string[]>([]);
@@ -175,6 +179,8 @@ const VendorAvailabilityEditor = ({
       };
     });
 
+    const limit = availability?.maxConcurrentBookings ?? 1;
+    setMaxConcurrentBookings(Number.isSafeInteger(limit) && limit >= 1 ? limit : 1);
     setEditorDaySlots(merged);
     setEditorBlockedDates((availability?.blockedDates || []).map((d) => toKey(d)));
   }, [visible, availability]);
@@ -397,14 +403,11 @@ const VendorAvailabilityEditor = ({
           : [],
       }));
 
-      await patchVendorAvailability(vendorId, {
-        daySlots: cleanDaySlots,
-        blockedDates: editorBlockedDates,
-      });
+      const settings = { daySlots: cleanDaySlots, blockedDates: editorBlockedDates, maxConcurrentBookings };
+      await patchVendorAvailability(vendorId, settings);
+      onSaved(settings);
 
-      onSaved({ daySlots: cleanDaySlots, blockedDates: editorBlockedDates });
-
-      Alert.alert('Availability Saved', 'Your working days and time slots have been updated successfully.');
+      Alert.alert('Availability Saved', 'Your availability settings have been saved.');
     } catch (error) {
       console.error('Error saving availability:', error);
       Alert.alert('Error', 'Unable to save availability. Please try again.');
@@ -449,6 +452,10 @@ const VendorAvailabilityEditor = ({
               Choose which days you work, add working time slots, and set how early customers must
               book each day.
             </Text>
+          </View>
+
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 16 }}>
+            <BookingLimitStepper value={maxConcurrentBookings} onChange={setMaxConcurrentBookings} disabled={editorSaving} />
           </View>
 
           <Text style={styles.editorSectionTitle}>Working Days</Text>

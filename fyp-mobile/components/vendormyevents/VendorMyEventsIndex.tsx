@@ -946,11 +946,10 @@ ListEmptyComponent={
   availability={availability}
   selectedDate={selectedDate}
   onClose={() => setAvailabilityEditorVisible(false)}
-  onSaved={({ daySlots, blockedDates }) => {
+  onSaved={(settings) => {
     setAvailability((prev) => ({
       ...(prev || {}),
-      daySlots,
-      blockedDates,
+      ...settings,
     }));
     setAvailabilityEditorVisible(false);
     fetchData();
