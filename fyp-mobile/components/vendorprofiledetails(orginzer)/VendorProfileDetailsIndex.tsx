@@ -2376,6 +2376,7 @@ const serviceCityNamesFromIds =
       vendorData?.cakeBusinessDetails ||
       vendorData?.mehndiBusinessDetails ||
       vendorData?.soundBusinessDetails ||
+      vendorData?.genericBusinessDetails ||
       vendorData?.BusinessDetails;
 
       const serviceCityNames =
@@ -2401,6 +2402,8 @@ const serviceCityNamesFromIds =
         ? 'mehndi'
         : vendorData?.soundBusinessDetails
         ? 'sound'
+        : vendorData?.genericBusinessDetails
+        ? 'generic'
         : '';
 
     const selectedPackage =
@@ -3269,6 +3272,7 @@ const serviceCityNamesFromIds =
                           mehndi: '/bdmehndi',
                           sound: '/bdsounds',
                           venue: '/bdvenue',
+                          generic: '/bdgeneric',
                         };
 
                         const pathname = routeByCategory[category];
@@ -3636,6 +3640,15 @@ const serviceCityNamesFromIds =
                         businessDetails?.staff
                       }
                     />
+                  </>
+                )}
+
+                {category === 'generic' && (
+                  <>
+                    <Field label="Business Type / Services Offered" value={businessDetails?.customFields?.businessType} />
+                    <Field label="Staff" value={Array.isArray(businessDetails?.customFields?.teamGenders)
+                      ? businessDetails.customFields.teamGenders.join(', ') : undefined} />
+                    <Field label="Years of Experience" value={businessDetails?.customFields?.yearsExperience?.toString()} />
                   </>
                 )}
 

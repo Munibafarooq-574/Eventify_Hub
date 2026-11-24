@@ -349,7 +349,7 @@ if (!hasAccess) {
 
     const vendorQuery = this.userModel
       .findById(vendorId)
-      .select('availabilitySettings role packages businessCityId photographerBusinessDetails.downPayment photographerBusinessDetails.downPaymentType cateringBusinessDetails.downPayment cateringBusinessDetails.downPaymentType venueBusinessDetails.downPayment venueBusinessDetails.downPaymentType salonBusinessDetails.downPayment salonBusinessDetails.downPaymentType cakeBusinessDetails.downPayment cakeBusinessDetails.downPaymentType mehndiBusinessDetails.downPayment mehndiBusinessDetails.downPaymentType soundBusinessDetails.downPayment soundBusinessDetails.downPaymentType');
+      .select('availabilitySettings role packages businessCityId photographerBusinessDetails.downPayment photographerBusinessDetails.downPaymentType cateringBusinessDetails.downPayment cateringBusinessDetails.downPaymentType venueBusinessDetails.downPayment venueBusinessDetails.downPaymentType salonBusinessDetails.downPayment salonBusinessDetails.downPaymentType cakeBusinessDetails.downPayment cakeBusinessDetails.downPaymentType mehndiBusinessDetails.downPayment mehndiBusinessDetails.downPaymentType soundBusinessDetails.downPayment soundBusinessDetails.downPaymentType genericBusinessDetails.downPayment genericBusinessDetails.downPaymentType genericBusinessDetails.currency');
 
     if (session) {
       vendorQuery.session(session);

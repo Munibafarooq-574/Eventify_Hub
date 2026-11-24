@@ -58,7 +58,8 @@ export function getVendorDownPaymentConfig(vendorUser: any): { type: string; val
             vendorUser?.salonBusinessDetails ||
             vendorUser?.cakeBusinessDetails ||
             vendorUser?.mehndiBusinessDetails ||
-            vendorUser?.soundBusinessDetails;
+            vendorUser?.soundBusinessDetails ||
+            vendorUser?.genericBusinessDetails;
 
         if (!businessDetails || businessDetails.downPayment == null) {
             return null;

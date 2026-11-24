@@ -1750,6 +1750,9 @@ export class OrderService {
             mehndiBusinessDetails.downPaymentType
             soundBusinessDetails.downPayment
             soundBusinessDetails.downPaymentType
+            genericBusinessDetails.downPayment
+            genericBusinessDetails.downPaymentType
+            genericBusinessDetails.currency
         `,
         populate: [
             {

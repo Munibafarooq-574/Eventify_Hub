@@ -49,6 +49,31 @@ describe('Down payment and expiry safety',()=>{
   if(downPayment===0){expect(f.booking.confirmationTime).toEqual(f.booking.acceptedAt);expect(f.booking.paymentStatus).toBe('PARTIALLY_PAID');expect(f.booking.paymentDeadline).toBeNull();expect(f.booking.holdExpiresAt).toBeNull()}
   else{expect(f.booking.paymentDeadline).toEqual(new Date('2026-10-24T11:00:00Z'));expect(f.booking.paymentPreparationMinutes).toBe(120)}
  });
+ it('uses the generic vendor percentage for the booking and checkout', async () => {
+  const f = fixture();
+  Object.assign(f.booking, { status: 'pending', price: 100, finalAmount: 100, currency: 'USD' });
+  const order = Object.create(OrderService.prototype);
+  Object.assign(order, {
+    rescheduleRequestModel: { exists: async () => null },
+    vendorOrderModel: { findById: async () => f.booking, exists: async () => null },
+    userModel: { findById: () => q({
+      availabilitySettings: { minimumAdvanceMinutes: 120 },
+      genericBusinessDetails: { downPaymentType: 'PERCENTAGE', downPayment: 45 },
+    }) },
+    orderModel: { findById: () => q(null), findOne: async () => ({ organizerId: 'client' }) },
+    commissionConfigModel: { findOne: async () => null },
+    sendPushNotification: jest.fn(),
+  });
+  await order.updateVendorResponse('booking', 'accepted');
+  expect(f.booking).toMatchObject({
+    downPaymentPercentage: 45, downPaymentAmount: 45, remainingAmount: 55,
+    paymentStatus: 'PAYMENT_REQUIRED',
+  });
+  await f.s.initiatePayment('booking', 'card', 'client');
+  expect(f.payments[0]).toMatchObject({ amount: 45 });
+  await f.s.confirmPayment('payment');
+  expect(f.booking).toMatchObject({ paymentStatus: 'PARTIALLY_PAID', remainingAmount: 55 });
+ });
  it('remaining payment confirmation stays available after service completion',async()=>{const f=fixture();f.booking.status='completed';f.booking.paymentStatus='PARTIALLY_PAID';f.payments.push({_id:'remaining',type:'REMAINING',status:'PENDING',vendorOrderId:'booking',amount:6000,createdAt:new Date(),save:jest.fn()});jest.setSystemTime(new Date('2026-10-25T09:00:00Z'));f.s.payoutService={createPayoutIfEligible:async()=>{}};await f.s.confirmPayment('remaining');expect(f.booking.paymentStatus).toBe('PAID');expect(f.booking.confirmationTime).toBeUndefined()});
 
 });
