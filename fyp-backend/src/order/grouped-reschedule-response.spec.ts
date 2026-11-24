@@ -55,3 +55,24 @@ describe('grouped vendor reschedule response', () => {
         expect(service.applyRescheduleIfAllAccepted).not.toHaveBeenCalled();
     });
 });
+
+describe('recover an accepted schedule that is still pending', () => {
+    it.each([true, false])('retries finalization only when all packages approved (%s)', async allAccepted => {
+        const { service, rows, orderId, requestGroupId } = fixture();
+        const organizerId = new Types.ObjectId();
+        rows[0].status = 'ACCEPTED';
+        rows[1].status = allAccepted ? 'ACCEPTED' : 'CHANGE_REQUESTED';
+        service.orderModel.findById = () => ({ lean: async () => ({ _id: orderId, organizerId }) });
+        service.rescheduleRequestModel.findOne = () => ({ sort: () => ({ lean: async () => rows[0] }) });
+        service.rescheduleRequestModel.find = () => ({ lean: async () => rows });
+        service.applyRescheduleIfAllAccepted.mockResolvedValue({ applied: true });
+        const operation = service.resolvePartialReschedule(String(orderId), String(organizerId), 'FINALIZE_ACCEPTED');
+        if (allAccepted) {
+            await expect(operation).resolves.toEqual({ resolutionStatus: 'APPLIED' });
+            expect(service.applyRescheduleIfAllAccepted).toHaveBeenCalledWith(String(orderId), undefined, requestGroupId);
+        } else {
+            await expect(operation).rejects.toThrow('Every affected package must accept');
+            expect(service.applyRescheduleIfAllAccepted).not.toHaveBeenCalled();
+        }
+    });
+});

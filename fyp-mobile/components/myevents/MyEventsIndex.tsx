@@ -416,6 +416,20 @@ const MyEventsScreen = () => {
     );
   }, [fetchData]);
 
+  const [finalizingSchedule, setFinalizingSchedule] = useState(false);
+  const finalizeAcceptedSchedule = async (orderId: string) => {
+    if (finalizingSchedule) return;
+    setFinalizingSchedule(true);
+    try {
+      await resolvePartialReschedule(orderId, 'FINALIZE_ACCEPTED');
+      await fetchData();
+    } catch (error: any) {
+      Alert.alert('Could not finalize schedule', error?.message || 'Please refresh and try again.');
+    } finally {
+      setFinalizingSchedule(false);
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
@@ -961,6 +975,18 @@ const MyEventsScreen = () => {
                               <Text style={styles.rescheduleHelp}>
                                 {resolutionStatus === 'KEEP_ORIGINAL' ? 'You chose to keep the original schedule. Existing bookings and payments remain unchanged.' : resolutionStatus === 'REPLACEMENT_REQUIRED' ? (statusCounts.cancelledByVendor > 0 ? 'A vendor cancelled before responding to your schedule change. Your other confirmed bookings are safe. Choose a replacement to continue with the new schedule.' : 'New date selected. The event has not moved yet; unavailable vendors must be replaced before finalization.') : 'A vendor isn’t available for the new schedule. No worries — your current booking is still safe while you decide how you’d like to continue.'}
                               </Text>
+                            </View>
+                          )}
+
+                          {resolutionStatus === 'PENDING' && statusCounts.accepted === eventRequests.length && (
+                            <View style={styles.rescheduleActions}>
+                              <Text style={styles.rescheduleActionText}>All packages approved the new schedule. Finalize it to update the event date and resume booking actions.</Text>
+                              <TouchableOpacity style={styles.reschedulePrimaryAction} disabled={finalizingSchedule} onPress={() => void finalizeAcceptedSchedule(String(event._id))}>
+                                <Text style={styles.reschedulePrimaryActionText}>{finalizingSchedule ? 'Finalizing…' : 'Finalize New Schedule'}</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.rescheduleSecondaryAction} disabled={finalizingSchedule} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
+                                <Text style={styles.rescheduleSecondaryActionText}>Keep Original Schedule</Text>
+                              </TouchableOpacity>
                             </View>
                           )}
 

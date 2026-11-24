@@ -347,7 +347,7 @@ async updateVendorOrderStatus(
     async resolvePartialReschedule(@Request() req: any, @Param('id') orderId: string, @Body() body: ResolveRescheduleRequestDto) {
         const role = req.user?.role?.toString().trim().toLowerCase();
         if (role !== 'client' && role !== 'organizer') throw new ForbiddenException('Only the booking client can resolve rescheduling');
-        if (!['KEEP_ORIGINAL', 'CONTINUE_WITH_NEW_DATE'].includes(body?.action)) throw new BadRequestException('Unsupported rescheduling resolution');
+        if (!['KEEP_ORIGINAL', 'CONTINUE_WITH_NEW_DATE', 'FINALIZE_ACCEPTED'].includes(body?.action)) throw new BadRequestException('Unsupported rescheduling resolution');
         return this.orderService.resolvePartialReschedule(orderId, req.user?.id?.toString(), body.action);
     }
 

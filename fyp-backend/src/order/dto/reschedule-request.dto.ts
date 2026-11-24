@@ -13,5 +13,5 @@ export interface RespondRescheduleRequestDto {
 }
 
 export interface ResolveRescheduleRequestDto {
-  action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE';
+  action: 'KEEP_ORIGINAL' | 'CONTINUE_WITH_NEW_DATE' | 'FINALIZE_ACCEPTED';
 }
