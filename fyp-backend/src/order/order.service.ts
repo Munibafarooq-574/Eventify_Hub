@@ -3396,18 +3396,17 @@ async completeVendorOrder(vendorOrderId: string) {
 
     private async applyRescheduleIfAllAccepted(orderId: string, activeSession?: ClientSession, requestGroupId?: Types.ObjectId) {
         const apply = async (session: ClientSession) => {
-            const latest: any = await this.rescheduleRequestModel
-                .findOne({ orderId: new Types.ObjectId(orderId), ...(requestGroupId ? { requestGroupId } : {}) })
-                .sort({ createdAt: -1 }).session(session)
+            const orderKey = new Types.ObjectId(orderId);
+            const groupId = requestGroupId ?? (await this.rescheduleRequestModel
+                .findOne({ orderId: orderKey }).sort({ createdAt: -1 }).session(session).lean())?.requestGroupId;
+            if (!groupId) return { applied: false };
+
+            const batch = await this.rescheduleRequestModel
+                .find({ orderId: orderKey, requestGroupId: groupId }).session(session)
                 .lean();
 
-            if (!latest) return { applied: false };
-
-            const batch: any[] = await this.rescheduleRequestModel
-                .find({ orderId, requestGroupId: latest.requestGroupId }).session(session)
-                .lean();
-
-            if (!batch.length || batch.some((r: any) => r.status !== 'ACCEPTED' || !['PENDING', 'REPLACEMENT_REQUIRED'].includes(r.resolutionStatus || 'PENDING'))) {
+            if (batch.length && batch.every(row => row.resolutionStatus === 'APPLIED')) return { applied: true };
+            if (!batch.length || batch.some(row => row.status !== 'ACCEPTED' || !['PENDING', 'REPLACEMENT_REQUIRED'].includes(row.resolutionStatus || 'PENDING'))) {
                 return { applied: false };
             }
 
@@ -3458,7 +3457,7 @@ async completeVendorOrder(vendorOrderId: string) {
             await order.save({ session });
 
             await this.rescheduleRequestModel.updateMany(
-                { requestGroupId: first.requestGroupId },
+                { orderId: orderKey, requestGroupId: groupId },
                 { $set: { resolutionStatus: 'APPLIED', resolvedAt: new Date() } },
                 { session },
             );
@@ -3503,12 +3502,12 @@ async completeVendorOrder(vendorOrderId: string) {
                 const applied = !unresolved && await this.rescheduleRequestModel.exists({
                     orderId: order._id, requestGroupId: latest.requestGroupId, resolutionStatus: 'APPLIED',
                 });
-                if (!applied) throw new ConflictException('The approved request could not be applied. Refresh or keep the original schedule.');
+                if (!applied) throw new ConflictException('The approved request could not be applied. Refresh to check its latest status.');
             }
             return { resolutionStatus: 'APPLIED' };
         }
         if (batch.some((r: any) => r.status === 'CHANGE_REQUESTED')) throw new ConflictException('Wait for all vendors to respond or for pending requests to expire');
-        if (!(allAccepted && action === 'KEEP_ORIGINAL') && !batch.some((r: any) => ['REJECTED', 'EXPIRED'].includes(r.status))) throw new ConflictException('Client resolution is only required when a vendor rejects or a request expires');
+        if (!batch.some((r: any) => ['REJECTED', 'EXPIRED'].includes(r.status))) throw new ConflictException('Client resolution is only required when a vendor rejects or a request expires');
         const resolutionStatus = action === 'KEEP_ORIGINAL' ? 'KEEP_ORIGINAL' : 'REPLACEMENT_REQUIRED';
         const resolvedAt = new Date();
         const session = await this.connection.startSession();

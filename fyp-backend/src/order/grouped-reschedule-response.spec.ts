@@ -91,3 +91,15 @@ it('treats a repeat finalization of an already applied schedule as successful', 
         .resolves.toEqual({ resolutionStatus: 'APPLIED' });
     expect(service.applyRescheduleIfAllAccepted).not.toHaveBeenCalled();
 });
+
+it('loads the approved group directly with the event ObjectId in the finalization transaction', async () => {
+    const { service, rows, orderId, requestGroupId, session } = fixture();
+    const apply = (OrderService.prototype as any).applyRescheduleIfAllAccepted.bind(service);
+    const approved = rows.map(row => ({ ...row, status: 'ACCEPTED', resolutionStatus: 'APPLIED' }));
+    const read = jest.fn(() => ({ session: () => ({ lean: async () => approved }) }));
+    service.rescheduleRequestModel.find = read;
+
+    await expect(apply(String(orderId), undefined, requestGroupId)).resolves.toEqual({ applied: true });
+    expect(read).toHaveBeenCalledWith({ orderId, requestGroupId });
+    expect(session.withTransaction).toHaveBeenCalledTimes(1);
+});

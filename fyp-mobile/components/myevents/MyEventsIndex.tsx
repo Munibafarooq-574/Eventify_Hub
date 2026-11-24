@@ -844,10 +844,11 @@ const MyEventsScreen = () => {
                     )}
 
                     {eventExpanded && rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id)) && (() => {
-                      const eventRequests = rescheduleRequests.filter(
+                      const orderRequests = rescheduleRequests.filter(
                         (request: any) => String(request.orderId) === String(event._id),
                       );
-                      const firstRequest = eventRequests[0];
+                      const firstRequest = orderRequests[0];
+                      const eventRequests = orderRequests.filter(request => String(request.requestGroupId) === String(firstRequest.requestGroupId));
                       const requestedDuration =
                         firstRequest?.requestedDurationMinutes ??
                         event.eventDurationMinutes;
@@ -990,13 +991,8 @@ const MyEventsScreen = () => {
                             </View>
                           )}
 
-                          {resolutionStatus === 'PENDING' && statusCounts.accepted === eventRequests.length && scheduleFinalizationErrors[String(event._id)] && (
-                            <View style={styles.rescheduleActions}>
-                              <Text style={styles.rescheduleActionText}>{scheduleFinalizationErrors[String(event._id)]}</Text>
-                              <TouchableOpacity style={styles.rescheduleSecondaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
-                                <Text style={styles.rescheduleSecondaryActionText}>Keep Original Schedule</Text>
-                              </TouchableOpacity>
-                            </View>
+                          {['PENDING', 'REPLACEMENT_REQUIRED'].includes(resolutionStatus) && statusCounts.accepted === eventRequests.length && scheduleFinalizationErrors[String(event._id)] && (
+                            <Text style={styles.rescheduleActionText}>{scheduleFinalizationErrors[String(event._id)]}</Text>
                           )}
 
                           {needsClientAction && (
