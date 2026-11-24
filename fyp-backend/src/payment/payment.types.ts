@@ -35,8 +35,19 @@ pendingPayment: {
     method: string;
 } | null;
 
+combinedDownPaymentReceipt?: {
+    groupId: string;
+    amount: number;
+    packages: { name: string; amount: number }[];
+    method?: string | null;
+    transactionRef?: string | null;
+    paidAt?: Date | null;
+    verificationUrl: string;
+};
+
 latestSuccessfulPayment: {
     paymentId: string;
+    checkoutGroupId?: string;
     type: string;
     amount: number;
     method: string;

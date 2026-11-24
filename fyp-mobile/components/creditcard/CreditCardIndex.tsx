@@ -1,3 +1,4 @@
+import getVendorDownPaymentQuote from '@/services/getVendorDownPaymentQuote';
 import { formatMoney, currencyOf } from '@/utils/currency';
 import type { ComponentRef } from 'react';
 import getPaymentStatus from '@/services/getPaymentStatus';
@@ -153,8 +154,9 @@ const Field = React.forwardRef<ComponentRef<typeof TextInput>, FieldProps>(
 Field.displayName = 'Field';
 
 const CreditCardPaymentScreen = () => {
-  const { vendorOrderId, paymentType, subscriptionVendorId, subscriptionPlan, subscriptionActivationType } = useLocalSearchParams<{
+  const { vendorOrderId, paymentType, quoteKey, subscriptionVendorId, subscriptionPlan, subscriptionActivationType } = useLocalSearchParams<{
     vendorOrderId?: string;
+    quoteKey?: string;
     amount?: string;
     paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
     subscriptionVendorId?: string;
@@ -222,13 +224,19 @@ const CreditCardPaymentScreen = () => {
     }
     return plan.monthlyPrice;
   }, [subscriptionVendorId, subscriptionPlan]);
+  const loadBookingPayment = useCallback(async () => {
+    if (!quoteKey) return getPaymentStatus(vendorOrderId!);
+    const quote = await getVendorDownPaymentQuote(vendorOrderId!);
+    if (quote.quoteKey !== quoteKey) throw new Error('Packages or payment amounts changed. Go back and review the checkout again.');
+    return quote;
+  }, [quoteKey, vendorOrderId]);
   const loadScreen = useCallback(async () => {
     const request = ++generation.current;
     setLoading(true); setScreenError(''); setOwnerId(null); setSavedCards([]); setAmountPayable(null);
     try {
       if (!isSubscription && (typeof vendorOrderId !== 'string' || !/^[a-f\d]{24}$/i.test(vendorOrderId))) throw new Error('Open card payment from your booking.');
       const id = await getCardOwnerId();
-      const financials = isSubscription ? null : await getPaymentStatus(vendorOrderId!);
+      const financials = isSubscription ? null : await loadBookingPayment();
       const payable = isSubscription
         ? await loadSubscriptionPayment(id)
         : cardPaymentAmount(financials!, paymentKind, id);
@@ -239,7 +247,7 @@ const CreditCardPaymentScreen = () => {
     } catch (error) {
       if (request === generation.current) setScreenError(error instanceof Error ? error.message : 'Could not load payment details.');
     } finally { if (request === generation.current) setLoading(false); }
-  }, [vendorOrderId, paymentKind, isSubscription, loadSubscriptionPayment]);
+  }, [vendorOrderId, paymentKind, isSubscription, loadSubscriptionPayment, loadBookingPayment]);
   useFocusEffect(useCallback(() => {
     clearForm(); void loadScreen();
     const subscription = AppState.addEventListener('change', state => {
@@ -255,7 +263,7 @@ const CreditCardPaymentScreen = () => {
     try {
       await assertCardOwner(ownerId);
       if (isSubscription) await loadSubscriptionPayment(ownerId);
-      else cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
+      else cardPaymentAmount(await loadBookingPayment(), paymentKind, ownerId);
       if (request !== generation.current) return;
       if (!isExpiryValid(card.expiry)) { Alert.alert('Expired test card', 'Remove this shortcut and enter a new expiry.'); return; }
       const demo = DEMO_CARD_OPTIONS.find(item => item.id === card.demoCardId)!;
@@ -269,7 +277,7 @@ const CreditCardPaymentScreen = () => {
     const request = generation.current;
     try {
       if (isSubscription) await loadSubscriptionPayment(ownerId);
-      else cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
+      else cardPaymentAmount(await loadBookingPayment(), paymentKind, ownerId);
       const cards = await removeDemoCard(ownerId, card.demoCardId);
       if (request === generation.current) setSavedCards(cards);
     } catch { Alert.alert('Unable to remove card', 'Please reload and try again.'); }
@@ -314,7 +322,7 @@ const CreditCardPaymentScreen = () => {
       await assertCardOwner(ownerId);
       const payable = isSubscription
         ? await loadSubscriptionPayment(ownerId)
-        : cardPaymentAmount(await getPaymentStatus(vendorOrderId!), paymentKind, ownerId);
+        : cardPaymentAmount(await loadBookingPayment(), paymentKind, ownerId);
       await assertCardOwner(ownerId);
       if (request !== generation.current) return;
       if (payable !== amountPayable) {
@@ -330,6 +338,7 @@ const CreditCardPaymentScreen = () => {
           sendReceipt,
         });
       } else if (paymentKind === 'REMAINING') await payRemainingAmount(vendorOrderId!, 'card', sendReceipt);
+      else if (quoteKey) await createPayment(vendorOrderId!, 'card', sendReceipt, quoteKey);
       else await createPayment(vendorOrderId!, 'card', sendReceipt);
       initiated = true;
       let saveNotice = '';

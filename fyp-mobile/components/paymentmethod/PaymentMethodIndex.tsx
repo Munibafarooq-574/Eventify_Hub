@@ -1,3 +1,4 @@
+import getVendorDownPaymentQuote, { type VendorDownPaymentQuote } from '@/services/getVendorDownPaymentQuote';
 import { formatMoney, currencyOf } from '@/utils/currency';
 import { formatBookingDateTime, validTimeZone } from '@/utils/bookingTimezone';
 // fyp-mobile/components/paymentmethod/PaymentMethodIndex.tsx
@@ -90,6 +91,8 @@ type BookingFinancials = {
   remainingPaymentDeadline?: string | null;
 
   serviceName?: string;
+  quoteKey?: string;
+  packages?: VendorDownPaymentQuote['packages'];
 };
 
 // ───────────────────────── UI helpers ─────────────────────────
@@ -200,7 +203,7 @@ const MethodCard = ({
 const PaymentMethodScreen = () => {
   // vendorOrderId is passed in as a route param when navigating here, e.g.
   // router.push({ pathname: '/paymentmethod', params: { vendorOrderId } })
-  const { vendorOrderId } = useLocalSearchParams<{ vendorOrderId?: string }>();
+  const { vendorOrderId, combined } = useLocalSearchParams<{ vendorOrderId?: string; combined?: string }>();
 
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -230,15 +233,15 @@ const PaymentMethodScreen = () => {
     setLoading(true);
 
     try {
-      const data = await getBookingFinancials(vendorOrderId);
+      const data = combined === 'true' ? await getVendorDownPaymentQuote(vendorOrderId) : await getBookingFinancials(vendorOrderId);
       setFinancials(data);
     } catch (err) {
       console.error('Error fetching booking financials:', err);
-      setError('Could not load payment details. Please try again.');
+      setError(err instanceof Error ? err.message : 'Could not load payment details. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [vendorOrderId]);
+  }, [vendorOrderId, combined]);
 
   useEffect(() => {
     loadFinancials();
@@ -305,6 +308,7 @@ const PaymentMethodScreen = () => {
       params: {
         vendorOrderId,
         amount: String(amountDue),
+        ...(financials.quoteKey ? { quoteKey: financials.quoteKey } : {}),
 
         paymentType: isRemainingPayment ? 'REMAINING' : 'DOWN_PAYMENT',
       },
@@ -360,6 +364,12 @@ const PaymentMethodScreen = () => {
           )}
         </View>
       </View>
+
+      {financials.packages?.map(pkg => (
+        <Text key={pkg.vendorOrderId} style={styles.breakdownLabel}>
+          {pkg.name} · {formatCurrency(pkg.amount)} down payment
+        </Text>
+      ))}
 
       {/* Progress */}
       <View style={styles.progressTrack}>

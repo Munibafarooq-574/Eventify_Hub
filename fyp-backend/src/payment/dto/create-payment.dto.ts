@@ -1,5 +1,5 @@
 // fyp-backend/src/payment/dto/create-payment.dto.ts
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreatePaymentDto {
     @IsIn(['card', 'jazzcash', 'easypaisa'])
@@ -9,4 +9,9 @@ export class CreatePaymentDto {
     @IsOptional()
     @IsBoolean()
     sendReceipt?: boolean;
+
+    @IsOptional()
+    @IsString()
+    @Matches(/^[a-f0-9]{64}$/)
+    quoteKey?: string;
 }

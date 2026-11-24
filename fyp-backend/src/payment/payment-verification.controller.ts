@@ -157,10 +157,9 @@ export class PaymentVerificationController {
                 'Vendor Name',
                 data.vendorName,
             ],
-            [
-                'Package Name',
-                data.packageName,
-            ],
+            ...(data.combinedReceipt
+                ? data.combinedReceipt.packages.map(pkg => [pkg.name, `${currencySymbol(data.currency)} ${money(pkg.amount)}`])
+                : [['Package Name', data.packageName]]),
             [
                 'Amount Paid',
                 `${currencySymbol(data.currency)} ${money(
@@ -171,6 +170,7 @@ export class PaymentVerificationController {
                 'Payment Date & Time',
                 paidAtLabel,
             ],
+            ...(!data.combinedReceipt ? [
             [
                 'Paid So Far',
                 `${currencySymbol(data.currency)} ${money(
@@ -187,6 +187,7 @@ export class PaymentVerificationController {
                 'Payment Status',
                 data.bookingPaymentStatus,
             ],
+            ] : []),
             [
                 'Transaction Status',
                 data.transactionStatus,

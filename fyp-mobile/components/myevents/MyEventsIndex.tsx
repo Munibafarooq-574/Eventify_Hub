@@ -1,5 +1,5 @@
 import VendorScheduleProposal from '../booking/VendorScheduleProposal';
-import { currencySymbol, currencyOf } from '@/utils/currency';
+import { currencySymbol, currencyOf, formatMoney } from '@/utils/currency';
 import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
@@ -1084,6 +1084,21 @@ const MyEventsScreen = () => {
                     {/* ───── Vendors ───── */}
                     {Array.from(vendorGroups, ([key, packages]) => {
                       const [vendor] = packages;
+                      const groupedDownPayment = packages.length > 1;
+                      const eligible = groupedDownPayment && !rescheduleRequests.some(request =>
+                        String(request.orderId) === String(event._id) &&
+                        ['PENDING', 'REPLACEMENT_REQUIRED'].includes(request.resolutionStatus || 'PENDING'))
+                        ? packages.flatMap(booking => {
+                          const payment = paymentBreakdowns[booking._id];
+                          const deadline = new Date(payment?.paymentDeadline ?? booking.paymentDeadline).getTime();
+                          const amount = Number(booking.downPaymentAmount);
+                          return String(booking.status).toLowerCase() === 'accepted' &&
+                            ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(booking.paymentStatus).toUpperCase()) &&
+                            !payment?.pendingPayment && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
+                            currencyOf(booking) === currencyOf(vendor)
+                            ? [{ booking, deadline, cents: Math.round(amount * 100) }] : [];
+                        }) : [];
+                      const groupedAmount = eligible.reduce((sum, row) => sum + row.cents, 0) / 100;
                       const groupKey = `vendor-${event._id}-${key}`;
                       const vendorExpanded = !!expandedVendors[groupKey];
                       const proposalBooking = allVendorOrders.find((booking: any) => {
@@ -1219,6 +1234,33 @@ const MyEventsScreen = () => {
                               canRespond
                             />
                           )}
+                          {eligible.length > 0 && (
+                            <View style={styles.paymentBox}>
+                              <Text style={styles.paymentTitle}>Vendor down payment</Text>
+                              <Text style={styles.packageText}>{eligible.length} {eligible.length === 1 ? 'package' : 'packages'} ready to pay</Text>
+                              <Text style={styles.paymentDeadlineText}>
+                                Due by {new Date(Math.min(...eligible.map(row => row.deadline))).toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
+                              </Text>
+                              <TouchableOpacity style={styles.payNowButton} onPress={() => router.push({
+                                pathname: '/paymentmethod',
+                                params: { vendorOrderId: String(eligible[0].booking._id), combined: 'true' },
+                              })}>
+                                <Text style={styles.payNowButtonText}>Pay {formatMoney(groupedAmount, currencyOf(vendor))} Down Payment</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                          {Array.from(new Map<string, any>(packages.flatMap(booking => {
+                            const receipt = paymentBreakdowns[booking._id]?.combinedDownPaymentReceipt;
+                            return receipt ? [[receipt.groupId, { receipt, booking }]] : [];
+                          })).values()).map(({ receipt, booking }) => (
+                            <TouchableOpacity key={receipt.groupId} style={styles.receiptButton} onPress={() => router.push({
+                              pathname: '/paymentconfirmation',
+                              params: { vendorOrderId: String(booking._id), combinedReceipt: 'true' },
+                            })}>
+                              <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
+                              <Text style={styles.receiptButtonText}>View Down Payment Receipt · {formatMoney(receipt.amount, currencyOf(booking))}</Text>
+                            </TouchableOpacity>
+                          ))}
                           {packages.map((vendor, index) => {
                             const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
                             const vendorData = vendor?.vendorId || {};
@@ -1496,7 +1538,7 @@ const MyEventsScreen = () => {
                                       </View>
                                     )}
 
-                                    {paymentStatus === 'PAYMENT_REQUIRED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
+                                    {!groupedDownPayment && paymentStatus === 'PAYMENT_REQUIRED' && !paymentOverdue && !hasPendingPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id) && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(String(request.resolutionStatus || 'PENDING'))) && (
                                       <TouchableOpacity
                                         style={styles.payNowButton}
                                         activeOpacity={0.85}
@@ -1516,14 +1558,14 @@ const MyEventsScreen = () => {
                                           </Text>
                                         </View>
 
-                                        <TouchableOpacity
+                                        {!groupedDownPayment && <TouchableOpacity
                                           style={styles.payNowButton}
                                           activeOpacity={0.85}
                                           onPress={() => goToPayment(vendor._id)}
                                         >
                                           <Ionicons name="refresh" size={15} color="#fff" />
                                           <Text style={styles.payNowButtonText}>Retry Down Payment</Text>
-                                        </TouchableOpacity>
+                                        </TouchableOpacity>}
                                       </>
                                     )}
 
@@ -1557,7 +1599,7 @@ const MyEventsScreen = () => {
                                       </View>
                                     )}
 
-                                    {hasSuccessfulPayment && (
+                                    {hasSuccessfulPayment && !successfulPayment?.checkoutGroupId && (
                                       <TouchableOpacity
                                         style={styles.receiptButton}
                                         activeOpacity={0.8}

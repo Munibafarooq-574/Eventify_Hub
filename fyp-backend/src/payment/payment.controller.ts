@@ -31,6 +31,16 @@ getStatus(
     );
 }
 
+    @Get('vendor-order/:id/down-payment-quote')
+    getVendorDownPaymentQuote(@Param('id') id: string, @Request() req: any) {
+        return this.paymentService.getVendorDownPaymentQuote(id, req.user.id);
+    }
+
+    @Post('vendor-order/:id/combined-down-payment')
+    initiateVendorDownPayment(@Param('id') id: string, @Body() dto: CreatePaymentDto, @Request() req: any) {
+        return this.paymentService.initiateVendorDownPayment(id, dto.method, req.user.id, dto.quoteKey!, dto.sendReceipt);
+    }
+
   @Post('vendor-order/:id/initiate')
 initiate(
     @Param('id') vendorOrderId: string,

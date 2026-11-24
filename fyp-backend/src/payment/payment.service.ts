@@ -4,7 +4,7 @@ import type { City } from '../schemas/city.schema';
 import { ChatGateway } from '../chat/chat.gateway';
 import { displayDeliveryWeight } from '../common/utils/delivery-booking';
 import { effectiveDownPaymentDeadline, withBookingPaymentLock, applyLegacyPaymentWindow, paymentVerificationOverdue, servicePaymentCutoff } from '../common/utils/booking-payment-window';
-import { ClientSession } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 import {
     BadRequestException,
     ConflictException,
@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+    createHash,
     createHmac,
     timingSafeEqual,
 } from 'crypto';
@@ -119,6 +120,27 @@ private buildPaymentVerificationUrl(
     return `${baseUrl}/payment/verify/${encodeURIComponent(
         token,
     )}`;
+}
+
+private async getCombinedReceipt(payment: Pick<Payment, 'checkoutGroupId' | 'organizerId' | 'orderId' | 'vendorId' | 'currency'>) {
+    if (!payment.checkoutGroupId) return undefined;
+    const rows = await this.paymentModel.find({
+        checkoutGroupId: payment.checkoutGroupId, organizerId: payment.organizerId,
+        orderId: payment.orderId, vendorId: payment.vendorId, status: 'SUCCESS',
+    }).sort({ _id: 1 }).lean();
+    if (!rows.length) return undefined;
+    const bookings = await this.vendorOrderModel.find({ _id: { $in: rows.map(row => row.vendorOrderId) } }).lean();
+    const first = rows[0];
+    return {
+        groupId: String(payment.checkoutGroupId),
+        amount: roundMoney(rows.reduce((sum, row) => sum + row.amount, 0)),
+        packages: rows.map(row => ({
+            name: bookings.find(item => String(item._id) === String(row.vendorOrderId))?.serviceName || 'Package',
+            amount: row.amount,
+        })),
+        method: first.method, transactionRef: first.transactionRef, paidAt: first.paidAt,
+        verificationUrl: this.buildPaymentVerificationUrl(String(first._id), String(first.vendorOrderId)),
+    };
 }
 
 async verifyPaymentReceipt(
@@ -301,17 +323,20 @@ if (
     const order = await this.orderModel.findById(vendorOrder.orderId)
         .select('eventCityId').populate({ path: 'eventCityId', select: 'timeZone' }).lean();
 
+    const combinedReceipt = await this.getCombinedReceipt(payment);
+
     return {
         verified: true,
+        ...(combinedReceipt ? { combinedReceipt } : {}),
         currency: currencyOf(vendorOrder),
-        delivery: vendorOrder.delivery,
-        deliveryStartDateTime: vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
+        delivery: combinedReceipt ? undefined : vendorOrder.delivery,
+        deliveryStartDateTime: !combinedReceipt && vendorOrder.delivery ? vendorOrder.eventStartDateTime : undefined,
         packageName: bookedPackage?.packageName || vendorOrder.serviceName || 'N/A',
         eventTimeZone: (order?.eventCityId as any)?.timeZone || 'UTC',
 
         bookingReference:
             `EH-${String(
-                vendorOrder._id,
+                combinedReceipt?.groupId ?? vendorOrder._id,
             )
                 .slice(-8)
                 .toUpperCase()}`,
@@ -332,10 +357,7 @@ if (
             payment.type,
 
         amountPaid:
-            Number(
-                payment.amount ||
-                    0,
-            ),
+            combinedReceipt?.amount ?? Number(payment.amount || 0),
 
         paymentMethod:
             payment.method ||
@@ -480,8 +502,12 @@ if (!vendorOrder.bookingChatTimeZone && order.eventCityId && !(order.eventCityId
     eventTimeZone = city?.timeZone || 'UTC';
 }
 
+const groupedPayment = successfulPayments.find(payment => payment.checkoutGroupId);
+const combinedDownPaymentReceipt = groupedPayment ? await this.getCombinedReceipt(groupedPayment) : undefined;
+
 return {
     vendorOrderId,
+    ...(combinedDownPaymentReceipt ? { combinedDownPaymentReceipt } : {}),
     organizerId,
     eventTimeZone,
     currency: currencyOf(vendorOrder),
@@ -544,6 +570,7 @@ pendingPayment: pendingPayment
     latestSuccessfulPayment:
     latestSuccessfulPayment
         ? {
+              ...(latestSuccessfulPayment.checkoutGroupId ? { checkoutGroupId: String(latestSuccessfulPayment.checkoutGroupId) } : {}),
               paymentId:
                   latestSuccessfulPayment._id.toString(),
 
@@ -578,6 +605,92 @@ pendingPayment: pendingPayment
     }
 
     // ===== Organizer initiates the down payment =====
+    private async withCheckoutLocks<T>(ids: Types.ObjectId[], work: (session: ClientSession) => Promise<T>) {
+        if (!ids.length) throw new ConflictException('No packages found for this payment.');
+        const sorted = [...new Set(ids.map(String))].sort();
+        return withBookingPaymentLock(this.vendorOrderModel.db, this.vendorOrderModel, sorted[0], async session => {
+            for (const id of sorted.slice(1)) {
+                await this.vendorOrderModel.updateOne({ _id: id }, { $inc: { __v: 1 } }, { session });
+            }
+            return work(session);
+        });
+    }
+
+    private async vendorDownPaymentQuote(anchor: VendorOrder, order: Order, session?: ClientSession) {
+        const reschedule = await this.rescheduleRequestModel.exists({
+            orderId: order._id, resolutionStatus: { $in: ['PENDING', 'REPLACEMENT_REQUIRED'] },
+        }).session(session ?? null);
+        if (reschedule) throw new ConflictException('Payment is temporarily unavailable while the date/time change is being resolved.');
+        const bookings = await this.vendorOrderModel.find({
+            orderId: order._id, vendorId: anchor.vendorId, status: 'accepted',
+            paymentStatus: { $in: ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'] },
+            replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
+        }).sort({ _id: 1 }).session(session ?? null);
+        const blocked = await this.paymentModel.distinct('vendorOrderId', {
+            vendorOrderId: { $in: bookings.map(booking => booking._id) },
+            type: 'DOWN_PAYMENT', status: { $in: ['PENDING', 'SUCCESS'] },
+        }).session(session ?? null);
+        const blockedIds = new Set(blocked.map(String));
+        const currency = currencyOf(anchor);
+        const packages: { vendorOrderId: string; name: string; total: number; amount: number; deadline: string }[] = [];
+        for (const booking of bookings) {
+            if (blockedIds.has(String(booking._id)) || currencyOf(booking) !== currency) continue;
+            await this.normalizeLegacyPaymentWindow(booking);
+            const deadline = effectiveDownPaymentDeadline(booking);
+            if (!deadline || deadline.getTime() <= Date.now()) continue;
+            const amount = Number(booking.downPaymentAmount ?? NaN);
+            const total = Number(booking.finalAmount ?? booking.price);
+            if (!Number.isFinite(amount) || !Number.isFinite(total) || amount < 0 || amount > total || roundMoney(amount) !== amount) {
+                throw new ConflictException(`${booking.serviceName}: invalid down-payment amount.`);
+            }
+            if (amount > 0) packages.push({ vendorOrderId: String(booking._id), name: booking.serviceName, total, amount, deadline: deadline.toISOString() });
+        }
+        if (!packages.length) throw new ConflictException('No packages currently have a down payment available.');
+        const downPaymentAmount = packages.reduce((cents, pkg) => cents + Math.round(pkg.amount * 100), 0) / 100;
+        const totalAmount = roundMoney(packages.reduce((sum, pkg) => sum + pkg.total, 0));
+        const quoteKey = createHash('sha256').update(JSON.stringify([String(order._id), String(anchor.vendorId), currency, packages])).digest('hex');
+        return {
+            currency, packages, quoteKey, downPaymentAmount, totalAmount, organizerId: String(order.organizerId),
+            remainingAmount: roundMoney(totalAmount - downPaymentAmount), paidSoFar: 0,
+            outstandingAmount: totalAmount, fullyPaid: false, paymentStatus: 'PAYMENT_REQUIRED',
+            paymentDeadline: packages.map(pkg => pkg.deadline).sort()[0],
+            eventTimeZone: (order.eventCityId as any)?.timeZone || anchor.bookingChatTimeZone || 'UTC',
+            vendorOrderId: String(anchor._id),
+        };
+    }
+
+    async getVendorDownPaymentQuote(vendorOrderId: string, organizerId: string) {
+        const order = await this.assertOrganizerOwnsVendorOrder(vendorOrderId, organizerId);
+        const anchor = await this.vendorOrderModel.findById(vendorOrderId);
+        if (!anchor) throw new NotFoundException('Vendor booking not found.');
+        return this.vendorDownPaymentQuote(anchor, order);
+    }
+
+    async initiateVendorDownPayment(vendorOrderId: string, method: string, organizerId: string, quoteKey: string, sendReceipt = true) {
+        if (!['card', 'jazzcash', 'easypaisa'].includes(method) || typeof quoteKey !== 'string' || !/^[a-f0-9]{64}$/.test(quoteKey)) {
+            throw new BadRequestException('Review the vendor payment and choose a payment method.');
+        }
+        const order = await this.assertOrganizerOwnsVendorOrder(vendorOrderId, organizerId);
+        const anchor = await this.vendorOrderModel.findById(vendorOrderId);
+        if (!anchor) throw new NotFoundException('Vendor booking not found.');
+        const reviewed = await this.vendorDownPaymentQuote(anchor, order);
+        if (reviewed.quoteKey !== quoteKey) throw new ConflictException('Packages or payment amounts changed. Review the checkout again.');
+        if (reviewed.currency === 'USD' && method !== 'card') throw new BadRequestException('USD bookings require card payment.');
+        const ids = reviewed.packages.map(pkg => new Types.ObjectId(pkg.vendorOrderId));
+        return this.withCheckoutLocks(ids, async session => {
+            const current = await this.vendorDownPaymentQuote(anchor, order, session);
+            if (current.quoteKey !== quoteKey) throw new ConflictException('Packages or payment amounts changed. Review the checkout again.');
+            const checkoutGroupId = new Types.ObjectId();
+            const records = await this.paymentModel.create(current.packages.map(pkg => ({
+                currency: current.currency, vendorOrderId: pkg.vendorOrderId, orderId: order._id,
+                organizerId: order.organizerId, vendorId: anchor.vendorId, amount: pkg.amount,
+                type: 'DOWN_PAYMENT', status: 'PENDING', sendReceipt, method, checkoutGroupId,
+            })), { session, ordered: true });
+            if (Date.parse(current.paymentDeadline) <= Date.now()) throw new ConflictException('The down-payment deadline has passed.');
+            return { id: records[0]._id, checkoutGroupId, amount: current.downPaymentAmount, status: 'PENDING' };
+        });
+    }
+
     async initiatePayment(vendorOrderId: string, method: string, organizerId: string, sendReceipt = true) {
         return withBookingPaymentLock(this.vendorOrderModel.db, this.vendorOrderModel, vendorOrderId,
             session => this.initiateDownPaymentLocked(vendorOrderId, method, organizerId, sendReceipt, session));
@@ -1141,16 +1254,7 @@ private buildPaymentReceiptEmail(
     `);
 }
 
-    // ===== Called by gateway webhook (or manually for now) on success =====
-    async confirmPayment(
-        paymentId: string,
-        transactionRef?: string,
-    ) {
-        
-        const initialPayment = await this.paymentModel.findById(paymentId);
-        if (!initialPayment) throw new NotFoundException('Payment not found');
-        const { payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount } = await withBookingPaymentLock(
-            this.vendorOrderModel.db, this.vendorOrderModel, initialPayment.vendorOrderId, async session => {
+    private async confirmPaymentLocked(paymentId: string, transactionRef: string | undefined, session: ClientSession) {
         const payment =
             await this.paymentModel.findById(paymentId).session(session);
 
@@ -1235,8 +1339,60 @@ if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline =
        await vendorOrder.save({session});
 
         return { payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount };
-        });
+    }
 
+    private async resolveVendorDownPayment(initial: Payment, reference: string | undefined, success: boolean) {
+        const group = await this.paymentModel.find({ checkoutGroupId: initial.checkoutGroupId }).sort({ _id: 1 }).lean();
+        const results = await this.withCheckoutLocks(group.map(row => row.vendorOrderId), async session => {
+            const confirmed: Awaited<ReturnType<PaymentService['confirmPaymentLocked']>>[] = [];
+            for (const row of group) {
+                if (success) confirmed.push(await this.confirmPaymentLocked(String(row._id), reference, session));
+                else await this.failPaymentLocked(String(row._id), reference, session);
+            }
+            return confirmed;
+        });
+        if (!success) return this.paymentModel.findById(initial._id);
+
+        const total = roundMoney(results.reduce((sum, row) => sum + row.payment.amount, 0));
+        const { payment } = results[0];
+        try {
+            const [order, client] = await Promise.all([
+                this.orderModel.findById(payment.orderId).lean(),
+                this.userModel.findById(payment.organizerId).select('email').lean(),
+            ]);
+            if (order) {
+                for (const row of results) {
+                    await this.chatGateway?.sendBookingNotice(order, row.vendorOrder, 'confirmed', true, {
+                        amount: row.payment.amount, remainingAmount: row.remainingAmount,
+                    }).catch(error => console.warn('Booking confirmation notice failed', error));
+                }
+            }
+            if (payment.sendReceipt !== false && client?.email) {
+                const money = (amount: number) => `${currencyOf(payment)} ${amount.toFixed(2)}`;
+                const lines = results.map(row => `<li>${this.escapeHtml(row.vendorOrder.serviceName)} — ${money(row.payment.amount)}</li>`).join('');
+                await this.emailService.sendTransactionalEmail({
+                    to: client.email, senderName: 'Eventify Hub',
+                    subject: `Down payment receipt — ${order?.eventName || 'Eventify Hub'}`,
+                    html: `<h1>Down payment received</h1><p>${this.escapeHtml(order?.eventName)}</p><p>Receipt ${String(payment.checkoutGroupId)}</p><ul>${lines}</ul><p><strong>Total paid: ${money(total)}</strong></p>`,
+                });
+            }
+        } catch (error) {
+            console.warn('Combined payment receipt or notification failed', error);
+        }
+        return { id: payment._id, checkoutGroupId: payment.checkoutGroupId, amount: total, status: 'SUCCESS' };
+    }
+
+    // ===== Called by gateway webhook (or manually for now) on success =====
+    async confirmPayment(
+        paymentId: string,
+        transactionRef?: string,
+    ) {
+        const initialPayment = await this.paymentModel.findById(paymentId);
+        if (!initialPayment) throw new NotFoundException('Payment not found');
+        if (initialPayment.checkoutGroupId) return this.resolveVendorDownPayment(initialPayment, transactionRef, true);
+        const { payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount } = await withBookingPaymentLock(
+            this.vendorOrderModel.db, this.vendorOrderModel, initialPayment.vendorOrderId,
+            session => this.confirmPaymentLocked(paymentId, transactionRef, session));
         if (payment.type === 'DOWN_PAYMENT' && vendorOrder.confirmationTime) {
             try {
                 const bookingOrder = await this.orderModel.findById(vendorOrder.orderId).lean();
@@ -1512,6 +1668,7 @@ return payment;
     async failPayment(paymentId: string, reason?: string) {
         const payment = await this.paymentModel.findById(paymentId);
         if (!payment) throw new NotFoundException('Payment not found');
+        if (payment.checkoutGroupId) return this.resolveVendorDownPayment(payment, reason, false);
         return withBookingPaymentLock(this.vendorOrderModel.db, this.vendorOrderModel, payment.vendorOrderId,
             session => this.failPaymentLocked(paymentId, reason, session));
     }

@@ -55,7 +55,7 @@ test('signed-out users and unsupported synthetic IDs cannot save cards',async()=
  s.setToken(null);await assert.rejects(s.api.getCardOwnerId(),/sign in/);assert.equal(s.values.size,0);
 });
 
-function checkout({kind='DOWN_PAYMENT',changedAmount=false,pending=false,saveFails=false}={}) {
+function checkout({kind='DOWN_PAYMENT',changedAmount=false,pending=false,saveFails=false,combined=false,changedQuote=false}={}) {
  const state=[],refs=[],calls=[],alerts=[],remembered=[],events={};let stateIndex=0,refIndex=0,focus,tree,reads=0;
  class Value{interpolate(){return 0;}}
  const react={createElement:(type,props,...children)=>({type,props:{...props,children}}),forwardRef:render=>Object.assign(props=>render(props,null),{}),useState:initial=>{const i=stateIndex++;if(!(i in state))state[i]=typeof initial==='function'?initial():initial;return[state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value}];},useRef:initial=>{const i=refIndex++;if(!refs[i])refs[i]={current:initial};return refs[i]},useEffect(){},useCallback:fn=>fn};
@@ -63,9 +63,14 @@ function checkout({kind='DOWN_PAYMENT',changedAmount=false,pending=false,saveFai
  native.StyleSheet={create:s=>s,absoluteFill:{}};native.Alert={alert:(...args)=>alerts.push(args)};native.Platform={OS:'android'};native.Animated={Value,View:'AnimatedView',timing:()=>({start(){}})};native.Easing={cubic:x=>x,out:x=>x,inOut:x=>x};native.useWindowDimensions=()=>({width:390});native.AppState={addEventListener:(name,cb)=>{events[name]=cb;return{remove(){}}}};
  const owner='a'.repeat(24),booking='b'.repeat(24);let saved=[];
  const imported={
- react,'react-native':native,'@expo/vector-icons':{Ionicons:'Icon'},'expo-router':{router:{back(){},replace(){}},useLocalSearchParams:()=>({vendorOrderId:booking,amount:'99999999',paymentType:kind}),useFocusEffect:cb=>{focus=cb}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24,bottom:12})},
+ react,'react-native':native,'@expo/vector-icons':{Ionicons:'Icon'},'expo-router':{router:{back(){},replace(){}},useLocalSearchParams:()=>({vendorOrderId:booking,amount:'99999999',paymentType:kind,...(combined?{quoteKey:'a'.repeat(64)}:{})}),useFocusEffect:cb=>{focus=cb}},'react-native-safe-area-context':{useSafeAreaInsets:()=>({top:24,bottom:12})},
  '@/utils/cardPaymentValidation':validation,
  '@/services/demoSavedCards':{getCardOwnerId:async()=>owner,assertCardOwner:async id=>assert.equal(id,owner),listDemoCards:async()=>saved,rememberDemoCard:async(id,card)=>{remembered.push({id,card});if(saveFails)throw Error('Cannot save');saved=[card];return saved;},removeDemoCard:async()=>{saved=[];return[]}},
+ '@/services/getSubscriptionPlans':async()=>[],
+ '@/services/getSubscriptionAccessState':{getSubscriptionAccessState:async()=>({})},
+ '@/types/subscription.types':{PaymentProvider:{CARD_TEST:'CARD_TEST'}},
+ '@/services/requestSubscriptionPayment':async()=>({}),
+ '@/services/getVendorDownPaymentQuote':async()=>{reads++;return{organizerId:owner,paymentStatus:'PAYMENT_REQUIRED',downPaymentAmount:210,quoteKey:(changedQuote&&reads>1?'b':'a').repeat(64),currency:'USD'}},
  '@/services/getPaymentStatus':async()=>{reads++;return{organizerId:owner,paymentStatus:kind==='REMAINING'?'PARTIALLY_PAID':'PAYMENT_REQUIRED',downPaymentAmount:changedAmount&&reads>1?2000:1500,outstandingAmount:700,pendingPayment:pending&&reads>1?{}:null}},
  '@/services/createPayment':async(...args)=>{calls.push({type:'down',args});return{paymentId:'pending'}},'@/services/payRemainingAmount':async(...args)=>{calls.push({type:'remaining',args});return{paymentId:'pending'}}};
  const Component=load('components/creditcard/CreditCardIndex.tsx',imported).default;
@@ -94,3 +99,16 @@ test('remaining checkout preserves the existing remaining-payment endpoint',asyn
 test('backgrounding clears card entry and prevents use of the previous account context',async()=>{const c=checkout();await c.start();c.fill();c.events.change('background');c.render();assert.equal(c.field('CVV').props.value,'');assert.equal(c.field('Test Card Number').props.value,'');assert.equal(c.pay().props.disabled,true);});
 
 test('email receipt opt-out reaches the payment request',async()=>{const c=checkout();await c.start();c.fill();const toggle=c.nodes().find(n=>n.type==='Switch'&&n.props.accessibilityLabel==='Email me a receipt');assert.equal(toggle.props.value,true);toggle.props.onValueChange(false);c.render();await c.pay().props.onPress();assert.equal(c.calls[0].args[2],false);});
+
+test('combined card checkout sends one reviewed quote, with no card fields', async () => {
+ const c = checkout({combined:true}); await c.start(); c.fill();
+ await c.pay().props.onPress();
+ assert.equal(c.calls.length,1);
+ assert.deepEqual(c.calls[0].args,['b'.repeat(24),'card',true,'a'.repeat(64)]);
+});
+test('combined card checkout blocks changed allocations even when the total is identical', async () => {
+ const c = checkout({combined:true,changedQuote:true}); await c.start(); c.fill();
+ await c.pay().props.onPress();
+ assert.equal(c.calls.length,0);
+ assert.match(c.alerts[0][1],/review the checkout again/);
+});

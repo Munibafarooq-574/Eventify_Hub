@@ -6,9 +6,10 @@ import { getSecureData } from "@/store";
 export default async function createPayment(
     vendorOrderId: string,
     method: "card" | "jazzcash" | "easypaisa",
-    sendReceipt?: boolean
+    sendReceipt?: boolean,
+    quoteKey?: string
 ) {
-    const url = `https://eventify-hub.onrender.com/payment/vendor-order/${vendorOrderId}/initiate`;
+    const url = `https://eventify-hub.onrender.com/payment/vendor-order/${vendorOrderId}/${quoteKey ? "combined-down-payment" : "initiate"}`;
     const token = await getSecureData("token");
 
 const config: AxiosRequestConfig = {
@@ -19,7 +20,7 @@ const config: AxiosRequestConfig = {
               Authorization: `Bearer ${token}`,
           }
         : {},
-    data: { method, ...(sendReceipt !== undefined ? { sendReceipt } : {}) },
+    data: { method, ...(quoteKey ? { quoteKey } : {}), ...(sendReceipt !== undefined ? { sendReceipt } : {}) },
 };
     try {
         const response = await axios(config);

@@ -1,3 +1,4 @@
+import getVendorDownPaymentQuote from '@/services/getVendorDownPaymentQuote';
 import { currencySymbol } from '@/utils/currency';
 // fyp-mobile/components/easypaisa/EasyPaisaIndex.tsx
 import { Ionicons } from '@expo/vector-icons';
@@ -34,9 +35,11 @@ const EasyPaisaPaymentScreen = () => {
   vendorOrderId,
   amount,
   paymentType,
+  quoteKey,
 } = useLocalSearchParams<{
   vendorOrderId?: string;
   amount?: string;
+  quoteKey?: string;
   paymentType?: 'DOWN_PAYMENT' | 'REMAINING';
 }>();
 
@@ -58,6 +61,12 @@ const EasyPaisaPaymentScreen = () => {
 
   try {
     setSubmitting(true);
+    if (quoteKey) {
+      const quote = await getVendorDownPaymentQuote(vendorOrderId);
+      if (quote.quoteKey !== quoteKey || quote.downPaymentAmount !== amountPayable) {
+        throw new Error('Packages or payment amounts changed. Go back and review the checkout again.');
+      }
+    }
 
     const payment =
       paymentType === 'REMAINING'
@@ -68,6 +77,8 @@ const EasyPaisaPaymentScreen = () => {
         : await createPayment(
             vendorOrderId,
             'easypaisa',
+            undefined,
+            quoteKey,
           );
 
     console.log(

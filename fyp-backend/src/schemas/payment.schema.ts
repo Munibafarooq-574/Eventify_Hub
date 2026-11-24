@@ -19,6 +19,9 @@ export class Payment extends Document {
     @Prop({ type: Types.ObjectId, required: true, ref: 'User' })
     vendorId: Types.ObjectId;
 
+    @Prop({ type: Types.ObjectId, index: true })
+    checkoutGroupId?: Types.ObjectId;
+
     @Prop({ required: true })
     amount: number;
 

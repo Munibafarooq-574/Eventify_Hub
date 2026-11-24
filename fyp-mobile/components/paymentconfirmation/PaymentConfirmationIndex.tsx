@@ -47,7 +47,8 @@ const toOrderRef = (id?: string) => {
 /* ---------- Ticket helpers ---------- */
 
 const PaymentConfirmationScreen = () => {
-  const { vendorOrderId } = useLocalSearchParams<{
+  const { vendorOrderId, combinedReceipt } = useLocalSearchParams<{
+    combinedReceipt?: string;
     vendorOrderId?: string;
   }>();
 
@@ -71,7 +72,7 @@ const PaymentConfirmationScreen = () => {
 
       const data = await getPaymentStatus(vendorOrderId);
 
-      if (!data?.latestSuccessfulPayment) {
+      if (combinedReceipt === 'true' ? !data?.combinedDownPaymentReceipt : !data?.latestSuccessfulPayment) {
         setPaymentData(null);
         setError('No confirmed payment receipt is available yet.');
         return;
@@ -84,13 +85,16 @@ const PaymentConfirmationScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [vendorOrderId]);
+  }, [vendorOrderId, combinedReceipt]);
 
   useEffect(() => {
     loadPayment();
   }, [loadPayment]);
 
-  const successfulPayment = paymentData?.latestSuccessfulPayment;
+  const grouped = combinedReceipt === 'true' ? paymentData?.combinedDownPaymentReceipt : undefined;
+  const successfulPayment = grouped
+    ? { ...grouped, paymentId: grouped.groupId, type: 'DOWN_PAYMENT' }
+    : paymentData?.latestSuccessfulPayment;
 
   const amountPaid = Number(successfulPayment?.amount || 0);
   const paymentMethod = String(successfulPayment?.method || 'N/A');
@@ -101,7 +105,7 @@ const PaymentConfirmationScreen = () => {
     successfulPayment?.paymentId ||
     'N/A';
 
-  const orderRef = useMemo(() => toOrderRef(vendorOrderId), [vendorOrderId]);
+  const orderRef = useMemo(() => toOrderRef(grouped?.groupId || vendorOrderId), [grouped?.groupId, vendorOrderId]);
 
   const paidAt = useMemo(
     () =>
@@ -132,13 +136,14 @@ const PaymentConfirmationScreen = () => {
     { label: 'Vendor Name', value: paymentData?.vendor?.name || 'N/A' },
     { label: 'Brand Name', value: paymentData?.vendor?.brandName || 'N/A' },
     { label: 'Vendor Email', value: paymentData?.vendor?.email || 'N/A' },
-    ...(paymentData?.delivery ? [
+    ...(!grouped && paymentData?.delivery ? [
       {label:'Delivery date & time',value:deliveryDateTime(paymentData.deliveryStartDateTime,paymentData.delivery.timeZone || 'UTC')},
       {label:'Package amount',value:formatCurrency(Number(paymentData.delivery.packageAmount))},
       {label:'Delivery',value:paymentData.delivery.deliveryFeeType === 'FREE' ? 'Free' : formatCurrency(Number(paymentData.delivery.baseFee))},
       ...(paymentData.delivery.deliveryFeeType === 'PAID' && paymentData.delivery.deliveryExtraWeightEnabled ? [{label:'Extra weight fee',value:formatCurrency(Number(paymentData.delivery.extraFee))}, {label:'Delivery weight',value:`${displayDeliveryWeight(Number(paymentData.delivery.weightKg),paymentData.delivery.deliveryWeightUnit)} ${paymentData.delivery.deliveryWeightUnit || 'kg'}`}] : []),
     ] : []),
     { label: 'Payment Type', value: paymentTypeLabel },
+    ...(grouped?.packages ?? []).map((pkg: { name: string; amount: number }) => ({ label: pkg.name, value: formatCurrency(pkg.amount) })),
     { label: 'Amount Paid', value: formatCurrency(amountPaid) },
     { label: 'Payment Method', value: paymentMethodLabel },
     { label: 'Transaction Reference', value: String(transactionRef) },
