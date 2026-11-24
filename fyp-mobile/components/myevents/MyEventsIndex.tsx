@@ -1094,7 +1094,7 @@ const MyEventsScreen = () => {
                           const amount = Number(booking.downPaymentAmount);
                           return String(booking.status).toLowerCase() === 'accepted' &&
                             ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(payment?.paymentStatus ?? booking.paymentStatus).toUpperCase()) &&
-                            !payment?.pendingPayment && !payment?.combinedDownPaymentReceipt && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
+                            !!payment && !payment.pendingPayment && !payment.combinedDownPaymentReceipt && !payment.latestSuccessfulPayment && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
                             currencyOf(booking) === currencyOf(vendor)
                             ? [{ booking, deadline, cents: Math.round(amount * 100) }] : [];
                         }) : [];
@@ -1233,6 +1233,13 @@ const MyEventsScreen = () => {
                               onUpdated={fetchData}
                               canRespond
                             />
+                          )}
+                          {groupedDownPayment && packages.some(booking =>
+                            String(booking.status).toLowerCase() === 'accepted' &&
+                            ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(booking.paymentStatus).toUpperCase()) &&
+                            paymentBreakdowns[booking._id] === null
+                          ) && (
+                            <Text style={styles.packageText}>Payment status unavailable. Pull down to refresh.</Text>
                           )}
                           {eligible.length > 0 && (
                             <View style={styles.paymentBox}>

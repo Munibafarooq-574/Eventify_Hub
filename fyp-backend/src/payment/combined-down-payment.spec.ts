@@ -26,7 +26,7 @@ function fixture() {
         withCheckoutLocks: jest.fn(async (_ids, work) => work(session)),
         rescheduleRequestModel: { exists: jest.fn(() => query(null)) },
         vendorOrderModel: { findById: jest.fn(async () => bookings[0]), find: jest.fn(() => query(bookings)) },
-        paymentModel: { distinct: jest.fn(() => query([])), create: jest.fn(async rows => rows.map((row: Record<string, unknown>) => ({ ...row, _id: new Types.ObjectId() }))) },
+        paymentModel: { find: jest.fn(() => ({ session: () => query([]) })), distinct: jest.fn(() => query([])), create: jest.fn(async rows => rows.map((row: Record<string, unknown>) => ({ ...row, _id: new Types.ObjectId() }))) },
     });
     const getQuote = () => service.getVendorDownPaymentQuote(String(bookings[0]._id), String(order.organizerId));
     const initiate = (quoteKey: string, method = 'card') => service.initiateVendorDownPayment(String(bookings[0]._id), method, String(order.organizerId), quoteKey);
@@ -178,4 +178,18 @@ it('credits a confirmed allocation even when the prior ledger contains no succes
     expect(booking).toMatchObject({ paymentStatus: 'PARTIALLY_PAID', paymentDeadline: null });
     expect(allocation.status).toBe('SUCCESS');
     expect(booking.save).toHaveBeenCalledWith({ session });
+});
+
+it('reconciles ledger allocations by exact package and ignores a sibling allocation', async () => {
+    const { service, bookings, order } = fixture();
+    const exact = { _id: new Types.ObjectId(), vendorOrderId: String(bookings[0]._id), amount: 135 };
+    const sibling = { _id: new Types.ObjectId(), vendorOrderId: bookings[1]._id, amount: 75 };
+    service.paymentModel.find.mockReturnValueOnce(query([])).mockReturnValueOnce(query([exact, sibling]));
+    await expect(service.findSuccessfulBookingPayments(bookings[0], order)).resolves.toEqual([exact]);
+});
+
+it('blocks a second charge when an allocation is found in the order ledger', async () => {
+    const { service, bookings, getQuote } = fixture();
+    service.paymentModel.find.mockReturnValue({ session: () => query([{ vendorOrderId: String(bookings[0]._id) }]) });
+    await expect(getQuote()).resolves.toMatchObject({ downPaymentAmount: 75 });
 });

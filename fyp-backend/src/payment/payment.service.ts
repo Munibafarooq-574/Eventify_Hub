@@ -424,6 +424,24 @@ if (
 }
 
     // ===== Read-only status / breakdown, used by mobile UI =====
+    private async findSuccessfulBookingPayments(booking: VendorOrder, order: Order) {
+        const direct = await this.paymentModel.find({ vendorOrderId: booking._id, status: 'SUCCESS' }).lean();
+        if (!order._id || !booking.vendorId) return direct;
+
+        // Older combined allocations can be visible in the order ledger even
+        // when the booking-reference query misses them. Match the exact booking
+        // and deduplicate before calculating or reconciling its balance.
+        const grouped = await this.paymentModel.find({
+            orderId: order._id, vendorId: booking.vendorId, organizerId: order.organizerId,
+            checkoutGroupId: { $ne: null }, status: 'SUCCESS',
+        }).lean();
+        const byId = new Map(direct.map(row => [String(row._id), row]));
+        for (const row of grouped) {
+            if (String(row.vendorOrderId) === String(booking._id)) byId.set(String(row._id), row);
+        }
+        return [...byId.values()];
+    }
+
     async getPaymentStatus(
     vendorOrderId: string,
     organizerId: string,
@@ -443,13 +461,7 @@ const order = await this.assertOrganizerOwnsVendorOrder(
     vendorOrder.finalAmount ??
     vendorOrder.price;
 
-const successfulPayments =
-    await this.paymentModel
-        .find({
-            vendorOrderId: vendorOrder._id,
-            status: 'SUCCESS',
-        })
-        .lean();
+const successfulPayments = await this.findSuccessfulBookingPayments(vendorOrder, order);
 
 const paidAmount =
     successfulPayments.reduce(
@@ -494,20 +506,10 @@ const outstandingAmount = Math.max(
     0,
 );
 
-const latestSuccessfulPayment =
-    await this.paymentModel
-        .findOne({
-            vendorOrderId: vendorOrder._id,
-            status: 'SUCCESS',
-        })
-        .sort({
-            paidAt: -1,
-            createdAt: -1,
-        })
-        .lean();
-
-
-
+const latestSuccessfulPayment = [...successfulPayments].sort((first, second) =>
+    (second.paidAt?.getTime() ?? 0) - (first.paidAt?.getTime() ?? 0) ||
+    String(second._id).localeCompare(String(first._id)),
+)[0];
 
 const vendor = vendorOrder.vendorId
     ? await this.userModel.findById(vendorOrder.vendorId)
@@ -651,7 +653,11 @@ pendingPayment: pendingPayment
             vendorOrderId: { $in: bookings.map(booking => booking._id) },
             type: 'DOWN_PAYMENT', status: { $in: ['PENDING', 'SUCCESS'] },
         }).session(session ?? null);
-        const blockedIds = new Set(blocked.map(String));
+        const grouped = await this.paymentModel.find({
+            orderId: order._id, vendorId: anchor.vendorId, organizerId: order.organizerId,
+            checkoutGroupId: { $ne: null }, type: 'DOWN_PAYMENT', status: { $in: ['PENDING', 'SUCCESS'] },
+        }).session(session ?? null).lean();
+        const blockedIds = new Set([...blocked.map(String), ...grouped.map(row => String(row.vendorOrderId))]);
         const currency = currencyOf(anchor);
         const packages: { vendorOrderId: string; name: string; total: number; amount: number; deadline: string }[] = [];
         for (const booking of bookings) {
