@@ -1061,52 +1061,21 @@ if (status !== 'ALL') {
         )
         .filter(Boolean);
 
-    const successfulPaymentTotals =
-      vendorOrderIds.length > 0
-        ? await this.paymentModel.aggregate([
-            {
-              $match: {
-                vendorOrderId: {
-                  $in:
-                    vendorOrderIds,
-                },
-
-                status:
-                  'SUCCESS',
-              },
-            },
-            {
-              $group: {
-                _id:
-                  '$vendorOrderId',
-
-                paidSoFar: {
-                  $sum:
-                    '$amount',
-                },
-              },
-            },
-          ])
-        : [];
-
-    const paidMap =
-      new Map<
-        string,
-        number
-      >();
-
-    for (
-      const item of successfulPaymentTotals
-    ) {
-      paidMap.set(
-        String(
-          item._id,
-        ),
-        Number(
-          item.paidSoFar ||
-            0,
-        ),
-      );
+    const successfulPayments = vendorOrderIds.length
+      ? await this.paymentModel.find({ vendorOrderId: { $in: vendorOrderIds }, status: 'SUCCESS' })
+        .select('vendorOrderId amount').lean()
+      : [];
+    // Count a successful allocation visible in either read once, by its own payment ID.
+    const successfulById = new Map(successfulPayments.map(payment => [String(payment._id), payment]));
+    for (const payment of payments) {
+      if (payment.status === 'SUCCESS' && payment.vendorOrderId?._id) {
+        successfulById.set(String(payment._id), { ...payment, vendorOrderId: payment.vendorOrderId._id } as any);
+      }
+    }
+    const paidMap = new Map<string, number>();
+    for (const payment of successfulById.values()) {
+      const key = String(payment.vendorOrderId);
+      paidMap.set(key, (paidMap.get(key) ?? 0) + Number(payment.amount || 0));
     }
 
     return payments.map(
@@ -1254,9 +1223,9 @@ if (status !== 'ALL') {
                     ),
 
                   paymentStatus:
-                    vendorOrder
-                      .paymentStatus ??
-                    null,
+                    paidSoFar > 0 && ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(vendorOrder.paymentStatus)
+                      ? (outstandingAmount === 0 ? 'PAID' : 'PARTIALLY_PAID')
+                      : vendorOrder.paymentStatus ?? null,
                 }
               : null,
 

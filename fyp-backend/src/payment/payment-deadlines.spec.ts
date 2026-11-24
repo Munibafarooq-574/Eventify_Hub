@@ -8,7 +8,7 @@ describe('Payment deadline lifecycle', () => {
         const remainingDeadline = new Date('2026-11-10T07:00:00Z');
         const booking: any = { _id: 'booking', status: 'accepted', price: 3000, paymentDeadline: new Date(), holdExpiresAt: new Date(), remainingPaymentDeadline: remainingDeadline, save: jest.fn() };
         const service: any = Object.create(PaymentService.prototype);
-        service.paymentModel = { findById: jest.fn().mockResolvedValue(payment), find: jest.fn(() => ({ lean: async () => [{ amount: totalPaid }] })) };
+        service.paymentModel = { findById: jest.fn().mockResolvedValue(payment), find: jest.fn(() => ({ lean: async () => totalPaid > payment.amount ? [{ amount: totalPaid - payment.amount }] : [] })) };
         service.vendorOrderModel = { findById: jest.fn().mockResolvedValue(booking) };
         const empty: any = { lean: async () => null }; empty.populate = () => empty;
         service.userModel = { findById: () => ({ select: () => empty }) };

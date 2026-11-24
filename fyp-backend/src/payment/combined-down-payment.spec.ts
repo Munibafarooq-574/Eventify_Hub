@@ -111,19 +111,19 @@ describe('combined checkout resolution', () => {
         const checkoutGroupId = new Types.ObjectId();
         const rows = f.bookings.map(booking => ({
             _id: new Types.ObjectId(), vendorOrderId: booking._id, checkoutGroupId,
-            amount: booking.downPaymentAmount, orderId: f.order._id, organizerId: f.order.organizerId,
+            amount: booking.downPaymentAmount, orderId: f.order._id, organizerId: f.order.organizerId, vendorId: booking.vendorId, currency: booking.currency,
         }));
         Object.assign(f.service, {
             paymentModel: {
                 findById: jest.fn(async () => rows[0]),
                 find: jest.fn(() => query(rows)),
             },
-            orderModel: { findById: () => query({ eventName: 'Event' }) },
-            userModel: { findById: () => ({ select: () => query({ email: 'customer@example.test' }) }) },
+            orderModel: { findById: () => ({ ...query({ eventName: 'Event' }), populate: () => query({ eventName: 'Event' }) }) },
+            userModel: { findById: () => ({ select: () => ({ ...query({ email: 'customer@example.test' }), populate: () => query({ name: 'Photo19' }) }) }) },
             emailService: { sendTransactionalEmail: jest.fn() },
             confirmPaymentLocked: jest.fn(async (id: string) => {
                 const index = rows.findIndex(row => String(row._id) === id);
-                return { payment: rows[index], vendorOrder: f.bookings[index], remainingAmount: 0 };
+                return { payment: rows[index], vendorOrder: f.bookings[index], remainingAmount: 0, paidSoFar: rows[index].amount };
             }),
             failPaymentLocked: jest.fn(),
         });
@@ -138,7 +138,11 @@ describe('combined checkout resolution', () => {
             .toHaveBeenCalledWith(String(row._id), 'reference', f.session));
         const send = f.service.emailService.sendTransactionalEmail;
         expect(send).toHaveBeenCalledTimes(1);
-        expect(send.mock.calls[0][0].html).toMatch(/Portraits.*135.00.*Photography.*75.00.*210.00/);
+        const html = send.mock.calls[0][0].html;
+        expect(html).toContain('Payment Receipt');
+        expect(html).toContain('Service Details');
+        expect(html).toContain('Payment Details');
+        expect(html).toMatch(/Portraits[\s\S]*135[\s\S]*Photography[\s\S]*75[\s\S]*210/);
     });
 
     it('fails both allocations together and emits no receipt', async () => {
@@ -155,4 +159,23 @@ describe('combined checkout resolution', () => {
         await expect(f.service.confirmPayment(String(f.rows[0]._id))).rejects.toThrow('Expired');
         expect(f.service.emailService.sendTransactionalEmail).not.toHaveBeenCalled();
     });
+});
+
+it('credits a confirmed allocation even when the prior ledger contains no successful payments', async () => {
+    const { service, bookings } = fixture();
+    const booking = { ...bookings[0], status: 'accepted', save: jest.fn() };
+    const allocation = {
+        _id: new Types.ObjectId(), checkoutGroupId: new Types.ObjectId(),
+        vendorOrderId: booking._id, status: 'PENDING', type: 'DOWN_PAYMENT',
+        amount: 135, createdAt: new Date(), save: jest.fn(),
+    };
+    const session = {};
+    service.vendorOrderModel.findById.mockReturnValue(query(booking));
+    service.paymentModel.findById = () => query(allocation);
+    service.paymentModel.find = () => ({ session: () => query([]) });
+    const result = await service.confirmPaymentLocked(String(allocation._id), 'test-reference', session);
+    expect(result).toMatchObject({ paidSoFar: 135, remainingAmount: 315 });
+    expect(booking).toMatchObject({ paymentStatus: 'PARTIALLY_PAID', paymentDeadline: null });
+    expect(allocation.status).toBe('SUCCESS');
+    expect(booking.save).toHaveBeenCalledWith({ session });
 });

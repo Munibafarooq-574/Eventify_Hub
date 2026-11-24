@@ -458,6 +458,27 @@ const paidAmount =
         0,
     );
 
+    const confirmedGroupPayment = successfulPayments.find(payment => payment.type === 'DOWN_PAYMENT' && payment.checkoutGroupId && payment.amount > 0);
+    if (confirmedGroupPayment && vendorOrder.status === 'accepted' &&
+        ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(vendorOrder.paymentStatus)) {
+        const paid = roundMoney(paidAmount);
+        const remaining = Math.max(roundMoney(bookingAmount - paid), 0);
+        const correctedStatus = remaining === 0 ? 'PAID' : 'PARTIALLY_PAID';
+        const corrected = await this.vendorOrderModel.findOneAndUpdate(
+            { _id: vendorOrder._id, status: 'accepted', paymentStatus: vendorOrder.paymentStatus, __v: vendorOrder.__v },
+            { $set: {
+                paymentStatus: correctedStatus, remainingAmount: remaining,
+                confirmationTime: vendorOrder.confirmationTime || confirmedGroupPayment.paidAt,
+                paymentDeadline: null, holdExpiresAt: null,
+            }, $inc: { __v: 1 } },
+            { new: true },
+        );
+        if (corrected) {
+            vendorOrder.paymentStatus = corrected.paymentStatus;
+            vendorOrder.remainingAmount = corrected.remainingAmount;
+        }
+    }
+
     const pendingPayment =
     await this.paymentModel
         .findOne({
@@ -871,6 +892,7 @@ private buildPaymentReceiptEmail(
         delivery?: any;
         bookingType?: string | null;
         eventTimeZone?: string | null;
+        packages?: { name: string; amount: number; total: number; remaining: number; quantity?: number | null; people?: number | null; pricing?: string | null; start?: Date | null; end?: Date | null }[];
         packageName?: string | null;
         pricingMethod?: string | null;
         quantity?: number | null;
@@ -1135,6 +1157,18 @@ private buildPaymentReceiptEmail(
           )}
         </div>
 
+        ${data.packages ? data.packages.map(pkg => `
+          <div style="margin-top:12px;">
+            <strong>${this.escapeHtml(pkg.name)}</strong>
+            <div>Package total: ${currencySymbol(data.currency)} ${money(pkg.total)}</div>
+            <div>Down payment: ${currencySymbol(data.currency)} ${money(pkg.amount)}</div>
+            <div>Remaining: ${currencySymbol(data.currency)} ${money(pkg.remaining)}</div>
+            ${pkg.pricing ? `<div>Pricing: ${this.escapeHtml(pkg.pricing.replace(/_/g, ' '))}</div>` : ''}
+            ${pkg.quantity != null ? `<div>Quantity: ${this.escapeHtml(pkg.quantity)}</div>` : ''}
+            ${pkg.people != null ? `<div>People: ${this.escapeHtml(pkg.people)}</div>` : ''}
+            ${pkg.start ? `<div>Service start: ${this.escapeHtml(formatDateTime(pkg.start))}</div>` : ''}
+            ${pkg.end ? `<div>Service end: ${this.escapeHtml(formatDateTime(pkg.end))}</div>` : ''}
+          </div>`).join('') : `
         <div style="margin-top:8px;">
           <strong>Package:</strong>
           ${this.escapeHtml(
@@ -1151,6 +1185,8 @@ private buildPaymentReceiptEmail(
         ${serviceTimes.map(row => `<div style="margin-top:8px;">
           <strong>${row.label}:</strong> ${this.escapeHtml(formatDateTime(row.value))}
         </div>`).join('')}
+
+        `}
 
         <div style="margin-top:8px;">
           <strong>Booking Total:</strong>
@@ -1290,27 +1326,20 @@ private buildPaymentReceiptEmail(
             }
         }
 
-        payment.status = 'SUCCESS';
-        payment.transactionRef =
-            transactionRef || null;
-        payment.paidAt = new Date();
-
-        await payment.save({session});
-
-        const successfulPayments =
-            await this.paymentModel
-                .find({
+        const previousPayments = await this.paymentModel.find({
             vendorOrderId: vendorOrder._id,
-                    status: 'SUCCESS',
-                }).session(session)
-                .lean();
-
-        const paidSoFar =
-            successfulPayments.reduce(
-                (sum, item) =>
-                    sum + Number(item.amount || 0),
-                0,
-            );
+            status: 'SUCCESS',
+            _id: { $ne: payment._id },
+        }).session(session).lean();
+        const amount = Number(payment.amount);
+        if (!Number.isFinite(amount) || amount < 0 || (payment.checkoutGroupId && amount === 0)) {
+            throw new ConflictException('The payment amount is invalid.');
+        }
+        const paidSoFar = roundMoney(previousPayments.reduce((sum, row) => sum + Number(row.amount || 0), amount));
+        payment.status = 'SUCCESS';
+        payment.transactionRef = transactionRef || null;
+        payment.paidAt = new Date();
+        await payment.save({ session });
 
         const bookingAmount =
     vendorOrder.finalAmount ??
@@ -1356,10 +1385,7 @@ if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline =
         const total = roundMoney(results.reduce((sum, row) => sum + row.payment.amount, 0));
         const { payment } = results[0];
         try {
-            const [order, client] = await Promise.all([
-                this.orderModel.findById(payment.orderId).lean(),
-                this.userModel.findById(payment.organizerId).select('email').lean(),
-            ]);
+            const order = await this.orderModel.findById(payment.orderId).lean();
             if (order) {
                 for (const row of results) {
                     await this.chatGateway?.sendBookingNotice(order, row.vendorOrder, 'confirmed', true, {
@@ -1367,18 +1393,10 @@ if (vendorOrder.paymentStatus === 'PAID') vendorOrder.remainingPaymentDeadline =
                     }).catch(error => console.warn('Booking confirmation notice failed', error));
                 }
             }
-            if (payment.sendReceipt !== false && client?.email) {
-                const money = (amount: number) => `${currencyOf(payment)} ${amount.toFixed(2)}`;
-                const lines = results.map(row => `<li>${this.escapeHtml(row.vendorOrder.serviceName)} — ${money(row.payment.amount)}</li>`).join('');
-                await this.emailService.sendTransactionalEmail({
-                    to: client.email, senderName: 'Eventify Hub',
-                    subject: `Down payment receipt — ${order?.eventName || 'Eventify Hub'}`,
-                    html: `<h1>Down payment received</h1><p>${this.escapeHtml(order?.eventName)}</p><p>Receipt ${String(payment.checkoutGroupId)}</p><ul>${lines}</ul><p><strong>Total paid: ${money(total)}</strong></p>`,
-                });
-            }
         } catch (error) {
-            console.warn('Combined payment receipt or notification failed', error);
+            console.warn('Combined payment notification failed', error);
         }
+        await this.sendBookingPaymentReceipt(results);
         return { id: payment._id, checkoutGroupId: payment.checkoutGroupId, amount: total, status: 'SUCCESS' };
     }
 
@@ -1424,6 +1442,13 @@ if (
     }
 }
 
+        await this.sendBookingPaymentReceipt([{ payment, vendorOrder, paidSoFar, bookingAmount, remainingAmount }]);
+        return payment;
+    }
+
+    private async sendBookingPaymentReceipt(results: Awaited<ReturnType<PaymentService['confirmPaymentLocked']>>[]) {
+        const { payment, vendorOrder } = results[0];
+        const combined = !!payment.checkoutGroupId;
 try {
     const [
         client,
@@ -1479,23 +1504,9 @@ try {
                   )
                 : null;
 
-        const bookingAmount =
-            Number(
-                vendorOrder.finalAmount ??
-                vendorOrder.price ??
-                0,
-            );
-
-        const paymentAmount =
-            Number(
-                payment.amount || 0,
-            );
-
-        const totalPaid =
-            Number(
-                paidSoFar || 0,
-            );
-
+        const bookingAmount = roundMoney(results.reduce((sum, row) => sum + Number(row.vendorOrder.finalAmount ?? row.vendorOrder.price ?? 0), 0));
+        const paymentAmount = roundMoney(results.reduce((sum, row) => sum + row.payment.amount, 0));
+        const totalPaid = roundMoney(results.reduce((sum, row) => sum + row.paidSoFar, 0));
         const previouslyPaid =
             Math.max(
                 roundMoney(totalPaid -
@@ -1591,6 +1602,17 @@ try {
                     null,
 
                 categoryName: (vendor.buisnessCategory as any)?.name || null,
+                packages: combined ? results.map(row => ({
+                    name: row.vendorOrder.serviceName,
+                    amount: row.payment.amount,
+                    total: Number(row.vendorOrder.finalAmount ?? row.vendorOrder.price),
+                    remaining: row.remainingAmount,
+                    quantity: row.vendorOrder.quantity,
+                    people: row.vendorOrder.personCount,
+                    pricing: row.vendorOrder.pricingMethod,
+                    start: row.vendorOrder.eventStartDateTime,
+                    end: row.vendorOrder.eventEndDateTime,
+                })) : undefined,
                 delivery: (vendorOrder as any).delivery,
                 pricingMethod: vendorOrder.pricingMethod,
                 quantity: vendorOrder.quantity,
@@ -1661,7 +1683,6 @@ try {
     );
 }
 
-return payment;
     }
 
     // ===== Called by gateway webhook (or manually for now) on failure =====

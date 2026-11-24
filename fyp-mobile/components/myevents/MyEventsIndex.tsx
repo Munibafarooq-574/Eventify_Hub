@@ -1093,8 +1093,8 @@ const MyEventsScreen = () => {
                           const deadline = new Date(payment?.paymentDeadline ?? booking.paymentDeadline).getTime();
                           const amount = Number(booking.downPaymentAmount);
                           return String(booking.status).toLowerCase() === 'accepted' &&
-                            ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(booking.paymentStatus).toUpperCase()) &&
-                            !payment?.pendingPayment && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
+                            ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(payment?.paymentStatus ?? booking.paymentStatus).toUpperCase()) &&
+                            !payment?.pendingPayment && !payment?.combinedDownPaymentReceipt && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
                             currencyOf(booking) === currencyOf(vendor)
                             ? [{ booking, deadline, cents: Math.round(amount * 100) }] : [];
                         }) : [];
@@ -1278,14 +1278,14 @@ const MyEventsScreen = () => {
                             const vStatus =
                               vendorStatusStyleMap[vendorStatus] || vendorStatusStyleMap.pending;
 
-                            const paymentStatus = String(vendor?.paymentStatus || 'UNPAID').toUpperCase();
+                            const paymentStatus = String(paymentBreakdowns[vendor._id]?.paymentStatus ?? vendor?.paymentStatus ?? 'UNPAID').toUpperCase();
 
                             const finalAmount = Number(vendor?.finalAmount ?? vendor?.price ?? 0);
 
                             const downPaymentAmount = Number(vendor?.downPaymentAmount ?? 0);
 
                             const remainingAmount = Number(
-                              vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
+                              paymentBreakdowns[vendor._id]?.remainingAmount ?? vendor?.remainingAmount ?? Math.max(finalAmount - downPaymentAmount, 0),
                             );
 
                             const paymentBreakdown = paymentBreakdowns[vendor._id];
