@@ -247,6 +247,7 @@ const MyEventsScreen = () => {
   const [expandedEvents, setExpandedEvents] = useState<Record<string, boolean>>({});
   useFocusEffect(useCallback(() => { if (targetOrderId) setExpandedEvents(current => ({ ...current, [targetOrderId]: true })); }, [targetOrderId]));
   const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({});
+  const [scheduleFinalizationErrors, setScheduleFinalizationErrors] = useState<Record<string, string>>({});
   const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
   const { refunds, refundLoading, refundError, loadRefunds } = useRefundUpdates(false);
 
@@ -278,7 +279,40 @@ const MyEventsScreen = () => {
         setEvents([]);
         return;
       }
-      const fetchedEvents = await getVendorOrders('Organizer', user._id);
+      let fetchedEvents = await getVendorOrders('Organizer', user._id);
+      const failures: Record<string, string> = {};
+      try {
+        let requests = await getRescheduleRequests();
+        const groups = new Map<string, any[]>();
+        const ownedOrders = new Set((fetchedEvents || []).map((event: any) => String(event._id)));
+        for (const request of Array.isArray(requests) ? requests : []) {
+          const orderId = String(request.orderId);
+          if (!ownedOrders.has(orderId)) continue;
+          const group = groups.get(orderId) ?? [];
+          group.push(request);
+          groups.set(orderId, group);
+        }
+        let attempted = false;
+        for (const [orderId, rows] of groups) {
+          const latest = rows.filter(row => String(row.requestGroupId) === String(rows[0].requestGroupId));
+          if (!rows[0].requestGroupId || !latest.every(row => row.status === 'ACCEPTED' && ['PENDING', 'REPLACEMENT_REQUIRED'].includes(row.resolutionStatus || 'PENDING'))) continue;
+          attempted = true;
+          try {
+            await resolvePartialReschedule(orderId, 'FINALIZE_ACCEPTED');
+          } catch (error: any) {
+            failures[orderId] = error?.message || 'Could not apply the new schedule.';
+          }
+        }
+        if (attempted) {
+          requests = await getRescheduleRequests();
+          fetchedEvents = await getVendorOrders('Organizer', user._id);
+        }
+        setRescheduleRequests(Array.isArray(requests) ? requests : []);
+      } catch (error) {
+        console.error('Could not load rescheduling requests:', error);
+        setRescheduleRequests([]);
+      }
+      setScheduleFinalizationErrors(failures);
 
       setEvents(fetchedEvents || []);
       void resolveBookingCategories(fetchedEvents || []).then(categories => {
@@ -291,14 +325,6 @@ const MyEventsScreen = () => {
           }),
         })));
       }).catch(error => reportMarketplaceLoadError('Could not load booking categories', error));
-
-      try {
-        const requests = await getRescheduleRequests();
-        setRescheduleRequests(Array.isArray(requests) ? requests : []);
-      } catch (error) {
-        console.error('Could not load rescheduling requests:', error);
-        setRescheduleRequests([]);
-      }
 
       const paymentEntries = await Promise.all(
         (fetchedEvents || [])
@@ -415,20 +441,6 @@ const MyEventsScreen = () => {
       ],
     );
   }, [fetchData]);
-
-  const [finalizingSchedule, setFinalizingSchedule] = useState(false);
-  const finalizeAcceptedSchedule = async (orderId: string) => {
-    if (finalizingSchedule) return;
-    setFinalizingSchedule(true);
-    try {
-      await resolvePartialReschedule(orderId, 'FINALIZE_ACCEPTED');
-      await fetchData();
-    } catch (error: any) {
-      Alert.alert('Could not finalize schedule', error?.message || 'Please refresh and try again.');
-    } finally {
-      setFinalizingSchedule(false);
-    }
-  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -978,13 +990,10 @@ const MyEventsScreen = () => {
                             </View>
                           )}
 
-                          {resolutionStatus === 'PENDING' && statusCounts.accepted === eventRequests.length && (
+                          {resolutionStatus === 'PENDING' && statusCounts.accepted === eventRequests.length && scheduleFinalizationErrors[String(event._id)] && (
                             <View style={styles.rescheduleActions}>
-                              <Text style={styles.rescheduleActionText}>All packages approved the new schedule. Finalize it to update the event date and resume booking actions.</Text>
-                              <TouchableOpacity style={styles.reschedulePrimaryAction} disabled={finalizingSchedule} onPress={() => void finalizeAcceptedSchedule(String(event._id))}>
-                                <Text style={styles.reschedulePrimaryActionText}>{finalizingSchedule ? 'Finalizing…' : 'Finalize New Schedule'}</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity style={styles.rescheduleSecondaryAction} disabled={finalizingSchedule} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
+                              <Text style={styles.rescheduleActionText}>{scheduleFinalizationErrors[String(event._id)]}</Text>
+                              <TouchableOpacity style={styles.rescheduleSecondaryAction} onPress={() => resolveRescheduleDecision(String(event._id), 'KEEP_ORIGINAL')}>
                                 <Text style={styles.rescheduleSecondaryActionText}>Keep Original Schedule</Text>
                               </TouchableOpacity>
                             </View>

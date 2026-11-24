@@ -76,3 +76,18 @@ describe('recover an accepted schedule that is still pending', () => {
         }
     });
 });
+
+it('treats a repeat finalization of an already applied schedule as successful', async () => {
+    const { service, rows, orderId } = fixture();
+    const organizerId = new Types.ObjectId();
+    for (const row of rows) {
+        row.status = 'ACCEPTED';
+        row.resolutionStatus = 'APPLIED';
+    }
+    service.orderModel.findById = () => ({ lean: async () => ({ _id: orderId, organizerId }) });
+    service.rescheduleRequestModel.findOne = () => ({ sort: () => ({ lean: async () => rows[0] }) });
+    service.rescheduleRequestModel.find = () => ({ lean: async () => rows });
+    await expect(service.resolvePartialReschedule(String(orderId), String(organizerId), 'FINALIZE_ACCEPTED'))
+        .resolves.toEqual({ resolutionStatus: 'APPLIED' });
+    expect(service.applyRescheduleIfAllAccepted).not.toHaveBeenCalled();
+});

@@ -3486,12 +3486,25 @@ async completeVendorOrder(vendorOrderId: string) {
         const batch: any[] = await this.rescheduleRequestModel.find({ orderId: order._id, requestGroupId: latest.requestGroupId }).lean();
         if (!batch.length) throw new NotFoundException('Rescheduling request group not found');
         const currentResolution = batch[0]?.resolutionStatus || 'PENDING';
-        if (currentResolution !== 'PENDING') throw new ConflictException('This rescheduling request has already been resolved');
+        if (action === 'FINALIZE_ACCEPTED' && batch.every((row: any) => row.resolutionStatus === 'APPLIED')) {
+            return { resolutionStatus: 'APPLIED' };
+        }
+        if (currentResolution !== 'PENDING' && !(action === 'FINALIZE_ACCEPTED' && currentResolution === 'REPLACEMENT_REQUIRED')) {
+            throw new ConflictException('This rescheduling request has already been resolved');
+        }
         const allAccepted = batch.every((row: any) => row.status === 'ACCEPTED');
         if (action === 'FINALIZE_ACCEPTED') {
             if (!allAccepted) throw new ConflictException('Every affected package must accept the new schedule first.');
             const result = await this.applyRescheduleIfAllAccepted(orderId, undefined, latest.requestGroupId);
-            if (!result.applied) throw new ConflictException('The schedule request changed. Refresh the event to see its current status.');
+            if (!result.applied) {
+                const unresolved = await this.rescheduleRequestModel.exists({
+                    orderId: order._id, requestGroupId: latest.requestGroupId, resolutionStatus: { $ne: 'APPLIED' },
+                });
+                const applied = !unresolved && await this.rescheduleRequestModel.exists({
+                    orderId: order._id, requestGroupId: latest.requestGroupId, resolutionStatus: 'APPLIED',
+                });
+                if (!applied) throw new ConflictException('The approved request could not be applied. Refresh or keep the original schedule.');
+            }
             return { resolutionStatus: 'APPLIED' };
         }
         if (batch.some((r: any) => r.status === 'CHANGE_REQUESTED')) throw new ConflictException('Wait for all vendors to respond or for pending requests to expire');
