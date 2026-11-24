@@ -968,7 +968,7 @@ const MyEventsScreen = () => {
                             <View style={{ flex: 1 }}>
                               <Text style={styles.rescheduleStatusTitle}>Date/Time Change Request</Text>
                               <Text style={styles.rescheduleStatusSubtitle}>
-                                One request per event • {eventRequests.length} vendor{eventRequests.length === 1 ? '' : 's'}
+                                One request per event • {eventRequests.length} package{eventRequests.length === 1 ? '' : 's'}
                               </Text>
                             </View>
                           </View>
@@ -1050,6 +1050,7 @@ const MyEventsScreen = () => {
                                     </View>
                                   </View>
 
+                                  {!!vendorOrder?.serviceName && <Text style={styles.packageText}>{vendorOrder.serviceName}</Text>}
                                   {request.bookingType === 'DELIVERY_BASED' && request.newServiceStartDateTime && <Text style={styles.rescheduleResponseLabel}>Requested delivery: {deliveryDateTime(request.newServiceStartDateTime,timeZone)}</Text>}
                                   {request.respondedAt && (() => {
                                     const respondedAt = new Date(request.respondedAt);
@@ -1172,7 +1173,8 @@ const MyEventsScreen = () => {
                     <View style={styles.divider} />
 
                     {(() => {
-                    const vendorDetails = Array.from(vendorGroups, ([key, packages]) => {
+                    vendorGroups.forEach((packages, key) => {
+                      const vendorSections = new Map<string, React.ReactNode[]>();
                       const [vendor] = packages;
                       const groupedDownPayment = packages.length > 1;
                       const groupKey = `vendor-${event._id}-${key}`;
@@ -1181,11 +1183,6 @@ const MyEventsScreen = () => {
                         return getBookingVendorId(booking) === key && booking.vendorScheduleProposal?.status === 'PENDING';
                       })
                         ?? packages.find(booking => booking.vendorScheduleProposal);
-                      const counts = new Map<string, number>();
-                      for (const booking of packages) {
-                        const status = String(booking.status || 'pending').toLowerCase();
-                        counts.set(status, (counts.get(status) ?? 0) + 1);
-                      }
                       const vendorData = vendor?.vendorId || {};
 
                       const vendorBrandName =
@@ -1224,43 +1221,8 @@ const MyEventsScreen = () => {
                         vendorData?.businessAddress ||
                         'N/A';
 
-                      const vendorDetail = (
-                        <View key={groupKey} style={styles.vendorCard}>
-                          {/* Vendor header */}
-                          <TouchableOpacity
-                            onPress={() => toggleVendorDetails(groupKey)}
-                            activeOpacity={0.8}
-                          >
-                            <View style={styles.vendorHeaderRow}>
-                              <View style={styles.vendorAvatar}>
-                                <Text style={styles.vendorAvatarText}>
-                                  {String(vendorBrandName).trim().charAt(0).toUpperCase() || 'V'}
-                                </Text>
-                              </View>
-
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.vendorText} numberOfLines={1}>
-                                  {vendorBrandName}
-                                </Text>
-                                <Text style={styles.packageText} numberOfLines={1}>
-                                  {packages.length} {packages.length === 1 ? 'package' : 'packages'}
-                                </Text>
-                                {!!vendorCategory && (
-                                  <Text style={styles.vendorCategoryText} numberOfLines={1}>
-                                    {vendorCategory}
-                                  </Text>
-                                )}
-                              </View>
-
-                              <Ionicons
-                                name={vendorExpanded ? 'chevron-up' : 'chevron-down'}
-                                size={18}
-                                color={COLORS.primary}
-                              />
-                            </View>
-                          </TouchableOpacity>
-
-                          <Text style={styles.packageText}>{Array.from(counts, ([status, count]) => `${count} ${status}`).join(' · ')}</Text>
+                      const vendorDetails = (
+                        <>
                           {vendorExpanded && (
                             <View style={styles.vendorDetailsPanel}>
                               <Text style={styles.detailsSectionTitle}>Vendor details</Text>
@@ -1290,16 +1252,6 @@ const MyEventsScreen = () => {
 
                             </View>
                           )}
-                          <View style={styles.vendorFooterRow}>
-                            <TouchableOpacity
-                              style={styles.messageButton}
-                              activeOpacity={0.85}
-                              onPress={() => handleMessage(vendor, false, timeZone)}
-                            >
-                              <Ionicons name="chatbubble-ellipses-outline" size={14} color="#fff" />
-                              <Text style={styles.messageButtonText}>Message</Text>
-                            </TouchableOpacity>
-                          </View>
                           {!!proposalBooking && (
                             <VendorScheduleProposal
                               key={proposalBooking.vendorScheduleProposal.id}
@@ -1317,19 +1269,7 @@ const MyEventsScreen = () => {
                           ) && (
                             <Text style={styles.packageText}>Payment status unavailable. Pull down to refresh.</Text>
                           )}
-                          {Array.from(new Map<string, any>(packages.flatMap(booking => {
-                            const receipt = paymentBreakdowns[booking._id]?.combinedDownPaymentReceipt;
-                            return receipt ? [[receipt.groupId, { receipt, booking }]] : [];
-                          })).values()).map(({ receipt, booking }) => (
-                            <TouchableOpacity key={receipt.groupId} style={styles.receiptButton} onPress={() => router.push({
-                              pathname: '/paymentconfirmation',
-                              params: { vendorOrderId: String(booking._id), combinedReceipt: 'true' },
-                            })}>
-                              <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
-                              <Text style={styles.receiptButtonText}>View Down Payment Receipt · {formatMoney(receipt.amount, currencyOf(booking))}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
+                        </>
                       );
                       packages.forEach((vendor, index) => {
                         if (paymentFilter && !actionIds.has(String(vendor._id))) return;
@@ -1392,7 +1332,7 @@ const MyEventsScreen = () => {
                                   <View style={styles.vendorHeaderRow}>
                                     <View style={{ flex: 1 }}>
                                       <Text style={styles.vendorText}>{vendor.serviceName}</Text>
-                                      <Text style={styles.packageText}>{vendorBrandName} · {formatMoney(finalAmount, currencyOf(vendor))}</Text>
+                                      <Text style={styles.packageText}>{formatMoney(finalAmount, currencyOf(vendor))}</Text>
                                     </View>
                                     <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
                                       <Text style={[styles.statusPillText, { color: vStatus.text, textTransform: 'capitalize' }]}>
@@ -1402,10 +1342,24 @@ const MyEventsScreen = () => {
                                     <Ionicons name={vendorExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.primary} />
                                   </View>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.packageChat} accessibilityRole="button"
-                                  accessibilityLabel={`Message ${vendorBrandName}`} onPress={() => handleMessage(vendor, false, timeZone)}>
-                                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={COLORS.primary} />
-                                </TouchableOpacity>
+                                {['accepted', 'completed'].includes(vendorStatus) && hasSuccessfulPayment && !successfulPayment?.checkoutGroupId && (
+                                  <TouchableOpacity
+                                    style={styles.receiptButton}
+                                    activeOpacity={0.8}
+                                    onPress={() =>
+                                      router.push({
+                                        pathname: '/paymentconfirmation',
+                                        params: {
+                                          vendorOrderId: vendor._id,
+                                        },
+                                      })
+                                    }
+                                  >
+                                    <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
+                                    <Text style={styles.receiptButtonText}>View package receipt</Text>
+                                  </TouchableOpacity>
+                                )}
+
                                 {vendorExpanded && <>
                                 {/* Price block */}
                                 {vendor?.promotionCode && Number(vendor?.discountAmount || 0) > 0 ? (
@@ -1661,24 +1615,6 @@ const MyEventsScreen = () => {
                                       </View>
                                     )}
 
-                                    {hasSuccessfulPayment && !successfulPayment?.checkoutGroupId && (
-                                      <TouchableOpacity
-                                        style={styles.receiptButton}
-                                        activeOpacity={0.8}
-                                        onPress={() =>
-                                          router.push({
-                                            pathname: '/paymentconfirmation',
-                                            params: {
-                                              vendorOrderId: vendor._id,
-                                            },
-                                          })
-                                        }
-                                      >
-                                        <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
-                                        <Text style={styles.receiptButtonText}>View Receipt</Text>
-                                      </TouchableOpacity>
-                                    )}
-
                                     {paymentStatus === 'PAYMENT_EXPIRED' && (
                                       <View style={styles.paymentExpiredBox}>
                                         <Ionicons name="time-outline" size={13} color="#9A6B00" />
@@ -1696,11 +1632,66 @@ const MyEventsScreen = () => {
                               : vendorStatus === 'pending' ? 'Waiting for vendor'
                               : vendor.confirmationTime || vendorStatus === 'completed' ? 'Confirmed'
                               : 'Accepted bookings';
-                            const rows = packageSections.get(section) ?? [];
+                            const rows = vendorSections.get(section) ?? [];
                             rows.push(packageRow);
-                            packageSections.set(section, rows);
+                            vendorSections.set(section, rows);
                       });
-                      return vendorDetail;
+
+                      // Show shared vendor controls and receipts once, alongside that vendor's bookings.
+                      const primarySection = ['Confirmed', 'Accepted bookings', 'Waiting for vendor', 'Payment due']
+                        .find(section => vendorSections.has(section));
+                      vendorSections.forEach((packagesInSection, section) => {
+                        const showVendorDetails = !paymentFilter && section === primarySection;
+                        const rows = packageSections.get(section) ?? [];
+                        rows.push(
+                          <View key={groupKey} style={styles.vendorGroup}>
+                            <View style={styles.vendorHeaderRow}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.vendorGroupName}>{vendorBrandName}</Text>
+                                <Text style={styles.packageText}>
+                                  {vendorCategory ? `${vendorCategory} · ` : ''}
+                                  {packagesInSection.length} {packagesInSection.length === 1 ? 'package' : 'packages'}
+                                </Text>
+                              </View>
+                              <TouchableOpacity style={styles.vendorGroupControl} accessibilityRole="button"
+                                accessibilityLabel={`Message ${vendorBrandName}`} onPress={() => handleMessage(vendor, false, timeZone)}>
+                                <Ionicons name="chatbubble-ellipses-outline" size={18} color={COLORS.primary} />
+                              </TouchableOpacity>
+                            </View>
+                            {showVendorDetails && (
+                              <>
+                              {Array.from(new Map<string, any>(packages.flatMap(booking => {
+                                const receipt = paymentBreakdowns[booking._id]?.combinedDownPaymentReceipt;
+                                return receipt ? [[receipt.groupId, { receipt, booking }]] : [];
+                              })).values()).map(({ receipt, booking }) => (
+                                <View key={receipt.groupId}>
+                                <TouchableOpacity style={styles.receiptButton} onPress={() => router.push({
+                                  pathname: '/paymentconfirmation',
+                                  params: { vendorOrderId: String(booking._id), combinedReceipt: 'true' },
+                                })}>
+                                  <Ionicons name="receipt-outline" size={14} color={COLORS.primary} />
+                                  <Text style={[styles.receiptButtonText, { flexShrink: 1 }]}>Combined down payment receipt · {formatMoney(receipt.amount, currencyOf(booking))}</Text>
+                                </TouchableOpacity>
+                                {Array.isArray(receipt.packages) && <Text style={styles.packageText}>
+                                  {receipt.packages.map((item: { name: string }) => item.name).join(' · ')}
+                                </Text>}
+                                </View>
+                              ))}
+                              </>
+                            )}
+                            {packagesInSection}
+                            {showVendorDetails && <>
+                              <TouchableOpacity style={styles.vendorGroupControl} accessibilityRole="button"
+                                accessibilityState={{ expanded: vendorExpanded }} onPress={() => toggleVendorDetails(groupKey)}>
+                                <Text style={styles.receiptButtonText}>{vendorExpanded ? 'Hide vendor details' : 'Vendor details'}</Text>
+                                <Ionicons name={vendorExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.primary} />
+                              </TouchableOpacity>
+                              {vendorDetails}
+                            </>}
+                          </View>,
+                        );
+                        packageSections.set(section, rows);
+                      });
                     });
                     return <>
                       {['Payment due', 'Waiting for vendor', 'Accepted bookings', 'Confirmed'].map(section => {
@@ -1710,10 +1701,6 @@ const MyEventsScreen = () => {
                           {rows}
                         </View> : null;
                       })}
-                      {!paymentFilter && vendorDetails.length > 0 && <View style={styles.detailsPanel}>
-                        <Text style={styles.sectionTitle}>Vendor details and receipts</Text>
-                        {vendorDetails}
-                      </View>}
                     </>;
                     })()}
 
@@ -1825,7 +1812,9 @@ const styles = StyleSheet.create({
   eventTab: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF' },
   eventTabSelected: { backgroundColor: COLORS.primarySoft },
   countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
-  packageChat: { alignSelf: 'flex-end', padding: 8 },
+  vendorGroup: { marginTop: 10, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
+  vendorGroupName: { color: COLORS.primary, fontSize: 16, fontWeight: '800' },
+  vendorGroupControl: { minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
 
   rescheduleButton: { marginTop: 16, backgroundColor: COLORS.primary, minHeight: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   rescheduleButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
