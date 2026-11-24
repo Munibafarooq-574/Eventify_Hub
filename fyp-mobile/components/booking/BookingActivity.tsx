@@ -2,11 +2,12 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { groupedBookingActivity, formatBookingActivityTime, type BookingActivityRecord } from '@/utils/bookingActivity';
 
-export default function BookingActivity({ booking, bookings, timeZone, cancellationDetailsVisible = false }: {
+export default function BookingActivity({ booking, bookings, timeZone, cancellationDetailsVisible = false, hideTimeZone = false }: {
   booking?: BookingActivityRecord;
   bookings?: (BookingActivityRecord & { serviceName?: string })[];
   timeZone?: string;
   cancellationDetailsVisible?: boolean;
+  hideTimeZone?: boolean;
 }) {
   const rows = groupedBookingActivity(bookings ?? (booking ? [booking] : []), cancellationDetailsVisible);
   if (!rows.length) return null;
@@ -16,7 +17,7 @@ export default function BookingActivity({ booking, bookings, timeZone, cancellat
       <Text style={styles.label}>{row.label}: </Text>{formatBookingActivityTime(row.at, timeZone)}
       {row.packages.length > 0 && <Text>{` · ${row.packages.join(', ')}`}</Text>}
     </Text>)}
-    {!!timeZone && <Text style={styles.zone}>Times shown in {timeZone.replace(/_/g, ' ')}</Text>}
+    {!!timeZone && !hideTimeZone && <Text style={styles.zone}>Times shown in {timeZone.replace(/_/g, ' ')}</Text>}
   </View>;
 }
 const styles = StyleSheet.create({

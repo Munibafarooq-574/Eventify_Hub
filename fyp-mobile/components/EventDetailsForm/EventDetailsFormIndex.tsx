@@ -77,6 +77,11 @@ const formatDuration = (minutes: number) => {
 const PersonalizedExperienceScreen: React.FC = () => {
   const [draft] = useState(createBookingDraftStore);
   const routeParams = useLocalSearchParams();
+  const [duplicateEventId] = useState(() => routeParams.duplicate === 'true' ? generateEventId() : undefined);
+  const duplicateField = (key: string) => {
+    const value = routeParams[key];
+    return routeParams.duplicate === 'true' && typeof value === 'string' ? value : '';
+  };
   const editDateTimeOnly = (Array.isArray(routeParams.editDateTime) ? routeParams.editDateTime[0] : routeParams.editDateTime) === "true";
   const [editLoading, setEditLoading] = useState(editDateTimeOnly);
   const [editSaving, setEditSaving] = useState(false);
@@ -146,8 +151,8 @@ const PersonalizedExperienceScreen: React.FC = () => {
   // STEP 1 & 2 — EVENT NAME / TYPE
   // -------------------------------------------------------
 
-  const [eventName, setEventName] = useState("");
-  const [eventType, setEventType] = useState("");
+  const [eventName, setEventName] = useState(() => duplicateField('eventName'));
+  const [eventType, setEventType] = useState(() => duplicateField('eventType'));
 
   // -------------------------------------------------------
   // STEP 3, 4, 5 — DATE / START TIME / DURATION
@@ -187,7 +192,7 @@ const updateCustomDuration = (
   // STEP 6 — TOTAL GUESTS
   // -------------------------------------------------------
 
-  const [guests, setGuests] = useState("");
+  const [guests, setGuests] = useState(() => duplicateField('guests'));
 
   // -------------------------------------------------------
 // STEP 7 & 8 — EVENT LOCATION
@@ -196,8 +201,8 @@ const updateCustomDuration = (
 const [cities, setCities] = useState<ActiveCity[]>([]);
 const [citiesLoading, setCitiesLoading] = useState(false);
 
-const [eventCityId, setEventCityId] = useState("");
-const [eventAddress, setEventAddress] = useState("");
+const [eventCityId, setEventCityId] = useState(() => duplicateField('cityId'));
+const [eventAddress, setEventAddress] = useState(() => duplicateField('eventAddress'));
 
 const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
 const [citySearch, setCitySearch] = useState("");
@@ -206,7 +211,9 @@ const [citySearch, setCitySearch] = useState("");
   // DESIRED SERVICES (Phase 3 — shown right after event details)
   // -------------------------------------------------------
 
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>(() =>
+    duplicateField('services').split(',').map(name => name.trim()).filter(Boolean)
+  );
   const [categories, setCategories] = useState<ICategory[]>([]);
 
   // -------------------------------------------------------
@@ -482,12 +489,12 @@ const selectedCity = useMemo(
     }
 
     try {
-  let eventId: string | undefined;
+  let eventId = duplicateEventId;
 
   try {
     const existingRaw = await draft.get("eventDetails");
 
-    if (existingRaw) {
+    if (!eventId && existingRaw) {
       eventId = JSON.parse(existingRaw)?.eventId;
     }
   } catch {

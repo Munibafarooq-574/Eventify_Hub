@@ -362,11 +362,11 @@ const MyEventsScreen = () => {
     }, [fetchData]),
   );
 
-  const toggleEventDetails = (eventId: string) => {
+  const toggleEventDetails = (eventId: string, expanded: boolean) => {
     smoothLayout();
     setExpandedEvents((current) => ({
       ...current,
-      [eventId]: !current[eventId],
+      [eventId]: !expanded,
     }));
   };
 
@@ -509,30 +509,64 @@ const MyEventsScreen = () => {
       params: { vendorOrderId },
     });
 
-  // ─────────── Summary numbers for the hero card (display only) ───────────
-  const totalVendors = events.reduce(
-    (sum, e) =>
-      sum +
-      (Array.isArray(e.vendorOrders)
-        ? groupBookingsByVendor(e.vendorOrders.filter(isActiveVendorOrder)).size
-        : 0),
-    0,
-  );
-  const paymentsDue = events.reduce(
-    (sum, e) =>
-      sum +
-      (Array.isArray(e.vendorOrders)
-        ? e.vendorOrders.filter(
-            (v: any) =>
-              isActiveVendorOrder(v) &&
-              String(v?.status || '').toLowerCase() === 'accepted' &&
-              ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(v?.paymentStatus || '').toUpperCase()) &&
-              !paymentBreakdowns[v._id]?.pendingPayment &&
-              new Date(paymentBreakdowns[v._id]?.paymentDeadline ?? v?.paymentDeadline).getTime() > paymentNow,
-          ).length
-        : 0),
-    0,
-  );
+  const [paymentFilter, setPaymentFilter] = useState(false);
+  const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
+
+  const paymentActions = (event: any, vendorGroups: ReturnType<typeof groupBookingsByVendor>) => {
+    if (rescheduleRequests.some(request => String(request.orderId) === String(event._id) &&
+      ['PENDING', 'REPLACEMENT_REQUIRED'].includes(request.resolutionStatus || 'PENDING'))) return [];
+
+    return Array.from(vendorGroups.values()).flatMap(packages => {
+      const [vendor] = packages;
+      const combined = packages.length > 1;
+      const eligible = packages.flatMap(booking => {
+        const payment = paymentBreakdowns[booking._id];
+        const deadline = new Date(payment?.paymentDeadline ?? booking.paymentDeadline).getTime();
+        const amount = Number(booking.downPaymentAmount);
+        const status = String(payment?.paymentStatus ?? booking.paymentStatus).toUpperCase();
+        if (String(booking.status).toLowerCase() !== 'accepted' ||
+          !['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(status) ||
+          payment?.pendingPayment || payment?.combinedDownPaymentReceipt || payment?.latestSuccessfulPayment ||
+          (combined && !payment) || !(deadline > paymentNow) || !Number.isFinite(amount) || amount <= 0 ||
+          currencyOf(booking) !== currencyOf(vendor)) return [];
+        return [{ booking, deadline, cents: Math.round(amount * 100) }];
+      });
+      if (!eligible.length) return [];
+      return [{
+        vendor, combined, eligible,
+        amount: eligible.reduce((sum, row) => sum + row.cents, 0) / 100,
+        deadline: Math.min(...eligible.map(row => row.deadline)),
+      }];
+    });
+  };
+
+  const eventRows = events.map(event => {
+    const bookings = Array.isArray(event.vendorOrders) ? event.vendorOrders.filter(isActiveVendorOrder) : [];
+    const groups = groupBookingsByVendor(bookings);
+    const actions = paymentActions(event, groups);
+    const end = new Date(event.eventEndDateTime || event.eventStartDateTime || event.eventDate).getTime();
+    return { event, groups, actions, past: end < paymentNow };
+  });
+  const paymentsDue = eventRows.reduce((sum, row) => sum + row.actions.length, 0);
+  useEffect(() => {
+    if (!targetOrderId) return;
+    const target = events.find(event => String(event._id) === targetOrderId);
+    if (!target) return;
+    const end = new Date(target.eventEndDateTime || target.eventStartDateTime || target.eventDate).getTime();
+    setEventTab(end < Date.now() ? 'past' : 'upcoming');
+    setPaymentFilter(false);
+  }, [targetOrderId, events]);
+  const visibleEvents = eventRows.filter(row => paymentFilter ? row.actions.length > 0 : row.past === (eventTab === 'past'));
+  const countdown = (deadline: number) =>
+    deadline <= paymentNow ? 'Overdue' : `${Math.ceil((deadline - paymentNow) / 3600000)} hrs left`;
+  const paidFor = (booking: any) => {
+    const payment = paymentBreakdowns[booking._id];
+    const status = String(payment?.paymentStatus ?? booking.paymentStatus).toUpperCase();
+    const total = Number(booking.finalAmount ?? booking.price ?? 0);
+    const paid = Number(payment?.paidAmount ?? (status === 'PAID' ? total :
+      status === 'PARTIALLY_PAID' ? booking.downPaymentAmount ?? 0 : 0));
+    return Math.max(0, Math.min(total, paid));
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
@@ -628,27 +662,28 @@ const MyEventsScreen = () => {
                 </View>
 
                 <View style={styles.heroStatDivider} />
-
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{totalVendors}</Text>
-                  <Text style={styles.heroStatLabel}>
-                    {totalVendors === 1 ? 'Vendor' : 'Vendors'}
-                  </Text>
-                </View>
-
-                <View style={styles.heroStatDivider} />
-
-                <View style={styles.heroStat}>
+                <TouchableOpacity style={styles.heroStat} accessibilityRole="button"
+                  accessibilityState={{ selected: paymentFilter }} onPress={() => setPaymentFilter(value => !value)}>
                   <Text style={styles.heroStatValue}>{paymentsDue}</Text>
-                  <Text style={styles.heroStatLabel}>Payments due</Text>
-                </View>
+                  <Text style={styles.heroStatLabel}>{paymentFilter ? 'Clear payments filter' : 'Payments due'}</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
-            {events.map((event, eventIndex) => {
+            <View style={styles.eventTabs}>
+              {(['upcoming', 'past'] as const).map(tab => (
+                <TouchableOpacity key={tab} style={[styles.eventTab, !paymentFilter && eventTab === tab && styles.eventTabSelected]}
+                  accessibilityRole="tab" accessibilityState={{ selected: !paymentFilter && eventTab === tab }}
+                  onPress={() => { setEventTab(tab); setPaymentFilter(false); }}>
+                  <Text style={styles.totalLabel}>{tab === 'upcoming' ? 'Upcoming' : 'Past'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {!visibleEvents.length && <Text style={styles.packageText}>{paymentFilter ? 'No payments due.' : 'No events in this tab.'}</Text>}
+            {visibleEvents.map(({ event, groups: vendorGroups, actions }, eventIndex) => {
               const timeZone = bookingTimeZone(event);
               const isDeleting = deletingId === event._id;
-              const eventExpanded = !!expandedEvents[event._id];
+              const eventExpanded = expandedEvents[event._id] ?? paymentFilter;
               const badge = getDateBadge(event.eventDate);
               const allVendorOrders: any[] = Array.isArray(event.vendorOrders)
                 ? event.vendorOrders
@@ -657,12 +692,21 @@ const MyEventsScreen = () => {
               const inactiveVendorOrders = allVendorOrders.filter(
                 (vendor: any) => !isActiveVendorOrder(vendor),
               );
-              const vendorGroups = groupBookingsByVendor(vendorOrders);
               const activeEventTotal = vendorOrders.reduce(
                 (sum: number, vendor: any) =>
                   sum + Number(vendor?.finalAmount ?? vendor?.price ?? 0),
                 0,
               );
+              const pending = vendorOrders.filter(booking => String(booking.status).toLowerCase() === 'pending');
+              const accepted = vendorOrders.filter(booking => ['accepted', 'completed'].includes(String(booking.status).toLowerCase()));
+              const sumValue = (bookings: any[]) => bookings.reduce(
+                (sum, booking) => sum + Number(booking.finalAmount ?? booking.price ?? 0), 0);
+              const due = actions.reduce((sum, action) => sum + Math.round(action.amount * 100), 0) / 100;
+              const money = (amount: number) => formatMoney(amount, currencyOf(event));
+              const start = new Date(event.eventStartDateTime || event.eventDate).getTime();
+              const daysLeft = Math.ceil((start - paymentNow) / 86400000);
+              const actionIds = new Set(actions.flatMap(action => action.eligible.map(row => String(row.booking._id))));
+              const packageSections = new Map<string, React.ReactNode[]>();
               const hasSuccessfulVendorPayment = vendorOrders.some((vendor: any) =>
                 ['PARTIALLY_PAID', 'PAID'].includes(String(vendor?.paymentStatus || 'UNPAID').toUpperCase()),
               );
@@ -674,8 +718,10 @@ const MyEventsScreen = () => {
                     <View style={styles.cardTopRow}>
                       <TouchableOpacity
                         style={{ flex: 1 }}
-                        onPress={() => toggleEventDetails(event._id)}
+                        onPress={() => toggleEventDetails(event._id, eventExpanded)}
                         activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: eventExpanded }}
                       >
                         <View style={styles.expandHeaderRow}>
                           <View style={styles.dateBadge}>
@@ -706,6 +752,15 @@ const MyEventsScreen = () => {
                                 </View>
                               )}
                             </View>
+                            <Text style={styles.packageText}>
+                              {vendorGroups.size} vendors · {vendorOrders.length} packages
+                              {pending.length > 0 ? ` · ${pending.length} pending` : ''}
+                              {accepted.length > 0 ? ` · ${accepted.length} accepted` : ''}
+                            </Text>
+                            <Text style={styles.totalLabel}>
+                              {money(activeEventTotal)} total{due > 0 ? ` · ${money(due)} down payment due` : ''}
+                            </Text>
+                            {daysLeft > 0 && <Text style={styles.packageText}>in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}</Text>}
                           </View>
 
                           <View style={styles.chevronCircle}>
@@ -722,16 +777,58 @@ const MyEventsScreen = () => {
                         style={styles.deleteButton}
                         disabled={isDeleting}
                         activeOpacity={0.7}
-                        onPress={() => handleDelete(event._id, event.eventName)}
+                        accessibilityLabel="Event options"
+                        onPress={() => Alert.alert('Event options', undefined, [
+                          { text: 'Duplicate', onPress: () => router.push({
+                            pathname: '/EventDetailsForm',
+                            params: {
+                              duplicate: 'true',
+                              eventName: String(event.eventName ?? ''),
+                              eventType: String(event.eventType ?? ''),
+                              guests: String(event.guests ?? ''),
+                              cityId: String(event.eventCityId?._id ?? event.eventCityId ?? ''),
+                              eventAddress: String(event.eventAddress ?? ''),
+                              services: getDesiredServices(event) === 'N/A' ? '' : getDesiredServices(event),
+                            },
+                          }) },
+                          { text: 'Close', style: 'cancel' },
+                          { text: 'Delete', style: 'destructive', onPress: () => handleDelete(event._id, event.eventName) },
+                        ])}
                       >
                         {isDeleting ? (
                           <ActivityIndicator size="small" color={COLORS.danger} />
                         ) : (
-                          <Ionicons name="trash-outline" size={17} color={COLORS.danger} />
+                          <Ionicons name="ellipsis-horizontal" size={17} color={COLORS.primary} />
                         )}
                       </TouchableOpacity>
                     </View>
 
+                    {eventExpanded && <>
+                    {actions.length > 0 && (
+                      <View style={styles.detailsPanel}>
+                        <Text style={styles.sectionTitle}>Action needed</Text>
+                        {actions.map(({ vendor, combined, eligible, amount, deadline }) => (
+                          <View key={vendor._id} style={styles.paymentBox}>
+                            <Text style={styles.paymentTitle}>{vendor.vendorId?.contactDetails?.brandName || vendor.vendorId?.name || 'Vendor'} · {eligible.length} {eligible.length === 1 ? 'package' : 'packages'}</Text>
+                            <Text style={styles.countdown}>{countdown(deadline)}</Text>
+                            <Text style={styles.paymentDeadlineText}>Due {formatBookingDate(new Date(deadline), timeZone)} · {formatBookingTime(new Date(deadline), timeZone)}</Text>
+                            <TouchableOpacity style={styles.payNowButton} accessibilityRole="button" onPress={() => router.push({
+                              pathname: '/paymentmethod',
+                              params: { vendorOrderId: String(eligible[0].booking._id), ...(combined ? { combined: 'true' } : {}) },
+                            })}>
+                              <Text style={styles.payNowButtonText}>Pay {formatMoney(amount, currencyOf(vendor))}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    <View style={styles.detailsPanel}>
+                      <Text style={styles.sectionTitle}>Booking totals</Text>
+                      <DetailRow label="Accepted booking value" value={money(sumValue(accepted))} />
+                      <DetailRow label="Pending approval" value={money(sumValue(pending))} />
+                      <DetailRow label="Paid so far" value={money(vendorOrders.reduce((sum, booking) => sum + paidFor(booking), 0))} />
+                      <DetailRow label="Down payment due" value={money(due)} />
+                    </View>
                     {/* ───── Event details ───── */}
                     {eventExpanded && (
                       <View style={styles.detailsPanel}>
@@ -1074,31 +1171,10 @@ const MyEventsScreen = () => {
 
                     <View style={styles.divider} />
 
-                    <View style={styles.sectionHeaderRow}>
-                      <Text style={styles.sectionTitle}>Vendors</Text>
-                      <View style={styles.countBubble}>
-                        <Text style={styles.countBubbleText}>{vendorGroups.size}</Text>
-                      </View>
-                    </View>
-
-                    {/* ───── Vendors ───── */}
-                    {Array.from(vendorGroups, ([key, packages]) => {
+                    {(() => {
+                    const vendorDetails = Array.from(vendorGroups, ([key, packages]) => {
                       const [vendor] = packages;
                       const groupedDownPayment = packages.length > 1;
-                      const eligible = groupedDownPayment && !rescheduleRequests.some(request =>
-                        String(request.orderId) === String(event._id) &&
-                        ['PENDING', 'REPLACEMENT_REQUIRED'].includes(request.resolutionStatus || 'PENDING'))
-                        ? packages.flatMap(booking => {
-                          const payment = paymentBreakdowns[booking._id];
-                          const deadline = new Date(payment?.paymentDeadline ?? booking.paymentDeadline).getTime();
-                          const amount = Number(booking.downPaymentAmount);
-                          return String(booking.status).toLowerCase() === 'accepted' &&
-                            ['PAYMENT_REQUIRED', 'PAYMENT_FAILED'].includes(String(payment?.paymentStatus ?? booking.paymentStatus).toUpperCase()) &&
-                            !!payment && !payment.pendingPayment && !payment.combinedDownPaymentReceipt && !payment.latestSuccessfulPayment && deadline > paymentNow && Number.isFinite(amount) && amount > 0 &&
-                            currencyOf(booking) === currencyOf(vendor)
-                            ? [{ booking, deadline, cents: Math.round(amount * 100) }] : [];
-                        }) : [];
-                      const groupedAmount = eligible.reduce((sum, row) => sum + row.cents, 0) / 100;
                       const groupKey = `vendor-${event._id}-${key}`;
                       const vendorExpanded = !!expandedVendors[groupKey];
                       const proposalBooking = allVendorOrders.find((booking: any) => {
@@ -1148,7 +1224,7 @@ const MyEventsScreen = () => {
                         vendorData?.businessAddress ||
                         'N/A';
 
-                      return (
+                      const vendorDetail = (
                         <View key={groupKey} style={styles.vendorCard}>
                           {/* Vendor header */}
                           <TouchableOpacity
@@ -1241,21 +1317,6 @@ const MyEventsScreen = () => {
                           ) && (
                             <Text style={styles.packageText}>Payment status unavailable. Pull down to refresh.</Text>
                           )}
-                          {eligible.length > 0 && (
-                            <View style={styles.paymentBox}>
-                              <Text style={styles.paymentTitle}>Vendor down payment</Text>
-                              <Text style={styles.packageText}>{eligible.length} {eligible.length === 1 ? 'package' : 'packages'} ready to pay</Text>
-                              <Text style={styles.paymentDeadlineText}>
-                                Due by {new Date(Math.min(...eligible.map(row => row.deadline))).toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
-                              </Text>
-                              <TouchableOpacity style={styles.payNowButton} onPress={() => router.push({
-                                pathname: '/paymentmethod',
-                                params: { vendorOrderId: String(eligible[0].booking._id), combined: 'true' },
-                              })}>
-                                <Text style={styles.payNowButtonText}>Pay {formatMoney(groupedAmount, currencyOf(vendor))} Down Payment</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
                           {Array.from(new Map<string, any>(packages.flatMap(booking => {
                             const receipt = paymentBreakdowns[booking._id]?.combinedDownPaymentReceipt;
                             return receipt ? [[receipt.groupId, { receipt, booking }]] : [];
@@ -1268,7 +1329,10 @@ const MyEventsScreen = () => {
                               <Text style={styles.receiptButtonText}>View Down Payment Receipt · {formatMoney(receipt.amount, currencyOf(booking))}</Text>
                             </TouchableOpacity>
                           ))}
-                          {packages.map((vendor, index) => {
+                        </View>
+                      );
+                      packages.forEach((vendor, index) => {
+                        if (paymentFilter && !actionIds.has(String(vendor._id))) return;
                             const vendorStatus = String(vendor?.status || 'pending').toLowerCase();
                             const vendorData = vendor?.vendorId || {};
                             const vendorExpanded = !!expandedVendors[vendor._id];
@@ -1322,14 +1386,27 @@ const MyEventsScreen = () => {
                               text: COLORS.primary,
                             };
 
-                            return (
+                            const packageRow = (
                               <View key={vendor._id || index} style={styles.vendorCard}>
                                 <TouchableOpacity onPress={() => toggleVendorDetails(vendor._id)} accessibilityRole="button" accessibilityState={{ expanded: vendorExpanded }}>
                                   <View style={styles.vendorHeaderRow}>
-                                    <Text style={[styles.vendorText, { flex: 1 }]}>{vendor.serviceName}</Text>
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={styles.vendorText}>{vendor.serviceName}</Text>
+                                      <Text style={styles.packageText}>{vendorBrandName} · {formatMoney(finalAmount, currencyOf(vendor))}</Text>
+                                    </View>
+                                    <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
+                                      <Text style={[styles.statusPillText, { color: vStatus.text, textTransform: 'capitalize' }]}>
+                                        {vendor.confirmationTime && vendorStatus === 'accepted' ? 'Confirmed' : vendorStatus}
+                                      </Text>
+                                    </View>
                                     <Ionicons name={vendorExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.primary} />
                                   </View>
                                 </TouchableOpacity>
+                                <TouchableOpacity style={styles.packageChat} accessibilityRole="button"
+                                  accessibilityLabel={`Message ${vendorBrandName}`} onPress={() => handleMessage(vendor, false, timeZone)}>
+                                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={COLORS.primary} />
+                                </TouchableOpacity>
+                                {vendorExpanded && <>
                                 {/* Price block */}
                                 {vendor?.promotionCode && Number(vendor?.discountAmount || 0) > 0 ? (
                                   <View style={styles.promotionSnapshot}>
@@ -1434,24 +1511,7 @@ const MyEventsScreen = () => {
 
                                 {!!vendor.laterTimeRequest && <CancellationReplacementActions event={event} booking={vendor} onUpdated={fetchData}
                                   canReschedule={!hasSuccessfulVendorPayment && !rescheduleRequests.some((request: any) => String(request.orderId) === String(event._id))} />}
-                                <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
-                                {/* Status + message row */}
-                                <View style={styles.vendorFooterRow}>
-                                  <View style={[styles.statusPill, { backgroundColor: vStatus.bg }]}>
-                                    <Ionicons name={vStatus.icon} size={12} color={vStatus.text} />
-                                    <Text
-                                      style={[
-                                        styles.statusPillText,
-                                        { color: vStatus.text, textTransform: 'capitalize' },
-                                      ]}
-                                    >
-                                      {vendorStatus}
-                                    </Text>
-                                  </View>
-
-
-                                </View>
-
+                                <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible hideTimeZone />
                                 {vendorStatus === 'accepted' && paymentStatus === 'PARTIALLY_PAID' && (
                                   <TouchableOpacity
                                     accessibilityRole="button"
@@ -1486,6 +1546,7 @@ const MyEventsScreen = () => {
                                       />
                                     </View>
 
+                                    <Text style={styles.packageText}>{formatMoney(paidFor(vendor), currencyOf(vendor))} paid of {formatMoney(finalAmount, currencyOf(vendor))}</Text>
                                     <View style={styles.paymentFigures}>
                                       <View style={styles.paymentFigure}>
                                         <Text style={styles.paymentLabel}>Total</Text>
@@ -1513,7 +1574,7 @@ const MyEventsScreen = () => {
                                       <View style={styles.deadlineRow}>
                                         <Ionicons name="alarm-outline" size={12} color="#B8860B" />
                                         <Text style={styles.paymentDeadlineText}>
-                                          {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
+                                          {countdown(paymentDeadline.getTime())} · {isRemainingDue ? (paymentOverdue ? 'Remaining payment overdue since ' : 'Remaining payment due by ') : 'Down payment due by '}
                                           {paymentDeadline.toLocaleString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}
                                         </Text>
                                       </View>
@@ -1628,14 +1689,35 @@ const MyEventsScreen = () => {
                                     )}
                                   </View>
                                 )}
+                                </>}
                               </View>
                             );
-                          })}
-                        </View>
-                      );
-                    })}
+                            const section = actionIds.has(String(vendor._id)) ? 'Payment due'
+                              : vendorStatus === 'pending' ? 'Waiting for vendor'
+                              : vendor.confirmationTime || vendorStatus === 'completed' ? 'Confirmed'
+                              : 'Accepted bookings';
+                            const rows = packageSections.get(section) ?? [];
+                            rows.push(packageRow);
+                            packageSections.set(section, rows);
+                      });
+                      return vendorDetail;
+                    });
+                    return <>
+                      {['Payment due', 'Waiting for vendor', 'Accepted bookings', 'Confirmed'].map(section => {
+                        const rows = packageSections.get(section);
+                        return rows?.length ? <View key={section} style={styles.detailsPanel}>
+                          <Text style={styles.sectionTitle}>{section}</Text>
+                          {rows}
+                        </View> : null;
+                      })}
+                      {!paymentFilter && vendorDetails.length > 0 && <View style={styles.detailsPanel}>
+                        <Text style={styles.sectionTitle}>Vendor details and receipts</Text>
+                        {vendorDetails}
+                      </View>}
+                    </>;
+                    })()}
 
-                    {inactiveVendorOrders.length > 0 && (
+                    {!paymentFilter && inactiveVendorOrders.length > 0 && (
                       <View style={styles.inactiveHistoryBox}>
                         <View style={styles.inactiveHistoryHeader}>
                           <Ionicons name="time-outline" size={14} color={COLORS.muted} />
@@ -1697,7 +1779,7 @@ const MyEventsScreen = () => {
                                   <Text style={styles.messageButtonText}>Contact Support</Text>
                                 </TouchableOpacity>
                               </View>
-                              <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible />
+                              <BookingActivity booking={vendor} timeZone={timeZone} cancellationDetailsVisible hideTimeZone />
                               <BookingCancellationDetails timeZone={timeZone} booking={vendor} refundState={{ record: refunds[String(vendor._id)], loading: refundLoading, error: refundError }} />
                               {!!vendor.vendorScheduleProposal && !vendorGroups.has(getBookingVendorId(vendor)) && (
                                 <VendorScheduleProposal
@@ -1715,18 +1797,7 @@ const MyEventsScreen = () => {
                       </View>
                     )}
 
-                    {/* ───── Total ───── */}
-                    <View style={styles.totalRow}>
-                      <View>
-                        <Text style={styles.totalLabel}>Total Event Price</Text>
-                        <Text style={styles.totalHint}>
-                          {vendorGroups.size} {vendorGroups.size === 1 ? 'vendor' : 'vendors'}
-                        </Text>
-                      </View>
-                      <Text style={styles.totalPrice}>
-                        {currencySymbol(currencyOf(event))} {activeEventTotal.toLocaleString()}
-                      </Text>
-                    </View>
+                    </>}
                   </View>
                 </FadeInUp>
               );
@@ -1750,6 +1821,12 @@ const MyEventsScreen = () => {
 export default MyEventsScreen;
 
 const styles = StyleSheet.create({
+  eventTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  eventTab: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF' },
+  eventTabSelected: { backgroundColor: COLORS.primarySoft },
+  countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
+  packageChat: { alignSelf: 'flex-end', padding: 8 },
+
   rescheduleButton: { marginTop: 16, backgroundColor: COLORS.primary, minHeight: 46, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   rescheduleButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   rescheduleStatusCard: { marginTop: 14, padding: 16, backgroundColor: '#FFF9FC', borderRadius: 20, borderWidth: 1, borderColor: '#E9D2E1', shadowColor: COLORS.primary, shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
