@@ -1311,17 +1311,11 @@ const MyEventsScreen = () => {
 
                             const hasSuccessfulPayment = !!successfulPayment;
 
-                            // Progress bar (display only)
-                            const paidSoFar =
-                              paymentStatus === 'PAID'
-                                ? finalAmount
-                                : paymentStatus === 'PARTIALLY_PAID'
-                                  ? downPaymentAmount
+                            // The midpoint marks a confirmed down payment.
+                            const paymentProgress =
+                              paymentStatus === 'PAID' ? 100
+                                : paymentStatus === 'PARTIALLY_PAID' && downPaymentAmount > 0 ? 50
                                   : 0;
-                            const paidPercent =
-                              finalAmount > 0
-                                ? Math.min(100, Math.round((paidSoFar / finalAmount) * 100))
-                                : 0;
 
                             const payChip = paymentChipMap[paymentStatus] || {
                               bg: COLORS.primarySoft,
@@ -1488,7 +1482,7 @@ const MyEventsScreen = () => {
                                     {/* Progress */}
                                     <View style={styles.progressTrack}>
                                       <View
-                                        style={[styles.progressFill, { width: `${paidPercent}%` }]}
+                                        style={[styles.progressFill, { width: `${paymentProgress}%` }]}
                                       />
                                     </View>
 
@@ -1500,7 +1494,7 @@ const MyEventsScreen = () => {
                                         </Text>
                                       </View>
 
-                                      <View style={styles.paymentFigure}>
+                                      <View style={styles.downPaymentFigure}>
                                         <Text style={styles.paymentLabel}>Down payment</Text>
                                         <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                                           {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
@@ -2457,6 +2451,10 @@ const styles = StyleSheet.create({
   },
   paymentFigure: {
     flex: 1,
+  },
+  downPaymentFigure: {
+    flex: 1,
+    alignItems: 'center',
   },
   paymentLabel: {
     fontSize: 10.5,
