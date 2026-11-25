@@ -26,6 +26,8 @@ import { uploadReviewMedia } from '@/services/uploadReviewMedia';
 import { createBookingDraftStore, getUserData, getSecureData } from '@/store';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { router, useFocusEffect, useGlobalSearchParams, useLocalSearchParams } from 'expo-router';
 import React, {
@@ -354,6 +356,7 @@ const getRelevantVendorSlots = (
 
 const VendorDetailsScreen: React.FC =
   () => {
+    const { top: topInset } = useSafeAreaInsets();
   const [draft] = useState(createBookingDraftStore);
     const {
   id,
@@ -2443,7 +2446,11 @@ const serviceCityNamesFromIds =
             : 0
         }
       >
-                <ScrollView
+        <StatusBar style="light" />
+        <View style={{ height: topInset, backgroundColor: PRIMARY }} />
+        <ScrollView
+          automaticallyAdjustContentInsets={false}
+          contentInsetAdjustmentBehavior="never"
           ref={scrollViewRef}
           style={styles.container}
           contentContainerStyle={
@@ -5864,7 +5871,7 @@ const styles = StyleSheet.create({
   },
   heroWrapper: {
     backgroundColor: PRIMARY,
-    paddingTop: 44,
+    paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 20,
     borderBottomLeftRadius: 28,
