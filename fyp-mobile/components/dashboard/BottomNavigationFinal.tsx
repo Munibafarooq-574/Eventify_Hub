@@ -191,8 +191,12 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
     <View pointerEvents="box-none" style={[styles.footer, { bottom: Math.max(6, bottom) }]}>
       <View style={styles.dock} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
         <View pointerEvents="none" style={styles.glass}>
-          {Platform.OS === 'ios' && <BlurView intensity={55} tint="light" style={StyleSheet.absoluteFill} />}
-          <LinearGradient colors={['#FCF5FDEB', '#EEDFF5F5']} style={StyleSheet.absoluteFill} />
+          {Platform.OS === 'ios' && <BlurView intensity={72} tint="light" style={StyleSheet.absoluteFill} />}
+          <LinearGradient
+            colors={Platform.OS === 'ios' ? ['#FFFFFF78', '#F5E8FA30', '#EBD8F38C'] : ['#FFFFFFC9', '#F4E8F9A8', '#EBD8F3DB']}
+            locations={[0, 0.46, 1]}
+            style={StyleSheet.absoluteFill}
+          />
         </View>
         {selected >= 0 && width > 0 && (
           <Animated.View pointerEvents="none" style={[styles.beam, {
@@ -235,11 +239,11 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', left: 10, right: 10 },
   dock: {
     flexDirection: 'row', height: 60, borderRadius: 21,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCC9E7',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#FFFFFFCF',
     shadowColor: '#684174', shadowOpacity: .18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
-  glass: { ...StyleSheet.absoluteFill, borderRadius: 21, overflow: 'hidden', backgroundColor: '#F5EBFA88' },
+  glass: { ...StyleSheet.absoluteFill, borderRadius: 21, overflow: 'hidden', backgroundColor: '#F5EBFA32' },
   beam: { position: 'absolute', top: 0, bottom: 0, left: 0, alignItems: 'center' },
   wash: { ...StyleSheet.absoluteFill, marginHorizontal: 3, marginBottom: 3, borderRadius: 15, borderBottomWidth: 1 },
   beamCap: { position: 'absolute', top: -2, height: 4, width: 25, borderRadius: 4, shadowOpacity: .94, shadowRadius: 7, shadowOffset: { width: 0, height: 0 }, elevation: 3 },

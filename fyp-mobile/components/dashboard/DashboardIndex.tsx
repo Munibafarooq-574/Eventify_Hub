@@ -1,5 +1,4 @@
 import { getUserData, saveUserData } from '@/store';
-import { ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { growthApi } from '@/services/growthApiClient';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -8,7 +7,7 @@ import { DashboardRefreshContext } from "./DashboardRefreshContext";
 //client Dashboard Screen
 
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
 import Header from './Header';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
@@ -53,53 +52,53 @@ const DashboardIndex: React.FC = () => {
     () => Promise.allSettled(Array.from(sections, reload => reload())),
   );
 
-  if (locationStatus !== 'ready' || !location) {
-    return <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-      {locationStatus === 'loading' ? <ActivityIndicator /> : (
-        <TouchableOpacity accessibilityRole="button" onPress={() => setLocationRetry(value => value + 1)}>
-          <Text>Could not load your marketplace. Tap to try again.</Text>
-        </TouchableOpacity>
-      )}
-    </View>;
-  }
-
   return (
-    <DashboardRefreshContext.Provider key={`${location.countryCode}|${location.cityId}`} value={sections}>
-      <View style={styles.container}>
-        <ScrollView
-          refreshControl={refreshControl}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <Header />
-          <View style={styles.content}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={styles.marketplacePicker}
-              onPress={() => router.push({ pathname: '/marketplace-location', params: { mode: 'city' } })}
-            >
-              <Text style={styles.marketplaceLabel}>
-                Browsing {location.countryCode === 'US' ? 'United States' : 'Pakistan'} · {location.cityName || 'All cities'} ▾
-              </Text>
-            </TouchableOpacity>
-            <CategoryGrid />
+    <View style={styles.container}>
+      <ScrollView
+        refreshControl={refreshControl}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <Header />
+        {locationStatus === 'ready' && location ? (
+          <DashboardRefreshContext.Provider key={`${location.countryCode}|${location.cityId}`} value={sections}>
+            <View style={styles.content}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.marketplacePicker}
+                onPress={() => router.push({ pathname: '/marketplace-location', params: { mode: 'city' } })}
+              >
+                <Text style={styles.marketplaceLabel}>
+                  Browsing {location.countryCode === 'US' ? 'United States' : 'Pakistan'} · {location.cityName || 'All cities'} ▾
+                </Text>
+              </TouchableOpacity>
+              <CategoryGrid />
 
-            <PublicCouponOffers />
+              <PublicCouponOffers />
 
-            <SponsoredForYou />
+              <SponsoredForYou />
 
-            <RecommendedForYourEvent />
+              <RecommendedForYourEvent />
 
-            <FeaturedVendorsSection />
+              <FeaturedVendorsSection />
 
-            <FeaturedPackagesSection />
+              <FeaturedPackagesSection />
 
-            <VenueList />
+              <VenueList />
+            </View>
+          </DashboardRefreshContext.Provider>
+        ) : (
+          <View style={styles.locationFeedback}>
+            {locationStatus === 'loading' ? <ActivityIndicator color="#780C60" accessibilityLabel="Loading marketplace" /> : (
+              <TouchableOpacity accessibilityRole="button" onPress={() => setLocationRetry(value => value + 1)}>
+                <Text>Could not load your marketplace. Tap to try again.</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        </ScrollView>
-        <BottomNavigationFinal />
-      </View>
-    </DashboardRefreshContext.Provider>
+        )}
+      </ScrollView>
+      <BottomNavigationFinal />
+    </View>
   );
 };
 
@@ -109,6 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
     paddingTop: 50,
   },
+  locationFeedback: { minHeight: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   scrollContent: {
     paddingBottom: 110, // keeps content clear of the floating bottom nav
   },
