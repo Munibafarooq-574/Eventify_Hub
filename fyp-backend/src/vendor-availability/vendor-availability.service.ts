@@ -1051,7 +1051,8 @@ return {
       for (let start = first; start < last;) {
         const end = Math.min(start + 60 * 60000, last);
         const occupied = bookings.filter((booking) =>
-          new Date(booking.start).getTime() < end && new Date(booking.end).getTime() > start,
+          booking.start !== undefined && booking.end !== undefined &&
+          booking.start.getTime() < end && booking.end.getTime() > start,
         ).length;
         result.push({ start: new Date(start), end: new Date(end), booked: occupied >= (schedule?.capacity ?? 1) });
         start = end;
