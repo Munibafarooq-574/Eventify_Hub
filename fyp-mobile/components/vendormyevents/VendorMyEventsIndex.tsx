@@ -705,25 +705,34 @@ return (
         const orderId = bookings[0].orderId;
         const order = orderId ? orderById.get(orderId) : undefined;
         return <View key={key} style={[styles.slotCard, styles.bookingGroup]}>
-          {!!order?.eventName && <Text style={styles.slotTime}>
-            {order.eventName}{order.organizerId?.name ? ` · ${order.organizerId.name}` : ''}
-          </Text>}
-          {bookings.map((booking, index) => <View key={index} style={styles.capacityRow}>
-            <Text style={styles.slotTime}>{booking.eventName}</Text>
-            <Text style={styles.slotStatus}>{formatTime(booking.eventStartDateTime, daySnapshot?.timeZone)} – {formatTime(booking.eventEndDateTime, daySnapshot?.timeZone)}</Text>
+          <View style={styles.bookedHeading}>
+            {!!order?.eventName && <Text style={styles.slotTime}>{order.eventName}</Text>}
+            <Text style={styles.slotStatus}>
+              {order?.organizerId?.name ? `${order.organizerId.name} · ` : ''}
+              {bookings.length} {bookings.length === 1 ? 'package' : 'packages'}
+            </Text>
+          </View>
+          {bookings.map((booking, index) => <View key={index}
+            style={[styles.bookedPackageRow, index > 0 && styles.bookedPackageDivider]}>
+            <Text style={[styles.slotTime, styles.bookedPackageName]}>{booking.eventName}</Text>
+            <Text style={[styles.slotStatus, styles.bookedPackageTime]}>
+              {formatTime(booking.eventStartDateTime, daySnapshot?.timeZone)} – {formatTime(booking.eventEndDateTime, daySnapshot?.timeZone)}
+            </Text>
           </View>)}
-          {!!orderId && <TouchableOpacity accessibilityRole="button" onPress={() =>
-            router.push({ pathname: '/vendorordersummary', params: { orderId } })}>
-            <Text style={styles.slotLink}>{bookings.length > 1 ? 'Same order · Open order ›' : 'Open order ›'}</Text>
-          </TouchableOpacity>}
         </View>;
       }) : <Text style={styles.slotStatus}>No booked slots</Text>}
     </View>
   </>}
-      {dayAvailability.slots.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSlots }}
-        style={styles.scheduleAction} onPress={toggleSlots}>
-        <Text style={styles.slotLink}>{showSlots ? 'Hide all slots ▴' : 'Show all slots ▾'}</Text>
-      </TouchableOpacity>}
+  <View style={styles.slotControls}>
+    {dayAvailability.slots.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSlots }}
+      style={styles.scheduleAction} onPress={toggleSlots}>
+      <Text style={styles.slotLink}>{showSlots ? 'Hide all slots ▴' : 'Show all slots ▾'}</Text>
+    </TouchableOpacity>}
+    <TouchableOpacity style={styles.slotInfoAction} accessibilityRole="button" accessibilityLabel="About availability"
+    onPress={() => Alert.alert('Booking capacity', `You can handle up to ${capacity} bookings at the same time. A red slot has an existing booking and may still have room under your limit. The complete service window and booking notice are checked before confirmation.`)}>
+    <Ionicons name="information-circle-outline" size={20} color={PRIMARY} />
+  </TouchableOpacity>
+  </View>
       {showSlots && <View style={styles.slotsGrid}>
         {dayAvailability.slots.map(slot => {
           const booked = slot.status === 'booked';
@@ -742,10 +751,6 @@ return (
         })}
       </View>}
 
-  <TouchableOpacity style={styles.scheduleAction} accessibilityRole="button" accessibilityLabel="About availability"
-    onPress={() => Alert.alert('Booking capacity', `You can handle up to ${capacity} bookings at the same time. A red slot has an existing booking and may still have room under your limit. The complete service window and booking notice are checked before confirmation.`)}>
-    <Ionicons name="information-circle-outline" size={20} color={PRIMARY} />
-  </TouchableOpacity>
 </View>
         </>
       }
@@ -871,7 +876,13 @@ export default MyEventsScreen;
 
 const styles = StyleSheet.create({
   statFilter: { flex: 1, justifyContent: 'center', paddingHorizontal: 6 },
-  capacityRow: { gap: 2, paddingVertical: 5 },
+  bookedHeading: { gap: 2, paddingBottom: 4 },
+  bookedPackageRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  bookedPackageDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#DDD2DA' },
+  bookedPackageName: { flex: 1, minWidth: 0 },
+  bookedPackageTime: { flexShrink: 1, maxWidth: '48%', textAlign: 'right', marginTop: 0 },
+  slotControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  slotInfoAction: { marginLeft: 'auto', minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
   bookingGroup: { flexDirection: 'column', alignItems: 'stretch', gap: 4, backgroundColor: '#FAF7F9', borderColor: '#E9DCE5' },
   stickyFilters: { backgroundColor: '#F8E9F0', paddingVertical: 10, gap: 8 },
   rulesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },

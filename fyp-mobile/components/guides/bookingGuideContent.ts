@@ -133,7 +133,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
-        'Tap Open order on an event or grouped booking to view it in Order Summary.',
+        'Tap Open order on an event card to view it in Order Summary.',
         'Open My Orders / Order Summary to accept, review schedule changes, request a later time, cancel or mark a service completed when those actions are available.',
         'Prices use the saved booking currency: PKR for Pakistan or USD for USA. Older PKR bookings keep their currency.',
         'Check the client, package and booked service window before responding. If acceptance is blocked for insufficient time, use Request later service time rather than treating the booking as accepted.',
