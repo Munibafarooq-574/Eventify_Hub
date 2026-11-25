@@ -7,6 +7,8 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
+  MaxLength,
   Min,
   Max,
   ValidateIf,
@@ -14,6 +16,15 @@ import {
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
+
+export class BlockedDateReasonDto {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  date: string;
+
+  @IsString()
+  @MaxLength(160)
+  reason: string;
+}
 
 export class WorkingDayDto {
   @IsIn(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
@@ -94,6 +105,12 @@ export class SetAvailabilityDto {
   @IsArray()
   @IsOptional()
   blockedDates?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BlockedDateReasonDto)
+  blockedDateReasons?: BlockedDateReasonDto[];
 
   /**
    * Minimum advance booking notice in whole-day minutes.

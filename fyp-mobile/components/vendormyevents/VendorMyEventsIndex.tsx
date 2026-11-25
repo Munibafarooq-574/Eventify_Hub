@@ -23,7 +23,7 @@ type ViewMode = "day" | "upcoming" | "month" | "past" | "total" | "pending";
 type WorkingDay = { day: string; enabled: boolean };
 type TimeSlotConfig = { start: string; end: string };
 type DaySlotConfig = { day: string; enabled: boolean; slots: TimeSlotConfig[]; advanceNoticeOptionsMinutes?: number[] };
-type AvailabilitySettings = { minimumWorkingWindowMinutes?: number; workingDays?: WorkingDay[]; workingHoursStart?: string; workingHoursEnd?: string; daySlots?: DaySlotConfig[]; blockedDates?: string[]; advanceNoticeOptionsMinutes?: number[]; maxConcurrentBookings?: number };
+type AvailabilitySettings = { minimumWorkingWindowMinutes?: number; workingDays?: WorkingDay[]; workingHoursStart?: string; workingHoursEnd?: string; daySlots?: DaySlotConfig[]; blockedDates?: string[]; blockedDateReasons?: { date: string; reason: string }[]; minimumAdvanceMinutes?: number; advanceNoticeOptionsMinutes?: number[]; maxConcurrentBookings?: number };
 type GeneratedSlot = { start: string; end: string; status: "available" | "booked"; booking?: any; durationMinutes?: number; belowMinimum?: boolean; startMs: number; endMs: number };
 
 const FILTERS: { key: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -852,6 +852,7 @@ renderSectionFooter={() => events.length === 0 ? (
   availability={availability}
   selectedDate={selectedDate}
   onClose={() => setAvailabilityEditorVisible(false)}
+  bookingDates={Object.keys(markedDates).filter(date => markedDates[date].dots?.length)}
   onSaved={(settings) => {
     setAvailability((prev) => ({
       ...(prev || {}),

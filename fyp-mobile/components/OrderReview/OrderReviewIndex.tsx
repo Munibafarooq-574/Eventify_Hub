@@ -1101,8 +1101,8 @@ const isInvalidCode =
           const selectedWindow = bookingType === 'DURATION_BASED' ||
             (bookingType === 'DELIVERY_BASED' && !latest.deliveryFeeType)
             ? undefined : getResolvedServiceWindow(pkg) ?? undefined;
-          const available = bookingType === 'DELIVERY_BASED' && latest.deliveryFeeType && !selectedWindow
-            ? false
+          const availability = bookingType === 'DELIVERY_BASED' && latest.deliveryFeeType && !selectedWindow
+            ? { available: false, reason: undefined }
             : await checkReviewPackageAvailability({
                 vendorId, packageId, eventDate, eventStartTime, eventCityId,
                 eventDurationMinutes: bookingType === 'DURATION_BASED' ? selectedDuration : eventDurationMinutes,
@@ -1143,7 +1143,11 @@ const isInvalidCode =
           }
           return {
             pkg: updated,
-            notice: available ? '' : `The selected time for ${pkg.packageName} is no longer available. Go back to choose another time.`,
+            notice: availability.available ? '' : [
+              `The selected time for ${pkg.packageName} is no longer available.`,
+              availability.reason,
+              'Go back to choose another time.',
+            ].filter(Boolean).join(' '),
           };
         }));
         return {

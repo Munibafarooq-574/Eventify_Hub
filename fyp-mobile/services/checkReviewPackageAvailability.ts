@@ -11,7 +11,7 @@ type ReviewAvailability = Parameters<typeof getTimeSlotAppointments>[0] & {
 
 export async function checkReviewPackageAvailability({
   bookingType, replacementMode, window, deliveryTimeZone, ...event
-}: ReviewAvailability): Promise<boolean> {
+}: ReviewAvailability): Promise<{ available: boolean; reason?: string }> {
   if (bookingType === "DURATION_BASED" || (bookingType === "DELIVERY_BASED" && !window)) {
     const result = await checkVendorsAvailability({
       vendorIds: [event.vendorId],
@@ -22,10 +22,10 @@ export async function checkReviewPackageAvailability({
       durationMinutes: event.eventDurationMinutes,
       replacementMode,
     });
-    return result.some(item => item.vendorId === event.vendorId && item.available);
+    return result.find(item => item.vendorId === event.vendorId) ?? { available: false };
   }
 
-  if (!window) return false;
+  if (!window) return { available: false };
 
   let result: TimeSlotAppointmentResponse;
   if (bookingType === "TIME_SLOT_BASED") {
@@ -42,10 +42,11 @@ export async function checkReviewPackageAvailability({
       ...event, deliveryDate: `${date.year}-${date.month}-${date.day}`,
     });
   } else {
-    return false;
+    return { available: false };
   }
 
-  return result.slots.some(slot => slot.available &&
+  const matchingSlots = result.slots.filter(slot =>
     Date.parse(slot.startDateTime) === Date.parse(window.startDateTime) &&
     Date.parse(slot.endDateTime) === Date.parse(window.endDateTime));
+  return matchingSlots.find(slot => slot.available) ?? matchingSlots[0] ?? { available: false };
 }

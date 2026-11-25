@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -48,14 +49,18 @@ export type DaySlotConfig = {
   advanceNoticeOptionsMinutes?: number[];
 };
 
+type BlockedDateReason = { date: string; reason: string };
+
 type AvailabilitySettings = {
   maxConcurrentBookings?: number;
   minimumWorkingWindowMinutes?: number;
+  minimumAdvanceMinutes?: number;
   workingDays?: { day: string; enabled: boolean }[];
   workingHoursStart?: string;
   workingHoursEnd?: string;
   daySlots?: DaySlotConfig[];
   blockedDates?: string[];
+  blockedDateReasons?: BlockedDateReason[];
   advanceNoticeOptionsMinutes?: number[];
 };
 
@@ -104,11 +109,13 @@ type Props = {
   vendorId: string | null;
   availability: AvailabilitySettings | null;
   selectedDate: string;
+  bookingDates: string[];
   onClose: () => void;
   onSaved: (data: {
     maxConcurrentBookings: number;
     daySlots: DaySlotConfig[];
     blockedDates: string[];
+    blockedDateReasons: BlockedDateReason[];
   }) => void;
 };
 
@@ -117,6 +124,7 @@ const VendorAvailabilityEditor = ({
   vendorId,
   availability,
   selectedDate,
+  bookingDates,
   onClose,
   onSaved,
 }: Props) => {
@@ -134,6 +142,8 @@ const VendorAvailabilityEditor = ({
   const [maxConcurrentBookings, setMaxConcurrentBookings] = useState(1);
   const [editorSaving, setEditorSaving] = useState(false);
   const [editorDaySlots, setEditorDaySlots] = useState<DaySlotConfig[]>([]);
+  const [blockedDateReasons, setBlockedDateReasons] = useState<BlockedDateReason[]>([]);
+  const [newBlockReason, setNewBlockReason] = useState('');
   const [editorBlockedDates, setEditorBlockedDates] = useState<string[]>([]);
 
   const [activeDayForSlot, setActiveDayForSlot] = useState<string | null>(null);
@@ -191,7 +201,10 @@ const VendorAvailabilityEditor = ({
     const limit = availability?.maxConcurrentBookings ?? 1;
     const validLimit = Number.isSafeInteger(limit) && limit >= 1 ? limit : 1;
     const blockedDates = (availability?.blockedDates || []).map(toKey);
-    savedDraft.current = JSON.stringify([validLimit, merged, blockedDates]);
+    const reasons = availability?.blockedDateReasons ?? [];
+    setBlockedDateReasons(reasons);
+    setNewBlockReason('');
+    savedDraft.current = JSON.stringify([validLimit, merged, blockedDates, reasons]);
     setMaxConcurrentBookings(validLimit);
     setEditorDaySlots(merged);
     setEditorBlockedDates(blockedDates);
@@ -361,6 +374,21 @@ const VendorAvailabilityEditor = ({
     setSlotPickerMode(null);
   };
 
+  const addBlockedDates = (dates: string[]) => {
+    const added = dates.filter(date => !editorBlockedDates.includes(date));
+    const reason = newBlockReason.trim();
+    setEditorBlockedDates(previous => [...new Set([...previous, ...added])].sort());
+    if (reason) {
+      setBlockedDateReasons(previous => [...previous, ...added.map(date => ({ date, reason }))]);
+    }
+    setNewBlockReason('');
+  };
+
+  const removeBlockedDate = (date: string) => {
+    setEditorBlockedDates(previous => previous.filter(item => item !== date));
+    setBlockedDateReasons(previous => previous.filter(item => item.date !== date));
+  };
+
   const toggleBlockedDate = (dateKey: string) => {
     const today = new Date().toISOString().slice(0, 10);
     if (dateKey < today && !editorBlockedDates.includes(dateKey)) {
@@ -380,14 +408,19 @@ const VendorAvailabilityEditor = ({
             dates.push(cursor.toISOString().slice(0, 10));
             cursor.setUTCDate(cursor.getUTCDate() + 1);
           }
-          setEditorBlockedDates(previous => [...new Set([...previous, ...dates])].sort());
+          addBlockedDates(dates);
           setRangeStart(null); setSelectingRange(false);
         } },
       ]);
       return;
     }
-    setEditorBlockedDates(previous =>
-      previous.includes(dateKey) ? previous.filter(date => date !== dateKey) : [...previous, dateKey].sort());
+    if (editorBlockedDates.includes(dateKey)) removeBlockedDate(dateKey);
+    else if (bookingDates.includes(dateKey)) {
+      Alert.alert('This date has bookings', 'Blocking this date prevents new bookings. Existing bookings keep their schedules.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block date', onPress: () => addBlockedDates([dateKey]) },
+      ]);
+    } else addBlockedDates([dateKey]);
   };
 
   const addNoticeOption = (dayCode: string, days: number) => {
@@ -397,9 +430,7 @@ const VendorAvailabilityEditor = ({
         item.day === dayCode
           ? {
               ...item,
-              advanceNoticeOptionsMinutes: Array.from(
-                new Set([...(item.advanceNoticeOptionsMinutes || []).filter((value) => value > 0), minutes]),
-              ).sort((a, b) => a - b),
+              advanceNoticeOptionsMinutes: [minutes],
             }
           : item,
       ),
@@ -407,15 +438,13 @@ const VendorAvailabilityEditor = ({
     setNoticePromptDay(null);
   };
 
-  const removeNoticeOption = (dayCode: string, minutes: number) => {
+  const removeNoticeOption = (dayCode: string) => {
     setEditorDaySlots((prev) =>
       prev.map((item) =>
         item.day === dayCode
           ? {
               ...item,
-              advanceNoticeOptionsMinutes: (item.advanceNoticeOptionsMinutes || []).filter(
-                (v) => v !== minutes,
-              ),
+              advanceNoticeOptionsMinutes: [],
             }
           : item,
       ),
@@ -454,7 +483,7 @@ const VendorAvailabilityEditor = ({
           : [],
       }));
 
-      const settings = { daySlots: cleanDaySlots, blockedDates: editorBlockedDates, maxConcurrentBookings };
+      const settings = { daySlots: cleanDaySlots, blockedDates: editorBlockedDates, blockedDateReasons, maxConcurrentBookings };
       await patchVendorAvailability(vendorId, settings);
       onSaved(settings);
 
@@ -467,7 +496,7 @@ const VendorAvailabilityEditor = ({
     }
   };
 
-  const dirty = !!savedDraft.current && savedDraft.current !== JSON.stringify([maxConcurrentBookings, editorDaySlots, editorBlockedDates]);
+  const dirty = !!savedDraft.current && savedDraft.current !== JSON.stringify([maxConcurrentBookings, editorDaySlots, editorBlockedDates, blockedDateReasons]);
   const requestClose = () => {
     if (editorSaving) return;
     if (!dirty) { onClose(); return; }
@@ -537,13 +566,13 @@ const VendorAvailabilityEditor = ({
           </View>
         </View>
 
-        <View style={styles.tabs}>
+        <View style={styles.screenTabs}>
           {(['weekly', 'blocked'] as const).map(value => <TouchableOpacity key={value}
-            style={[styles.copyDayChip, tab === value && styles.copyDayChipActive]}
+            style={[styles.copyDayChip, styles.screenTab, tab === value && styles.copyDayChipActive]}
             accessibilityRole="tab" accessibilityState={{ selected: tab === value }}
             onPress={() => setTab(value)}>
-            <Text style={[styles.copyDayChipText, tab === value && styles.copyDayChipTextActive]}>
-              {value === 'weekly' ? 'Weekly hours' : 'Block dates'}
+            <Text style={[styles.copyDayChipText, styles.screenTabText, tab === value && styles.copyDayChipTextActive]}>
+              {value === 'weekly' ? 'Weekly hours' : `Block dates${editorBlockedDates.length ? ` (${editorBlockedDates.length})` : ''}`}
             </Text>
           </TouchableOpacity>)}
         </View>
@@ -628,6 +657,12 @@ const VendorAvailabilityEditor = ({
               advanceNoticeOptionsMinutes: [],
             };
 
+            const notices = config.advanceNoticeOptionsMinutes || [];
+            const notice = notices.length ? Math.min(...notices) : null;
+            const globalNotices = (availability?.advanceNoticeOptionsMinutes || [])
+              .filter(minutes => minutes >= 1440 && minutes % 1440 === 0);
+            const defaultNotice = globalNotices.length ? Math.min(...globalNotices) : Math.max(1440, availability?.minimumAdvanceMinutes ?? 1440);
+
             return (
               <View
                 key={day.code}
@@ -641,6 +676,7 @@ const VendorAvailabilityEditor = ({
                       <Text style={styles.dayName}>{day.label}</Text>
                       <Text style={styles.dayStatus}>{config.enabled ? config.slots.map(slot =>
                         `${formatDisplayTime(slot.start)} – ${formatDisplayTime(slot.end)}`).join(' · ') || 'No slots' : 'Closed'}</Text>
+                      <Text style={styles.dayStatus}>{notice === null ? `Notice: default (${formatNoticeLabel(defaultNotice)})` : `Notice: ${formatNoticeLabel(notice)}`}</Text>
                     </View>
                     <Ionicons name={expandedDay === day.code ? 'chevron-up' : 'chevron-down'} size={17} color={PRIMARY} />
                   </TouchableOpacity>
@@ -702,26 +738,18 @@ const VendorAvailabilityEditor = ({
                         Notice is measured from the service start time.
                       </Text>
 
-                      <View style={styles.durationChipsRow}>
-                        {(config.advanceNoticeOptionsMinutes || []).map((minutes) => (
-                          <View key={`${day.code}-${minutes}`} style={styles.durationChip}>
-                            <Text style={styles.durationChipText}>{formatNoticeLabel(minutes)}</Text>
-                            <TouchableOpacity onPress={() => Alert.alert('Remove booking notice?', formatNoticeLabel(minutes), [
-                              { text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => removeNoticeOption(day.code, minutes) },
-                            ])}>
-                              <Ionicons name="close-circle" size={17} color="#C0392B" />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.addDurationButton}
-                        onPress={() => setNoticePromptDay(day.code)}
-                      >
-                        <Ionicons name="add-circle-outline" size={18} color={PRIMARY} />
-                        <Text style={styles.addDurationButtonText}>Add notice period</Text>
+                      <TouchableOpacity style={notice === null ? styles.addDurationButton : styles.durationChip}
+                        accessibilityRole="button" onPress={() => setNoticePromptDay(day.code)}>
+                        <Ionicons name={notice === null ? 'add-circle-outline' : 'create-outline'} size={18} color={PRIMARY} />
+                        <Text style={styles.addDurationButtonText}>{notice === null ? 'Add notice period' : formatNoticeLabel(notice)}</Text>
                       </TouchableOpacity>
+                      {notice !== null && <TouchableOpacity style={styles.scheduleOption} accessibilityRole="button"
+                        onPress={() => Alert.alert('Reset booking notice?', 'This day will use your default notice.', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Reset to default', onPress: () => removeNoticeOption(day.code) },
+                        ])}>
+                        <Text style={styles.copyDayChipText}>Reset to default</Text>
+                      </TouchableOpacity>}
                     </View>
 
                   </View>
@@ -731,27 +759,35 @@ const VendorAvailabilityEditor = ({
           })}
 
           </> : <>
-          <Text style={styles.editorSectionTitle}>Block Specific Dates</Text>
-          <Text style={styles.editorSectionDescription}>
-            Tap a date to temporarily make yourself unavailable.
-          </Text>
-
-          <TouchableOpacity style={styles.scheduleOption} accessibilityRole="button" onPress={() => {
-            setSelectingRange(value => !value); setRangeStart(null);
-          }}>
-            <Text style={styles.copyDayChipText}>{selectingRange ? 'Cancel range' : 'Block a date range'}</Text>
-          </TouchableOpacity>
-          {selectingRange && <Text style={styles.editorSectionDescription}>{rangeStart ? `Start: ${rangeStart}. Select an end date.` : 'Select the first date.'}</Text>}
           <View style={styles.blockCalendarCard}>
+            <Text style={styles.editorSectionTitle}>Block specific dates</Text>
+            <Text style={styles.editorSectionDescription}>
+              Customers cannot book blocked dates. Confirmed bookings keep their schedules.
+            </Text>
+            <View style={styles.weeklySwitch}>
+              <Text style={styles.copyDayChipText}>Block a date range</Text>
+              <Switch accessibilityLabel="Block a date range" value={selectingRange}
+                trackColor={{ false: '#D8D8D8', true: PRIMARY }}
+                onValueChange={value => { setSelectingRange(value); setRangeStart(null); }} />
+            </View>
+            <TextInput style={styles.reasonInput} value={newBlockReason} onChangeText={setNewBlockReason}
+              maxLength={160} placeholder="Reason for new dates (optional)"
+              accessibilityLabel="Optional reason visible to customers" />
+            <Text style={styles.dayStatus}>Customers can see the reason you enter.</Text>
             <Calendar
               current={selectedDate}
+              firstDay={1}
               markingType="custom"
-              markedDates={editorBlockedDates.reduce((result: Record<string, any>, date) => {
+              markedDates={[...new Set([...bookingDates, ...editorBlockedDates, ...(rangeStart ? [rangeStart] : [])])].reduce((result: Record<string, any>, date) => {
                 result[date] = {
-                  customStyles: {
-                    container: { backgroundColor: '#C0392B', borderRadius: 8 },
-                    text: { color: '#FFFFFF', fontWeight: '800' },
-                  },
+                  marked: bookingDates.includes(date),
+                  dotColor: PRIMARY,
+                  selected: date === rangeStart,
+                  selectedColor: PRIMARY,
+                  ...(editorBlockedDates.includes(date) ? { customStyles: {
+                    container: { backgroundColor: '#FBE5DF', borderRadius: 8 },
+                    text: { color: '#9F3125', fontWeight: '800', textDecorationLine: 'line-through' },
+                  } } : {}),
                 };
                 return result;
               }, {})}
@@ -773,22 +809,27 @@ const VendorAvailabilityEditor = ({
               }}
             />
 
-            {editorBlockedDates.length > 0 && (
-              <View style={styles.blockedDatesSummary}>
-                <Ionicons name="ban-outline" size={17} color="#C0392B" />
-                <Text style={styles.blockedDatesText}>
-                  {editorBlockedDates.length} blocked {editorBlockedDates.length === 1 ? 'date' : 'dates'}
-                </Text>
-              </View>
-            )}
-            {editorBlockedDates.map(date => <View key={date} style={styles.weeklySwitch}>
-              <Text style={styles.dayStatus}>{date}</Text>
-              <TouchableOpacity style={styles.scheduleOption} accessibilityRole="button"
-                accessibilityLabel={`Unblock ${date}`} onPress={() => setEditorBlockedDates(previous => previous.filter(item => item !== date))}>
-                <Text style={styles.copyDayChipText}>Unblock</Text>
-              </TouchableOpacity>
-            </View>)}
+            <Text style={styles.dayStatus}>Red dates are blocked · Purple dot means a booking</Text>
+            {selectingRange && <Text style={styles.rangeHint}>
+              {rangeStart ? `Start: ${rangeStart}. Select the last date.` : 'Tap the first date, then the last date.'}
+            </Text>}
           </View>
+          {editorBlockedDates.length > 0 && <View style={styles.blockCalendarCard}>
+            <Text style={styles.editorSectionTitle}>Blocked dates</Text>
+            {editorBlockedDates.map(date => {
+              const reason = blockedDateReasons.find(item => item.date === date)?.reason;
+              return <View key={date} style={styles.blockedDateRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.blockedDatesText}>{date}</Text>
+                  {!!reason && <Text style={styles.dayStatus}>{reason}</Text>}
+                </View>
+                <TouchableOpacity style={styles.closeIcon} accessibilityRole="button"
+                  accessibilityLabel={`Unblock ${date}`} onPress={() => removeBlockedDate(date)}>
+                  <Ionicons name="close" size={20} color="#9F3125" />
+                </TouchableOpacity>
+              </View>;
+            })}
+          </View>}
 
           </>}
         </ScrollView>
@@ -815,21 +856,26 @@ const VendorAvailabilityEditor = ({
         {activeDayForSlot && (
           <View style={styles.pickerOverlay}>
             <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-              <Text style={styles.pickerTitle}>
-                {editingSlotIndex !== null ? 'Edit time slot' : 'Add time slot'} · {DAYS.find(day => day.code === activeDayForSlot)?.label}
-              </Text>
-              <View style={styles.tabs}>
+              <View style={styles.pickerHeader}>
+                <Text style={[styles.pickerTitle, { flex: 1 }]}>
+                  {editingSlotIndex !== null ? 'Edit time slot' : 'Add time slot'} · {DAYS.find(day => day.code === activeDayForSlot)?.label}
+                </Text>
+                <TouchableOpacity style={styles.closeIcon} accessibilityRole="button" accessibilityLabel="Close time slot" onPress={closeSlot}>
+                  <Ionicons name="close" size={23} color={PRIMARY} />
+                </TouchableOpacity>
+              </View>
+              <View style={[styles.tabs, styles.centerRow]}>
                 {([{ label: 'Full day', start: '09:00', end: '23:00' }, { label: 'Morning', start: '09:00', end: '12:00' },
                   { label: 'Evening', start: '17:00', end: '23:00' }]).map(preset =>
                   <TouchableOpacity key={preset.label} style={styles.copyDayChip} accessibilityRole="button" onPress={() => {
                     chooseTime('start', parseTime(preset.start)); chooseTime('end', parseTime(preset.end));
                   }}><Text style={styles.copyDayChipText}>{preset.label}</Text></TouchableOpacity>)}
               </View>
-              <View style={styles.tabs}>
+              <View style={[styles.tabs, styles.centerRow]}>
                 {(['start', 'end'] as const).map(field => {
                   const value = field === 'start' ? draftStart : draftEnd;
                   const picked = field === 'start' ? pickedStart : pickedEnd;
-                  return <TouchableOpacity key={field} style={styles.copyDayChip} accessibilityRole="button"
+                  return <TouchableOpacity key={field} style={[styles.copyDayChip, styles.timeField]} accessibilityRole="button"
                     onPress={() => {
                       if (Platform.OS === 'android') {
                         DateTimePickerAndroid.open({ mode: 'time', value, onChange: (event, date) => {
@@ -850,11 +896,10 @@ const VendorAvailabilityEditor = ({
                   onChange={(_, date) => { if (date) chooseTime(slotPickerMode, date); }} />
               )}
               {!!slotError && <Text accessibilityRole="alert" style={styles.dirtyNotice}>{slotError}</Text>}
-              {pickedStart && pickedEnd && !slotError && <Text style={styles.dayStatus}>
+              {pickedStart && pickedEnd && !slotError && <Text style={styles.slotDuration}>
                 Duration: {Math.floor(duration / 60)} hr {duration % 60 ? `${duration % 60} min` : ''}
               </Text>}
               <View style={styles.pickerButtonsRow}>
-                <TouchableOpacity style={styles.pickerBackButton} onPress={closeSlot}><Text style={styles.pickerBackButtonText}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.pickerPrimaryButtonFlex, (!pickedStart || !pickedEnd || !!slotError) && { opacity: 0.5 }]}
                   disabled={!pickedStart || !pickedEnd || !!slotError} onPress={confirmSlot}>
                   <Text style={styles.pickerPrimaryButtonText}>Save slot</Text>
@@ -866,7 +911,7 @@ const VendorAvailabilityEditor = ({
 
         <HourPromptModal
           visible={!!noticePromptDay}
-          title="Add booking notice"
+          title="Set booking notice"
           message="Enter the minimum number of days before the service (1 or more)."
           onCancel={() => setNoticePromptDay(null)}
           onSubmit={(days) => noticePromptDay && addNoticeOption(noticePromptDay, days)}
@@ -879,6 +924,16 @@ const VendorAvailabilityEditor = ({
 export default VendorAvailabilityEditor;
 
 const styles = StyleSheet.create({
+  screenTabs: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  screenTab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  screenTabText: { fontSize: 14, textAlign: 'center' },
+  centerRow: { justifyContent: 'center' },
+  timeField: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: PRIMARY_LIGHT },
+  slotDuration: { textAlign: 'center', color: PRIMARY, fontWeight: '600', marginVertical: 10 },
+  closeIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  reasonInput: { borderWidth: 1, borderColor: '#DDD2DA', borderRadius: 10, padding: 10, color: '#222' },
+  rangeHint: { marginTop: 10, backgroundColor: '#E5F5EC', color: '#256347', borderRadius: 8, padding: 9 },
+  blockedDateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingLeft: 10, borderRadius: 10, backgroundColor: '#FBE5DF' },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
   weeklySwitch: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   scheduleOption: { minHeight: 44, justifyContent: 'center' },

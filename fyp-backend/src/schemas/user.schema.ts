@@ -684,6 +684,9 @@ export class VendorAvailabilitySettings {
   @Prop({ type: [Date], default: [] })
   blockedDates: Date[];
 
+  @Prop({ type: [{ _id: false, date: String, reason: String }], default: [] })
+  blockedDateReasons: { date: string; reason: string }[];
+
   @Prop({
     enum: [0, 30, 60, 120, 240, 480, 1440, 2880],
     default: 0,

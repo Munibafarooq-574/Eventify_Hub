@@ -229,6 +229,13 @@ if (!hasAccess) {
       );
     }
 
+    const current =
+      (user.availabilitySettings as any)?.toObject?.() ??
+      user.availabilitySettings ??
+      {};
+
+    const existingBlockedDates = new Set<string>((current.blockedDates ?? []).map(toDateKey));
+
     // Validate blocked dates and reject past dates.
     if (dto.blockedDates !== undefined) {
       const todayKey = new Date().toISOString().slice(0, 10);
@@ -255,7 +262,7 @@ if (!hasAccess) {
           );
         }
 
-        if (date < todayKey) {
+        if (date < todayKey && !existingBlockedDates.has(date)) {
           throw new BadRequestException(
             `Blocked date cannot be in the past: ${date}`,
           );
@@ -263,14 +270,19 @@ if (!hasAccess) {
       }
     }
 
-    const current =
-      (user.availabilitySettings as any)?.toObject?.() ??
-      user.availabilitySettings ??
-      {};
+
+    const blockedDateKeys = new Set(dto.blockedDates ?? existingBlockedDates);
+    const reasons = new Map<string, string>();
+    for (const { date, reason } of dto.blockedDateReasons ?? current.blockedDateReasons ?? []) {
+      if (blockedDateKeys.has(date) && reason.trim()) {
+        reasons.set(date, reason.trim());
+      }
+    }
 
     user.availabilitySettings = {
       ...current,
       ...dto,
+      blockedDateReasons: Array.from(reasons, ([date, reason]) => ({ date, reason })),
 
       blockedDates: dto.blockedDates
         ? dto.blockedDates.map((d) => new Date(d))
@@ -680,6 +692,15 @@ if (!hasAccess) {
     const blockedDates: Date[] =
       settings.blockedDates ?? [];
 
+    if (blockedDates.some((date) => toDateKey(date) === localDateKey)) {
+      return {
+        vendorId,
+        available: false,
+        reason: settings.blockedDateReasons?.find((item: { date: string; reason: string }) => item.date === localDateKey)?.reason
+          || 'Vendor has blocked this date',
+      };
+    }
+
     const maxConcurrentBookings =
       settings.maxConcurrentBookings ?? 1;
 
@@ -776,21 +797,6 @@ if (!hasAccess) {
         };
       }
     }
-    const key = localDateKey;
-
-    if (
-      blockedDates.some(
-        (d) => toDateKey(d) === key,
-      )
-    ) {
-      return {
-        vendorId,
-        available: false,
-        reason:
-          'Vendor has blocked this date',
-      };
-    }
-
     const advanceNoticeOptionsMinutes: number[] =
       daySlotConfig &&
       Array.isArray(daySlotConfig.advanceNoticeOptionsMinutes) &&
