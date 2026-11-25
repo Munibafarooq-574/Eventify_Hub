@@ -1,5 +1,5 @@
 import BookingLimitStepper from '@/components/booking/BookingLimitStepper';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from '@react-native-community/datetimepicker';
 import { Calendar } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import patchVendorAvailability from '@/services/patchVendorAvailability';
 import HourPromptModal from './HourPromptModal';
@@ -67,9 +68,6 @@ const parseTime = (time: string) => {
 
 const toHHMM = (date: Date) =>
   `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-
-const addMinutes = (date: Date, minutes: number) =>
-  new Date(date.getTime() + minutes * 60000);
 
 const minutesBetween = (start: string, end: string) => {
   const s = parseTime(start);
@@ -122,6 +120,17 @@ const VendorAvailabilityEditor = ({
   onClose,
   onSaved,
 }: Props) => {
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<'weekly' | 'blocked'>('weekly');
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
+  const [sameHours, setSameHours] = useState(false);
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [selectingRange, setSelectingRange] = useState(false);
+  const [copyHours, setCopyHours] = useState(true);
+  const [copyNotice, setCopyNotice] = useState(true);
+  const [pickedStart, setPickedStart] = useState(false);
+  const [pickedEnd, setPickedEnd] = useState(false);
+  const savedDraft = useRef('');
   const [maxConcurrentBookings, setMaxConcurrentBookings] = useState(1);
   const [editorSaving, setEditorSaving] = useState(false);
   const [editorDaySlots, setEditorDaySlots] = useState<DaySlotConfig[]>([]);
@@ -180,14 +189,24 @@ const VendorAvailabilityEditor = ({
     });
 
     const limit = availability?.maxConcurrentBookings ?? 1;
-    setMaxConcurrentBookings(Number.isSafeInteger(limit) && limit >= 1 ? limit : 1);
+    const validLimit = Number.isSafeInteger(limit) && limit >= 1 ? limit : 1;
+    const blockedDates = (availability?.blockedDates || []).map(toKey);
+    savedDraft.current = JSON.stringify([validLimit, merged, blockedDates]);
+    setMaxConcurrentBookings(validLimit);
     setEditorDaySlots(merged);
-    setEditorBlockedDates((availability?.blockedDates || []).map((d) => toKey(d)));
+    setEditorBlockedDates(blockedDates);
+    setTab('weekly');
+    setExpandedDay(null);
+    setSameHours(false); setRangeStart(null); setSelectingRange(false);
   }, [visible, availability]);
 
   const toggleEditorDay = (dayCode: string) => {
     setEditorDaySlots((prev) =>
-      prev.map((day) => (day.day === dayCode ? { ...day, enabled: !day.enabled } : day)),
+      prev.map(day => {
+        if (day.day !== dayCode) return day;
+        const source = sameHours && !day.enabled ? prev.find(item => item.enabled) : undefined;
+        return { ...day, enabled: !day.enabled, ...(source ? { slots: source.slots.map(slot => ({ ...slot })) } : {}) };
+      }),
     );
   };
 
@@ -199,6 +218,8 @@ const VendorAvailabilityEditor = ({
 
     setActiveDayForSlot(dayCode);
     setEditingSlotIndex(null);
+    setPickedStart(false);
+    setPickedEnd(false);
     setDraftStart(start);
     setDraftEnd(end);
     setSlotPickerMode('start');
@@ -211,13 +232,18 @@ const VendorAvailabilityEditor = ({
 
     setActiveDayForSlot(dayCode);
     setEditingSlotIndex(index);
+    setPickedStart(true);
+    setPickedEnd(true);
     setDraftStart(parseTime(slot.start));
     setDraftEnd(parseTime(slot.end));
     setSlotPickerMode('start');
   };
 
   const deleteSlot = (dayCode: string, index: number) => {
-    Alert.alert('Delete time slot', 'Are you sure you want to remove this working slot?', [
+    const slot = editorDaySlots.find(day => day.day === dayCode)?.slots[index];
+    if (!slot) return;
+    Alert.alert(`Delete ${formatDisplayTime(slot.start)} – ${formatDisplayTime(slot.end)}?`,
+      'Customers will not be able to book this time.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -225,7 +251,7 @@ const VendorAvailabilityEditor = ({
         onPress: () => {
           setEditorDaySlots((prev) =>
             prev.map((day) =>
-              day.day === dayCode
+              (day.day === dayCode || sameHours && day.enabled)
                 ? { ...day, slots: day.slots.filter((_, i) => i !== index) }
                 : day,
             ),
@@ -238,6 +264,8 @@ const VendorAvailabilityEditor = ({
   const startCopyingDay = (dayCode: string) => {
     setCopyDaySource(dayCode);
     setCopyTargetDays([]);
+    setCopyHours(true);
+    setCopyNotice(true);
   };
 
   const toggleCopyTargetDay = (dayCode: string) => {
@@ -247,7 +275,7 @@ const VendorAvailabilityEditor = ({
   };
 
   const applyCopyToDays = () => {
-    if (!copyDaySource || copyTargetDays.length === 0) {
+    if (!copyDaySource || copyTargetDays.length === 0 || (!copyHours && !copyNotice)) {
       setCopyDaySource(null);
       return;
     }
@@ -259,15 +287,15 @@ const VendorAvailabilityEditor = ({
     }
 
     const clonedSlots = sourceDay.slots.map((slot) => ({ ...slot }));
+    if (copyHours) setSameHours(false);
 
     setEditorDaySlots((prev) =>
       prev.map((day) =>
         copyTargetDays.includes(day.day)
           ? {
               ...day,
-              enabled: true,
-              slots: clonedSlots,
-              advanceNoticeOptionsMinutes: [...(sourceDay.advanceNoticeOptionsMinutes || [])],
+              ...(copyHours ? { enabled: sourceDay.enabled, slots: clonedSlots } : {}),
+              ...(copyNotice ? { advanceNoticeOptionsMinutes: [...(sourceDay.advanceNoticeOptionsMinutes || [])] } : {}),
             }
           : day,
       ),
@@ -277,11 +305,11 @@ const VendorAvailabilityEditor = ({
     setCopyDaySource(null);
     setCopyTargetDays([]);
 
-    Alert.alert('Copied', `Working hours copied to ${copiedCount} ${copiedCount === 1 ? 'day' : 'days'}.`);
+    Alert.alert('Copied', `Schedule settings copied to ${copiedCount} ${copiedCount === 1 ? 'day' : 'days'}.`);
   };
 
   const confirmSlot = () => {
-    if (!activeDayForSlot) return;
+    if (!activeDayForSlot || !pickedStart || !pickedEnd) return;
 
     if (draftEnd <= draftStart) {
       Alert.alert('Invalid slot', 'End time must be after start time.');
@@ -316,7 +344,7 @@ const VendorAvailabilityEditor = ({
 
     setEditorDaySlots((prev) =>
       prev.map((day) => {
-        if (day.day !== activeDayForSlot) return day;
+        if (day.day !== activeDayForSlot && !(sameHours && day.enabled)) return day;
         const slots = [...day.slots];
         if (editingIndex !== null) {
           slots[editingIndex] = newSlot;
@@ -334,9 +362,32 @@ const VendorAvailabilityEditor = ({
   };
 
   const toggleBlockedDate = (dateKey: string) => {
-    setEditorBlockedDates((prev) =>
-      prev.includes(dateKey) ? prev.filter((d) => d !== dateKey) : [...prev, dateKey],
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    if (dateKey < today && !editorBlockedDates.includes(dateKey)) {
+      Alert.alert('Past date', 'Choose today or a future date.');
+      return;
+    }
+    if (selectingRange) {
+      if (dateKey < today) return;
+      if (!rangeStart) { setRangeStart(dateKey); return; }
+      const [first, last] = [rangeStart, dateKey].sort();
+      Alert.alert('Block date range?', `${first} – ${last}. Existing bookings keep their schedules.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block dates', onPress: () => {
+          const dates: string[] = [];
+          const cursor = new Date(`${first}T00:00:00Z`);
+          while (cursor.toISOString().slice(0, 10) <= last) {
+            dates.push(cursor.toISOString().slice(0, 10));
+            cursor.setUTCDate(cursor.getUTCDate() + 1);
+          }
+          setEditorBlockedDates(previous => [...new Set([...previous, ...dates])].sort());
+          setRangeStart(null); setSelectingRange(false);
+        } },
+      ]);
+      return;
+    }
+    setEditorBlockedDates(previous =>
+      previous.includes(dateKey) ? previous.filter(date => date !== dateKey) : [...previous, dateKey].sort());
   };
 
   const addNoticeOption = (dayCode: string, days: number) => {
@@ -416,14 +467,56 @@ const VendorAvailabilityEditor = ({
     }
   };
 
+  const dirty = !!savedDraft.current && savedDraft.current !== JSON.stringify([maxConcurrentBookings, editorDaySlots, editorBlockedDates]);
+  const requestClose = () => {
+    if (editorSaving) return;
+    if (!dirty) { onClose(); return; }
+    Alert.alert('Discard changes?', 'Your availability changes have not been saved.', [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: onClose },
+    ]);
+  };
+  const workingSource = editorDaySlots.find(day => day.enabled);
+  const toggleSameHours = (enabled: boolean) => {
+    const apply = () => {
+      setSameHours(enabled);
+      if (!enabled || !workingSource) return;
+      setExpandedDay(workingSource.day);
+      setEditorDaySlots(days => days.map(day => day.enabled ? { ...day, slots: workingSource.slots.map(slot => ({ ...slot })) } : day));
+    };
+    if (enabled && workingSource && editorDaySlots.some(day => day.enabled && JSON.stringify(day.slots) !== JSON.stringify(workingSource.slots))) {
+      Alert.alert('Use the same hours?', 'This copies the first working day’s hours to your other open days.', [
+        { text: 'Cancel', style: 'cancel' }, { text: 'Apply', onPress: apply },
+      ]);
+    } else apply();
+  };
+  const draftStartText = toHHMM(draftStart);
+  const draftEndText = toHHMM(draftEnd);
+  const duration = minutesBetween(draftStartText, draftEndText);
+  const overlap = editorDaySlots.find(day => day.day === activeDayForSlot)?.slots.find((slot, index) =>
+    index !== editingSlotIndex && draftStartText < slot.end && draftEndText > slot.start);
+  const minimumWindow = availability?.minimumWorkingWindowMinutes ?? 60;
+  const slotError = pickedStart && pickedEnd
+    ? draftEndText <= draftStartText ? 'End time must be after start time.'
+      : duration < minimumWindow ? `Working time must be at least ${minimumWindow} min.`
+        : overlap ? `This overlaps ${formatDisplayTime(overlap.start)} – ${formatDisplayTime(overlap.end)}.` : ''
+    : '';
+  const chooseTime = (field: 'start' | 'end', value: Date) => {
+    if (field === 'start') { setDraftStart(value); setPickedStart(true); }
+    else { setDraftEnd(value); setPickedEnd(true); }
+  };
+  const closeSlot = () => {
+    setSlotPickerMode(null);
+    setActiveDayForSlot(null);
+    setEditingSlotIndex(null);
+  };
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={() => {
-        if (!editorSaving) onClose();
-      }}
+      onRequestClose={activeDayForSlot ? closeSlot : requestClose}
     >
       <View style={styles.editorContainer}>
                 <View style={styles.editorHeader}>
@@ -433,30 +526,97 @@ const VendorAvailabilityEditor = ({
           </View>
 
           <View style={styles.editorHeaderRow}>
-            <TouchableOpacity style={styles.editorCloseButton} disabled={editorSaving} onPress={onClose}>
+            <TouchableOpacity style={styles.editorCloseButton} disabled={editorSaving} onPress={requestClose}>
               <Ionicons name="close" size={22} color={PRIMARY} />
             </TouchableOpacity>
 
-            <View style={styles.editorHeaderIcon}>
-              <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
-            </View>
+            <TouchableOpacity style={styles.editorHeaderIcon} accessibilityRole="button" accessibilityLabel="About availability"
+              onPress={() => Alert.alert('Manage Availability', 'Set working hours, booking notice and dates you are unavailable.')}>
+              <Ionicons name="information-circle-outline" size={21} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.editorContent}>
-          <View style={styles.editorInfoCard}>
-            <View style={styles.editorInfoIcon}>
-              <Ionicons name="information-circle-outline" size={21} color={PRIMARY} />
-            </View>
-            <Text style={styles.editorInfoText}>
-              Choose which days you work, add working time slots, and set how early customers must
-              book each day.
+        <View style={styles.tabs}>
+          {(['weekly', 'blocked'] as const).map(value => <TouchableOpacity key={value}
+            style={[styles.copyDayChip, tab === value && styles.copyDayChipActive]}
+            accessibilityRole="tab" accessibilityState={{ selected: tab === value }}
+            onPress={() => setTab(value)}>
+            <Text style={[styles.copyDayChipText, tab === value && styles.copyDayChipTextActive]}>
+              {value === 'weekly' ? 'Weekly hours' : 'Block dates'}
             </Text>
-          </View>
-
+          </TouchableOpacity>)}
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.editorContent}>
+          {tab === 'weekly' ? <>
           <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 16 }}>
             <BookingLimitStepper value={maxConcurrentBookings} onChange={setMaxConcurrentBookings} disabled={editorSaving} />
           </View>
+
+          <View style={styles.weeklySwitch}>
+            <Text style={styles.dayName}>Same hours every day</Text>
+            <Switch value={sameHours} onValueChange={toggleSameHours} />
+          </View>
+          <View style={styles.copyDayPanel}>
+            <Text style={styles.copyDayPanelTitle}>Copy schedule from</Text>
+            <View style={styles.copyDayChipsRow}>
+              {DAYS.map(day => <TouchableOpacity key={day.code} accessibilityRole="button"
+                accessibilityState={{ selected: copyDaySource === day.code }}
+                style={[styles.copyDayChip, copyDaySource === day.code && styles.copyDayChipActive]}
+                onPress={() => startCopyingDay(day.code)}>
+                <Text style={[styles.copyDayChipText, copyDaySource === day.code && styles.copyDayChipTextActive]}>{day.label.slice(0, 3)}</Text>
+              </TouchableOpacity>)}
+            </View>
+          </View>
+                    {copyDaySource && (
+                      <View style={styles.copyDayPanel}>
+                        <Text style={styles.copyDayPanelTitle}>Copy {DAYS.find(day => day.code === copyDaySource)?.label}’s schedule to</Text>
+                        <View style={styles.weeklySwitch}><Text>Hours</Text><Switch value={copyHours} onValueChange={setCopyHours} /></View>
+                        <View style={styles.weeklySwitch}><Text>Notice</Text><Switch value={copyNotice} onValueChange={setCopyNotice} /></View>
+                        <TouchableOpacity style={styles.scheduleOption} onPress={() => setCopyTargetDays(
+                          copyTargetDays.length === DAYS.length - 1 ? [] : DAYS.filter(other => other.code !== copyDaySource).map(other => other.code)
+                        )}><Text style={styles.copyDayChipText}>All days</Text></TouchableOpacity>
+                        <View style={styles.copyDayChipsRow}>
+                          {DAYS.filter((other) => other.code !== copyDaySource).map((other) => {
+                            const selected = copyTargetDays.includes(other.code);
+                            return (
+                              <TouchableOpacity
+                                key={other.code}
+                                style={[styles.copyDayChip, selected && styles.copyDayChipActive]}
+                                onPress={() => toggleCopyTargetDay(other.code)}
+                              >
+                                <Text
+                                  style={[styles.copyDayChipText, selected && styles.copyDayChipTextActive]}
+                                >
+                                  {other.label.slice(0, 3)}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                        <View style={styles.copyDayActionsRow}>
+                          <TouchableOpacity
+                            style={styles.copyDayCancelButton}
+                            onPress={() => {
+                              setCopyDaySource(null);
+                              setCopyTargetDays([]);
+                            }}
+                          >
+                            <Text style={styles.copyDayCancelText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.copyDayApplyButton,
+                              copyTargetDays.length === 0 && styles.copyDayApplyButtonDisabled,
+                            ]}
+                            disabled={copyTargetDays.length === 0 || (!copyHours && !copyNotice)}
+                            onPress={applyCopyToDays}
+                          >
+                            <Text style={styles.copyDayApplyText}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
 
           <Text style={styles.editorSectionTitle}>Working Days</Text>
 
@@ -474,30 +634,16 @@ const VendorAvailabilityEditor = ({
                 style={[styles.dayEditorCard, config.enabled && styles.dayEditorCardActive]}
               >
                 <View style={styles.dayEditorHeader}>
-                  <View style={styles.dayTitleRow}>
-                    <View
-                      style={[
-                        styles.dayIconCircle,
-                        config.enabled ? styles.dayIconActive : styles.dayIconInactive,
-                      ]}
-                    >
-                      <Ionicons
-                        name={config.enabled ? 'checkmark' : 'moon-outline'}
-                        size={17}
-                        color={config.enabled ? '#FFFFFF' : '#999999'}
-                      />
-                    </View>
-                    <View>
+                  <TouchableOpacity style={[styles.dayTitleRow, { flex: 1 }]} accessibilityRole="button"
+                    accessibilityState={{ expanded: expandedDay === day.code }}
+                    onPress={() => setExpandedDay(expandedDay === day.code ? null : day.code)}>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.dayName}>{day.label}</Text>
-                      <Text style={styles.dayStatus}>
-                        {config.enabled
-                          ? config.slots.length > 0
-                            ? `${config.slots.length} time ${config.slots.length === 1 ? 'slot' : 'slots'}`
-                            : 'Working day'
-                          : 'Day off'}
-                      </Text>
+                      <Text style={styles.dayStatus}>{config.enabled ? config.slots.map(slot =>
+                        `${formatDisplayTime(slot.start)} – ${formatDisplayTime(slot.end)}`).join(' · ') || 'No slots' : 'Closed'}</Text>
                     </View>
-                  </View>
+                    <Ionicons name={expandedDay === day.code ? 'chevron-up' : 'chevron-down'} size={17} color={PRIMARY} />
+                  </TouchableOpacity>
 
                   <Switch
                     value={config.enabled}
@@ -507,7 +653,7 @@ const VendorAvailabilityEditor = ({
                   />
                 </View>
 
-                {config.enabled && (
+                {config.enabled && expandedDay === day.code && (
                   <View style={styles.daySlotsEditor}>
                     {config.slots.length === 0 ? (
                       <View style={styles.noEditorSlots}>
@@ -553,15 +699,16 @@ const VendorAvailabilityEditor = ({
                         <Text style={styles.noticeLabel}>Booking notice for this day</Text>
                       </View>
                       <Text style={styles.noticeHelp}>
-                        How early a customer must book you on {day.label}. Leave empty to use your
-                        default notice.
+                        Notice is measured from the service start time.
                       </Text>
 
                       <View style={styles.durationChipsRow}>
                         {(config.advanceNoticeOptionsMinutes || []).map((minutes) => (
                           <View key={`${day.code}-${minutes}`} style={styles.durationChip}>
                             <Text style={styles.durationChipText}>{formatNoticeLabel(minutes)}</Text>
-                            <TouchableOpacity onPress={() => removeNoticeOption(day.code, minutes)}>
+                            <TouchableOpacity onPress={() => Alert.alert('Remove booking notice?', formatNoticeLabel(minutes), [
+                              { text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => removeNoticeOption(day.code, minutes) },
+                            ])}>
                               <Ionicons name="close-circle" size={17} color="#C0392B" />
                             </TouchableOpacity>
                           </View>
@@ -577,68 +724,24 @@ const VendorAvailabilityEditor = ({
                       </TouchableOpacity>
                     </View>
 
-                    {config.slots.length > 0 && (
-                      <TouchableOpacity style={styles.copyDayButton} onPress={() => startCopyingDay(day.code)}>
-                        <Ionicons name="copy-outline" size={15} color={ACCENT} />
-                        <Text style={styles.copyDayButtonText}>Copy to other days</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {copyDaySource === day.code && (
-                      <View style={styles.copyDayPanel}>
-                        <Text style={styles.copyDayPanelTitle}>Apply these hours to:</Text>
-                        <View style={styles.copyDayChipsRow}>
-                          {DAYS.filter((other) => other.code !== day.code).map((other) => {
-                            const selected = copyTargetDays.includes(other.code);
-                            return (
-                              <TouchableOpacity
-                                key={other.code}
-                                style={[styles.copyDayChip, selected && styles.copyDayChipActive]}
-                                onPress={() => toggleCopyTargetDay(other.code)}
-                              >
-                                <Text
-                                  style={[styles.copyDayChipText, selected && styles.copyDayChipTextActive]}
-                                >
-                                  {other.label.slice(0, 3)}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                        <View style={styles.copyDayActionsRow}>
-                          <TouchableOpacity
-                            style={styles.copyDayCancelButton}
-                            onPress={() => {
-                              setCopyDaySource(null);
-                              setCopyTargetDays([]);
-                            }}
-                          >
-                            <Text style={styles.copyDayCancelText}>Cancel</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[
-                              styles.copyDayApplyButton,
-                              copyTargetDays.length === 0 && styles.copyDayApplyButtonDisabled,
-                            ]}
-                            disabled={copyTargetDays.length === 0}
-                            onPress={applyCopyToDays}
-                          >
-                            <Text style={styles.copyDayApplyText}>Apply</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    )}
                   </View>
                 )}
               </View>
             );
           })}
 
+          </> : <>
           <Text style={styles.editorSectionTitle}>Block Specific Dates</Text>
           <Text style={styles.editorSectionDescription}>
             Tap a date to temporarily make yourself unavailable.
           </Text>
 
+          <TouchableOpacity style={styles.scheduleOption} accessibilityRole="button" onPress={() => {
+            setSelectingRange(value => !value); setRangeStart(null);
+          }}>
+            <Text style={styles.copyDayChipText}>{selectingRange ? 'Cancel range' : 'Block a date range'}</Text>
+          </TouchableOpacity>
+          {selectingRange && <Text style={styles.editorSectionDescription}>{rangeStart ? `Start: ${rangeStart}. Select an end date.` : 'Select the first date.'}</Text>}
           <View style={styles.blockCalendarCard}>
             <Calendar
               current={selectedDate}
@@ -678,8 +781,19 @@ const VendorAvailabilityEditor = ({
                 </Text>
               </View>
             )}
+            {editorBlockedDates.map(date => <View key={date} style={styles.weeklySwitch}>
+              <Text style={styles.dayStatus}>{date}</Text>
+              <TouchableOpacity style={styles.scheduleOption} accessibilityRole="button"
+                accessibilityLabel={`Unblock ${date}`} onPress={() => setEditorBlockedDates(previous => previous.filter(item => item !== date))}>
+                <Text style={styles.copyDayChipText}>Unblock</Text>
+              </TouchableOpacity>
+            </View>)}
           </View>
 
+          </>}
+        </ScrollView>
+        <View style={[styles.stickySave, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          {dirty && <Text style={styles.dirtyNotice}>Unsaved changes</Text>}
           <TouchableOpacity
             style={styles.saveAvailabilityButton}
             disabled={editorSaving}
@@ -696,105 +810,55 @@ const VendorAvailabilityEditor = ({
             )}
           </TouchableOpacity>
 
-          <View style={{ height: 30 }} />
-        </ScrollView>
+        </View>
 
-        {slotPickerMode && (
+        {activeDayForSlot && (
           <View style={styles.pickerOverlay}>
-            <View style={styles.pickerCard}>
-              <View style={styles.pickerHeader}>
-                <View>
-                  <Text style={styles.pickerTitle}>
-                    {editingSlotIndex !== null ? 'Edit Time Slot' : 'Add Time Slot'}
-                  </Text>
-                  <Text style={styles.pickerSubtitle}>
-                    Select {slotPickerMode === 'start' ? 'start' : 'end'} time
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    setSlotPickerMode(null);
-                    setActiveDayForSlot(null);
-                    setEditingSlotIndex(null);
-                  }}
-                >
-                  <Ionicons name="close-circle" size={25} color="#999999" />
-                </TouchableOpacity>
+            <View style={[styles.pickerCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <Text style={styles.pickerTitle}>
+                {editingSlotIndex !== null ? 'Edit time slot' : 'Add time slot'} · {DAYS.find(day => day.code === activeDayForSlot)?.label}
+              </Text>
+              <View style={styles.tabs}>
+                {([{ label: 'Full day', start: '09:00', end: '23:00' }, { label: 'Morning', start: '09:00', end: '12:00' },
+                  { label: 'Evening', start: '17:00', end: '23:00' }]).map(preset =>
+                  <TouchableOpacity key={preset.label} style={styles.copyDayChip} accessibilityRole="button" onPress={() => {
+                    chooseTime('start', parseTime(preset.start)); chooseTime('end', parseTime(preset.end));
+                  }}><Text style={styles.copyDayChipText}>{preset.label}</Text></TouchableOpacity>)}
               </View>
-
-                          {Platform.OS === 'ios' ? (
-                <DateTimePicker
-                  value={slotPickerMode === 'start' ? draftStart : draftEnd}
-                  mode="time"
-                  display="spinner"
-                  themeVariant="light"
-                  textColor="#1A1A1A"
-                  onChange={(_, date) => {
-                    if (!date) return;
-                    if (slotPickerMode === 'start') {
-                      setDraftStart(date);
-                      if (date >= draftEnd) setDraftEnd(addMinutes(date, 60));
-                    } else {
-                      setDraftEnd(date);
-                    }
-                  }}
-                  style={styles.timePicker}
-                />
-              ) : (
-                <TouchableOpacity
-                  style={styles.androidTimeButton}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    const currentValue = slotPickerMode === 'start' ? draftStart : draftEnd;
-                    DateTimePickerAndroid.open({
-                      value: currentValue,
-                      mode: 'time',
-                      display: 'default',
-                      onChange: (_, date) => {
-                        if (!date) return;
-                        if (slotPickerMode === 'start') {
-                          setDraftStart(date);
-                          if (date >= draftEnd) setDraftEnd(addMinutes(date, 60));
-                        } else {
-                          setDraftEnd(date);
-                        }
-                      },
-                    });
-                  }}
-                >
-                  <Ionicons name="time-outline" size={20} color={PRIMARY} />
-                  <Text style={styles.androidTimeButtonText}>
-                    Tap to set {slotPickerMode === 'start' ? 'start' : 'end'} time
-                  </Text>
-                  <Ionicons name="chevron-forward" size={18} color={PRIMARY} />
-                </TouchableOpacity>
+              <View style={styles.tabs}>
+                {(['start', 'end'] as const).map(field => {
+                  const value = field === 'start' ? draftStart : draftEnd;
+                  const picked = field === 'start' ? pickedStart : pickedEnd;
+                  return <TouchableOpacity key={field} style={styles.copyDayChip} accessibilityRole="button"
+                    onPress={() => {
+                      if (Platform.OS === 'android') {
+                        DateTimePickerAndroid.open({ mode: 'time', value, onChange: (event, date) => {
+                          if (event.type === 'set' && date) chooseTime(field, date);
+                        } });
+                      } else {
+                        setSlotPickerMode(field);
+                        if (!picked) chooseTime(field, value);
+                      }
+                    }}>
+                    <Text style={styles.copyDayChipText}>{field === 'start' ? 'Start' : 'End'}</Text>
+                    <Text style={styles.dayName}>{picked ? formatDisplayTime(toHHMM(value)) : 'Select time'}</Text>
+                  </TouchableOpacity>;
+                })}
+              </View>
+              {Platform.OS === 'ios' && slotPickerMode && (slotPickerMode === 'start' ? pickedStart : pickedEnd) && (
+                <DateTimePicker value={slotPickerMode === 'start' ? draftStart : draftEnd} mode="time" display="compact"
+                  onChange={(_, date) => { if (date) chooseTime(slotPickerMode, date); }} />
               )}
-
-              <View style={styles.pickerPreview}>
-                <Ionicons name="time-outline" size={18} color={PRIMARY} />
-                <Text style={styles.pickerPreviewText}>
-                  {formatDisplayTime(toHHMM(draftStart))} - {formatDisplayTime(toHHMM(draftEnd))}
-                </Text>
-              </View>
-
-              <View style={styles.pickerButtons}>
-                {slotPickerMode === 'start' ? (
-                  <TouchableOpacity style={styles.pickerPrimaryButton} onPress={() => setSlotPickerMode('end')}>
-                    <Text style={styles.pickerPrimaryButtonText}>Next: End Time</Text>
-                    <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.pickerButtonsRow}>
-                    <TouchableOpacity style={styles.pickerBackButton} onPress={() => setSlotPickerMode('start')}>
-                      <Ionicons name="arrow-back" size={17} color={PRIMARY} />
-                      <Text style={styles.pickerBackButtonText}>Back</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.pickerPrimaryButtonFlex} onPress={confirmSlot}>
-                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                      <Text style={styles.pickerPrimaryButtonText}>Save Slot</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+              {!!slotError && <Text accessibilityRole="alert" style={styles.dirtyNotice}>{slotError}</Text>}
+              {pickedStart && pickedEnd && !slotError && <Text style={styles.dayStatus}>
+                Duration: {Math.floor(duration / 60)} hr {duration % 60 ? `${duration % 60} min` : ''}
+              </Text>}
+              <View style={styles.pickerButtonsRow}>
+                <TouchableOpacity style={styles.pickerBackButton} onPress={closeSlot}><Text style={styles.pickerBackButtonText}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.pickerPrimaryButtonFlex, (!pickedStart || !pickedEnd || !!slotError) && { opacity: 0.5 }]}
+                  disabled={!pickedStart || !pickedEnd || !!slotError} onPress={confirmSlot}>
+                  <Text style={styles.pickerPrimaryButtonText}>Save slot</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -815,6 +879,12 @@ const VendorAvailabilityEditor = ({
 export default VendorAvailabilityEditor;
 
 const styles = StyleSheet.create({
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
+  weeklySwitch: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+  scheduleOption: { minHeight: 44, justifyContent: 'center' },
+  stickySave: { backgroundColor: '#FFF', paddingHorizontal: 16, paddingTop: 8 },
+  dirtyNotice: { color: '#8E4B0A', fontSize: 12, marginVertical: 6 },
+
   editorContainer: { flex: 1, backgroundColor: PRIMARY_LIGHT },
     editorHeader: {
     backgroundColor: PRIMARY,
@@ -880,7 +950,7 @@ const styles = StyleSheet.create({
   editorSlotTimeBox: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 7 },
   editorSlotTime: { fontSize: 12, fontWeight: '800', color: PRIMARY },
   editorSlotActions: { flexDirection: 'row', gap: 6 },
-  slotActionButton: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  slotActionButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   deleteSlotButton: { backgroundColor: '#FDEBEC' },
   addSlotButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5,
