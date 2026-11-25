@@ -41,6 +41,7 @@ const vendorTabs: Tab[] = [
 ];
 
 type BadgeCounts = Record<NonNullable<Tab['badge']>, number>;
+let tabTransition: { route: Href; from: number } | undefined;
 const emptyCounts: BadgeCounts = { messages: 0, notifications: 0, orders: 0 };
 type NotificationItem = { _id?: string; isRead?: boolean };
 
@@ -61,7 +62,6 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
   const [user, setUser] = useState<{ id: string; vendor: boolean }>();
   const [badges, setBadges] = useState(emptyCounts);
   const [width, setWidth] = useState(0);
-  const [pendingTab, setPendingTab] = useState<number>();
   const [reduceMotion, setReduceMotion] = useState(false);
   const position = useRef(new Animated.Value(0)).current;
   const transition = useRef<Animated.CompositeAnimation | null>(null);
@@ -69,7 +69,7 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
   const tabs = (user?.vendor ?? (pathname.startsWith('/vendor') && pathname !== '/vendormessages'))
     ? vendorTabs : organizerTabs;
   const activeTab = tabs.findIndex(tab => tab.route === pathname);
-  const selected = pendingTab ?? activeTab;
+  const selected = activeTab;
   const accent = tabs[selected]?.color ?? '#FF737D';
   const tabWidth = width / tabs.length;
 
@@ -83,14 +83,21 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
   }, []);
 
   useFocusEffect(useCallback(() => {
-    position.setValue(Math.max(activeTab, 0));
+    const from = tabTransition?.route === pathname ? tabTransition.from : undefined;
+    tabTransition = undefined;
+    position.setValue(from ?? Math.max(activeTab, 0));
+    if (from !== undefined && activeTab >= 0) {
+      transition.current = Animated.timing(position, {
+        toValue: activeTab, duration: 240, easing: Easing.bezier(.2, .8, .25, 1), useNativeDriver: true,
+      });
+      transition.current.start();
+    }
     return () => {
       transition.current?.stop();
       transition.current = null;
       navigating.current = false;
-      setPendingTab(undefined);
     };
-  }, [activeTab, position]));
+  }, [activeTab, pathname, position]));
 
   useFocusEffect(useCallback(() => {
     let focused = true;
@@ -173,26 +180,19 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
     ).catch(() => {});
   }, [user, viewedNotifications]));
 
-  const navigate = (tab: Tab, index: number) => {
+  const navigate = (tab: Tab) => {
     if (navigating.current || tab.route === pathname || !user) return;
     navigating.current = true;
-    setPendingTab(index);
-    if (reduceMotion || !width || activeTab < 0) {
-      router.navigate(tab.route);
-      return;
-    }
-    transition.current = Animated.timing(position, {
-      toValue: index, duration: 260, easing: Easing.bezier(.2, .8, .25, 1), useNativeDriver: true,
-    });
-    transition.current.start(({ finished }) => { if (finished) router.navigate(tab.route); });
+    tabTransition = !reduceMotion && activeTab >= 0 ? { route: tab.route, from: activeTab } : undefined;
+    router.navigate(tab.route);
   };
 
   return (
     <View pointerEvents="box-none" style={[styles.footer, { bottom: Math.max(6, bottom) }]}>
       <View style={styles.dock} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
         <View pointerEvents="none" style={styles.glass}>
-          {Platform.OS === 'ios' && <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />}
-          <LinearGradient colors={['#292434B8', '#17151FE8']} style={StyleSheet.absoluteFill} />
+          {Platform.OS === 'ios' && <BlurView intensity={55} tint="light" style={StyleSheet.absoluteFill} />}
+          <LinearGradient colors={['#FCF5FDEB', '#EEDFF5F5']} style={StyleSheet.absoluteFill} />
         </View>
         {selected >= 0 && width > 0 && (
           <Animated.View pointerEvents="none" style={[styles.beam, {
@@ -212,10 +212,10 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
           return (
             <Pressable key={tab.label} accessibilityRole="tab" accessibilityState={{ selected: isSelected }}
               accessibilityLabel={count > 0 ? `${tab.label}, ${count} ${tab.badge === 'messages' ? 'unread conversations' : tab.badge === 'orders' ? 'pending orders' : 'unread'}` : tab.label}
-              onPress={() => navigate(tab, index)}
+              onPress={() => navigate(tab)}
               style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
               <Animated.View style={{ transform: [{ translateY: selected < 0 ? 0 : lift }] }}>
-                <Ionicons name={tab.icon} size={23} color={isSelected ? '#FFFFFF' : '#D2CCD9'} />
+                <Ionicons name={tab.icon} size={23} color={isSelected ? '#481E52' : '#725D7B'} />
                 {count > 0 && (
                   <View style={[styles.badge, { backgroundColor: tab.color }]}>
                     <Text allowFontScaling={false} style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
@@ -235,17 +235,17 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', left: 10, right: 10 },
   dock: {
     flexDirection: 'row', height: 60, borderRadius: 21,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: '#FFFFFF42',
-    shadowColor: '#17101F', shadowOpacity: .28, shadowRadius: 10, shadowOffset: { width: 0, height: 5 },
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCC9E7',
+    shadowColor: '#684174', shadowOpacity: .18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 },
     elevation: 5,
   },
-  glass: { ...StyleSheet.absoluteFill, borderRadius: 21, overflow: 'hidden', backgroundColor: '#211C2B77' },
+  glass: { ...StyleSheet.absoluteFill, borderRadius: 21, overflow: 'hidden', backgroundColor: '#F5EBFA88' },
   beam: { position: 'absolute', top: 0, bottom: 0, left: 0, alignItems: 'center' },
   wash: { ...StyleSheet.absoluteFill, marginHorizontal: 3, marginBottom: 3, borderRadius: 15, borderBottomWidth: 1 },
   beamCap: { position: 'absolute', top: -2, height: 4, width: 25, borderRadius: 4, shadowOpacity: .94, shadowRadius: 7, shadowOffset: { width: 0, height: 0 }, elevation: 3 },
   tab: { flex: 1, minWidth: 0, justifyContent: 'center', alignItems: 'center', borderRadius: 16 },
   pressed: { opacity: .75 },
-  label: { position: 'absolute', bottom: 7, left: 2, right: 2, textAlign: 'center', color: '#FFF', fontSize: 10, fontWeight: '700' },
-  badge: { position: 'absolute', top: -6, left: 16, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26212E' },
+  label: { position: 'absolute', bottom: 7, left: 2, right: 2, textAlign: 'center', color: '#481E52', fontSize: 10, fontWeight: '700' },
+  badge: { position: 'absolute', top: -6, left: 16, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F8EFFB' },
   badgeText: { fontSize: 9, color: '#201825', fontWeight: '800' },
 });

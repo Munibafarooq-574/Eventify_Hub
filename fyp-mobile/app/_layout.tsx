@@ -79,10 +79,10 @@ export default function RootLayout() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="selectrole" options={{ headerShown: false }} />
-        <Stack.Screen name="dashboard" options={{ headerShown: false }} />
-        <Stack.Screen name="account" options={{ headerShown: false }} />
+        <Stack.Screen name="dashboard" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="account" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="editprofile" options={{ headerShown: false }} />
-        <Stack.Screen name="notificationacc" options={{ headerShown: false }} />
+        <Stack.Screen name="notificationacc" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="feedbacknreview" options={{ headerShown: false }} />
         <Stack.Screen name="vendorcategories" options={{ headerShown: false }} />
         <Stack.Screen name="categoryvendorlisting" options={{ headerShown: false }} />
@@ -98,7 +98,7 @@ export default function RootLayout() {
         <Stack.Screen name="packages" options={{ headerShown: false }} />
         <Stack.Screen name="images" options={{ headerShown: false }} />
         <Stack.Screen name="vendorreview" options={{ headerShown: false }} />
-        <Stack.Screen name="bottomnotification" options={{ headerShown: false }} />
+        <Stack.Screen name="bottomnotification" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="bottommessages" options={{ headerShown: false }} />
         <Stack.Screen name="bdphotographer" options={{ headerShown: false }} />
         <Stack.Screen name="EventDetailsForm" options={{ headerShown: false }} />
@@ -114,7 +114,7 @@ export default function RootLayout() {
         <Stack.Screen name="paymentconfirmation" options={{ headerShown: false }} />
         <Stack.Screen name="vendorcontactdetails" options={{ headerShown: false }} />
         <Stack.Screen name="vendorprofilepending" options={{ headerShown: false, gestureEnabled: false, }}/>
-        <Stack.Screen name="vendordashboard" options={{ headerShown: false }} />
+        <Stack.Screen name="vendordashboard" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="vendorpackages" options={{ headerShown: false }} />
         <Stack.Screen name="editpackage" options={{ headerShown: false }} />
         <Stack.Screen name="bdsalon" options={{ headerShown: false }} />
@@ -125,15 +125,15 @@ export default function RootLayout() {
         <Stack.Screen name="bdmehndi" options={{ headerShown: false }} />
         <Stack.Screen name="bdsounds" options={{ headerShown: false }} />
         <Stack.Screen name="imagesuploaded" options={{ headerShown: false }} />
-        <Stack.Screen name="vendoraccount" options={{ headerShown: false }} />
-        <Stack.Screen name="vendormessages" options={{ headerShown: false }} />
-        <Stack.Screen name="vendornotifications" options={{ headerShown: false }} />
-        <Stack.Screen name="vendorordersummary" options={{ headerShown: false }} />
-        <Stack.Screen name="vendormyevents" options={{ headerShown: false }} />
+        <Stack.Screen name="vendoraccount" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="vendormessages" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="vendornotifications" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="vendorordersummary" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="vendormyevents" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="vendorfaqs" options={{ headerShown: false }} />
         <Stack.Screen name="customizeyourown" options={{ headerShown: false }} />
         <Stack.Screen name="e-card" options={{ headerShown: false }} />
-        <Stack.Screen name="myevents" options={{ headerShown: false }} />
+        <Stack.Screen name="myevents" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="reschedulebooking" options={{ headerShown: false }} />
         <Stack.Screen name="VPD" options={{ headerShown: false }} />
         <Stack.Screen name="vendoreditprofile" options={{ headerShown: false }} />
