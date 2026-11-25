@@ -1136,7 +1136,7 @@ return {
         },
       })
         .select(
-          'eventStartDateTime eventEndDateTime status serviceName',
+          'orderId eventStartDateTime eventEndDateTime status serviceName',
         )
         .lean();
 
@@ -1174,6 +1174,7 @@ return {
   workingSlots,
 
   bookings: bookings.map((b) => ({
+    orderId: b.orderId?.toString(),
     start: b.eventStartDateTime,
     end: b.eventEndDateTime,
     status: b.status,
