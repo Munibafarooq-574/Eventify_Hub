@@ -103,6 +103,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Use Message on the relevant available booking to open that vendor’s conversation. Chatting alone does not change a date, payment or booking status.',
         'Review Booking history for closed bookings and recorded decisions. View chat history opens previous messages without sending new ones. If no messages were exchanged, the history screen shows No previous messages for this booking. Contact Support for help with refunds or penalties.',
         'Use the Today, Upcoming and Past tabs to see event counts and switch lists. Use Event options to duplicate event details into a new form.',
+        'Starts in shows the time remaining until the event begins.',
       ] },
     ],
   },

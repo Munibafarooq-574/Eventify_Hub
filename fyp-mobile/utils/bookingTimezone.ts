@@ -46,3 +46,17 @@ export function eventLocalDateTime(date: string, time: string, timeZone: string)
   }
   return new Date(matches.length === 1 ? matches[0] : NaN);
 }
+
+export function formatBookingCountdown(time: number, now: number): string {
+    const remaining = time - now;
+    if (!(remaining > 0)) return '';
+    const dayMs = 24 * 60 * 60_000;
+    if (remaining > dayMs) {
+        const days = Math.floor(remaining / dayMs);
+        const hours = Math.floor((remaining % dayMs) / (60 * 60_000));
+        return `${days} ${days === 1 ? 'day' : 'days'}${hours ? ` ${hours}h` : ''}`;
+    }
+    const minutes = Math.ceil(remaining / 60_000);
+    const hours = Math.floor(minutes / 60);
+    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}

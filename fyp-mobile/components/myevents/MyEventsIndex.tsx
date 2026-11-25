@@ -1,6 +1,6 @@
 import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { currencySymbol, currencyOf, formatMoney } from '@/utils/currency';
-import { bookingDateKey, bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
+import { eventLocalDateTime, formatBookingCountdown, bookingDateKey, bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -690,8 +690,10 @@ const MyEventsScreen = () => {
                 (sum, booking) => sum + Number(booking.finalAmount ?? booking.price ?? 0), 0);
               const due = actions.reduce((sum, action) => sum + Math.round(action.amount * 100), 0) / 100;
               const money = (amount: number) => formatMoney(amount, currencyOf(event));
-              const start = new Date(event.eventStartDateTime || event.eventDate).getTime();
-              const daysLeft = Math.ceil((start - paymentNow) / 86400000);
+              const start = event.eventStartDateTime
+                ? new Date(event.eventStartDateTime).getTime()
+                : eventLocalDateTime(String(event.eventDate ?? '').slice(0, 10), String(event.eventTime ?? '').padStart(5, '0'), timeZone).getTime();
+              const startsIn = formatBookingCountdown(start, paymentNow);
               const actionIds = new Set(actions.flatMap(action => action.eligible.map(row => String(row.booking._id))));
               const paidTotal = vendorOrders.reduce((sum, booking) => sum + paidFor(booking), 0);
               const hasSuccessfulVendorPayment = vendorOrders.some((vendor: any) =>
@@ -745,7 +747,7 @@ const MyEventsScreen = () => {
                               {accepted.length > 0 ? ` · ${accepted.length} accepted` : ''}
                             </Text>
                             {due > 0 && <Text style={styles.totalLabel}>{money(due)} down payment due</Text>}
-                            {daysLeft > 0 && <Text style={styles.packageText}>in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}</Text>}
+                            {!!startsIn && <Text style={styles.packageText}>Starts in {startsIn}</Text>}
                           </View>
 
                           <View style={styles.chevronCircle}>

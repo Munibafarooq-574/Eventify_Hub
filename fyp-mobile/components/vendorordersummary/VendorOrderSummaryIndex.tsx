@@ -1,6 +1,6 @@
 import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { displayBookingMoney, getVendorBookingSummary } from '@/utils/vendorBookingAmounts';
-import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
+import { formatBookingCountdown, bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
@@ -44,20 +44,6 @@ interface Order {
 
 const titleCase = (value: string) => value.toLowerCase().replace(/_/g, ' ')
     .replace(/\b\w/g, letter => letter.toUpperCase());
-
-const completionTimeLeft = (time: number, now: number) => {
-    const remaining = time - now;
-    if (!(remaining > 0)) return '';
-    const dayMs = 24 * 60 * 60_000;
-    if (remaining > dayMs) {
-        const days = Math.floor(remaining / dayMs);
-        const hours = Math.floor((remaining % dayMs) / (60 * 60_000));
-        return `${days} ${days === 1 ? 'day' : 'days'}${hours ? ` ${hours}h` : ''}`;
-    }
-    const minutes = Math.ceil(remaining / 60_000);
-    const hours = Math.floor(minutes / 60);
-    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-};
 
 const openOrderLink = (url: string) => {
     void Linking.openURL(url).catch(() => Alert.alert('Unable to open link'));
@@ -979,7 +965,7 @@ const OrderSummary = () => {
                                             const detailsOpen = expandedPackage === packageKey;
                                             const completionTime = getVendorCompletionTime(booking);
                                             const completionNow = Date.now();
-                                            const timeLeft = completionTime === null ? '' : completionTimeLeft(completionTime, completionNow);
+                                            const timeLeft = completionTime === null ? '' : formatBookingCountdown(completionTime, completionNow);
                                             const bookedPackage = booking.vendorId?.packages?.find((pkg: any) => String(pkg._id) === String(booking.packageId));
                                             const completionLabel = (booking.bookingType || bookedPackage?.bookingType) === 'DELIVERY_BASED'
                                                 ? 'Scheduled delivery' : 'After service ends';
