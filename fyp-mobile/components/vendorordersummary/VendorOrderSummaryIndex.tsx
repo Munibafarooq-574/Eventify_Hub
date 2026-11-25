@@ -62,25 +62,30 @@ const PRIMARY = "#780C60";
 const PRIMARY_LIGHT = "#F8E9F0";
 const ACCENT = "#B84B9A";
 
-const getCardColor = (label: string) => {
-    switch (label) {
-        case "All":
-            return "#C79AE8";
-        case "Pending":
-            return "#E8A23A"; // amber - order placed, not yet confirmed
-        case "Processing":
-            return "#4A84BD"; // blue - accepted, payment still due
-        case "Confirmed":
-            return "#8F6CCF"; // financially secured after down payment
-        case "Completed":
-            return "#63BE63"; // green - done
-        case "Cancelled":
-            return "#D9534F"; // red - cancelled
-        case "Payment Expired":
-            return "#C47A2C"; // warm amber - payment hold expired
-        default:
-            return PRIMARY;
-    }
+type StatusAppearance = { color: string; background: string; icon: keyof typeof Ionicons.glyphMap };
+const statusAppearance: Record<string, StatusAppearance> = {
+    pending: { color: '#9A5107', background: '#FFF0D7', icon: 'time-outline' },
+    processing: { color: '#195B95', background: '#E4F0FD', icon: 'hourglass-outline' },
+    accepted: { color: '#126A60', background: '#DDF4EF', icon: 'checkmark-outline' },
+    confirmed: { color: '#6533A0', background: '#EFE5FC', icon: 'shield-checkmark-outline' },
+    completed: { color: '#217448', background: '#E4F5E9', icon: 'checkmark-done-outline' },
+    cancelled: { color: '#A6293D', background: '#FCE7EB', icon: 'close-circle-outline' },
+    expired: { color: '#685B54', background: '#EEE9E5', icon: 'hourglass-outline' },
+    payment_expired: { color: '#9C411D', background: '#FCE9DC', icon: 'alarm-outline' },
+    no_longer_assigned: { color: '#4F5D73', background: '#E9EDF4', icon: 'remove-circle-outline' },
+    unpaid: { color: '#9C411D', background: '#FCE9DC', icon: 'ellipse-outline' },
+    partially_paid: { color: '#9A5107', background: '#FFF0D7', icon: 'contrast-outline' },
+    paid: { color: '#217448', background: '#E4F5E9', icon: 'checkmark-circle-outline' },
+};
+const defaultAppearance: StatusAppearance = { color: PRIMARY, background: PRIMARY_LIGHT, icon: 'information-circle-outline' };
+const appearanceFor = (status: string) =>
+    statusAppearance[['rejected', 'cancelled_by_vendor'].includes(status) ? 'cancelled' : status] ?? defaultAppearance;
+const StatusChip = ({ status, label }: { status: string; label?: string }) => {
+    const { color, background, icon } = appearanceFor(status);
+    return <View style={[styles.statusBadge, { backgroundColor: background }]}>
+        <Ionicons name={icon} size={12} color={color} />
+        <Text style={[styles.statusBadgeText, { color }]}>{label ?? titleCase(status)}</Text>
+    </View>;
 };
 
 // Backend statuses mapped to UI filters:
@@ -146,7 +151,7 @@ const getVendorStatus = (order: any) => {
     return "pending";
 };
 
-type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Fully Paid" | "Cancelled" | "Expired" | "Payment Expired" | "No Longer Assigned";
+type FilterType = "All" | "Pending" | "Processing" | "Confirmed" | "Completed" | "Fully Paid" | "Cancelled" | "Expired" | "Payment Expired" | "No Longer Assigned" | "Closed";
 
 const OrderSummary = () => {
     const { selectedTab, orderId: targetOrderId } = useLocalSearchParams(); // Read tab from navigation params
@@ -233,7 +238,7 @@ const OrderSummary = () => {
             const tabIndex = validTabs.indexOf(tab as FilterType);
             requestAnimationFrame(() => {
                 summaryScrollRef.current?.scrollTo({
-                    x: Math.max(0, tabIndex * 168 - 16),
+                    x: Math.max(0, tabIndex * 108 - 16),
                     animated: true,
                 });
             });
@@ -316,26 +321,6 @@ const OrderSummary = () => {
         };
     }, [orders]);
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "pending":
-                return "#E8A23A";
-            case "confirmed":
-                return "#337AB7";
-            case "completed":
-                return "#5CB85C";
-            case "cancelled":
-                return "#D9534F";
-            case "expired":
-            case "payment_expired":
-                return "#C47A2C";
-            case "no_longer_assigned":
-                return "#8B6B82";
-            default:
-                return "#999";
-        }
-    };
-
     // Filter respects the selected summary card:
     // - All -> everything except cancelled
     // - Pending -> newly placed orders only
@@ -344,7 +329,8 @@ const OrderSummary = () => {
         const filteredOrders = useMemo(() => {
         if (selectedFilter === "Fully Paid") return fullyPaidOrders;
         const matchingOrders = orders.filter((order) => {
-            if (selectedFilter === "All") return true;
+            if (selectedFilter === "All") return order._id === targetId || !isClosedVendorStatus(getVendorStatus(order));
+            if (selectedFilter === "Closed") return isClosedVendorStatus(getVendorStatus(order));
             if (selectedFilter === "Pending") return getVendorStatus(order) === PENDING_STATUS;
             if (selectedFilter === "Processing") return getVendorStatus(order) === PROCESSING_STATUS;
             if (selectedFilter === "Confirmed") return getVendorStatus(order) === CONFIRMED_STATUS;
@@ -631,7 +617,7 @@ const OrderSummary = () => {
                     >
                         <SummaryCard
                             label="All"
-                            value={orderStats.totalOrders}
+                            value={orderStats.totalOrders - orderStats.expired - orderStats.paymentExpired - orderStats.noLongerAssigned}
                             icon="cart-outline"
                             isActive={selectedFilter === "All"}
                         />
@@ -703,32 +689,9 @@ const OrderSummary = () => {
                         />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => handleSummaryCardClick("Expired")} activeOpacity={0.7}>
-                        <SummaryCard label="Request Expired" value={orderStats.expired} icon="timer-outline" isActive={selectedFilter === "Expired"} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={() => handleSummaryCardClick("Payment Expired")}
-                        activeOpacity={0.7}
-                    >
-                        <SummaryCard
-                            label="Payment Expired"
-                            value={orderStats.paymentExpired}
-                            icon="timer-outline"
-                            isActive={selectedFilter === "Payment Expired"}
-                        />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={() => handleSummaryCardClick("No Longer Assigned")}
-                        activeOpacity={0.7}
-                    >
-                        <SummaryCard
-                            label="No Longer Assigned"
-                            value={orderStats.noLongerAssigned}
-                            icon="archive-outline"
-                            isActive={selectedFilter === "No Longer Assigned"}
-                        />
+                    <TouchableOpacity onPress={() => handleSummaryCardClick("Closed")} activeOpacity={0.7}>
+                        <SummaryCard label="Closed" value={orderStats.expired + orderStats.paymentExpired + orderStats.noLongerAssigned}
+                            icon="archive-outline" isActive={["Closed", "Expired", "Payment Expired", "No Longer Assigned"].includes(selectedFilter)} />
                     </TouchableOpacity>
                 </ScrollView>
 
@@ -795,7 +758,8 @@ const OrderSummary = () => {
                         const acceptanceDisabled = !!scheduleHold || proposalBooking?.vendorScheduleProposal?.status === 'PENDING'
                             || pending.some((booking: any) => isAcceptanceDisabled(booking, lateAcceptanceId));
                         const status = getVendorStatus(item);
-                        const closed = isClosedVendorStatus(status) || status === 'cancelled';
+                        const faded = isClosedVendorStatus(status);
+                        const closed = faded || status === 'cancelled';
                         const orderStatusLabel = status === EXPIRED_STATUS ? 'Request Expired' : titleCase(status);
                         const { amounts, original, discount, bookingTotal, platformFee, earnings, totalPaid, totalRemaining } = getVendorBookingSummary(services, item);
                         const cancellablePackages = services.filter((booking: any) =>
@@ -805,6 +769,9 @@ const OrderSummary = () => {
                             .map(getVendorCompletionTime)
                             .reduce<number>((next, time) => time !== null && time > Date.now() ? Math.min(next, time) : next, Infinity);
                         const organizer = item.organizerId;
+                        const organizerName = organizer?.name || 'Organizer';
+                        const organizerPhone = organizer?.phone_number || organizer?.phone || organizer?.contactDetails?.contactNumber;
+                        const organizerEmail = organizer?.email;
                         const city = item.eventCityId?.name || item.eventCity?.name || item.city?.name || (typeof item.city === 'string' ? item.city : '');
                         const schedule = item.eventStartDateTime
                             ? slotLabel(item.eventStartDateTime, item.eventEndDateTime)
@@ -818,8 +785,8 @@ const OrderSummary = () => {
                         const historyOpen = expandedHistory === item._id;
 
                         return (
-                            <View style={styles.orderCard}>
-                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]} />
+                            <View style={[styles.orderCard, faded && { opacity: 0.78 }]}>
+                                <View style={[styles.statusIndicator, { backgroundColor: appearanceFor(status).color }]} />
                                 <View style={styles.orderInfo}>
                                     <View style={styles.orderCardHeader}>
                                         <TouchableOpacity style={[styles.detailRow, { flex: 1 }]} activeOpacity={0.85}
@@ -832,7 +799,7 @@ const OrderSummary = () => {
                                                     {[organizer?.name, item.guests != null ? `${item.guests} guests` : ''].filter(Boolean).join(' · ')}
                                                 </Text>}
                                             </View>
-                                            <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{orderStatusLabel}</Text></View>
+                                            <StatusChip status={status} label={orderStatusLabel} />
                                             <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={PRIMARY} />
                                         </TouchableOpacity>
                                         {!closed && cancellablePackages.length > 0 && <TouchableOpacity style={styles.iconAction} accessibilityRole="button"
@@ -846,7 +813,13 @@ const OrderSummary = () => {
                                             <Text style={[styles.detailText, { flex: 1 }]}>{schedule}{!isExpanded && isTomorrow ? ' · Tomorrow' : ''}</Text>
                                         </View>
                                         {isExpanded && <>
-                                            <Text style={styles.detailText}>{[city, item.guests != null ? `${item.guests} guests` : '', item.eventType].filter(Boolean).join(' · ')}</Text>
+                                            {[ { icon: 'location-outline', label: city }, { icon: 'people-outline', label: item.guests != null ? `${item.guests} guests` : '' },
+                                                { icon: 'pricetag-outline', label: item.eventType } ].map(({ icon, label }) => label ? (
+                                                <View key={icon} style={styles.detailRow}>
+                                                    <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={15} color={PRIMARY} />
+                                                    <Text style={[styles.detailText, { flex: 1 }]}>{label}</Text>
+                                                </View>
+                                            ) : null)}
                                             {!!item.eventAddress && <TouchableOpacity style={styles.detailRow} accessibilityRole="link"
                                                 onPress={() => openOrderLink('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([item.eventAddress, city].filter(Boolean).join(', ')))}>
                                                 <Ionicons name="location-outline" size={16} color={PRIMARY} />
@@ -856,7 +829,7 @@ const OrderSummary = () => {
                                         {!isExpanded && <>
                                             <Text style={styles.detailText}>{services.length} {services.length === 1 ? 'package' : 'packages'} · {displayBookingMoney(bookingTotal, item)}</Text>
                                             <Text style={styles.moneyLine}>Received {displayBookingMoney(totalPaid, item)} · Pending {displayBookingMoney(totalRemaining, item)}</Text>
-                                            {Number.isFinite(nextCompletion) && <Text style={styles.detailText}>Next completion · {formatBookingActivityTime(new Date(nextCompletion).toISOString(), zone)}</Text>}
+                                            {Number.isFinite(nextCompletion) && <Text style={styles.detailText}>Next to complete · {formatBookingActivityTime(new Date(nextCompletion).toISOString(), zone)}</Text>}
                                         </>}
                                     </View>
                                     {isExpanded && <>
@@ -894,23 +867,34 @@ const OrderSummary = () => {
                                                         const busy = respondingRequestId === request._id;
                                                         const applied = group.every(row => row.resolutionStatus === 'APPLIED');
                                                         const showDetails = expandedSchedule === key;
+                                                        const accepted = group.every(row => row.status === 'ACCEPTED');
                                                         return (
-                                                            <View key={key} style={styles.rescheduleCard}>
-                                                                {!actionable && <TouchableOpacity style={styles.detailRow} accessibilityRole="button"
+                                                            <View key={key} style={[styles.rescheduleCard, {
+                                                                backgroundColor: actionable ? '#FFF4E2' : applied ? '#F0F7F2' : '#F4F1F3',
+                                                            }]}>
+                                                                {!actionable && <TouchableOpacity accessibilityRole="button"
                                                                     accessibilityState={{ expanded: showDetails }}
                                                                     onPress={() => setExpandedSchedule(showDetails ? null : key)}>
-                                                                    <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
-                                                                    <Text style={[styles.rescheduleTitle, { flex: 1 }]}>
-                                                                        {applied ? `Date changed ${formatCalendarDate(request.oldEventDate)} → ${formatCalendarDate(request.newEventDate)} · Accepted ✓`
-                                                                            : group.every(row => row.status === 'ACCEPTED') ? 'Schedule accepted · Awaiting update' : 'Schedule change history'}
+                                                                    <View style={styles.detailRow}>
+                                                                        <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
+                                                                        <Text style={[styles.rescheduleTitle, { flex: 1 }]}>
+                                                                            {applied ? 'Rescheduled' : accepted ? 'Awaiting schedule update' : 'Schedule change history'}
+                                                                        </Text>
+                                                                        {accepted && <StatusChip status="completed" label="Accepted" />}
+                                                                        <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={16} color={PRIMARY} />
+                                                                    </View>
+                                                                    {applied && <Text style={styles.rescheduleLine}>{formatCalendarDate(request.oldEventDate)} → {formatCalendarDate(request.newEventDate)}</Text>}
+                                                                    <Text style={styles.scheduleMeta}>
+                                                                        Requested {formatBookingDate(request.createdAt, zone)} · Reason: {request.reason || 'Not provided'}
                                                                     </Text>
-                                                                    <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={16} color={PRIMARY} />
                                                                 </TouchableOpacity>}
                                                                 {(actionable || showDetails) && <>
                                                                 <View style={styles.rescheduleHeader}>
                                                                     <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
-                                                                    <Text style={styles.rescheduleTitle}>{actionable ? "Review Reschedule Request" : "Schedule change details"}</Text>
+                                                                    <Text style={styles.rescheduleTitle}>{actionable ? "Review Reschedule Request" : "Package schedules"}</Text>
+                                                                    {actionable && <StatusChip status="pending" label="Pending" />}
                                                                 </View>
+                                                                {actionable && <>
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New date: {new Date(request.newEventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                                                                 </Text>
@@ -919,6 +903,7 @@ const OrderSummary = () => {
                                                                 </Text>
                                                                 <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
                                                                 <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, bookingTimeZone(item))}</Text>
+                                                                </>}
                                                                 <Text style={styles.rescheduleTitle}>Affected packages ({group.length})</Text>
                                                                 {group.map(row => {
                                                                     const booking = services.find((service: any) => String(service._id) === String(row.vendorOrderId));
@@ -987,13 +972,15 @@ const OrderSummary = () => {
                                             const completionTime = getVendorCompletionTime(booking);
                                             const canComplete = canCompleteVendorBooking(booking);
                                             const showCompletion = !closed && booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED';
-                                            const paymentLabel = String(booking.paymentStatus || 'UNPAID');
+                                            const paymentLabel = String(booking.paymentStatus || 'UNPAID').toUpperCase();
+                                            const paymentTone = paymentLabel === 'PAID' ? 'paid' : paymentLabel === 'PARTIALLY_PAID' ? 'partially_paid'
+                                                : paymentLabel === 'PAYMENT_EXPIRED' ? 'payment_expired' : 'unpaid';
                                             return (
                                                 <View key={packageKey} style={styles.serviceDetailCard}>
                                                     <TouchableOpacity style={styles.detailRow} accessibilityRole="button" accessibilityState={{ expanded: detailsOpen }}
                                                         onPress={() => setExpandedPackage(detailsOpen ? null : packageKey)}>
                                                         <Text style={[styles.serviceDetailTitle, { flex: 1 }]}>{booking.serviceName || 'Package'}</Text>
-                                                        <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{titleCase(String(booking.status || 'pending'))}</Text></View>
+                                                        <StatusChip status={booking.replacementOutcome === 'NO_LONGER_ASSIGNED' ? 'no_longer_assigned' : paymentLabel === 'PAYMENT_EXPIRED' ? 'payment_expired' : String(booking.status || 'pending').toLowerCase()} label={booking.status === 'expired' && paymentLabel !== 'PAYMENT_EXPIRED' ? 'Request expired' : undefined} />
                                                         <Ionicons name={detailsOpen ? 'chevron-up' : 'chevron-down'} size={15} color={PRIMARY} />
                                                     </TouchableOpacity>
                                                     {booking.delivery ? <DeliveryDetails pkg={booking} timeZone={zone} /> : (
@@ -1006,8 +993,9 @@ const OrderSummary = () => {
                                                         </Text>
                                                     )}
                                                     {detailsOpen && <View style={styles.packageDetails}>
-                                                        {booking.quantity != null && <Text style={styles.serviceDetailText}>Quantity · {booking.quantity}</Text>}
-                                                        {!!booking.pricingMethod && <Text style={styles.serviceDetailText}>Pricing · {pricingLabel(booking)}</Text>}
+                                                        {(booking.quantity != null || !!booking.pricingMethod) && <Text style={styles.serviceDetailText}>
+                                                            {[booking.quantity != null ? `Qty ${booking.quantity}` : '', booking.pricingMethod ? pricingLabel(booking) : ''].filter(Boolean).join(' · ')}
+                                                        </Text>}
                                                         {booking.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included · {Number(booking.groupSize) * Number(booking.quantity || 1)}</Text>}
                                                     </View>}
                                                     <View style={styles.detailRow}>
@@ -1017,10 +1005,10 @@ const OrderSummary = () => {
                                                                 {booking.promotionCode ? `Discount (${booking.promotionCode})` : 'Discount'} · −{displayBookingMoney(amounts[index].discount, moneyContext)}
                                                             </Text>}
                                                         </View>
-                                                        <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{paymentLabel === 'PARTIALLY_PAID' ? 'Partially paid' : titleCase(paymentLabel)}</Text></View>
+                                                        <StatusChip status={paymentTone} label={paymentLabel === 'PAID' ? 'Fully paid' : paymentLabel === 'PARTIALLY_PAID' ? 'Partially paid' : titleCase(paymentLabel)} />
                                                     </View>
                                                     <View style={styles.paymentTrack}>
-                                                        <View style={[styles.paymentFill, { width: `${total > 0 ? Math.max(0, Math.min(100, paid / total * 100)) : 0}%` }]} />
+                                                        <View style={[styles.paymentFill, { backgroundColor: appearanceFor(paymentTone).color, width: `${paymentLabel === 'PAID' ? 100 : total > 0 ? Math.max(0, Math.min(100, paid / total * 100)) : 0}%` }]} />
                                                     </View>
                                                     <Text style={styles.serviceDetailText}>Paid {displayBookingMoney(paid, moneyContext)} · Left {displayBookingMoney(remaining, moneyContext)}</Text>
                                                     {showCompletion && (canComplete ? (
@@ -1033,9 +1021,14 @@ const OrderSummary = () => {
                                                         </TouchableOpacity>
                                                     ) : <View style={styles.detailRow}>
                                                         <Ionicons name="lock-closed-outline" size={14} color={PRIMARY} />
-                                                        <Text style={styles.completionHint}>{completionTime === null ? 'Scheduled service time unavailable.'
-                                                            : completionTime > Date.now() ? `Unlocks in ${timeUntilCompletion(completionTime)}`
-                                                            : 'Completion unlocks once payment is secured.'}</Text>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={styles.completionHint}>{completionTime === null ? 'Mark Completed · Scheduled service time unavailable.'
+                                                                : completionTime > Date.now() ? `Mark Completed available in ${timeUntilCompletion(completionTime)}`
+                                                                : 'Mark Completed available once payment is secured.'}</Text>
+                                                            {completionTime !== null && completionTime > Date.now() && <Text style={styles.scheduleMeta}>
+                                                                {completionTime === new Date(booking.eventEndDateTime).getTime() ? 'After service ends' : 'At scheduled delivery'} · {formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}
+                                                            </Text>}
+                                                        </View>
                                                     </View>)}
                                                     <BookingCancellationDetails booking={booking} timeZone={zone} audience="vendor"
                                                         refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
@@ -1048,20 +1041,36 @@ const OrderSummary = () => {
                                             {platformFee > 0 && <Text style={styles.detailText}>Platform fee {displayBookingMoney(platformFee, item)} · Net booking value {displayBookingMoney(earnings, item)}</Text>}
                                         </View>
                                         <View style={styles.serviceDetailCard}>
-                                            <Text style={styles.serviceDetailTitle}>Organizer</Text>
-                                            {!!organizer?.name && <Text style={styles.detailText}>{organizer.name}</Text>}
+                                            <View style={styles.detailRow}>
+                                                <View style={styles.eventIconWrap}><Text style={styles.moneyLine}>{organizerName.charAt(0).toUpperCase()}</Text></View>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.serviceDetailTitle}>{organizerName}</Text>
+                                                    <Text style={styles.scheduleMeta}>Organizer</Text>
+                                                </View>
+                                            </View>
+                                            {!!organizerPhone && <TouchableOpacity style={styles.detailRow} accessibilityRole="link"
+                                                onPress={() => openOrderLink(`tel:${String(organizerPhone).replace(/[^+\d]/g, '')}`)}>
+                                                <Ionicons name="call-outline" size={16} color={PRIMARY} />
+                                                <Text style={[styles.detailText, styles.linkText]}>{organizerPhone}</Text>
+                                            </TouchableOpacity>}
+                                            {!!organizerEmail && <TouchableOpacity style={styles.detailRow} accessibilityRole="link"
+                                                onPress={() => openOrderLink(`mailto:${encodeURIComponent(organizerEmail)}`)}>
+                                                <Ionicons name="mail-outline" size={16} color={PRIMARY} />
+                                                <Text style={[styles.detailText, styles.linkText]}>{organizerEmail}</Text>
+                                            </TouchableOpacity>}
+                                            {!organizerPhone && !organizerEmail && <Text style={styles.scheduleMeta}>Phone and email unavailable</Text>}
                                             <View style={styles.contactRow}>
-                                                {!!organizer?.phone && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Call organizer"
-                                                    style={styles.iconAction} onPress={() => openOrderLink(`tel:${String(organizer.phone).replace(/[^+\d]/g, '')}`)}>
-                                                    <Ionicons name="call-outline" size={20} color={PRIMARY} />
+                                                {!!organizerPhone && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Call organizer"
+                                                    style={styles.contactAction} onPress={() => openOrderLink(`tel:${String(organizerPhone).replace(/[^+\d]/g, '')}`)}>
+                                                    <Ionicons name="call-outline" size={16} color={PRIMARY} /><Text style={styles.messageButtonText}>Call</Text>
                                                 </TouchableOpacity>}
-                                                {!!organizer?.email && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Email organizer"
-                                                    style={styles.iconAction} onPress={() => openOrderLink(`mailto:${encodeURIComponent(organizer.email)}`)}>
-                                                    <Ionicons name="mail-outline" size={20} color={PRIMARY} />
+                                                {!!organizerEmail && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Email organizer"
+                                                    style={styles.contactAction} onPress={() => openOrderLink(`mailto:${encodeURIComponent(organizerEmail)}`)}>
+                                                    <Ionicons name="mail-outline" size={16} color={PRIMARY} /><Text style={styles.messageButtonText}>Email</Text>
                                                 </TouchableOpacity>}
-                                                {!closed && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Message organizer"
-                                                    style={styles.iconAction} onPress={() => handleMessageButtonClick(organizer, undefined, zone)}>
-                                                    <Ionicons name="chatbubble-ellipses-outline" size={20} color={PRIMARY} />
+                                                {!closed && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Chat with organizer"
+                                                    style={styles.contactAction} onPress={() => handleMessageButtonClick(organizer, undefined, zone)}>
+                                                    <Ionicons name="chatbubble-ellipses-outline" size={16} color={PRIMARY} /><Text style={styles.messageButtonText}>Chat</Text>
                                                 </TouchableOpacity>}
                                             </View>
                                         </View>
@@ -1100,26 +1109,11 @@ const OrderSummary = () => {
                                                         ? "The client did not complete the required payment before the deadline. This booking is now history only and the reserved slot has been released."
                                                         : getVendorStatus(item) === EXPIRED_STATUS
                                                         ? "This request was not accepted before the service started. It is kept for your history; new booking actions and messages are unavailable. You can still view chat history."
-                                                        : "This record is available for your history only. No further actions are required."}
+                                                        : "You are no longer assigned to this event."}
                                                 </Text>
                                             </View>
                                         </View>
-                                    ) : (
-                                    <View style={styles.bookingActions}>
-                                        {getVendorStatus(item) !== "cancelled" && (
-                                            <View style={styles.actionButtons}>
-                                                <TouchableOpacity
-                                                    accessibilityRole="button"
-                                                    style={styles.messageButton}
-                                                    onPress={() => handleMessageButtonClick(item.organizerId, undefined, bookingTimeZone(item))}
-                                                >
-                                                    <Ionicons name="chatbubble-ellipses-outline" size={16} color={PRIMARY} />
-                                                    <Text style={styles.messageButtonText}>Message</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
-                                    </View>
-                                    )}
+                                    ) : null}
                                         <TouchableOpacity style={styles.historyToggle} accessibilityRole="button" accessibilityState={{ expanded: historyOpen }}
                                             onPress={() => setExpandedHistory(historyOpen ? null : item._id)}>
                                             <Text style={styles.serviceDetailTitle}>History</Text>
@@ -1198,19 +1192,19 @@ const SummaryCard = ({ label, value, icon, isActive = false }: {
     value: number;
     icon: keyof typeof Ionicons.glyphMap;
     isActive?: boolean;
-}) => (
-    <View style={[styles.filterChip, isActive && styles.filterChipActive]}>
-        <Ionicons name={icon} size={14} color={isActive ? '#FFF' : getCardColor(label)} />
-        <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{label} {value}</Text>
-    </View>
-);
+}) => {
+    const key = label === 'Fully Paid' ? 'paid' : label === 'Closed' ? 'expired' : label.toLowerCase().replace(/ /g, '_');
+    const { color, background, icon: statusIcon } = appearanceFor(key);
+    return <View style={[styles.filterChip, { backgroundColor: isActive ? color : background, borderColor: color }]}>
+        <Ionicons name={key === 'all' ? icon : statusIcon} size={14} color={isActive ? '#FFF' : color} />
+        <Text style={[styles.filterText, { color: isActive ? '#FFF' : color }]}>{label} {value}</Text>
+    </View>;
+};
 
 const styles = StyleSheet.create({
-    guideInset: { marginRight: 42 },
+    guideInset: { marginRight: 64 },
     filterChip: { minHeight: 38, marginRight: 7, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', borderRadius: 20, borderWidth: 1, borderColor: '#EAD7E5' },
-    filterChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
     filterText: { color: PRIMARY, fontSize: 12, fontWeight: '700' },
-    filterTextActive: { color: '#FFF' },
     iconAction: { minWidth: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     optionsList: { flexGrow: 0, maxHeight: 320, marginVertical: 12 },
     moneyLine: { color: PRIMARY, fontWeight: '800', fontSize: 13 },
@@ -1218,7 +1212,9 @@ const styles = StyleSheet.create({
     packageDetails: { gap: 4, paddingVertical: 5 },
     paymentTrack: { height: 6, backgroundColor: '#EBD8E8', borderRadius: 3, overflow: 'hidden', marginVertical: 5 },
     paymentFill: { height: '100%', backgroundColor: PRIMARY },
-    contactRow: { flexDirection: 'row', gap: 8 },
+    contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    contactAction: { minHeight: 44, paddingHorizontal: 10, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 10, backgroundColor: PRIMARY_LIGHT },
+    scheduleMeta: { color: '#675961', fontSize: 12, marginTop: 4 },
     historyToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     cancellationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     cancellationPanel: { width: '100%', maxWidth: 560, maxHeight: '85%', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20 },
@@ -1368,6 +1364,9 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
     statusBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
         backgroundColor: PRIMARY_LIGHT,
         paddingHorizontal: 10,
         paddingVertical: 4,
@@ -1377,7 +1376,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: "700",
         color: PRIMARY,
-        textTransform: "capitalize",
     },
     bold: {
         fontWeight: "bold"
