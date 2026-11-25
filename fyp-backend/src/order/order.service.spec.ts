@@ -70,9 +70,12 @@ describe('OrderService - Unit Tests', () => {
             aggregate: jest.fn().mockResolvedValue([]),
         };
 
+        const statsQuery = (rows: any[]) => ({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(rows) }) });
+        orderFindQuery.select = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+
         vendorOrderModel = {
             aggregate: jest.fn().mockResolvedValue([]),
-            find: jest.fn().mockResolvedValue([{ _id: validObjectId }]),
+            find: jest.fn().mockImplementation(() => Object.assign(Promise.resolve([{ _id: validObjectId }]), statsQuery([]))),
             deleteMany: jest.fn().mockResolvedValue({}),
             updateMany: jest.fn().mockResolvedValue({}),
             countDocuments: jest.fn().mockResolvedValue(0),
@@ -196,12 +199,28 @@ describe('OrderService - Unit Tests', () => {
         await expect(service.completeVendorOrder(validObjectId)).rejects.toThrow('Cancelled bookings');
     });
 
-    it('counts request expiry separately from payment expiry for the dashboard', async () => {
-        vendorOrderModel.countDocuments.mockImplementation(async (filter: any) => filter.$or ? 2 : filter.paymentStatus === 'PAYMENT_EXPIRED' ? 3 : 0);
-        const stats = await service.getOrderStats('Vendor', validObjectId);
-        expect(stats.requestExpired).toBe(2);
-        expect(stats.paymentExpired).toBe(3);
-        expect(vendorOrderModel.countDocuments).toHaveBeenCalledWith({ vendorId: new (require('mongoose').Types.ObjectId)(validObjectId), $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }], paymentStatus: { $ne: 'PAYMENT_EXPIRED' } });
+    it('counts vendor orders once and classifies mixed packages together', async () => {
+        const bookings = [
+            { _id: 'a', orderId: 'first', status: 'accepted', paymentStatus: 'PARTIALLY_PAID' },
+            { _id: 'b', orderId: 'first', status: 'accepted', paymentStatus: 'PAID' },
+            { _id: 'c', orderId: 'first', status: 'expired', paymentStatus: 'PAYMENT_EXPIRED' },
+            { _id: 'd', orderId: 'second', status: 'expired', paymentStatus: 'PAYMENT_EXPIRED' },
+            { _id: 'e', orderId: 'third', status: 'expired', paymentStatus: 'EXPIRED' },
+            { _id: 'f', orderId: 'fourth', status: 'rejected', replacementOutcome: 'NO_LONGER_ASSIGNED' },
+        ];
+        const parents = [
+            { _id: 'first', vendorOrders: ['a', 'b', 'c', 'other-vendor'] },
+            { _id: 'second', vendorOrders: ['d'] },
+            { _id: 'third', vendorOrders: ['e'] },
+            { _id: 'fourth', vendorOrders: [] },
+        ];
+        vendorOrderModel.find.mockReturnValueOnce({ select: () => ({ lean: async () => bookings }) });
+        orderModel.find.mockReturnValueOnce({ select: () => ({ lean: async () => parents }) });
+
+        expect(await service.getOrderStats('Vendor', validObjectId)).toMatchObject({
+            totalOrders: 4, confirmed: 1, pending: 0, processing: 0,
+            requestExpired: 1, paymentExpired: 1, noLongerAssigned: 1,
+        });
     });
 
     it('counts completed, fully paid orders with zero balance for the dashboard', async () => {
