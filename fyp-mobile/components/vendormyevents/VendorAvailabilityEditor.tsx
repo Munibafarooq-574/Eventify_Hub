@@ -104,6 +104,10 @@ const toKey = (date: string | Date) => {
   return d.toISOString().split('T')[0];
 };
 
+const formatBlockedDate = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', {
+  weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+});
+
 type Props = {
   visible: boolean;
   vendorId: string | null;
@@ -132,7 +136,12 @@ const VendorAvailabilityEditor = ({
   const [tab, setTab] = useState<'weekly' | 'blocked'>('weekly');
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [sameHours, setSameHours] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const initialCalendarDate = selectedDate >= today ? selectedDate : today;
+  const [calendarMonth, setCalendarMonth] = useState(initialCalendarDate.slice(0, 7));
   const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
+  const [rangeField, setRangeField] = useState<'start' | 'end'>('start');
   const [selectingRange, setSelectingRange] = useState(false);
   const [copyHours, setCopyHours] = useState(true);
   const [copyNotice, setCopyNotice] = useState(true);
@@ -210,7 +219,12 @@ const VendorAvailabilityEditor = ({
     setEditorBlockedDates(blockedDates);
     setTab('weekly');
     setExpandedDay(null);
-    setSameHours(false); setRangeStart(null); setSelectingRange(false);
+    setSameHours(false);
+    setCalendarMonth((selectedDate >= today ? selectedDate : today).slice(0, 7));
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeField('start');
+    setSelectingRange(false);
   }, [visible, availability]);
 
   const toggleEditorDay = (dayCode: string) => {
@@ -389,29 +403,40 @@ const VendorAvailabilityEditor = ({
     setBlockedDateReasons(previous => previous.filter(item => item.date !== date));
   };
 
+  const changeRangeMode = (enabled: boolean) => {
+    setSelectingRange(enabled);
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeField('start');
+  };
+
+  const applyDateRange = () => {
+    if (!rangeStart || !rangeEnd || rangeStart < today || rangeEnd < rangeStart) return;
+    Alert.alert('Block date range?', `${formatBlockedDate(rangeStart)} – ${formatBlockedDate(rangeEnd)}. Existing bookings keep their schedules.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Block dates', onPress: () => {
+        const dates: string[] = [];
+        const cursor = new Date(`${rangeStart}T00:00:00Z`);
+        while (toKey(cursor) <= rangeEnd) {
+          dates.push(toKey(cursor));
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
+        }
+        addBlockedDates(dates);
+        changeRangeMode(false);
+      } },
+    ]);
+  };
+
   const toggleBlockedDate = (dateKey: string) => {
-    const today = new Date().toISOString().slice(0, 10);
-    if (dateKey < today && !editorBlockedDates.includes(dateKey)) {
-      Alert.alert('Past date', 'Choose today or a future date.');
-      return;
-    }
+    if (dateKey < today) return;
     if (selectingRange) {
-      if (dateKey < today) return;
-      if (!rangeStart) { setRangeStart(dateKey); return; }
-      const [first, last] = [rangeStart, dateKey].sort();
-      Alert.alert('Block date range?', `${first} – ${last}. Existing bookings keep their schedules.`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Block dates', onPress: () => {
-          const dates: string[] = [];
-          const cursor = new Date(`${first}T00:00:00Z`);
-          while (cursor.toISOString().slice(0, 10) <= last) {
-            dates.push(cursor.toISOString().slice(0, 10));
-            cursor.setUTCDate(cursor.getUTCDate() + 1);
-          }
-          addBlockedDates(dates);
-          setRangeStart(null); setSelectingRange(false);
-        } },
-      ]);
+      if (rangeField === 'start') {
+        setRangeStart(dateKey);
+        if (rangeEnd && rangeEnd < dateKey) setRangeEnd(null);
+        setRangeField('end');
+      } else {
+        setRangeEnd(dateKey);
+      }
       return;
     }
     if (editorBlockedDates.includes(dateKey)) removeBlockedDate(dateKey);
@@ -764,27 +789,28 @@ const VendorAvailabilityEditor = ({
             <Text style={styles.editorSectionDescription}>
               Customers cannot book blocked dates. Confirmed bookings keep their schedules.
             </Text>
-            <View style={styles.weeklySwitch}>
-              <Text style={styles.copyDayChipText}>Block a date range</Text>
-              <Switch accessibilityLabel="Block a date range" value={selectingRange}
-                trackColor={{ false: '#D8D8D8', true: PRIMARY }}
-                onValueChange={value => { setSelectingRange(value); setRangeStart(null); }} />
-            </View>
+            <Text style={styles.reasonLabel}>Reason (optional)</Text>
             <TextInput style={styles.reasonInput} value={newBlockReason} onChangeText={setNewBlockReason}
-              maxLength={160} placeholder="Reason for new dates (optional)"
+              maxLength={160} placeholder="Add a reason for the dates you block" placeholderTextColor="#746773"
               accessibilityLabel="Optional reason visible to customers" />
             <Text style={styles.dayStatus}>Customers can see the reason you enter.</Text>
             <Calendar
-              current={selectedDate}
+              initialDate={initialCalendarDate}
+              minDate={today}
+              disableAllTouchEventsForDisabledDays
+              disableArrowLeft={calendarMonth <= today.slice(0, 7)}
+              onMonthChange={month => setCalendarMonth(month.dateString.slice(0, 7))}
               firstDay={1}
               markingType="custom"
-              markedDates={[...new Set([...bookingDates, ...editorBlockedDates, ...(rangeStart ? [rangeStart] : [])])].reduce((result: Record<string, any>, date) => {
+              markedDates={[...new Set([...bookingDates, ...editorBlockedDates, ...([rangeStart, rangeEnd].filter((date): date is string => date !== null))])].reduce((result: Record<string, any>, date) => {
+                if (date < today) return result;
+                const endpoint = date === rangeStart || date === rangeEnd;
                 result[date] = {
                   marked: bookingDates.includes(date),
                   dotColor: PRIMARY,
-                  selected: date === rangeStart,
+                  selected: endpoint,
                   selectedColor: PRIMARY,
-                  ...(editorBlockedDates.includes(date) ? { customStyles: {
+                  ...(!endpoint && editorBlockedDates.includes(date) ? { customStyles: {
                     container: { backgroundColor: '#FBE5DF', borderRadius: 8 },
                     text: { color: '#9F3125', fontWeight: '800', textDecorationLine: 'line-through' },
                   } } : {}),
@@ -792,7 +818,6 @@ const VendorAvailabilityEditor = ({
                 return result;
               }, {})}
               onDayPress={(day) => toggleBlockedDate(day.dateString)}
-              enableSwipeMonths
               theme={{
                 backgroundColor: '#FFFFFF',
                 calendarBackground: '#FFFFFF',
@@ -810,25 +835,56 @@ const VendorAvailabilityEditor = ({
             />
 
             <Text style={styles.dayStatus}>Red dates are blocked · Purple dot means a booking</Text>
-            {selectingRange && <Text style={styles.rangeHint}>
-              {rangeStart ? `Start: ${rangeStart}. Select the last date.` : 'Tap the first date, then the last date.'}
-            </Text>}
+            <View style={styles.weeklySwitch}>
+              <Text style={styles.copyDayChipText}>Block a date range</Text>
+              <Switch accessibilityLabel="Block a date range" value={selectingRange}
+                trackColor={{ false: '#D8D8D8', true: PRIMARY }} onValueChange={changeRangeMode} />
+            </View>
+            {selectingRange && (
+              <View style={styles.rangeControls}>
+                <View style={styles.rangeFields}>
+                  {(['start', 'end'] as const).map(field => {
+                    const active = rangeField === field;
+                    const date = field === 'start' ? rangeStart : rangeEnd;
+                    return <TouchableOpacity key={field}
+                      style={[styles.rangeField, active && styles.activeRangeField]}
+                      accessibilityRole="button" accessibilityState={{ selected: active }}
+                      onPress={() => setRangeField(field)}>
+                      <Text style={styles.copyDayChipText}>{field === 'start' ? 'Start date' : 'End date'}</Text>
+                      <Text style={styles.dayStatus}>{date ? formatBlockedDate(date) : 'Select date'}</Text>
+                    </TouchableOpacity>;
+                  })}
+                </View>
+                <Text style={styles.rangeHint}>
+                  {rangeStart && rangeEnd && rangeEnd < rangeStart
+                    ? 'End date must be on or after the start date.'
+                    : `Tap a date on the calendar to set the ${rangeField} date.`}
+                </Text>
+                <TouchableOpacity style={[styles.applyRange, (!rangeStart || !rangeEnd || rangeEnd < rangeStart) && { opacity: 0.45 }]}
+                  accessibilityRole="button" disabled={!rangeStart || !rangeEnd || rangeEnd < rangeStart}
+                  onPress={applyDateRange}>
+                  <Text style={styles.pickerPrimaryButtonText}>Apply range</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           {editorBlockedDates.length > 0 && <View style={styles.blockCalendarCard}>
             <Text style={styles.editorSectionTitle}>Blocked dates</Text>
-            {editorBlockedDates.map(date => {
-              const reason = blockedDateReasons.find(item => item.date === date)?.reason;
-              return <View key={date} style={styles.blockedDateRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.blockedDatesText}>{date}</Text>
-                  {!!reason && <Text style={styles.dayStatus}>{reason}</Text>}
-                </View>
-                <TouchableOpacity style={styles.closeIcon} accessibilityRole="button"
-                  accessibilityLabel={`Unblock ${date}`} onPress={() => removeBlockedDate(date)}>
-                  <Ionicons name="close" size={20} color="#9F3125" />
-                </TouchableOpacity>
-              </View>;
-            })}
+            <View style={styles.blockedDateList}>
+              {editorBlockedDates.map(date => {
+                const reason = blockedDateReasons.find(item => item.date === date)?.reason;
+                return <View key={date} style={styles.blockedDateRow}>
+                  <View style={styles.blockedDateTextGroup}>
+                    <Text style={styles.blockedDatesText}>{formatBlockedDate(date)}</Text>
+                    {!!reason && <Text style={styles.dayStatus}>{reason}</Text>}
+                  </View>
+                  <TouchableOpacity style={styles.closeIcon} accessibilityRole="button"
+                    accessibilityLabel={`Unblock ${date}`} onPress={() => removeBlockedDate(date)}>
+                    <Ionicons name="close" size={20} color="#9F3125" />
+                  </TouchableOpacity>
+                </View>;
+              })}
+            </View>
           </View>}
 
           </>}
@@ -931,9 +987,17 @@ const styles = StyleSheet.create({
   timeField: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: PRIMARY_LIGHT },
   slotDuration: { textAlign: 'center', color: PRIMARY, fontWeight: '600', marginVertical: 10 },
   closeIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  reasonLabel: { color: '#332430', fontWeight: '700', marginTop: 12, marginBottom: 6 },
   reasonInput: { borderWidth: 1, borderColor: '#DDD2DA', borderRadius: 10, padding: 10, color: '#222' },
-  rangeHint: { marginTop: 10, backgroundColor: '#E5F5EC', color: '#256347', borderRadius: 8, padding: 9 },
-  blockedDateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingLeft: 10, borderRadius: 10, backgroundColor: '#FBE5DF' },
+  rangeControls: { gap: 8 },
+  rangeFields: { flexDirection: 'row', gap: 8 },
+  rangeField: { flex: 1, minHeight: 52, padding: 8, borderWidth: 1, borderColor: '#DDD2DA', borderRadius: 10 },
+  activeRangeField: { borderColor: PRIMARY, backgroundColor: PRIMARY_LIGHT },
+  rangeHint: { color: '#625560', fontSize: 12 },
+  applyRange: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, backgroundColor: PRIMARY, borderRadius: 10 },
+  blockedDateList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  blockedDateRow: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', paddingLeft: 10, borderRadius: 12, backgroundColor: '#FBE5DF' },
+  blockedDateTextGroup: { flexShrink: 1, paddingVertical: 6 },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 },
   weeklySwitch: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
   scheduleOption: { minHeight: 44, justifyContent: 'center' },
