@@ -1,56 +1,104 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+    View,
+    StyleSheet,
+    Animated,
+    Dimensions,
+    Easing,
+    Image,
+    Text,
+    ActivityIndicator,
+    Pressable,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { restoreStartupSession } from '@/store';
 
-const routes = {
-    onboarding: '/sandwich1',
-    login: '/login',
-    organizer: '/dashboard',
-    vendor: '/vendordashboard',
-} as const;
+const routes = { onboarding: '/sandwich1', login: '/login', organizer: '/dashboard', vendor: '/vendordashboard' } as const;
 
-const bubbles = [
-    { x: .06, y: .12, size: 66, color: '#D884AE' },
-    { x: .69, y: .14, size: 98, color: '#9D4684' },
-    { x: .19, y: .32, size: 38, color: '#C08552' },
-    { x: .77, y: .40, size: 55, color: '#DF9BC4' },
-    { x: .08, y: .67, size: 106, color: '#AC548F' },
-    { x: .67, y: .74, size: 74, color: '#E5A7CB' },
-    { x: .38, y: .88, size: 43, color: '#C08552' },
-];
+const { width, height } = Dimensions.get('window');
 
-export default function SplashScreen() {
+const SplashScreen: React.FC = () => {
     const router = useRouter();
-    const { width, height } = useWindowDimensions();
-    const float = useRef(new Animated.Value(0)).current;
-    const logo = useRef(new Animated.Value(0)).current;
+
+    // Animation values
+    const bubbleOpacity = useRef(new Animated.Value(0.7)).current;
+    const logoOpacity = useRef(new Animated.Value(0)).current; // Start with opacity 0
+    const logoScale = useRef(new Animated.Value(0.8)).current; // Start smaller
+
+    const [bubbleAnimations] = useState(() => Array.from({ length: 12 }, () => new Animated.Value(0)));
     const [attempt, setAttempt] = useState(0);
     const [showRetry, setShowRetry] = useState(false);
 
     useEffect(() => {
-        const animation = Animated.timing(logo, { toValue: 1, duration: 550, useNativeDriver: true });
-        const drift = Animated.loop(Animated.sequence([
-            Animated.timing(float, { toValue: 1, duration: 1700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-            Animated.timing(float, { toValue: 0, duration: 1700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ]));
-        animation.start();
-        drift.start();
-        return () => {
-            animation.stop();
-            drift.stop();
+        // Function to animate bubbles
+        const animateBubble = (animation: Animated.Value, delay: number) => {
+            const loop = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(animation, {
+                        toValue: 1,
+                        duration: 4000,
+                        delay,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(animation, {
+                        toValue: 0,
+                        duration: 4000,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            loop.start();
+            return loop;
         };
-    }, [float, logo]);
+
+        // Start bubble animations
+        const loops = bubbleAnimations.map((animation, index) => animateBubble(animation, index * 300));
+
+        // Animate bubble opacity out and logo fade-in with scale-up
+        const hideBubblesTimer = setTimeout(() => {
+            Animated.parallel([
+            Animated.timing(bubbleOpacity, {
+             toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+            }),
+        Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+        }),
+         Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 60,
+        useNativeDriver: true,
+         }),
+    ]).start();
+        }, 2000);
+
+        
+        return () => {
+            clearTimeout(hideBubblesTimer);
+            loops.forEach(loop => loop.stop());
+            bubbleOpacity.stopAnimation();
+            logoOpacity.stopAnimation();
+            logoScale.stopAnimation();
+        };
+    }, [bubbleAnimations, bubbleOpacity, logoScale, logoOpacity]);
 
     useEffect(() => {
         let active = true;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 12_000);
-        let logoTimer: ReturnType<typeof setTimeout> | undefined;
-        const logoDelay = new Promise<void>(resolve => { logoTimer = setTimeout(resolve, 1850); });
+        let animationTimer: ReturnType<typeof setTimeout> | undefined;
+        const animationDelay = new Promise<void>(resolve => {
+            animationTimer = setTimeout(resolve, attempt === 0 ? 4000 : 0);
+        });
 
-        void Promise.all([restoreStartupSession(controller.signal), logoDelay]).then(([result]) => {
+        void Promise.all([restoreStartupSession(controller.signal), animationDelay]).then(([result]) => {
             clearTimeout(timeout);
             if (!active || result === 'cancelled') return;
             if (result === 'retry') {
@@ -59,61 +107,145 @@ export default function SplashScreen() {
             }
             router.replace(routes[result]);
         });
+
         return () => {
             active = false;
             clearTimeout(timeout);
-            clearTimeout(logoTimer);
+            clearTimeout(animationTimer);
             controller.abort();
         };
     }, [attempt, router]);
 
+    // Function to render bubbles
+    const renderBubbles = () => {
+        return bubbleAnimations.map((animation, index) => {
+            const translateY = animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [height, -200],
+            });
+
+            const translateX = animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [
+                    Math.random() * width,
+                    Math.random() * width - 100,
+                ],
+            });
+
+            const scale = animation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, 2],
+            });
+
+            const bubbleSize = Math.random() * 100 + 80;
+
+            return (
+                <Animated.View
+                    key={index}
+                    style={[
+                        styles.bubble,
+                        {
+                            width: bubbleSize,
+                            height: bubbleSize,
+                            backgroundColor:
+                                index % 3 === 0 ? '#FFDEE9' : index % 2 === 0 ? '#7B2869' : '#C08552', // Alternate colors
+                            transform: [{ translateY }, { translateX }, { scale }],
+                            opacity: bubbleOpacity,
+                        },
+                    ]}
+                />
+            );
+        });
+    };
+
     return (
-        <LinearGradient colors={['#FFDEE9', '#FFFFFF']} style={styles.container}>
-            <View pointerEvents="none" accessible={false} style={StyleSheet.absoluteFill}>
-                {bubbles.map(({ x, y, size, color }, index) => (
-                    <Animated.View key={x} style={[styles.bubble, {
-                        left: width * x,
-                        top: height * y,
-                        width: size,
-                        height: size,
-                        borderRadius: size / 2,
-                        backgroundColor: color,
-                        transform: [{ translateY: float.interpolate({
-                            inputRange: [0, 1], outputRange: [28, index % 2 ? -34 : -54],
-                        }) }],
-                    }]} />
-                ))}
-            </View>
-            <Animated.Image
-                source={require('@/assets/images/splash.png')}
-                resizeMode="contain"
-                accessibilityLabel="Eventify Hub"
-                style={[styles.logo, { opacity: logo, transform: [{ scale: logo.interpolate({
-                    inputRange: [0, 1], outputRange: [0.85, 1],
-                }) }] }]}
-            />
-            {showRetry ? (
-                <>
-                    <Text accessibilityRole="alert" style={styles.message}>
-                        Could not verify your session. Check your connection and try again.
-                    </Text>
-                    <Pressable accessibilityRole="button" style={styles.retry} onPress={() => {
+        <LinearGradient
+            colors={['#FFDEE9', '#FFFFFF']} // Gradient background
+            style={styles.container}
+        >
+            {/* Logo with scale and fade-in animation */}
+              <Animated.View
+                style={[
+                    styles.logoContainer,
+                    { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+                ]}
+            >
+                <Image
+                    resizeMode="contain"
+                    source={{
+                        uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&',
+                    }}
+                    style={styles.logoImage}
+                    accessibilityLabel="Company Logo"
+                />
+
+                <Animated.View style={{
+                marginTop: 25,
+                 opacity: logoOpacity,
+                     }} >
+                {showRetry ? (
+                    <Pressable accessibilityRole="button" onPress={() => {
                         setShowRetry(false);
                         setAttempt(value => value + 1);
-                    }}>
-                        <Text style={styles.retryText}>Try again</Text>
+                    }} style={{ padding: 12 }}>
+                        <Text style={{ color: '#7B2869', fontWeight: '700' }}>Could not verify session. Try again</Text>
                     </Pressable>
-                </>
-            ) : <ActivityIndicator color="#7B2869" accessibilityLabel="Starting Eventify Hub" />}
+                ) : <ActivityIndicator size="large" color="#7B2869" />}
+            </Animated.View>
+            </Animated.View>
+
+            {/* Animated bubbles */}
+            {renderBubbles()}
         </LinearGradient>
     );
-}
+};
 
 const styles = StyleSheet.create({
-    container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, overflow: 'hidden' },
-    bubble: { position: 'absolute', opacity: 0.22 },
-    logo: { width: 200, height: 200, marginBottom: 20 },
-    message: { textAlign: 'center', color: '#4A1436', marginBottom: 14 },
-    retry: { backgroundColor: '#7B2869', borderRadius: 12, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 },
-    retryText: { color: '#FFFFFF', fontWeight: '700' },
+    container: {
+        flex: 1,
+        backgroundColor: '#ffffff', // Background color
+        overflow: 'hidden', // Hide bubbles outside the screen
+    },
+    bubble: {
+        position: 'absolute',
+        borderRadius: 100, // Perfect circle
+        opacity: 0.5, // Semi-transparent bubbles
+    },
+    logoContainer: {
+        borderRadius: 60,
+        display: 'flex',
+        marginLeft: 'auto',
+        marginRight: 'auto',
+        maxWidth: 480,
+        width: '100%',
+        paddingTop: 150,
+        paddingBottom: 246,
+        flexDirection: 'column',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+
+    },
+    logoImage: {
+        position: 'relative',
+        display: 'flex',
+        width: '100%',
+        aspectRatio: 0.87,
+    },
+    title: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#7B2869',
+    marginTop: 20,
+    textAlign: 'center',
+    },
+
+    subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
+    },
 });
+
+export default SplashScreen;
