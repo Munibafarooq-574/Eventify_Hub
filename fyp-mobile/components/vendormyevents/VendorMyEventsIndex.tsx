@@ -435,27 +435,8 @@ const capacitySegments = dayAvailability.slots.flatMap(slot => {
     belowMinimum: !!slot.belowMinimum,
   }));
 });
-const displaySlots = capacitySegments.reduce<typeof capacitySegments>((rows, slot) => {
-  const previous = rows[rows.length - 1];
-  if (previous?.end === slot.start && previous.use === slot.use && previous.belowMinimum === slot.belowMinimum) {
-    rows[rows.length - 1] = { ...previous, end: slot.end };
-  } else {
-    rows.push(slot);
-  }
-  return rows;
-}, []);
-const capacityColor = (use: number) => use >= capacity ? '#AE2639' : use > 1 ? '#D47516' : use === 1 ? '#E8AD49' : '#278A4B';
-const capacityMinutes = capacitySegments.reduce((totals, slot) => {
-  const bucket = slot.use >= capacity ? 'full' : slot.use > 0 ? 'partial' : 'free';
-  totals[bucket] += (slot.end - slot.start) / 60_000;
-  return totals;
-}, { free: 0, partial: 0, full: 0 });
-const formatCapacityHours = (minutes: number) => {
-  const rounded = Math.round(minutes);
-  const hours = Math.floor(rounded / 60);
-  const remaining = rounded % 60;
-  return remaining ? `${hours}h ${remaining}m` : `${hours} hrs`;
-};
+const freeSlotCount = dayAvailability.slots.filter(slot => slot.status === 'available' && !slot.belowMinimum).length;
+const bookedSlotCount = dayAvailability.slots.filter(slot => slot.status === 'booked').length;
 const bookedGroups = new Map<string, typeof selectedDayBookings>();
 [...selectedDayBookings].sort((first, second) =>
   new Date(first.eventStartDateTime).getTime() - new Date(second.eventStartDateTime).getTime()
@@ -695,7 +676,7 @@ return (
           {capacitySegments.map((slot, index) => (
             <View key={index} style={{
               flex: slot.end - slot.start,
-              backgroundColor: slot.use === 0 && slot.belowMinimum ? '#B6A9B0' : capacityColor(slot.use),
+              backgroundColor: slot.use > 0 ? '#B23D49' : slot.belowMinimum ? '#B6A9B0' : '#278A4B',
             }} />
           ))}
         </View>
@@ -706,24 +687,14 @@ return (
         </View>
       </TouchableOpacity>}
       <View style={styles.slotSummaryRow}>
-        {([{ label: 'Free', color: '#278A4B' }, { label: 'Partly booked', color: '#D47516' },
-          { label: 'Full', color: '#AE2639' }]).map(item => (
-          <View key={item.label} style={styles.slotSummaryItem}>
-            <View style={[styles.summaryDot, { backgroundColor: item.color }]} />
-            <Text style={styles.summaryText}>{item.label}</Text>
-          </View>
-        ))}
-      </View>
-      <Text style={styles.slotSectionTitle}>Available for new bookings</Text>
-      <Text style={styles.timelineLabel}>Fully free: {formatCapacityHours(capacityMinutes.free)} · Partly booked: {formatCapacityHours(capacityMinutes.partial)} · Full: {formatCapacityHours(capacityMinutes.full)}</Text>
-      <View style={styles.slotsGrid}>
-        {displaySlots.filter(slot => slot.use > 0).map(slot => <View key={slot.start} style={styles.capacityRow}>
-          <Text style={styles.slotTime}>{formatTime(new Date(slot.start), daySnapshot?.timeZone)} – {formatTime(new Date(slot.end), daySnapshot?.timeZone)}</Text>
-          <Text style={[styles.slotStatus, slot.use >= capacity && styles.overlapText]}>
-            {slot.use} of {capacity} in use{slot.use > capacity ? ` · Over limit by ${slot.use - capacity}. Check this booking.`
-              : slot.use === capacity ? ' · Full · no new bookings' : ''}
-          </Text>
-        </View>)}
+        <View style={styles.slotSummaryItem}>
+          <View style={[styles.summaryDot, { backgroundColor: '#278A4B' }]} />
+          <Text style={styles.summaryText}>{freeSlotCount} free</Text>
+        </View>
+        <View style={styles.slotSummaryItem}>
+          <View style={[styles.summaryDot, { backgroundColor: '#B23D49' }]} />
+          <Text style={styles.summaryText}>{bookedSlotCount} booked</Text>
+        </View>
       </View>
     </>
   )}
@@ -754,17 +725,25 @@ return (
         <Text style={styles.slotLink}>{showSlots ? 'Hide all slots ▴' : 'Show all slots ▾'}</Text>
       </TouchableOpacity>}
       {showSlots && <View style={styles.slotsGrid}>
-        {displaySlots.filter(slot => slot.use === 0).map(slot => <View key={slot.start} style={[styles.slotCard, styles.freeSlot]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.slotTime}>{formatTime(new Date(slot.start), daySnapshot?.timeZone)} – {formatTime(new Date(slot.end), daySnapshot?.timeZone)}</Text>
-            <Text style={styles.slotStatus}>{slot.belowMinimum ? 'Below minimum working window' : `0 of ${capacity} in use · Free`}</Text>
-          </View>
-        </View>)}
-        {displaySlots.every(slot => slot.use > 0) && <Text style={styles.slotStatus}>All working times already have a booking. Check remaining capacity above.</Text>}
+        {dayAvailability.slots.map(slot => {
+          const booked = slot.status === 'booked';
+          const overLimit = capacitySegments.some(segment =>
+            segment.start < slot.endMs && segment.end > slot.startMs && segment.use > capacity);
+          return <View key={slot.startMs} style={[styles.slotCard, booked ? styles.bookedSlot : styles.freeSlot]}>
+            <View style={[styles.slotIcon, booked ? styles.bookedSlotIcon : styles.freeSlotIcon]}>
+              <Ionicons name={booked ? 'lock-closed-outline' : 'checkmark-outline'} size={16} color={booked ? '#C0392B' : '#278A4B'} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.slotTime}>{slot.start} – {slot.end}</Text>
+              <Text style={styles.slotStatus}>{booked ? 'Booked' : slot.belowMinimum ? 'Below minimum working window' : 'Available'}</Text>
+              {overLimit && <Text style={styles.overlapText}>Over booking limit. Check this slot.</Text>}
+            </View>
+          </View>;
+        })}
       </View>}
 
   <TouchableOpacity style={styles.scheduleAction} accessibilityRole="button" accessibilityLabel="About availability"
-    onPress={() => Alert.alert('Booking capacity', `You can handle up to ${capacity} bookings at the same time. Partly booked times still have capacity. The complete service window and booking notice are checked before confirmation.`)}>
+    onPress={() => Alert.alert('Booking capacity', `You can handle up to ${capacity} bookings at the same time. A red slot has an existing booking and may still have room under your limit. The complete service window and booking notice are checked before confirmation.`)}>
     <Ionicons name="information-circle-outline" size={20} color={PRIMARY} />
   </TouchableOpacity>
 </View>
