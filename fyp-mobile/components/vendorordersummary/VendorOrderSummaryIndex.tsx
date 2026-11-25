@@ -46,8 +46,15 @@ const titleCase = (value: string) => value.toLowerCase().replace(/_/g, ' ')
     .replace(/\b\w/g, letter => letter.toUpperCase());
 
 const completionTimeLeft = (time: number, now: number) => {
-    const minutes = Math.ceil((time - now) / 60_000);
-    if (minutes <= 0) return '';
+    const remaining = time - now;
+    if (!(remaining > 0)) return '';
+    const dayMs = 24 * 60 * 60_000;
+    if (remaining > dayMs) {
+        const days = Math.floor(remaining / dayMs);
+        const hours = Math.floor((remaining % dayMs) / (60 * 60_000));
+        return `${days} ${days === 1 ? 'day' : 'days'}${hours ? ` ${hours}h` : ''}`;
+    }
+    const minutes = Math.ceil(remaining / 60_000);
     const hours = Math.floor(minutes / 60);
     return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
 };
@@ -1023,12 +1030,13 @@ const OrderSummary = () => {
                                                             style={[styles.completeButton, styles.finishButton, completingBookingId !== null && styles.disabledAction]}
                                                             onPress={() => confirmCompletion(item._id, booking)}>
                                                             <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                                                            <Text style={styles.buttonText}>{completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}</Text>
+                                                            <Text style={styles.buttonText}>{completingBookingId === booking._id ? 'Completing…' : 'Mark as Completed'}</Text>
                                                         </TouchableOpacity>
-                                                    ) : <View style={styles.completionNotice}>
-                                                        <Ionicons name="lock-closed-outline" size={15} color={PRIMARY} />
+                                                    ) : <TouchableOpacity disabled accessibilityRole="button" accessibilityState={{ disabled: true }}
+                                                        style={[styles.completeButton, styles.lockedCompletionButton]}>
+                                                        <Ionicons name="lock-closed-outline" size={15} color="#5E5B60" />
                                                         <View style={{ flex: 1 }}>
-                                                            <Text style={styles.moneyLine}>Mark Completed</Text>
+                                                            <Text style={[styles.buttonText, styles.lockedCompletionTitle]}>Mark as Completed</Text>
                                                             <Text style={styles.scheduleMeta}>{completionTime === null ? 'Scheduled service time unavailable.'
                                                                 : timeLeft ? `Available in ${timeLeft}`
                                                                 : 'Available once payment is secured.'}</Text>
@@ -1036,7 +1044,7 @@ const OrderSummary = () => {
                                                                 {completionLabel} · {formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}
                                                             </Text>}
                                                         </View>
-                                                    </View>)}
+                                                    </TouchableOpacity>)}
                                                     <BookingCancellationDetails booking={booking} timeZone={zone} audience="vendor"
                                                         refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
                                                 </View>
@@ -1220,7 +1228,8 @@ const styles = StyleSheet.create({
     paymentFill: { height: '100%', backgroundColor: PRIMARY },
     contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     contactAction: { minHeight: 44, paddingHorizontal: 10, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 10, backgroundColor: PRIMARY_LIGHT },
-    completionNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: PRIMARY_LIGHT },
+    lockedCompletionButton: { alignItems: 'flex-start', gap: 8, marginTop: 8, padding: 12, backgroundColor: '#ECEBED', borderWidth: 1, borderColor: '#DBD9DD' },
+    lockedCompletionTitle: { color: '#4E4B50', fontSize: 13 },
     scheduleMeta: { color: '#675961', fontSize: 12, marginTop: 4 },
     historyToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     cancellationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 },

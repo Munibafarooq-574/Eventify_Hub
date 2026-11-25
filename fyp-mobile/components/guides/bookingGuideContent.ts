@@ -199,7 +199,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] },
       { id: 'complete-chat', title: 'Complete service and contact the client', summary: 'Finish only your work, then check the remaining payment.', steps: [
         'Use Call or Email in the Organizer card when those contact details are available. Tap Chat to open the in-app conversation.',
-        'A locked Mark Completed panel shows a countdown and the exact service end or scheduled delivery time in the event city timezone. The action becomes available when that time arrives and any required advance is secured. If payment is still pending, the panel explains the payment requirement. Tap Mark Completed and confirm after providing the service.',
+        'The disabled Mark as Completed button shows a countdown and the exact service end or scheduled delivery time in the event city timezone. The action becomes available when that time arrives and any required advance is secured. If payment is still pending, the button explains the payment requirement. Tap Mark as Completed and confirm after providing the service.',
         'Completion applies only to your vendor booking. If money remains, the client gets the remaining-payment action and its separate deadline; completion does not itself mark the balance paid.',
         'Tap Fully Paid Orders on the Vendor Dashboard or Fully Paid in Order Summary to see completed orders with no balance left.',
         'If your subscription is inactive, manage valid existing bookings through My Orders and open Chat in the Organizer card. The general Messages list can be restricted. Expiry of your subscription does not itself cancel customer bookings.',
