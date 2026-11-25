@@ -3,6 +3,8 @@ import searchVendors, { VendorSearchResult } from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
 import { createBookingDraftStore, getUserData } from '@/store';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -30,6 +32,7 @@ const COLORS = {
 };
 
 const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) => {
+  const insets = useSafeAreaInsets();
   const [draft] = useState(createBookingDraftStore);
   const [username, setUsername] = useState(""); // State for username
   const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
@@ -161,82 +164,61 @@ const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) =
 
   return (
     <View style={styles.container}>
-      {/* Location and Notification */}
-      <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoDot} />
-          <Text style={styles.brandText}>Dashboard</Text>
-        </View>
-
-        <View style={styles.iconGroup}>
-          <TouchableOpacity
-  onPress={() =>
-    router.push('/cartmanagement')
-  }
-  style={styles.iconButton}
-  activeOpacity={0.7}
->
-  <Ionicons
-    name="cart-outline"
-    size={22}
-    color={COLORS.primary}
-  />
-
-  {cartPackageCount > 0 && (
-    <View style={styles.cartBadge}>
-      <Text style={styles.cartBadgeText}>
-        {cartPackageCount > 99
-          ? '99+'
-          : cartPackageCount}
-      </Text>
-    </View>
-  )}
-</TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'}
-            onPress={() => router.push('/bottomnotification')}>
-            <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
-            {unreadNotifications > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.cartBadgeText}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</Text>
+      <LinearGradient colors={['#89147D', '#58094F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.welcomeCard, { paddingTop: insets.top + 14 }]}>
+        <View style={styles.header}>
+          <View style={styles.welcomeLeft}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarFallbackText}>
+                  {username ? username.charAt(0).toUpperCase() : '?'}
+                </Text>
               </View>
             )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Welcome Section */}
-      <View style={styles.welcomeCard}>
-        <View style={styles.welcomeLeft}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarFallbackText}>
-                {username ? username.charAt(0).toUpperCase() : '?'}
-              </Text>
+            <View style={styles.welcomeTextWrap}>
+              <Text style={styles.welcomeText}>Welcome back,</Text>
+              <Text numberOfLines={1} style={styles.username}>{username}</Text>
             </View>
-          )}
-          <View style={styles.welcomeTextWrap}>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.username}>{username}</Text>
+          </View>
+          <View style={styles.iconGroup}>
+            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={cartPackageCount ? `Cart, ${cartPackageCount} packages` : 'Cart'}
+              onPress={() => router.push('/cartmanagement')}>
+              <Ionicons name="cart-outline" size={22} color="#FFF" />
+              {cartPackageCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartPackageCount > 99 ? '99+' : cartPackageCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'}
+              onPress={() => router.push('/bottomnotification')}>
+              <Ionicons name="notifications-outline" size={22} color="#FFF" />
+              {unreadNotifications > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.cartBadgeText}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.planButton}
-          activeOpacity={0.8}
-          onPress={() => router.push('/EventDetailsForm')}
-        >
-          <Ionicons name="add-circle-outline" size={16} color="#FFF" style={{ marginRight: 6 }} />
+        <TouchableOpacity style={styles.planButton} activeOpacity={0.8} accessibilityRole="button"
+          onPress={() => router.push('/EventDetailsForm')}>
+          <Ionicons name="calendar-outline" size={19} color={COLORS.primaryDark} />
           <Text style={styles.planButtonText}>Plan an Event</Text>
+          <Ionicons name="arrow-forward" size={17} color={COLORS.primaryDark} />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
-      <View>
+      <View style={styles.searchSection}>
         {/* Search Bar */}
         <View style={styles.searchBarContainer}>
           <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
@@ -431,50 +413,13 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginLeft: 6,
   },
-  container: {
-    padding: 16,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.accent,
-    marginRight: 8,
-  },
-  brandText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-    letterSpacing: 0.3,
-  },
-  iconGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  container: { backgroundColor: COLORS.bg },
+  searchSection: { paddingHorizontal: 16, paddingBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  iconGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 
   cartBadge: {
@@ -525,40 +470,25 @@ cartBadgeText: {
     padding: 8,
   },
   welcomeCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: 18,
-    paddingVertical: 45,
-    paddingHorizontal: 18,
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
+    paddingHorizontal: 20, paddingBottom: 20, gap: 18,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
+    shadowColor: COLORS.primaryDark, shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16, shadowRadius: 8, elevation: 4,
   },
-  welcomeTextWrap: {
-    flexShrink: 1,
-    paddingRight: 10,
-  },
-  welcomeLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-  },
+  welcomeTextWrap: { flex: 1 },
+  welcomeLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   avatarImage: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     marginRight: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.5)',
   },
   avatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -583,18 +513,10 @@ cartBadgeText: {
     marginTop: 2,
   },
   planButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48,
+    backgroundColor: '#F5D99D', paddingHorizontal: 14, borderRadius: 14,
   },
-  planButtonText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  planButtonText: { flex: 1, color: COLORS.primaryDark, fontSize: 14, fontWeight: '800' },
   cartIconButton: {
     padding: 8,
     marginRight: 4,

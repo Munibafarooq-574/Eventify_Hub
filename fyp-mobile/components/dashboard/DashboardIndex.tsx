@@ -1,4 +1,5 @@
 import { getUserData, saveUserData } from '@/store';
+import { StatusBar } from 'expo-status-bar';
 import { router, useFocusEffect } from 'expo-router';
 import { growthApi } from '@/services/growthApiClient';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
@@ -55,6 +56,7 @@ const DashboardIndex: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       <ScrollView
         refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
@@ -107,7 +109,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
-    paddingTop: 50,
   },
   locationFeedback: { minHeight: 120, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   scrollContent: {
