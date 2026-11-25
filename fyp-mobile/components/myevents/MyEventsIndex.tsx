@@ -643,8 +643,8 @@ const MyEventsScreen = () => {
                 <TouchableOpacity key={tab} style={[styles.eventTab, !paymentFilter && eventTab === tab && styles.eventTabSelected]}
                   accessibilityRole="tab" accessibilityState={{ selected: !paymentFilter && eventTab === tab }}
                   onPress={() => { setEventTab(tab); setPaymentFilter(false); }}>
-                  <Text style={[styles.totalLabel, !paymentFilter && eventTab === tab && styles.eventTabSelectedText]}>
-                    {tab === 'upcoming' ? 'Upcoming' : 'Past'} ({eventsByTab[tab].length})
+                  <Text style={[styles.totalLabel, styles.eventTabText, !paymentFilter && eventTab === tab && styles.eventTabSelectedText]}>
+                    {tab === 'upcoming' ? 'Today & Upcoming' : 'Past'} ({eventsByTab[tab].length})
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -1755,8 +1755,9 @@ const MyEventsScreen = () => {
 export default MyEventsScreen;
 
 const styles = StyleSheet.create({
-  eventTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  eventTabs: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 12 },
   eventTab: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF' },
+  eventTabText: { textAlign: 'center' },
   eventTabSelected: { backgroundColor: COLORS.primary },
   eventTabSelectedText: { color: '#FFFFFF' },
   countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
