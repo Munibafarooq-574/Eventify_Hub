@@ -512,7 +512,7 @@ cartBadgeText: {
   },
   planButton: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
-    backgroundColor: '#FFF5E1', paddingHorizontal: 16, borderRadius: 22,
+    backgroundColor: '#F4C84E', paddingHorizontal: 16, borderRadius: 22,
   },
   planButtonText: { color: COLORS.primaryDark, fontSize: 14, fontWeight: '800' },
   cartIconButton: {
