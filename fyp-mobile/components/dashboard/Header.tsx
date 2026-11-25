@@ -3,8 +3,6 @@ import searchVendors, { VendorSearchResult } from '@/services/searchVendors';
 import { getVendorBadgesBulk } from '@/services/getVendorBadgesBulk';
 import { VendorBadgeSummary } from '@/types/badge.types';
 import { createBookingDraftStore, getUserData } from '@/store';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from "expo-router/react-navigation";
@@ -31,8 +29,9 @@ const COLORS = {
   border: '#F3DCE8',
 };
 
+export const HOME_HEADER_COLOR = COLORS.primary;
+
 const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) => {
-  const insets = useSafeAreaInsets();
   const [draft] = useState(createBookingDraftStore);
   const [username, setUsername] = useState(""); // State for username
   const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
@@ -164,8 +163,7 @@ const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) =
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#89147D', '#58094F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.welcomeCard, { paddingTop: insets.top + 14 }]}>
+      <View style={styles.welcomeCard}>
         <View style={styles.header}>
           <View style={styles.welcomeLeft}>
             {avatar ? (
@@ -212,11 +210,10 @@ const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) =
         </View>
         <TouchableOpacity style={styles.planButton} activeOpacity={0.8} accessibilityRole="button"
           onPress={() => router.push('/EventDetailsForm')}>
-          <Ionicons name="calendar-outline" size={19} color={COLORS.primaryDark} />
+          <Ionicons name="add-circle-outline" size={19} color={COLORS.primaryDark} />
           <Text style={styles.planButtonText}>Plan an Event</Text>
-          <Ionicons name="arrow-forward" size={17} color={COLORS.primaryDark} />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
 
       <View style={styles.searchSection}>
         {/* Search Bar */}
@@ -470,7 +467,8 @@ cartBadgeText: {
     padding: 8,
   },
   welcomeCard: {
-    paddingHorizontal: 20, paddingBottom: 20, gap: 18,
+    backgroundColor: HOME_HEADER_COLOR,
+    paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20, gap: 16,
     borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
     shadowColor: COLORS.primaryDark, shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.16, shadowRadius: 8, elevation: 4,
@@ -513,10 +511,10 @@ cartBadgeText: {
     marginTop: 2,
   },
   planButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48,
-    backgroundColor: '#F5D99D', paddingHorizontal: 14, borderRadius: 14,
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44,
+    backgroundColor: '#FFF5E1', paddingHorizontal: 16, borderRadius: 22,
   },
-  planButtonText: { flex: 1, color: COLORS.primaryDark, fontSize: 14, fontWeight: '800' },
+  planButtonText: { color: COLORS.primaryDark, fontSize: 14, fontWeight: '800' },
   cartIconButton: {
     padding: 8,
     marginRight: 4,

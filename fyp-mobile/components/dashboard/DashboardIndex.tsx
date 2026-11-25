@@ -9,7 +9,8 @@ import { DashboardRefreshContext } from "./DashboardRefreshContext";
 
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
-import Header from './Header';
+import Header, { HOME_HEADER_COLOR } from './Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CategoryGrid from './CategoryGrid';
 import VenueList from './VenueList';
 import BottomNavigationFinal from './BottomNavigationFinal';
@@ -24,6 +25,7 @@ const COLORS = {
 };
 
 const DashboardIndex: React.FC = () => {
+  const { top } = useSafeAreaInsets();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [locationStatus, setLocationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [location, setLocation] = useState<{ countryCode: string | null; cityId: string | null; cityName?: string }>();
@@ -57,7 +59,10 @@ const DashboardIndex: React.FC = () => {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
+      <View style={{ height: top, backgroundColor: HOME_HEADER_COLOR }} />
       <ScrollView
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
         refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
