@@ -49,6 +49,8 @@ const countUnreadConversations = (rows: { unreadCount?: number }[]) =>
 type NotificationItem = { _id?: string; isRead?: boolean };
 
 const seenKey = (userId: string) => `bottom-navigation:viewed-notifications:${userId}`;
+const seenWrites = new Map<string, Promise<void>>();
+const pendingSeen = new Map<string, Set<string>>();
 async function seenNotificationIds(userId: string): Promise<string[]> {
   const raw = await AsyncStorage.getItem(seenKey(userId));
   try {
@@ -64,6 +66,7 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
   onNotificationCountChange?: (count: number) => void;
 }) {
   const pathname = usePathname();
+  const viewingNotifications = pathname === '/bottomnotification' || pathname === '/vendornotifications';
   const { bottom } = useSafeAreaInsets();
   const [user, setUser] = useState<{ id: string; vendor: boolean }>();
   const [badges, setBadges] = useState(emptyCounts);
@@ -140,16 +143,20 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
       void refreshBadge('messages', () => getConversationList(userId, rows => {
           publish({ messages: countUnreadConversations(rows) });
         }).then(rows => publish({ messages: countUnreadConversations(rows) })));
-      void refreshBadge(vendor ? 'orders' : 'notifications', () => vendor
-          ? getVendorOrderStats('Vendor', userId).then(stats => publish({ orders: Number(stats.pending) || 0 }))
-          : Promise.all([getUserNotifications(userId), seenNotificationIds(userId)]).then(([items, seen]) => {
-              const viewed = new Set(seen);
+      if (vendor) {
+        void refreshBadge('orders', () => getVendorOrderStats('Vendor', userId)
+          .then(stats => publish({ orders: Number(stats.pending) || 0 })));
+      }
+      if (!vendor || onNotificationCountChange || viewingNotifications) {
+        void refreshBadge('notifications', () => Promise.all([getUserNotifications(userId), seenNotificationIds(userId)]).then(([items, seen]) => {
+              const viewed = new Set([...seen, ...(pendingSeen.get(userId) ?? [])]);
               const unread = new Set<string>();
               if (Array.isArray(items)) for (const item of items as NotificationItem[]) {
                 if (item._id && !item.isRead && !viewed.has(item._id)) unread.add(item._id);
               }
-              publish({ notifications: pathname === '/bottomnotification' ? 0 : unread.size });
+              publish({ notifications: viewingNotifications ? 0 : unread.size });
             }));
+      }
     };
     const scheduleRefresh = () => {
       clearTimeout(timer);
@@ -171,7 +178,7 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
       const cached = badgeSnapshot;
       const counts = cached?.userId === userId && cached.token === token ? cached.counts : emptyCounts;
       badgeSnapshot = { userId, token, counts };
-      setBadges(pathname === '/bottomnotification' ? { ...counts, notifications: 0 } : counts);
+      setBadges(viewingNotifications ? { ...counts, notifications: 0 } : counts);
       const socket = connectSocket();
       // The inbox also registers on mount. Reuse the same connection.
       if (pathname !== '/vendormessages') registerUser(userId);
@@ -195,15 +202,22 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
       push.remove();
       unsubscribe.forEach(cleanup => cleanup());
     };
-  }, [pathname]));
+  }, [pathname, onNotificationCountChange, viewingNotifications]));
 
   useFocusEffect(useCallback(() => {
     if (!user || !viewedNotifications?.length) return;
     const ids = viewedNotifications.flatMap(item => item._id ? [item._id] : []);
     // The notifications API does not have a mark-read operation.
-    void seenNotificationIds(user.id).then(previous =>
-      AsyncStorage.setItem(seenKey(user.id), JSON.stringify([...new Set([...previous, ...ids])].slice(-1000))),
-    ).catch(() => {});
+    const pending = new Set([...(pendingSeen.get(user.id) ?? []), ...ids]);
+    pendingSeen.set(user.id, pending);
+    const write = (seenWrites.get(user.id) ?? Promise.resolve()).then(() => seenNotificationIds(user.id)).then(previous =>
+      AsyncStorage.setItem(seenKey(user.id), JSON.stringify([...new Set([...previous, ...pending])].slice(-1000))),
+    ).then(() => {
+      if (pendingSeen.get(user.id) === pending) pendingSeen.delete(user.id);
+    }).catch(() => {}).finally(() => {
+      if (seenWrites.get(user.id) === write) seenWrites.delete(user.id);
+    });
+    seenWrites.set(user.id, write);
   }, [user, viewedNotifications]));
 
   const navigate = (tab: Tab) => {

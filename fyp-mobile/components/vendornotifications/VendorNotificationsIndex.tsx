@@ -108,7 +108,7 @@ const NotificationsScreen: React.FC = () => {
             />
 
             {/* Bottom Navigation */}
-            <BottomNavigationFinal />
+            <BottomNavigationFinal viewedNotifications={notifications} />
         </View>
     );
 };

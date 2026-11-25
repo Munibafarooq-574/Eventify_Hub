@@ -98,7 +98,7 @@ const DashboardScreen = () => {
     const [packages, setPackages] = useState<any[]>([]);
     const [packageCoupons, setPackageCoupons] = useState<Awaited<ReturnType<typeof getVendorPackageCouponOffers>>>([]);
     const [packagesError, setPackagesError] = useState(false);
-    const [hasNotifications, setHasNotifications] = useState<boolean>(true);
+    const [unreadNotifications, setUnreadNotifications] = useState(0);
     const [loading, setLoading] = useState<boolean>(true);
 
     const [checkingApproval, setCheckingApproval] =
@@ -895,6 +895,8 @@ if (!hasValidSubscription) {
     <TouchableOpacity
         style={styles.headerActionButton}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={unreadNotifications ? `Notifications, ${unreadNotifications} unread` : "Notifications"}
         onPress={() => router.push("/vendornotifications")}
     >
         <Ionicons
@@ -903,8 +905,10 @@ if (!hasValidSubscription) {
             color="#fff"
         />
 
-        {hasNotifications && (
-            <View style={styles.notificationDot} />
+        {unreadNotifications > 0 && (
+            <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</Text>
+            </View>
         )}
     </TouchableOpacity>
 
@@ -1820,7 +1824,7 @@ if (!hasValidSubscription) {
                 </TouchableOpacity>
             </ScrollView>
 
-            <BottomNavigationFinal />
+            <BottomNavigationFinal onNotificationCountChange={setUnreadNotifications} />
         </View>
     );
 };
@@ -2206,17 +2210,12 @@ headerActionButton: {
         justifyContent: "center",
         alignItems: "center",
     },
-    notificationDot: {
-        position: "absolute",
-        top: 9,
-        right: 10,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: "#FF5D5D",
-        borderWidth: 1.5,
-        borderColor: "#5E0A55",
+    notificationBadge: {
+        position: "absolute", top: 4, right: 4, minWidth: 16, height: 16,
+        paddingHorizontal: 3, borderRadius: 8, alignItems: "center", justifyContent: "center",
+        backgroundColor: "#FF7777", borderWidth: 1, borderColor: "#5E0A55",
     },
+    notificationBadgeText: { color: "#35112E", fontSize: 9, fontWeight: "800" },
 
     orderStatsErrorRow: {
         flexDirection: "row",
