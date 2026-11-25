@@ -13,7 +13,7 @@ test('cancellation timestamp is shown once when existing details own it',()=>{co
 test('timezone and twelve hour format preserve exact instant, invalid dates are safe',()=>{
  assert.match(format(t,'Asia/Karachi'),/8:18 pm/i);assert.match(format(t,'America/New_York'),/11:18 am/i);assert.match(format(t,'Asia/Karachi'),/26 Oct 2026/);assert.equal(format('bad'),'Time not recorded');assert.doesNotThrow(()=>format(t,'bad-zone'));
 });
-test('all three screens reuse shared component and compile',()=>{for(const p of ['components/myevents/MyEventsIndex.tsx','components/vendorordersummary/VendorOrderSummaryIndex.tsx','components/vendormyevents/VendorMyEventsIndex.tsx','components/booking/BookingActivity.tsx']){const s=fs.readFileSync(p,'utf8');assert.equal(ts.transpileModule(s,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true}).diagnostics.length,0);assert.match(s,/BookingActivity/);}});
+test('order detail screens reuse shared activity and compile',()=>{for(const p of ['components/myevents/MyEventsIndex.tsx','components/vendorordersummary/VendorOrderSummaryIndex.tsx','components/booking/BookingActivity.tsx']){const s=fs.readFileSync(p,'utf8');assert.equal(ts.transpileModule(s,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true}).diagnostics.length,0);assert.match(s,/BookingActivity/);}});
 
 test('order activity merges shared minutes and names the package for individual changes', () => {
  const activity = m.exports.groupedBookingActivity([
@@ -24,4 +24,11 @@ test('order activity merges shared minutes and names the package for individual 
  assert.equal(activity[0].label, 'Requested');
  assert.equal(activity[0].packages.length, 0);
  assert.equal(activity[1].packages.join(','), 'Portraits');
+});
+
+test('vendor calendar leaves booking activity to Order Summary', () => {
+  const source = fs.readFileSync('components/vendormyevents/VendorMyEventsIndex.tsx', 'utf8');
+  assert.equal(ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX }, reportDiagnostics: true }).diagnostics.length, 0);
+  assert.doesNotMatch(source, /<BookingActivity/);
+  assert.match(source, /pathname: "\/vendorordersummary"/);
 });
