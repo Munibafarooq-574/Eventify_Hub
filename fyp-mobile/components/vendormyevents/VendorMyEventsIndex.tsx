@@ -18,6 +18,7 @@ import { Calendar } from "react-native-calendars";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 const PRIMARY = "#780C60", PRIMARY_LIGHT = "#F8E9F0", ACCENT = "#B84B9A", ACCENT_LIGHT = "#F0DDEA";
+const UNAVAILABLE_BACKGROUND = '#FBE5DF', UNAVAILABLE_TEXT = '#9F3125';
 
 type ViewMode = "day" | "upcoming" | "month" | "past" | "total" | "pending";
 type WorkingDay = { day: string; enabled: boolean };
@@ -102,7 +103,6 @@ const MyEventsScreen = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [calendarOpen, setCalendarOpen] = useState(true);
-  const [calendarMonth, setCalendarMonth] = useState<string | null>(null);
   const [showSlots, setShowSlots] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilitySettings | null>(null);
@@ -116,7 +116,11 @@ const MyEventsScreen = () => {
    * AVAILABILITY EDITOR STATE
    */
   const [availabilityEditorVisible, setAvailabilityEditorVisible] = useState(false);
-  const todayKey = bookingDateKey(new Date(), daySnapshot?.timeZone || 'UTC');
+  const [calendarMonth, setCalendarMonth] = useState<string | null>(null);
+  const visibleMonth = (calendarMonth || selectedDate).slice(0, 7);
+  const [calendarTimeZone, setCalendarTimeZone] = useState('UTC');
+  const todayKey = bookingDateKey(new Date(), calendarTimeZone);
+  const isPastDate = selectedDate < todayKey;
   const initializedCalendarZone = useRef(false);
   useEffect(() => {
     if (daySnapshot?.timeZone && !initializedCalendarZone.current) {
@@ -161,7 +165,10 @@ const MyEventsScreen = () => {
     setDayError("");
     setDaySnapshot(null);
     getVendorDayAvailability(vendorId, selectedDate).then((data) => {
-      if (active) setDaySnapshot(data);
+      if (active) {
+        setDaySnapshot(data);
+        if (data.timeZone) setCalendarTimeZone(data.timeZone);
+      }
     }).catch(() => {
       if (active) setDayError("Availability could not be loaded. Pull down to refresh before choosing a time.");
     }).finally(() => { if (active) setDayLoading(false); });
@@ -387,19 +394,8 @@ const markedDates = useMemo(() => {
     }
     marks[key] = { dots };
   }
-  for (const date of availability?.blockedDates ?? []) {
-    const key = toKey(date);
-    if (key) marks[key] = { ...marks[key], disabled: true, disableTouchEvent: false };
-  }
-  const firstOfMonth = new Date(`${(calendarMonth || selectedDate).slice(0, 7)}-01T12:00:00Z`);
-  const month = firstOfMonth.getUTCMonth();
-  for (const day = new Date(firstOfMonth); day.getUTCMonth() === month; day.setUTCDate(day.getUTCDate() + 1)) {
-    const key = toKey(day);
-    if (!isWorkingDay(key)) marks[key] = { ...marks[key], disabled: true, disableTouchEvent: false };
-  }
-  marks[selectedDate] = { ...marks[selectedDate], selected: true, selectedColor: '#E9D6E5', selectedTextColor: PRIMARY };
   return marks;
-}, [scheduleOrders, selectedDate, availability, getVendorStatus, calendarMonth, isWorkingDay]);
+}, [scheduleOrders, getVendorStatus]);
 
 const weekStart = new Date(`${selectedDate}T12:00:00Z`);
 weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
@@ -408,6 +404,33 @@ const selectDay = (date: string) => {
   setSelectedDate(date);
   setViewMode('day');
   setShowSlots(false);
+};
+
+const renderCalendarDay = (date: string, day: string | number, weekView = false) => {
+  const selected = date === selectedDate;
+  const past = date < todayKey;
+  const blocked = isBlockedDate(date);
+  const unavailable = blocked || (!past && !isWorkingDay(date));
+  const outsideMonth = !weekView && date.slice(0, 7) !== visibleMonth;
+  const dots = markedDates[date]?.dots ?? [];
+  const status = blocked ? 'Blocked' : past ? 'Past date' : unavailable ? 'Unavailable' : '';
+  return (
+    <TouchableOpacity key={date}
+      style={[weekView ? styles.weekDay : styles.monthDay, selected && styles.weekSelected,
+        unavailable && styles.calendarUnavailable, selected && styles.calendarSelectedBorder]}
+      accessibilityRole="button"
+      accessibilityLabel={[formatCalendarDate(date), status, dots.length ? 'Has bookings' : ''].filter(Boolean).join(', ')}
+      accessibilityState={{ selected }}
+      onPress={() => selectDay(date)}>
+      <Text style={[styles.calendarDayText, (past || outsideMonth) && styles.calendarPastText,
+        unavailable && styles.calendarUnavailableText, blocked && styles.calendarBlockedText]}>
+        {day}
+      </Text>
+      <View style={styles.weekDots}>{dots.map((dot: { key: string; color: string }) => (
+        <View key={dot.key} style={[styles.calendarDot, { backgroundColor: dot.color }]} />
+      ))}</View>
+    </TouchableOpacity>
+  );
 };
 
 /**
@@ -539,7 +562,7 @@ return (
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.sectionSubtitle}>Times shown in {(daySnapshot?.timeZone || 'UTC').replace(/_/g, ' ')}</Text>
+          <Text style={styles.sectionSubtitle}>Times shown in {calendarTimeZone.replace(/_/g, ' ')}</Text>
 
           {/* CALENDAR */}
           <View style={styles.calendarCard}>
@@ -556,9 +579,7 @@ return (
 
             {calendarOpen ? <Calendar
               current={selectedDate}
-              markedDates={markedDates}
-              markingType="multi-dot"
-              onDayPress={(day) => selectDay(day.dateString)}
+              dayComponent={({ date }) => date ? renderCalendarDay(date.dateString, date.day) : null}
               onMonthChange={(day) => setCalendarMonth(day.dateString)}
               enableSwipeMonths
               theme={{
@@ -580,21 +601,13 @@ return (
               }}
               style={styles.calendar}
             /> : <View style={styles.weekRow}>
-              {weekDays.map(date => <TouchableOpacity key={date} style={[styles.weekDay, date === selectedDate && styles.weekSelected]}
-                accessibilityRole="button" accessibilityLabel={formatCalendarDate(date)} accessibilityState={{ selected: date === selectedDate }}
-                onPress={() => selectDay(date)}>
-                <Text style={{ color: isBlockedDate(date) || !isWorkingDay(date) ? '#777' : PRIMARY }}>
-                  {date.slice(-2)}{isBlockedDate(date) || !isWorkingDay(date) ? ' ×' : ''}
-                </Text>
-                <View style={styles.weekDots}>{markedDates[date]?.dots?.map((dot: { key: string; color: string }) =>
-                  <View key={dot.key} style={[styles.calendarDot, { backgroundColor: dot.color }]} />)}</View>
-              </TouchableOpacity>)}
+              {weekDays.map(date => renderCalendarDay(date, date.slice(-2), true))}
             </View>}
             <View style={styles.legendRow}>
               <View style={[styles.legendDot, { backgroundColor: ACCENT }]} />
               <Text style={styles.legendText}>Booking</Text>
 
-              <View style={[styles.legendDot, { backgroundColor: "#DDD" }]} />
+              <View style={[styles.legendDot, styles.calendarUnavailable]} />
               <Text style={styles.legendText}>Unavailable</Text>
 
               <View style={[styles.legendDot, { backgroundColor: PRIMARY }]} />
@@ -613,13 +626,19 @@ return (
     </View>
 
     <View style={styles.availabilityHeaderRight}>
+      {isPastDate ? (
+        <View style={[styles.availabilityStatus, styles.pastStatus]}>
+          <Text style={[styles.availabilityStatusText, styles.calendarPastText]}>Past date</Text>
+        </View>
+      ) : (
       <View style={[styles.availabilityStatus, availabilityPositive ? styles.availableStatus : styles.unavailableStatus]}>
         <View style={[styles.statusDot, { backgroundColor: availabilityPositive ? "#278A4B" : "#C0392B" }]} />
         <Text style={[styles.availabilityStatusText, { color: availabilityPositive ? "#278A4B" : "#C0392B" }]}>
           Day status: {availabilityState}
         </Text>
       </View>
-     {canEditAvailability && (
+      )}
+     {!isPastDate && canEditAvailability && (
   <TouchableOpacity
     style={styles.editAvailabilityButton}
     onPress={() => setAvailabilityEditorVisible(true)}
@@ -632,6 +651,7 @@ return (
     </View>
   </View>
 
+  {isPastDate ? null : <>
   {!!availability && <View style={styles.rulesRow}>
     {([{ icon: 'time-outline', label: workingHoursLabel },
       { icon: 'people-outline', label: `Max ${availability.maxConcurrentBookings ?? 1} at once` },
@@ -750,6 +770,7 @@ return (
           </View>;
         })}
       </View>}
+  </>}
 
 </View>
         </>
@@ -833,7 +854,7 @@ renderSectionFooter={() => events.length === 0 ? (
       <Ionicons name="calendar-outline" size={34} color={PRIMARY} />
     </View>
     <Text style={styles.emptyTitle}>
-      {viewMode === "day" ? "No bookings on this day" : viewMode === "month" ? "No bookings this month" : "No bookings found"}
+      {viewMode === "day" ? "No bookings on this date" : viewMode === "month" ? "No bookings this month" : "No bookings found"}
     </Text>
     <Text style={styles.emptySubtitle}>
       {viewMode === "day"
@@ -899,6 +920,14 @@ const styles = StyleSheet.create({
   timeline: { height: 10, flexDirection: 'row', overflow: 'hidden', borderRadius: 5, marginTop: 12, gap: 1 },
   weekRow: { flexDirection: 'row', gap: 4, marginVertical: 6 },
   weekDay: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 8 },
+  monthDay: { width: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  calendarDayText: { color: PRIMARY, fontSize: 13, fontWeight: '500' },
+  calendarPastText: { color: '#777078' },
+  calendarUnavailable: { backgroundColor: UNAVAILABLE_BACKGROUND },
+  calendarUnavailableText: { color: UNAVAILABLE_TEXT },
+  calendarBlockedText: { textDecorationLine: 'line-through', fontWeight: '800' },
+  calendarSelectedBorder: { borderWidth: 1, borderColor: PRIMARY },
+  pastStatus: { backgroundColor: '#F0EDF0' },
   weekSelected: { backgroundColor: PRIMARY_LIGHT },
   weekDots: { flexDirection: 'row', justifyContent: 'center', gap: 2, minHeight: 5 },
   calendarDot: { width: 4, height: 4, borderRadius: 2 },

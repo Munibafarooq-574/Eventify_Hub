@@ -130,6 +130,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Use the minus and plus buttons to set your limit. Choose 1 for one booking at a time, or 2 if your team can handle two bookings during the same hours.',
         'Tap Save Availability. The limit applies across all your packages, including multiple packages in the same order.',
         'Green means free and red means a slot has an existing booking. A red slot may still have room under your simultaneous booking limit. The counts show free and booked slots.',
+        'Blocked dates are red and crossed out. Select a grey past date to see its bookings. Availability slots are shown for today and future dates.',
         'Tap the timeline or Show all slots to see hourly rows for both available and booked times. Booked slots group packages from the same order. An over-limit note appears on the hourly row only when the booking limit is exceeded.',
       ] },
       service, delivery, status, timing,
