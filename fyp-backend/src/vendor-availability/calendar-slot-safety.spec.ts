@@ -12,6 +12,20 @@ function fixture(){
  const s:any=Object.create(VendorAvailabilityService.prototype);Object.assign(s,{userModel:{findById:()=>q(vendor)},vendorOrderModel:model,cityService:{requireCityTimeZone:async()=>'Asia/Karachi'},featureAccessService:{hasActiveSubscription:async()=>true}});return{s,model,vendor};
 }
 describe('Public vendor schedule', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-24T20:00:00Z'));
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('uses the vendor-local date and does not expose slots for past dates', async () => {
+    const { s, model, vendor } = fixture();
+    vendor.availabilitySettings.blockedDates = ['2026-10-24', '2026-10-27'].map(date => new Date(date));
+    await expect(s.getPublicSchedule(id, '2026-10-24')).resolves.toMatchObject({
+      today: '2026-10-25', blockedDates: ['2026-10-27'], unavailable: true, slots: [],
+    });
+    expect(model.find).not.toHaveBeenCalled();
+  });
   it('labels a held slot booked without returning booking details', async () => {
     const { s } = fixture();
     const day = await s.getPublicSchedule(id, '2026-10-26');

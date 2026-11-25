@@ -1039,7 +1039,7 @@ return {
   async getPublicSchedule(vendorId: string, date?: string) {
     const day = await this.getDaySlots(vendorId, date, true);
     const { date: selectedDate, timeZone, workingSlots, bookings, schedule } = day;
-    const base = { date: selectedDate, timeZone };
+    const base = { date: selectedDate, timeZone, today: schedule?.today, blockedDates: schedule?.blockedDates ?? [] };
     if (schedule?.blocked || !workingSlots.length) {
       return { ...base, unavailable: true, reason: schedule?.reason, slots: [] };
     }
@@ -1093,12 +1093,14 @@ return {
       String((vendor as any).businessCityId),
     );
     let dateStr = requestedDate;
-    if (publicSchedule && dateStr === undefined) {
+    let today: string | undefined;
+    if (publicSchedule) {
       const parts = new Intl.DateTimeFormat('en-US', {
         timeZone: vendorTimeZone, year: 'numeric', month: '2-digit', day: '2-digit',
       }).formatToParts();
       const { year, month, day } = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-      dateStr = `${year}-${month}-${day}`;
+      today = `${year}-${month}-${day}`;
+      dateStr ??= today;
     }
     if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       throw new BadRequestException('Calendar date must use YYYY-MM-DD');
@@ -1162,12 +1164,16 @@ return {
     // Existing bookings for this day
     // ---------------------------------------------------------
 
-    const blocked = publicSchedule && (settings.blockedDates ?? []).some((date: Date) => toDateKey(date) === dateStr);
+    const minimumDate = today;
+    const blockedDates = minimumDate
+      ? (settings.blockedDates ?? []).map(toDateKey).filter((date: string) => date >= minimumDate)
+      : [];
+    const blocked = blockedDates.includes(dateStr);
     const reason = blocked
       ? settings.blockedDateReasons?.find((item: { date: string; reason: string }) => item.date === dateStr)?.reason?.trim()
       : undefined;
     const legacyDays: { day: string; enabled: boolean }[] = settings.workingDays ?? [];
-    if (publicSchedule && (blocked || (!daySlotConfig && legacyDays.length && !legacyDays.some(
+    if (publicSchedule && ((today && dateStr < today) || blocked || (!daySlotConfig && legacyDays.length && !legacyDays.some(
       (day) => day.day === dayCode && day.enabled,
     )))) {
       workingSlots = [];
@@ -1228,7 +1234,7 @@ return {
 
   workingSlots,
 
-  ...(publicSchedule ? { schedule: { blocked, reason, capacity: Number(settings.maxConcurrentBookings) || 1 } } : {}),
+  ...(publicSchedule ? { schedule: { blocked, reason, today, blockedDates, capacity: Number(settings.maxConcurrentBookings) || 1 } } : {}),
 
   bookings: bookings.map((b) => ({
     orderId: b.orderId?.toString(),

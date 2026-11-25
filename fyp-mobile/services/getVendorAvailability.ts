@@ -67,6 +67,8 @@ export default function getVendorAvailability(vendorId: string) {
 
 export type VendorPublicSchedule = {
   date: string;
+  today?: string;
+  blockedDates?: string[];
   timeZone: string;
   unavailable: boolean;
   reason?: string;
