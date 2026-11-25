@@ -1934,7 +1934,6 @@ async getOrderStats(type: string, userId: string) {
       } else {
         switch (order.status) {
           case 'pending': counts.pending++; break;
-          case 'processing': counts.processing++; break;
           case 'confirmed': counts.confirmed++; break;
           case 'completed': counts.completed++; break;
           case 'cancelled': counts.cancelled++; break;
