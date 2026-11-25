@@ -2,9 +2,15 @@ import { getSecureData } from '../store';
 import { reportMarketplaceLoadError } from './reportMarketplaceLoadError';
 import axios, { AxiosRequestConfig } from "axios";
 
-export default async function getConversationList(userId: string) {
+let snapshot: { userId: string; token: string; rows: any[] } | undefined;
+let inFlight: { userId: string; token: string; request: Promise<any[]> } | undefined;
+
+export default async function getConversationList(userId: string, showCached?: (rows: any[]) => void) {
     const token = await getSecureData('token');
     if (!token) throw new Error('Your session has expired. Please sign in again.');
+    if (snapshot?.userId === userId && snapshot.token === token) showCached?.(snapshot.rows);
+    if (inFlight?.userId === userId && inFlight.token === token) return inFlight.request;
+
     const url = `https://eventify-hub.onrender.com/chat/${userId}`;
 
     const config: AxiosRequestConfig = {
@@ -14,15 +20,11 @@ export default async function getConversationList(userId: string) {
         url,
     };
 
-    try {
+    const request = (async () => {
+      try {
         const response = await axios(config);
 
-        console.log(
-        "Conversation List:",
-        JSON.stringify(response.data.conversations, null, 2)
-    );
-
-        const conversations = response.data.conversations || [];
+        const conversations = Array.isArray(response.data.conversations) ? response.data.conversations : [];
 
         // Remove duplicate conversations based on chatId
         const uniqueConversations = conversations.filter(
@@ -33,9 +35,19 @@ export default async function getConversationList(userId: string) {
                 )
         );
 
+        if (inFlight?.userId === userId && inFlight.token === token) {
+            snapshot = { userId, token, rows: uniqueConversations };
+        }
         return uniqueConversations;
-    } catch (error) {
+      } catch (error) {
         reportMarketplaceLoadError('Booking chat unavailable', error);
         throw error;
+      }
+    })();
+    inFlight = { userId, token, request };
+    try {
+        return await request;
+    } finally {
+        if (inFlight?.request === request) inFlight = undefined;
     }
 }

@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+    ActivityIndicator,
     FlatList,
     Image,
     Platform,
@@ -238,10 +239,10 @@ const MessagesScreen: React.FC = () => {
                 myUserIdRef.current =
                     normalizeId(user._id);
 
-                const data =
-                    (await getConversationList(
-                        user._id
-                    )) || [];
+                const data = await getConversationList(user._id, silent ? rows => {
+                    setConversations(current => current.length ? current : rows);
+                    if (rows.length) setLoading(false);
+                } : undefined);
 
                 setConversations(prevConvos => {
                     const prevMap = new Map(
@@ -426,7 +427,6 @@ const MessagesScreen: React.FC = () => {
         })();
 
         // Initial conversation fetch
-        fetchConversations();
 
         // ========================================================
         // NEW MESSAGE
@@ -1005,11 +1005,8 @@ const MessagesScreen: React.FC = () => {
                             styles.headerSubtitle
                         }
                     >
-                        {conversations.length}{' '}
-                        {conversations.length ===
-                        1
-                            ? 'conversation'
-                            : 'conversations'}
+                        {loading && !conversations.length ? 'Loading conversations…'
+                            : `${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`}
                     </Text>
                 </View>
             </View>
@@ -1086,7 +1083,7 @@ const MessagesScreen: React.FC = () => {
                                 message you
                             </Text>
                         </View>
-                    ) : undefined
+                    ) : <ActivityIndicator color={PRIMARY} style={{ marginTop: 30 }} accessibilityLabel="Loading conversations" />
                 }
             />
 

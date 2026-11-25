@@ -203,22 +203,25 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
             width: tabWidth,
             transform: [{ translateX: position.interpolate({ inputRange: [0, 1], outputRange: [0, tabWidth] }) }],
           }]}>
-            <LinearGradient colors={[`${accent}66`, `${accent}00`]} style={[styles.wash, { borderBottomColor: `${accent}77` }]} />
+            <LinearGradient colors={[`${accent}99`, `${accent}00`]} style={[styles.wash, { borderBottomColor: `${accent}BB` }]} />
             <View style={[styles.beamCap, { backgroundColor: accent, shadowColor: accent }]} />
           </Animated.View>
         )}
         {tabs.map((tab, index) => {
           const isSelected = selected === index;
           const count = tab.badge ? badges[tab.badge] : 0;
-          const lift = reduceMotion ? (isSelected ? -7 : 0) : position.interpolate({
-            inputRange: [index - 1, index, index + 1], outputRange: [0, -7, 0], extrapolate: 'clamp',
+          const lift = reduceMotion ? (isSelected ? -10 : 0) : position.interpolate({
+            inputRange: [index - 1, index, index + 1], outputRange: [0, -10, 0], extrapolate: 'clamp',
+          });
+          const scale = reduceMotion || selected < 0 ? 1 : position.interpolate({
+            inputRange: [index - 1, index, index + 1], outputRange: [1, 1.18, 1], extrapolate: 'clamp',
           });
           return (
             <Pressable key={tab.label} accessibilityRole="tab" accessibilityState={{ selected: isSelected }}
               accessibilityLabel={count > 0 ? `${tab.label}, ${count} ${tab.badge === 'messages' ? 'unread conversations' : tab.badge === 'orders' ? 'pending orders' : 'unread'}` : tab.label}
               onPress={() => navigate(tab)}
               style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
-              <Animated.View style={{ transform: [{ translateY: selected < 0 ? 0 : lift }] }}>
+              <Animated.View style={{ transform: [{ translateY: selected < 0 ? 0 : lift }, { scale }] }}>
                 <Ionicons name={tab.icon} size={23} color={isSelected ? '#481E52' : '#725D7B'} />
                 {count > 0 && (
                   <View style={[styles.badge, { backgroundColor: tab.color }]}>
