@@ -4,7 +4,7 @@ import getOrderStatsMonthly from "@/services/getOrderStatsMonthly";
 import getVendorOrderStats from "@/services/getVendorOrderStats";
 import getVendorAnalytics from "@/services/getVendorAnalytics";
 import { VendorBadgeChips } from "../VendorFeature/VendorBadgeChips";
-import { getSubscriptionAccessState } from "@/services/getSubscriptionAccessState";
+import { ACCESS_FRESH_MS, getSubscriptionAccessState, hasActiveVendorSubscription, readVerifiedSubscription, rememberVerifiedSubscription } from "@/services/getSubscriptionAccessState";
 import { getSubscriptionHistory } from "@/services/getSubscriptionHistory";
 import { PaymentStatus, VendorSubscription } from "@/types/subscription.types";
 import { getVendorPackagesList } from "@/services/getVendorPackagesList";
@@ -67,14 +67,6 @@ function formatPKR(amount: number): string {
     if (!amount) return `${currencySymbol()} 0`;
     return `${currencySymbol()} ${Math.round(amount).toLocaleString("en-PK")}`;
 }
-
-const ACCESS_FRESH_MS = 60_000;
-type VerifiedDashboardAccess = { userId: string; token: string; verifiedAt: number; access: SubscriptionAccessState };
-let verifiedDashboardAccess: VerifiedDashboardAccess | undefined;
-
-const hasActiveDashboardPlan = (access: SubscriptionAccessState | null | undefined) =>
-    access?.accessAllowed === true && access.subscriptionRequired === false &&
-    Date.parse(access.subscription?.endDate ?? '') > Date.now();
 
 const DashboardScreen = () => {
     const pathname = usePathname();
@@ -391,14 +383,14 @@ const fetchSubscriptionAccess = React.useCallback(async (
         if (!userId || !token) throw new Error('Vendor session unavailable');
         const access = await getSubscriptionAccessState(userId);
         if (!isCurrent()) return;
-        verifiedDashboardAccess = { userId, token, verifiedAt: Date.now(), access };
+        rememberVerifiedSubscription(userId, token, access);
         setSubscriptionAccess(access);
     } catch (error) {
         if (!isCurrent()) return;
         console.error('Error fetching subscription access:', error);
-        const cached = verifiedDashboardAccess;
-        if (cached?.userId !== userId || cached?.token !== token ||
-            Date.now() - cached.verifiedAt >= ACCESS_FRESH_MS || !hasActiveDashboardPlan(cached.access)) {
+        const cached = token ? readVerifiedSubscription(userId, token) : undefined;
+        if (!cached ||
+            Date.now() - cached.verifiedAt >= ACCESS_FRESH_MS || !hasActiveVendorSubscription(cached.access)) {
             setSubscriptionError(true);
             setSubscriptionAccess(null);
         }
@@ -438,11 +430,9 @@ const fetchSubscriptionAccess = React.useCallback(async (
                 const [user, token] = await Promise.all([getUserData(), getSecureData('token')]);
                 if (!active) return;
                 const userId = String(user?._id ?? '');
-                const lastVerified = verifiedDashboardAccess;
-                const cached = userId && token && lastVerified?.userId === userId && lastVerified.token === token
-                    ? lastVerified : undefined;
+                const cached = userId && token ? readVerifiedSubscription(userId, token) : undefined;
                 const fresh = !!cached && Date.now() - cached.verifiedAt < ACCESS_FRESH_MS;
-                const valid = hasActiveDashboardPlan(cached?.access);
+                const valid = hasActiveVendorSubscription(cached?.access);
                 if (cached && valid) {
                     setCheckingApproval(false);
                     setSubscriptionAccess(cached.access);
@@ -662,7 +652,7 @@ const fetchSubscriptionAccess = React.useCallback(async (
     }
 
     // Subscription access guard — before normal dashboard render.
-const hasValidSubscription = hasActiveDashboardPlan(subscriptionAccess);
+const hasValidSubscription = hasActiveVendorSubscription(subscriptionAccess);
 
 if (!hasValidSubscription) {
     return (

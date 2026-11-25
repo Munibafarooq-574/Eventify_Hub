@@ -174,6 +174,30 @@ const formatListTime = (iso?: string) => {
     });
 };
 
+export function MessagesHeader({ subtitle }: { subtitle: string }) {
+    return (
+        <View style={styles.header}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" style={styles.headerIconBtn} onPress={() => router.back()}>
+                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <View style={styles.headerTitleWrap}>
+                <Text style={styles.headerTitle}>Messages</Text>
+                <Text style={styles.headerSubtitle}>{subtitle}</Text>
+            </View>
+        </View>
+    );
+}
+
+export function MessagesAccessLoading() {
+    return (
+        <View style={styles.container}>
+            <MessagesHeader subtitle="Loading conversations…" />
+            <ActivityIndicator color={PRIMARY} style={{ marginTop: 30 }} accessibilityLabel="Checking messaging access" />
+            <BottomNavigationFinal />
+        </View>
+    );
+}
+
 const MessagesScreen: React.FC = () => {
     const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>({});
     const [conversations, setConversations] =
@@ -970,46 +994,8 @@ const MessagesScreen: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={
-                        styles.headerIconBtn
-                    }
-                    onPress={() =>
-                        router.back()
-                    }
-                >
-                    <Ionicons
-                        name="arrow-back"
-                        size={22}
-                        color="#FFFFFF"
-                    />
-                </TouchableOpacity>
-
-                <View
-                    style={
-                        styles.headerTitleWrap
-                    }
-                >
-                    <Text
-                        style={
-                            styles.headerTitle
-                        }
-                    >
-                        Messages
-                    </Text>
-
-                    <Text
-                        style={
-                            styles.headerSubtitle
-                        }
-                    >
-                        {loading && !conversations.length ? 'Loading conversations…'
-                            : `${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`}
-                    </Text>
-                </View>
-            </View>
+            <MessagesHeader subtitle={loading && !conversations.length ? 'Loading conversations…'
+                : `${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`} />
 
             {/* Messages List */}
             <FlatList
