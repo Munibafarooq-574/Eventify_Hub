@@ -1,6 +1,6 @@
 import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { currencySymbol, currencyOf, formatMoney } from '@/utils/currency';
-import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
+import { bookingDateKey, bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate, formatBookingDateTime } from '@/utils/bookingTimezone';
 import { deliveryDateTime } from '@/utils/deliveryBooking';
 import DeliveryDetails from '@/components/booking/DeliveryDetails';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
@@ -157,6 +157,25 @@ const isActiveVendorOrder = (vendor: any) => {
 
 
 // ───────────────────────── Small UI helpers ─────────────────────────
+const EVENT_TABS = [
+  { key: 'today', label: 'Today', empty: 'No events today.' },
+  { key: 'upcoming', label: 'Upcoming', empty: 'No upcoming events.' },
+  { key: 'past', label: 'Past', empty: 'No past events.' },
+] as const;
+
+type EventTab = (typeof EVENT_TABS)[number]['key'];
+
+const getEventTab = (event: any, now: number): EventTab => {
+  const timeZone = bookingTimeZone(event);
+  const today = bookingDateKey(new Date(now), timeZone);
+  const start = new Date(event.eventStartDateTime).getTime();
+  const end = new Date(event.eventEndDateTime).getTime();
+  const date = typeof event.eventDate === 'string' ? event.eventDate.slice(0, 10) : '';
+  const eventDay = date || (Number.isFinite(start) ? bookingDateKey(new Date(start), timeZone) : '');
+  if (eventDay === today || (eventDay < today && start <= now && end > now)) return 'today';
+  return eventDay && eventDay < today ? 'past' : 'upcoming';
+};
+
 const smoothLayout = () =>
   LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
 
@@ -472,7 +491,7 @@ const MyEventsScreen = () => {
     });
 
   const [paymentFilter, setPaymentFilter] = useState(false);
-  const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [eventTab, setEventTab] = useState<EventTab>('today');
 
   const paymentActions = (event: any, vendorGroups: ReturnType<typeof groupBookingsByVendor>) => {
     if (rescheduleRequests.some(request => String(request.orderId) === String(event._id) &&
@@ -506,21 +525,20 @@ const MyEventsScreen = () => {
     const bookings = Array.isArray(event.vendorOrders) ? event.vendorOrders.filter(isActiveVendorOrder) : [];
     const groups = groupBookingsByVendor(bookings);
     const actions = paymentActions(event, groups);
-    const end = new Date(event.eventEndDateTime || event.eventStartDateTime || event.eventDate).getTime();
-    return { event, groups, actions, past: end < paymentNow };
+    return { event, groups, actions, tab: getEventTab(event, paymentNow) };
   });
   const paymentsDue = eventRows.reduce((sum, row) => sum + row.actions.length, 0);
   useEffect(() => {
     if (!targetOrderId) return;
     const target = events.find(event => String(event._id) === targetOrderId);
     if (!target) return;
-    const end = new Date(target.eventEndDateTime || target.eventStartDateTime || target.eventDate).getTime();
-    setEventTab(end < Date.now() ? 'past' : 'upcoming');
+    setEventTab(getEventTab(target, Date.now()));
     setPaymentFilter(false);
   }, [targetOrderId, events]);
   const eventsByTab = {
-    upcoming: eventRows.filter(row => !row.past),
-    past: eventRows.filter(row => row.past),
+    today: eventRows.filter(row => row.tab === 'today'),
+    upcoming: eventRows.filter(row => row.tab === 'upcoming'),
+    past: eventRows.filter(row => row.tab === 'past'),
   };
   const visibleEvents = paymentFilter
     ? eventRows.filter(row => row.actions.length > 0)
@@ -639,17 +657,17 @@ const MyEventsScreen = () => {
             </View>
 
             <View style={styles.eventTabs}>
-              {(['upcoming', 'past'] as const).map(tab => (
+              {EVENT_TABS.map(({ key: tab, label }) => (
                 <TouchableOpacity key={tab} style={[styles.eventTab, !paymentFilter && eventTab === tab && styles.eventTabSelected]}
                   accessibilityRole="tab" accessibilityState={{ selected: !paymentFilter && eventTab === tab }}
                   onPress={() => { setEventTab(tab); setPaymentFilter(false); }}>
                   <Text style={[styles.totalLabel, styles.eventTabText, !paymentFilter && eventTab === tab && styles.eventTabSelectedText]}>
-                    {tab === 'upcoming' ? 'Today & Upcoming' : 'Past'} ({eventsByTab[tab].length})
+                    {label} ({eventsByTab[tab].length})
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            {!visibleEvents.length && <Text style={styles.packageText}>{paymentFilter ? 'No payments due.' : 'No events in this tab.'}</Text>}
+            {!visibleEvents.length && <Text style={styles.packageText}>{paymentFilter ? 'No payments due.' : EVENT_TABS.find(tab => tab.key === eventTab)?.empty}</Text>}
             {visibleEvents.map(({ event, groups: vendorGroups, actions }, eventIndex) => {
               const timeZone = bookingTimeZone(event);
               const eventExpanded = expandedEvents[event._id] ?? paymentFilter;
@@ -1757,7 +1775,7 @@ export default MyEventsScreen;
 const styles = StyleSheet.create({
   eventTabs: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 12 },
   eventTab: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF' },
-  eventTabText: { textAlign: 'center' },
+  eventTabText: { textAlign: 'center', flexShrink: 1 },
   eventTabSelected: { backgroundColor: COLORS.primary },
   eventTabSelectedText: { color: '#FFFFFF' },
   countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
