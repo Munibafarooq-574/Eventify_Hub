@@ -1881,90 +1881,67 @@ async getOrderStats(type: string, userId: string) {
   const userIdObj = new Types.ObjectId(userId);
 
   if (type === 'Vendor') {
-    const vQuery = { vendorId: userIdObj };
-
-    const [
-      totalOrders,
-      pending,
-      processing,
-      confirmed,
-      completed,
-      cancelled,
-      paymentExpired,
-      noLongerAssigned,
-      requestExpired,
-      fullyPaidOrderIds,
-    ] = await Promise.all([
-      this.vendorOrderModel.countDocuments(vQuery),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        status: 'pending',
-      }),
-      // Processing = vendor accepted, but the required down payment is still due.
-      // Keep booking status "accepted"; paymentStatus is the authoritative split.
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        status: 'accepted',
-        paymentStatus: 'PAYMENT_REQUIRED',
-        replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
-      }),
-      // Confirmed = booking is financially secured after down payment.
-      // PARTIALLY_PAID and PAID stay separate payment states; no new booking
-      // status is introduced, so existing acceptance/payment logic is preserved.
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        status: 'accepted',
-        paymentStatus: { $in: ['PARTIALLY_PAID', 'PAID'] },
-        replacementOutcome: { $ne: 'NO_LONGER_ASSIGNED' },
-      }),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        status: 'completed',
-      }),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        status: 'cancelled',
-      }),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        paymentStatus: 'PAYMENT_EXPIRED',
-      }),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        replacementOutcome: 'NO_LONGER_ASSIGNED',
-      }),
-      this.vendorOrderModel.countDocuments({
-        ...vQuery,
-        $or: [{ status: 'expired' }, { paymentStatus: 'EXPIRED' }],
-        paymentStatus: { $ne: 'PAYMENT_EXPIRED' },
-      }),
+    const [bookings, fullyPaidOrderIds] = await Promise.all([
+      this.vendorOrderModel.find({ vendorId: userIdObj })
+        .select('_id orderId status paymentStatus replacementOutcome').lean(),
       this.getFullyPaidVendorOrderIds(userIdObj),
     ]);
+    const bookingIds = bookings.map(booking => booking._id);
+    const parentIds = bookings.flatMap(booking => booking.orderId ? [booking.orderId] : []);
+    const orders = await this.orderModel.find({
+      $or: [{ vendorOrders: { $in: bookingIds } }, { _id: { $in: parentIds } }],
+    }).select('_id status vendorOrders').lean();
 
-    console.log('📊 Vendor order stats:', {
-      totalOrders,
-      pending,
-      processing,
-      confirmed,
-      completed,
-      cancelled,
-      paymentExpired,
-      noLongerAssigned,
-      requestExpired,
-    });
+    const byBookingId = new Map(bookings.map(booking => [String(booking._id), booking]));
+    const historicalByOrder = new Map<string, typeof bookings>();
+    for (const booking of bookings) {
+      if (!booking.orderId || booking.replacementOutcome !== 'NO_LONGER_ASSIGNED') continue;
+      const key = String(booking.orderId);
+      const historical = historicalByOrder.get(key) ?? [];
+      historical.push(booking);
+      historicalByOrder.set(key, historical);
+    }
 
-    return {
+    const counts = {
+      totalOrders: orders.length, pending: 0, processing: 0, confirmed: 0, completed: 0,
+      cancelled: 0, paymentExpired: 0, noLongerAssigned: 0, requestExpired: 0,
       fullyPaid: fullyPaidOrderIds.length,
-      totalOrders,
-      pending,
-      processing,
-      confirmed,
-      completed,
-      cancelled,
-      paymentExpired,
-      noLongerAssigned,
-      requestExpired,
     };
+
+    // Match Order Summary: classify each parent order from this vendor's visible packages.
+    for (const order of orders) {
+      const current = (order.vendorOrders ?? []).flatMap(id => {
+        const booking = byBookingId.get(String(id));
+        return booking ? [booking] : [];
+      });
+      const visible = [...current, ...(historicalByOrder.get(String(order._id)) ?? [])];
+      const payment = (booking: (typeof bookings)[number]) => String(booking.paymentStatus ?? '').toUpperCase();
+      if (visible.length && visible.every(booking => payment(booking) === 'PAYMENT_EXPIRED')) {
+        counts.paymentExpired++;
+      } else if (visible.length && visible.every(booking => booking.status === 'expired' || ['EXPIRED', 'PAYMENT_EXPIRED'].includes(payment(booking)))) {
+        counts.requestExpired++;
+      } else if (visible.length && visible.every(booking => booking.replacementOutcome === 'NO_LONGER_ASSIGNED')) {
+        counts.noLongerAssigned++;
+      } else if (visible.length && visible.every(booking => booking.status === 'completed' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')) {
+        counts.completed++;
+      } else if (visible.length && visible.every(booking => ['cancelled', 'cancelled_by_vendor'].includes(booking.status) && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')) {
+        counts.cancelled++;
+      } else if (visible.length) {
+        const accepted = visible.filter(booking => booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED');
+        if (accepted.some(booking => ['PARTIALLY_PAID', 'PAID'].includes(payment(booking)))) counts.confirmed++;
+        else if (accepted.length) counts.processing++;
+        else counts.pending++;
+      } else {
+        switch (order.status) {
+          case 'pending': counts.pending++; break;
+          case 'processing': counts.processing++; break;
+          case 'confirmed': counts.confirmed++; break;
+          case 'completed': counts.completed++; break;
+          case 'cancelled': counts.cancelled++; break;
+        }
+      }
+    }
+    return counts;
   }
 
   const query = {
