@@ -45,6 +45,7 @@ export type VendorAvailabilityResponse = {
   }[];
 
   bookings?: {
+    orderId?: string;
     start: string;
     end: string;
     status: string;
