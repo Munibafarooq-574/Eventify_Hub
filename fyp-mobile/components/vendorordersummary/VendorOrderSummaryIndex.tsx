@@ -603,7 +603,7 @@ const OrderSummary = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.guideInset}><BookingUserGuide kind="vendorOrders" primary={PRIMARY} /></View>
+                <BookingUserGuide kind="vendorOrders" primary={PRIMARY} />
                                 {/* Order Status Summary */}
                 <ScrollView
                     ref={summaryScrollRef}
@@ -1209,8 +1209,7 @@ const SummaryCard = ({ label, value, icon, isActive = false }: {
 };
 
 const styles = StyleSheet.create({
-    guideInset: { marginRight: 64 },
-    filterChip: { minHeight: 38, marginRight: 7, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', borderRadius: 20, borderWidth: 1, borderColor: '#EAD7E5' },
+    filterChip: { minHeight: 38, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', borderRadius: 20, borderWidth: 1, borderColor: '#EAD7E5' },
     filterText: { color: PRIMARY, fontSize: 12, fontWeight: '700' },
     iconAction: { minWidth: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     optionsList: { flexGrow: 0, maxHeight: 320, marginVertical: 12 },
@@ -1306,19 +1305,20 @@ const styles = StyleSheet.create({
     },
         summaryScroll: {
         flexGrow: 0,
+        marginHorizontal: 18,
         marginBottom: 18,
     },
     summaryContainer: {
         flexDirection: "row",
         alignItems: "flex-start",
-        paddingHorizontal: 12,
+        gap: 7,
     },
     ordersList: {
         flex: 1,
     },
     ordersListContent: {
         paddingBottom: 30,
-        paddingHorizontal: 15,
+        paddingHorizontal: 18,
     },
     sectionTitle: {
         fontSize: 16,
