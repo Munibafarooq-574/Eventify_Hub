@@ -112,7 +112,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     quickSteps: ['Choose a date → check remaining capacity', 'Edit availability → save and recheck', 'Tap a booking → manage that order in Order Summary'],
     sections: [
       { id: 'calendar', title: 'Find a day and review bookings', summary: 'Use the calendar and the available views.', steps: [
-        'Pick a date in the calendar to see working hours, booking notice and simultaneous booking limit. Expand or collapse the calendar to switch between month and week.',
+        'Pick a date in the month calendar to see working hours, booking notice and simultaneous booking limit. A blocked date shows your saved reason when you entered one.',
         'Tap Total, Upcoming or Pending above the calendar, or use the counted filters above the event list. Open order takes you to Order Summary for details and actions.',
         'Event cards show the package count, booking total, Received and Pending amounts. Chat and Call are available where contact details permit.',
         'Only your vendor bookings are shown here. Another vendor’s acceptance or cancellation does not change your own assignment.',

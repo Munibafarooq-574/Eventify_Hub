@@ -102,7 +102,6 @@ const MyEventsScreen = () => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [orders, setOrders] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("day");
-  const [calendarOpen, setCalendarOpen] = useState(true);
   const [showSlots, setShowSlots] = useState(false);
   const [vendorId, setVendorId] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilitySettings | null>(null);
@@ -397,26 +396,23 @@ const markedDates = useMemo(() => {
   return marks;
 }, [scheduleOrders, getVendorStatus]);
 
-const weekStart = new Date(`${selectedDate}T12:00:00Z`);
-weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
-const weekDays = Array.from({ length: 7 }, (_, index) => toKey(addMinutes(weekStart, index * 1440)));
 const selectDay = (date: string) => {
   setSelectedDate(date);
   setViewMode('day');
   setShowSlots(false);
 };
 
-const renderCalendarDay = (date: string, day: string | number, weekView = false) => {
+const renderCalendarDay = (date: string, day: number) => {
   const selected = date === selectedDate;
   const past = date < todayKey;
   const blocked = isBlockedDate(date);
   const unavailable = blocked || (!past && !isWorkingDay(date));
-  const outsideMonth = !weekView && date.slice(0, 7) !== visibleMonth;
+  const outsideMonth = date.slice(0, 7) !== visibleMonth;
   const dots = markedDates[date]?.dots ?? [];
   const status = blocked ? 'Blocked' : past ? 'Past date' : unavailable ? 'Unavailable' : '';
   return (
     <TouchableOpacity key={date}
-      style={[weekView ? styles.weekDay : styles.monthDay, selected && styles.weekSelected,
+      style={[styles.monthDay, selected && styles.calendarSelected,
         unavailable && styles.calendarUnavailable, selected && styles.calendarSelectedBorder]}
       accessibilityRole="button"
       accessibilityLabel={[formatCalendarDate(date), status, dots.length ? 'Has bookings' : ''].filter(Boolean).join(', ')}
@@ -511,6 +507,8 @@ const openChat = async (organizer: any, timeZone: string) => {
   }
 };
 
+const blockedDateReason = availability?.blockedDateReasons
+  ?.find(({ date }) => toKey(date) === selectedDate)?.reason?.trim();
 const availabilityState = dayAvailability.isBlocked ? "Blocked" : !dayAvailability.isWorking ? "Not Working" : dayAvailability.slots.length === 0 ? "No Slots" : "Available";
 
 const availabilityPositive = dayAvailability.isWorking && !dayAvailability.isBlocked && dayAvailability.slots.length > 0;
@@ -539,10 +537,6 @@ return (
 
     <BookingUserGuide kind="vendorEvents" primary={PRIMARY} />
     <SectionList
-      scrollEventThrottle={32}
-      onScroll={event => {
-        if (calendarOpen && event.nativeEvent.contentOffset.y > 80) setCalendarOpen(false);
-      }}
       sections={[{ key: "bookings", data: events }]}
       stickySectionHeadersEnabled
       keyExtractor={(item) => String(item?._id || item?.id)}
@@ -571,13 +565,12 @@ return (
                 <Text style={styles.calendarTitle}>Booking Calendar</Text>
                 <Text style={styles.calendarSubtitle}>Select a date to view your schedule</Text>
               </View>
-              <TouchableOpacity style={styles.calendarIcon} accessibilityRole="button" accessibilityLabel="Toggle calendar month"
-                accessibilityState={{ expanded: calendarOpen }} onPress={() => setCalendarOpen(value => !value)}>
-                <Ionicons name={calendarOpen ? "chevron-up" : "chevron-down"} size={20} color="#FFFFFF" />
-              </TouchableOpacity>
+              <View style={styles.calendarIcon}>
+                <Ionicons name="calendar-outline" size={20} color="#FFFFFF" />
+              </View>
             </View>
 
-            {calendarOpen ? <Calendar
+            <Calendar
               current={selectedDate}
               dayComponent={({ date }) => date ? renderCalendarDay(date.dateString, date.day) : null}
               onMonthChange={(day) => setCalendarMonth(day.dateString)}
@@ -600,9 +593,7 @@ return (
                 textDayHeaderFontSize: 12,
               }}
               style={styles.calendar}
-            /> : <View style={styles.weekRow}>
-              {weekDays.map(date => renderCalendarDay(date, date.slice(-2), true))}
-            </View>}
+            />
             <View style={styles.legendRow}>
               <View style={[styles.legendDot, { backgroundColor: ACCENT }]} />
               <Text style={styles.legendText}>Booking</Text>
@@ -677,6 +668,7 @@ return (
       <View style={{ flex: 1 }}>
         <Text style={styles.messageTitle}>Date blocked</Text>
         <Text style={styles.messageText}>You have marked this date as unavailable.</Text>
+        {!!blockedDateReason && <Text style={styles.messageText}>Reason: {blockedDateReason}</Text>}
       </View>
     </View>
   ) : !dayAvailability.isWorking ? (
@@ -918,8 +910,6 @@ const styles = StyleSheet.create({
   shortcutLabel: { color: PRIMARY, fontSize: 10, fontWeight: '700' },
 
   timeline: { height: 10, flexDirection: 'row', overflow: 'hidden', borderRadius: 5, marginTop: 12, gap: 1 },
-  weekRow: { flexDirection: 'row', gap: 4, marginVertical: 6 },
-  weekDay: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 42, borderRadius: 8 },
   monthDay: { width: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   calendarDayText: { color: PRIMARY, fontSize: 13, fontWeight: '500' },
   calendarPastText: { color: '#777078' },
@@ -928,7 +918,7 @@ const styles = StyleSheet.create({
   calendarBlockedText: { textDecorationLine: 'line-through', fontWeight: '800' },
   calendarSelectedBorder: { borderWidth: 1, borderColor: PRIMARY },
   pastStatus: { backgroundColor: '#F0EDF0' },
-  weekSelected: { backgroundColor: PRIMARY_LIGHT },
+  calendarSelected: { backgroundColor: PRIMARY_LIGHT },
   weekDots: { flexDirection: 'row', justifyContent: 'center', gap: 2, minHeight: 5 },
   calendarDot: { width: 4, height: 4, borderRadius: 2 },
   scheduleAction: { minHeight: 40, justifyContent: 'center', alignSelf: 'flex-start' },
