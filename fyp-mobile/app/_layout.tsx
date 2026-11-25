@@ -126,7 +126,7 @@ export default function RootLayout() {
         <Stack.Screen name="bdsounds" options={{ headerShown: false }} />
         <Stack.Screen name="imagesuploaded" options={{ headerShown: false }} />
         <Stack.Screen name="vendoraccount" options={{ headerShown: false, animation: 'none' }} />
-        <Stack.Screen name="vendormessages" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="vendormessages" options={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: '#F8E9F0' } }} />
         <Stack.Screen name="vendornotifications" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="vendorordersummary" options={{ headerShown: false, animation: 'none' }} />
         <Stack.Screen name="vendormyevents" options={{ headerShown: false, animation: 'none' }} />

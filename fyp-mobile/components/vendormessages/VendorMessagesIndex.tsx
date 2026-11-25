@@ -188,17 +188,7 @@ export function MessagesHeader({ subtitle }: { subtitle: string }) {
     );
 }
 
-export function MessagesAccessLoading() {
-    return (
-        <View style={styles.container}>
-            <MessagesHeader subtitle="Loading conversations…" />
-            <ActivityIndicator color={PRIMARY} style={{ marginTop: 30 }} accessibilityLabel="Checking messaging access" />
-            <BottomNavigationFinal />
-        </View>
-    );
-}
-
-const MessagesScreen: React.FC = () => {
+const MessagesScreen: React.FC<{ accessAllowed?: boolean }> = ({ accessAllowed = true }) => {
     const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>({});
     const [conversations, setConversations] =
         useState<any[]>([]);
@@ -426,6 +416,7 @@ const MessagesScreen: React.FC = () => {
     // ============================================================
 
     useEffect(() => {
+        if (!accessAllowed) return;
         // Shared singleton socket
         connectSocket();
 
@@ -739,7 +730,7 @@ const MessagesScreen: React.FC = () => {
         };
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [accessAllowed]);
 
     // ============================================================
     // REFRESH WHEN SCREEN GETS FOCUS
@@ -747,8 +738,8 @@ const MessagesScreen: React.FC = () => {
 
     useFocusEffect(
         useCallback(() => {
-            fetchConversations(true);
-        }, [fetchConversations])
+            if (accessAllowed) fetchConversations(true);
+        }, [accessAllowed, fetchConversations])
     );
 
     // ============================================================
@@ -994,12 +985,12 @@ const MessagesScreen: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <MessagesHeader subtitle={loading && !conversations.length ? 'Loading conversations…'
+            <MessagesHeader subtitle={!accessAllowed || (loading && !conversations.length) ? 'Loading conversations…'
                 : `${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}`} />
 
             {/* Messages List */}
             <FlatList
-                data={conversations}
+                data={accessAllowed ? conversations : []}
                 renderItem={renderMessage}
                 keyExtractor={item =>
                     normalizeId(
@@ -1012,7 +1003,7 @@ const MessagesScreen: React.FC = () => {
                 showsVerticalScrollIndicator={
                     false
                 }
-                refreshControl={
+                refreshControl={accessAllowed ? (
                     <RefreshControl
                         refreshing={
                             refreshing
@@ -1027,9 +1018,9 @@ const MessagesScreen: React.FC = () => {
                             PRIMARY,
                         ]}
                     />
-                }
+                ) : undefined}
                 ListEmptyComponent={
-                    !loading ? (
+                    accessAllowed && !loading ? (
                         <View
                             style={
                                 styles.emptyState

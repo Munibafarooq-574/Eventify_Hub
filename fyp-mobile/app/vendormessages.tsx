@@ -1,4 +1,4 @@
-import VendorMessagesIndex, { MessagesAccessLoading } from '@/components/vendormessages/VendorMessagesIndex';
+import VendorMessagesIndex from '@/components/vendormessages/VendorMessagesIndex';
 import { ACCESS_FRESH_MS, getSubscriptionAccessState, hasActiveVendorSubscription, readVerifiedSubscription, rememberVerifiedSubscription } from '@/services/getSubscriptionAccessState';
 import { getSecureData, getUserData } from '@/store';
 import { router, useFocusEffect } from 'expo-router';
@@ -46,8 +46,9 @@ export default function VendorMessagesScreen() {
     return () => { mounted = false; };
   }, [retry]));
 
-  if (state === 'loading') return <MessagesAccessLoading />;
-  if (state === 'allowed') return <VendorMessagesIndex />;
+  if (state === 'loading' || state === 'allowed') {
+    return <VendorMessagesIndex accessAllowed={state === 'allowed'} />;
+  }
   return <View style={{flex:1,justifyContent:'center',padding:24,backgroundColor:'#fff'}}>
       <Text style={{fontSize:22,fontWeight:'700',textAlign:'center',color:'#780C60',marginBottom:16}}>{state==='error'?'Unable to verify messaging access':'Booking messages'}</Text>
       <Text style={{fontSize:16,textAlign:'center',lineHeight:24,marginBottom:24}}>{state==='error'?'Please try again. Your existing bookings remain available.':'Your subscription is inactive. Open an existing booking and tap Message to contact its client.'}</Text>
