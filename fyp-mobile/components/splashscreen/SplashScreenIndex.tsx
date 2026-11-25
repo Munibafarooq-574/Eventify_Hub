@@ -1,386 +1,83 @@
-
-// import React, { useEffect, useRef, useState } from 'react';
-// import {
-//     View,
-//     StyleSheet,
-//     Animated,
-//     Dimensions,
-//     Easing,
-//     Image,
-// } from 'react-native';
-// import { useRouter } from 'expo-router';
-
-// const { width, height } = Dimensions.get('window'); // Screen dimensions
-
-// const SplashScreen: React.FC = () => {
-//     const router = useRouter(); // Initialize router
-
-//     const bubbleOpacity = useRef(new Animated.Value(0.7)).current; // For bubble fading
-//     const logoOpacity = useRef(new Animated.Value(1)).current; // Logo fades when bubbles disappear
-
-//     // Animation values for bubbles
-//     const bubbleAnimations = Array.from({ length: 10 }).map(() =>
-//         useRef(new Animated.Value(0)).current
-//     );
-
-//     useEffect(() => {
-//         const animateBubble = (animation: Animated.Value, delay: number) => {
-//             Animated.loop(
-//                 Animated.sequence([
-//                     Animated.timing(animation, {
-//                         toValue: 1,
-//                         duration: 3000,
-//                         delay,
-//                         easing: Easing.inOut(Easing.sin),
-//                         useNativeDriver: true,
-//                     }),
-//                     Animated.timing(animation, {
-//                         toValue: 0,
-//                         duration: 3000,
-//                         easing: Easing.inOut(Easing.sin),
-//                         useNativeDriver: true,
-//                     }),
-//                 ])
-//             ).start();
-//         };
-
-//         // Start animations for all bubbles
-//         bubbleAnimations.forEach((animation, index) => {
-//             animateBubble(animation, index * 400);
-//         });
-
-//         // Timer to fade out bubbles and logo after 5 seconds
-//         const hideBubblesTimer = setTimeout(() => {
-//             Animated.timing(bubbleOpacity, {
-//                 toValue: 0,
-//                 duration: 1000,
-//                 useNativeDriver: true,
-//             }).start();
-
-//             Animated.timing(logoOpacity, {
-//                 toValue: 1,
-//                 duration: 1000,
-//                 useNativeDriver: true,
-//             }).start();
-//         }, 5000);
-
-//         // Navigate to the next screen after 8 seconds
-//         const navigateTimer = setTimeout(() => {
-//             router.push('/sandwich1'); // Navigate to the next screen
-//         }, 8000);
-
-//         return () => {
-//             clearTimeout(hideBubblesTimer);
-//             clearTimeout(navigateTimer);
-//         };
-//     }, [router, bubbleAnimations, bubbleOpacity, logoOpacity]);
-
-//     // Render bubbles with animated styles
-//     const renderBubbles = () => {
-//         return bubbleAnimations.map((animation, index) => {
-//             const translateY = animation.interpolate({
-//                 inputRange: [0, 1],
-//                 outputRange: [height, -150], // Moves bubbles upwards
-//             });
-
-//             const translateX = animation.interpolate({
-//                 inputRange: [0, 1],
-//                 outputRange: [Math.random() * width, Math.random() * width], // Random horizontal movement
-//             });
-
-//             const scale = animation.interpolate({
-//                 inputRange: [0, 1],
-//                 outputRange: [1, 1.5], // Pulse effect
-//             });
-
-//             const bubbleSize = Math.random() * 120 + 100; // Random bubble size
-
-//             return (
-//                 <Animated.View
-//                     key={index}
-//                     style={[
-//                         styles.bubble,
-//                         {
-//                             width: bubbleSize,
-//                             height: bubbleSize,
-//                             backgroundColor: index % 2 === 0 ? '#7B2869' : '#C08552', // Alternate colors
-//                             transform: [{ translateY }, { translateX }, { scale }],
-//                             opacity: bubbleOpacity, // Animate bubble opacity
-//                         },
-//                     ]}
-//                 />
-//             );
-//         });
-//     };
-
-//     return (
-//         <View style={styles.container}>
-//             {/* Logo behind bubbles */}
-//             <Animated.View style={[styles.logoContainer, { opacity: logoOpacity }]}>
-//                 <Image
-//                     resizeMode="contain"
-//                     source={{
-//                         uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&',
-//                     }}
-//                     style={styles.logoImage}
-//                     accessibilityLabel="Company Logo"
-//                 />
-//             </Animated.View>
-
-//             {/* Bubbles in front of the logo */}
-//             {renderBubbles()}
-//         </View>
-//     );
-// };
-
-// const styles = StyleSheet.create({
-//     container: {
-//         flex: 1,
-//         backgroundColor: '#ffffff', // Background color
-//         overflow: 'hidden', // Hide bubbles outside the screen
-//     },
-//     bubble: {
-//         position: 'absolute',
-//         borderRadius: 100, // Perfect circle
-//         opacity: 0.5, // Semi-transparent bubbles
-//     },
-//     logoContainer: {
-//         borderRadius: 60,
-//         display: 'flex',
-//         marginLeft: 'auto',
-//         marginRight: 'auto',
-//         maxWidth: 480,
-//         width: '100%',
-//         paddingTop: 150,
-//         paddingBottom: 246,
-//         flexDirection: 'column',
-//         overflow: 'hidden',
-//         alignItems: 'stretch',
-//     },
-//     logoImage: {
-//         position: 'relative',
-//         display: 'flex',
-//         width: '100%',
-//         aspectRatio: 0.87,
-//     },
-// });
-
-// export default SplashScreen;
-import React, { useEffect, useRef } from 'react';
-import {
-    View,
-    StyleSheet,
-    Animated,
-    Dimensions,
-    Easing,
-    Image,
-    Text,
-    ActivityIndicator,
-} from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { restoreStartupSession } from '@/store';
 
-const { width, height } = Dimensions.get('window');
+const routes = {
+    onboarding: '/sandwich1',
+    login: '/login',
+    organizer: '/dashboard',
+    vendor: '/vendordashboard',
+} as const;
 
-const SplashScreen: React.FC = () => {
+export default function SplashScreen() {
     const router = useRouter();
-
-    // Animation values
-    const bubbleOpacity = useRef(new Animated.Value(0.7)).current;
-    const logoOpacity = useRef(new Animated.Value(0)).current; // Start with opacity 0
-    const logoScale = useRef(new Animated.Value(0.8)).current; // Start smaller
-
-    const bubbleAnimations = Array.from({ length: 12 }).map(() =>
-        useRef(new Animated.Value(0)).current
-    );
+    const logo = useRef(new Animated.Value(0)).current;
+    const [attempt, setAttempt] = useState(0);
+    const [showRetry, setShowRetry] = useState(false);
 
     useEffect(() => {
-        // Function to animate bubbles
-        const animateBubble = (animation: Animated.Value, delay: number) => {
-            Animated.loop(
-                Animated.sequence([
-                    Animated.timing(animation, {
-                        toValue: 1,
-                        duration: 4000,
-                        delay,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(animation, {
-                        toValue: 0,
-                        duration: 4000,
-                        easing: Easing.inOut(Easing.ease),
-                        useNativeDriver: true,
-                    }),
-                ])
-            ).start();
-        };
+        const animation = Animated.timing(logo, { toValue: 1, duration: 550, useNativeDriver: true });
+        animation.start();
+        return () => animation.stop();
+    }, [logo]);
 
-        // Start bubble animations
-        bubbleAnimations.forEach((animation, index) => {
-            animateBubble(animation, index * 300);
+    useEffect(() => {
+        let active = true;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        let logoTimer: ReturnType<typeof setTimeout> | undefined;
+        const logoDelay = new Promise<void>(resolve => { logoTimer = setTimeout(resolve, 600); });
+
+        void Promise.all([restoreStartupSession(controller.signal), logoDelay]).then(([result]) => {
+            clearTimeout(timeout);
+            if (!active || result === 'cancelled') return;
+            if (result === 'retry') {
+                setShowRetry(true);
+                return;
+            }
+            router.replace(routes[result]);
         });
-
-        // Animate bubble opacity out and logo fade-in with scale-up
-        const hideBubblesTimer = setTimeout(() => {
-            Animated.parallel([
-            Animated.timing(bubbleOpacity, {
-             toValue: 0,
-            duration: 1000,
-            useNativeDriver: true,
-            }),
-        Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 1200,
-        useNativeDriver: true,
-        }),
-         Animated.spring(logoScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 60,
-        useNativeDriver: true,
-         }),
-    ]).start();
-        }, 2000);
-
-        
-        // Navigate after 4 seconds
-            const navigateTimer = setTimeout(() => {
-    router.replace('/sandwich1');
-            }, 4000);
-
         return () => {
-            clearTimeout(hideBubblesTimer);
-            clearTimeout(navigateTimer);
+            active = false;
+            clearTimeout(timeout);
+            clearTimeout(logoTimer);
+            controller.abort();
         };
-    }, [router, bubbleAnimations, bubbleOpacity, logoScale, logoOpacity]);
-
-    // Function to render bubbles
-    const renderBubbles = () => {
-        return bubbleAnimations.map((animation, index) => {
-            const translateY = animation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [height, -200],
-            });
-
-            const translateX = animation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [
-                    Math.random() * width,
-                    Math.random() * width - 100,
-                ],
-            });
-
-            const scale = animation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 2],
-            });
-
-            const bubbleSize = Math.random() * 100 + 80;
-
-            return (
-                <Animated.View
-                    key={index}
-                    style={[
-                        styles.bubble,
-                        {
-                            width: bubbleSize,
-                            height: bubbleSize,
-                            backgroundColor:
-                                index % 3 === 0 ? '#FFDEE9' : index % 2 === 0 ? '#7B2869' : '#C08552', // Alternate colors
-                            transform: [{ translateY }, { translateX }, { scale }],
-                            opacity: bubbleOpacity,
-                        },
-                    ]}
-                />
-            );
-        });
-    };
+    }, [attempt, router]);
 
     return (
-        <LinearGradient
-            colors={['#FFDEE9', '#FFFFFF']} // Gradient background
-            style={styles.container}
-        >
-            {/* Logo with scale and fade-in animation */}
-              <Animated.View
-                style={[
-                    styles.logoContainer,
-                    { opacity: logoOpacity, transform: [{ scale: logoScale }] },
-                ]}
-            >
-                <Image
-                    resizeMode="contain"
-                    source={{
-                        uri: 'https://cdn.builder.io/api/v1/image/assets/TEMP/ee8619c3ba7069ac2ac92e880c53f6a08b69c1a800aaf83f5653c512dd5631a5?apiKey=0a92af3bc6e24da3a9ef8b1ae693931a&',
-                    }}
-                    style={styles.logoImage}
-                    accessibilityLabel="Company Logo"
-                />
-
-                <Animated.View style={{
-                marginTop: 25,
-                 opacity: logoOpacity,
-                     }} >
-                <ActivityIndicator
-                size="large"
-                    color="#7B2869"
-                     />
-            </Animated.View>
-            </Animated.View>
-
-            {/* Animated bubbles */}
-            {renderBubbles()}
+        <LinearGradient colors={['#FFDEE9', '#FFFFFF']} style={styles.container}>
+            <Animated.Image
+                source={require('@/assets/images/splash.png')}
+                resizeMode="contain"
+                accessibilityLabel="Eventify Hub"
+                style={[styles.logo, { opacity: logo, transform: [{ scale: logo.interpolate({
+                    inputRange: [0, 1], outputRange: [0.85, 1],
+                }) }] }]}
+            />
+            {showRetry ? (
+                <>
+                    <Text accessibilityRole="alert" style={styles.message}>
+                        Could not verify your session. Check your connection and try again.
+                    </Text>
+                    <Pressable accessibilityRole="button" style={styles.retry} onPress={() => {
+                        setShowRetry(false);
+                        setAttempt(value => value + 1);
+                    }}>
+                        <Text style={styles.retryText}>Try again</Text>
+                    </Pressable>
+                </>
+            ) : <ActivityIndicator color="#7B2869" accessibilityLabel="Starting Eventify Hub" />}
         </LinearGradient>
     );
-};
+}
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#ffffff', // Background color
-        overflow: 'hidden', // Hide bubbles outside the screen
-    },
-    bubble: {
-        position: 'absolute',
-        borderRadius: 100, // Perfect circle
-        opacity: 0.5, // Semi-transparent bubbles
-    },
-    logoContainer: {
-        borderRadius: 60,
-        display: 'flex',
-        marginLeft: 'auto',
-        marginRight: 'auto',
-        maxWidth: 480,
-        width: '100%',
-        paddingTop: 150,
-        paddingBottom: 246,
-        flexDirection: 'column',
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'center',
-
-    },
-    logoImage: {
-        position: 'relative',
-        display: 'flex',
-        width: '100%',
-        aspectRatio: 0.87,
-    },
-    title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#7B2869',
-    marginTop: 20,
-    textAlign: 'center',
-    },
-
-    subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-    },
+    container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+    logo: { width: 200, height: 200, marginBottom: 20 },
+    message: { textAlign: 'center', color: '#4A1436', marginBottom: 14 },
+    retry: { backgroundColor: '#7B2869', borderRadius: 12, minHeight: 44, justifyContent: 'center', paddingHorizontal: 20 },
+    retryText: { color: '#FFFFFF', fontWeight: '700' },
 });
-
-export default SplashScreen;

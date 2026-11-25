@@ -1,6 +1,6 @@
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { MarketplaceGuard } from '../city/marketplace.guard';
-import { Controller, Post, Body, Get, UseGuards, Req, Patch, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Body, Get, Header, UseGuards, Req, Patch, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -23,6 +23,13 @@ export class AuthController {
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Get('session')
+  @Header('Cache-Control', 'private, no-store')
+  @UseGuards(JwtAuthGuard)
+  getSession(@Req() request: { user: { id: string; role: string } }) {
+    return { id: request.user.id, role: request.user.role };
   }
 
   @Get('organizers')

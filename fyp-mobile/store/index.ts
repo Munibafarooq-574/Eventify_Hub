@@ -191,6 +191,7 @@ export async function startUserSession(token: string, user: any) {
       await remove('token');
       await remove('user');
       await AsyncStorage.setItem('user', JSON.stringify(user));
+      await AsyncStorage.setItem('hasSignedIn', 'true');
       await write('token', token);
       if (version === sessionVersion) sessionAvailable = true;
     } catch (error) {
@@ -233,4 +234,57 @@ export async function deleteUserData() {
     const failure = results.find(result => result.status === 'rejected');
     if (failure?.status === 'rejected') throw failure.reason;
   });
+}
+
+
+type StartupSession = 'onboarding' | 'login' | 'organizer' | 'vendor' | 'retry' | 'cancelled';
+
+export async function restoreStartupSession(signal: AbortSignal): Promise<StartupSession> {
+  const version = sessionVersion;
+  const isCurrent = () => sessionAvailable && version === sessionVersion && !signal.aborted;
+  const resultIfInactive = (): StartupSession => signal.aborted && version === sessionVersion ? 'retry' : 'cancelled';
+  try {
+    const [token, rawUser, hasSignedIn] = await Promise.all([
+      read('token'), AsyncStorage.getItem('user'), AsyncStorage.getItem('hasSignedIn'),
+    ]);
+    if (!isCurrent()) return resultIfInactive();
+    if (!token && !rawUser) return hasSignedIn ? 'login' : 'onboarding';
+
+    let user: { _id?: unknown; role?: unknown } | null = null;
+    try {
+      user = rawUser ? JSON.parse(rawUser) : null;
+    } catch {
+      // A damaged local profile cannot be associated with a session.
+    }
+    if (!token || typeof user?._id !== 'string' || typeof user.role !== 'string') {
+      await deleteUserData().catch(() => {});
+      return sessionVersion === version + 1 && !signal.aborted ? 'login' : 'cancelled';
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal,
+    });
+    if (!isCurrent()) return resultIfInactive();
+    if (response.status === 401 || response.status === 403) {
+      await deleteUserData().catch(() => {});
+      return sessionVersion === version + 1 && !signal.aborted ? 'login' : 'cancelled';
+    }
+    if (!response.ok) return 'retry';
+    const verified = await response.json();
+    if (!isCurrent()) return resultIfInactive();
+    if (typeof verified?.id !== 'string' || typeof verified.role !== 'string') return 'retry';
+
+    const role = verified.role.trim().toLowerCase();
+    if (verified.id !== user._id || role !== user.role.trim().toLowerCase() ||
+        !['vendor', 'organizer', 'client'].includes(role)) {
+      await deleteUserData().catch(() => {});
+      return sessionVersion === version + 1 && !signal.aborted ? 'login' : 'cancelled';
+    }
+    await AsyncStorage.setItem('hasSignedIn', 'true');
+    if (!isCurrent()) return resultIfInactive();
+    return role === 'vendor' ? 'vendor' : 'organizer';
+  } catch {
+    return version !== sessionVersion ? 'cancelled' : 'retry';
+  }
 }
