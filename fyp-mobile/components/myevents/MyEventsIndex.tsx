@@ -1392,10 +1392,44 @@ const MyEventsScreen = () => {
                                 </TouchableOpacity>}
                                 </View>
                                 {['accepted', 'completed'].includes(vendorStatus) && (
-                                  <View style={styles.packagePaymentSummary}>
+                                  <View style={styles.paymentBox}>
+                                    <View style={styles.paymentHeaderRow}>
+                                      <View style={styles.paymentTitleWrap}>
+                                        <Ionicons name="wallet-outline" size={14} color={COLORS.primary} />
+                                        <Text style={styles.paymentTitle}>Payment</Text>
+                                      </View>
+
+                                      <View style={[styles.paymentChip, { backgroundColor: payChip.bg }]}>
+                                        <Text style={[styles.paymentStatusText, { color: payChip.text }]}>
+                                          {paymentStatus.replace(/_/g, ' ')}
+                                        </Text>
+                                      </View>
+                                    </View>
+
                                     <Text style={styles.packageText}>Paid {formatMoney(paidFor(vendor), currencyOf(vendor))} of {formatMoney(finalAmount, currencyOf(vendor))}</Text>
                                     <View style={styles.progressTrack}>
                                       <View style={[styles.progressFill, { width: `${paymentProgress}%` }]} />
+                                    </View>
+                                    <View style={styles.paymentFigures}>
+                                      <View style={styles.paymentFigure}>
+                                        <Text style={styles.paymentLabel}>Total</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {formatMoney(finalAmount, currencyOf(vendor))}
+                                        </Text>
+                                      </View>
+                                      <View style={styles.downPaymentFigure}>
+                                        <Text style={styles.paymentLabel}>Down payment</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
+                                        </Text>
+                                      </View>
+
+                                      <View style={[styles.paymentFigure, { alignItems: 'flex-end' }]}>
+                                        <Text style={styles.paymentLabel}>Remaining</Text>
+                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                                          {currencySymbol(currencyOf(vendor))} {remainingAmount.toLocaleString()}
+                                        </Text>
+                                      </View>
                                     </View>
                                     {hasSuccessfulPayment && !successfulPayment.checkoutGroupId && (
                                       <TouchableOpacity style={styles.vendorGroupControl} accessibilityRole="button"
@@ -1514,35 +1548,6 @@ const MyEventsScreen = () => {
                                 {/* ───── Payment panel ───── */}
                                 {(vendorStatus === 'accepted' || vendorStatus === 'completed') && (
                                   <View style={styles.paymentBox}>
-                                    <View style={styles.paymentHeaderRow}>
-                                      <View style={styles.paymentTitleWrap}>
-                                        <Ionicons name="wallet-outline" size={14} color={COLORS.primary} />
-                                        <Text style={styles.paymentTitle}>Payment</Text>
-                                      </View>
-
-                                      <View style={[styles.paymentChip, { backgroundColor: payChip.bg }]}>
-                                        <Text style={[styles.paymentStatusText, { color: payChip.text }]}>
-                                          {paymentStatus.replace(/_/g, ' ')}
-                                        </Text>
-                                      </View>
-                                    </View>
-
-                                    <View style={styles.paymentFigures}>
-                                      <View style={styles.downPaymentFigure}>
-                                        <Text style={styles.paymentLabel}>Down payment</Text>
-                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                          {currencySymbol(currencyOf(vendor))} {downPaymentAmount.toLocaleString()}
-                                        </Text>
-                                      </View>
-
-                                      <View style={[styles.paymentFigure, { alignItems: 'flex-end' }]}>
-                                        <Text style={styles.paymentLabel}>Remaining</Text>
-                                        <Text style={styles.paymentValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                                          {currencySymbol(currencyOf(vendor))} {remainingAmount.toLocaleString()}
-                                        </Text>
-                                      </View>
-                                    </View>
-
                                     {paymentDeadline && (
                                       <View style={styles.deadlineRow}>
                                         <Ionicons name="alarm-outline" size={12} color="#B8860B" />
@@ -1794,7 +1799,6 @@ const styles = StyleSheet.create({
   eventTabSelected: { backgroundColor: COLORS.primarySoft },
   countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
   eventPaymentStrip: { marginTop: 10, backgroundColor: COLORS.primarySoft, borderRadius: 12, padding: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  packagePaymentSummary: { marginTop: 8, gap: 6 },
   vendorSheetBackdrop: { flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' },
   vendorSheet: { maxHeight: '75%', backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 18, paddingBottom: 30 },
   vendorGroup: { marginTop: 10, padding: 10, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: COLORS.border },
