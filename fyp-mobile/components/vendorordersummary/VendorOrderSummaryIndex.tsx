@@ -1,6 +1,6 @@
 import VendorScheduleProposal from '../booking/VendorScheduleProposal';
 import { displayBookingMoney, getVendorBookingSummary } from '@/utils/vendorBookingAmounts';
-import { bookingTimeZone, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
+import { bookingTimeZone, formatBookingDate, formatBookingTime, formatCalendarDate } from '@/utils/bookingTimezone';
 import { pricingLabel } from '@/utils/packagePricing';
 import { usePullToRefresh } from "@/components/refresh/usePullToRefresh";
 import type { ComponentRef } from 'react';
@@ -28,7 +28,7 @@ import { getUserData, saveSecureData } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, FlatList, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, FlatList, KeyboardAvoidingView, Linking, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import BottomNavigationFinal from "../dashboard/BottomNavigationFinal";
 
 // Order interface
@@ -42,6 +42,19 @@ interface Order {
     status: "Pending" | "Processing" | "Confirmed" | "Completed";
 }
 
+const titleCase = (value: string) => value.toLowerCase().replace(/_/g, ' ')
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+
+const timeUntilCompletion = (time: number) => {
+    const minutes = Math.max(1, Math.ceil((time - Date.now()) / 60000));
+    const hours = Math.floor(minutes / 60);
+    return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+};
+
+const openOrderLink = (url: string) => {
+    void Linking.openURL(url).catch(() => Alert.alert('Unable to open link'));
+};
+
 const { width } = Dimensions.get('window');
 
 // Same theme as MyEventsScreen
@@ -51,7 +64,7 @@ const ACCENT = "#B84B9A";
 
 const getCardColor = (label: string) => {
     switch (label) {
-        case "Orders":
+        case "All":
             return "#C79AE8";
         case "Pending":
             return "#E8A23A"; // amber - order placed, not yet confirmed
@@ -144,6 +157,10 @@ const OrderSummary = () => {
     const [fullyPaidOrders, setFullyPaidOrders] = useState<any[]>([]);
     const [completionTick, setCompletionTick] = useState(0);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
+    const [expandedSchedule, setExpandedSchedule] = useState<string | null>(null);
+    const [expandedPackage, setExpandedPackage] = useState<string | null>(null);
+    const [orderOptions, setOrderOptions] = useState<{ id: string; packages: any[] } | null>(null);
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [respondingRequestId, setRespondingRequestId] = useState<string | null>(null);
     const [isRefreshingScreen, setIsRefreshingScreen] = useState(false);
@@ -168,7 +185,7 @@ const OrderSummary = () => {
             .map(getVendorCompletionTime)
             .reduce<number>((earliest, time) => time !== null && time > now ? Math.min(earliest, time) : earliest, Infinity);
         if (!Number.isFinite(next)) return;
-        const timer = setTimeout(() => setCompletionTick(value => value + 1), Math.min(next - now, 2_147_483_647));
+        const timer = setTimeout(() => setCompletionTick(value => value + 1), Math.min(next - now, 60_000));
         return () => clearTimeout(timer);
     }, [orders, completionTick]);
 
@@ -599,12 +616,12 @@ const OrderSummary = () => {
                     </TouchableOpacity>
                 </View>
 
-                <BookingUserGuide kind="vendorOrders" primary={PRIMARY} />
+                <View style={styles.guideInset}><BookingUserGuide kind="vendorOrders" primary={PRIMARY} /></View>
                                 {/* Order Status Summary */}
                 <ScrollView
                     ref={summaryScrollRef}
                     horizontal
-                    showsHorizontalScrollIndicator={false}
+                    showsHorizontalScrollIndicator
                     style={styles.summaryScroll}
                     contentContainerStyle={styles.summaryContainer}
                 >
@@ -613,7 +630,7 @@ const OrderSummary = () => {
                         activeOpacity={0.7}
                     >
                         <SummaryCard
-                            label="Orders"
+                            label="All"
                             value={orderStats.totalOrders}
                             icon="cart-outline"
                             isActive={selectedFilter === "All"}
@@ -745,7 +762,7 @@ const OrderSummary = () => {
                     renderItem={({ item }) => {
                         const isExpanded = expandedOrderId === item._id;
                         const scheduleHold = rescheduleHoldReason(item);
-                        const services = Array.isArray(item.vendorOrders) ? item.vendorOrders : [];
+                        const services: any[] = Array.isArray(item.vendorOrders) ? item.vendorOrders : [];
                         const requestGroups = new Map<string, any[]>();
                         for (const request of rescheduleRequests) {
                             if (String(request.orderId) !== String(item._id)) continue;
@@ -756,12 +773,12 @@ const OrderSummary = () => {
                         }
                         const zone = bookingTimeZone(item);
                         const slotLabel = (start?: string, end?: string) => {
-                            if (!start) return 'Unavailable';
+                            if (!start || !Number.isFinite(new Date(start).getTime())) return 'Unavailable';
                             const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: zone });
                             const timeFormat = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: zone });
                             const startDate = new Date(start);
                             const startLabel = `${dateFormat.format(startDate)} · ${timeFormat.format(startDate)}`;
-                            if (!end) return startLabel;
+                            if (!end || !Number.isFinite(new Date(end).getTime())) return startLabel;
                             const endDate = new Date(end);
                             const endLabel = dateFormat.format(startDate) === dateFormat.format(endDate)
                                 ? timeFormat.format(endDate)
@@ -777,117 +794,72 @@ const OrderSummary = () => {
                             booking.laterTimeRequest?.status !== 'PENDING' && new Date(booking.eventStartDateTime).getTime() > Date.now());
                         const acceptanceDisabled = !!scheduleHold || proposalBooking?.vendorScheduleProposal?.status === 'PENDING'
                             || pending.some((booking: any) => isAcceptanceDisabled(booking, lateAcceptanceId));
-                        const statusCounts = new Map<string, number>();
-                        for (const booking of services) {
-                            const status = String(booking.status || 'pending');
-                            statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
-                        }
-                        const { amounts, original, discount, bookingTotal, earnings, platformFee, discountLabel, totalPaid, totalRemaining } =
-                            getVendorBookingSummary(services, item);
+                        const status = getVendorStatus(item);
+                        const closed = isClosedVendorStatus(status) || status === 'cancelled';
+                        const orderStatusLabel = status === EXPIRED_STATUS ? 'Request Expired' : titleCase(status);
+                        const { amounts, original, discount, bookingTotal, platformFee, earnings, totalPaid, totalRemaining } = getVendorBookingSummary(services, item);
+                        const cancellablePackages = services.filter((booking: any) =>
+                            ['pending', 'accepted'].includes(booking.status) && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED');
+                        const nextCompletion = services
+                            .filter((booking: any) => booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')
+                            .map(getVendorCompletionTime)
+                            .reduce<number>((next, time) => time !== null && time > Date.now() ? Math.min(next, time) : next, Infinity);
+                        const organizer = item.organizerId;
+                        const city = item.eventCityId?.name || item.eventCity?.name || item.city?.name || (typeof item.city === 'string' ? item.city : '');
+                        const schedule = item.eventStartDateTime
+                            ? slotLabel(item.eventStartDateTime, item.eventEndDateTime)
+                            : formatCalendarDate(item.eventDate);
+                        const eventDay = item.eventStartDateTime ? formatBookingDate(item.eventStartDateTime, zone) : formatCalendarDate(item.eventDate);
+                        const dayParts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' })
+                            .formatToParts(new Date());
+                        const dayNumber = (type: string) => Number(dayParts.find(part => part.type === type)?.value);
+                        const tomorrow = new Date(Date.UTC(dayNumber('year'), dayNumber('month') - 1, dayNumber('day') + 1));
+                        const isTomorrow = eventDay === formatCalendarDate(tomorrow);
+                        const historyOpen = expandedHistory === item._id;
+
                         return (
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                onPress={() => toggleExpand(item._id)}
-                                style={styles.orderCard}
-                            >
-                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(getVendorStatus(item)) }]} />
+                            <View style={styles.orderCard}>
+                                <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(status) }]} />
                                 <View style={styles.orderInfo}>
                                     <View style={styles.orderCardHeader}>
-                                        <View style={styles.eventIconWrap}>
-                                            <Ionicons name="calendar" size={18} color={PRIMARY} />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.eventTitle} numberOfLines={1}>{item.eventName}</Text>
-                                            <Text style={styles.orderName}>{item.organizerId?.name}</Text>
-                                        </View>
-                                        <View style={styles.statusBadge}>
-                                            <Text style={styles.statusBadgeText}>{getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
-                                        </View>
-                                        <Ionicons
-                                            name={isExpanded ? "chevron-up" : "chevron-down"}
-                                            size={18}
-                                            color="#8A8A8A"
-                                            style={{ marginLeft: 8 }}
-                                        />
+                                        <TouchableOpacity style={[styles.detailRow, { flex: 1 }]} activeOpacity={0.85}
+                                            accessibilityRole="button" accessibilityState={{ expanded: isExpanded }}
+                                            onPress={() => toggleExpand(item._id)}>
+                                            <View style={styles.eventIconWrap}><Ionicons name="calendar" size={18} color={PRIMARY} /></View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.eventTitle}>{item.eventName}</Text>
+                                                {!isExpanded && <Text style={styles.orderName}>
+                                                    {[organizer?.name, item.guests != null ? `${item.guests} guests` : ''].filter(Boolean).join(' · ')}
+                                                </Text>}
+                                            </View>
+                                            <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{orderStatusLabel}</Text></View>
+                                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={PRIMARY} />
+                                        </TouchableOpacity>
+                                        {!closed && cancellablePackages.length > 0 && <TouchableOpacity style={styles.iconAction} accessibilityRole="button"
+                                            accessibilityLabel="Order options" onPress={() => setOrderOptions({ id: item._id, packages: cancellablePackages })}>
+                                            <Ionicons name="ellipsis-horizontal" size={19} color={PRIMARY} />
+                                        </TouchableOpacity>}
                                     </View>
-
-                                    {services.length > 1 && (
-                                        <Text style={styles.detailText}>{Array.from(statusCounts, ([status, count]) => `${count} ${status.replace(/_/g, ' ')}`).join(' · ')}</Text>
-                                    )}
-                                    {fullyPaidOrders.some(order => order._id === item._id) && (
-                                        <View style={styles.paidInFullBadge}>
-                                            <Text style={styles.paidInFullText}>Paid in Full</Text>
-                                        </View>
-                                    )}
-                                    <BookingActivity bookings={services} timeZone={bookingTimeZone(item)} cancellationDetailsVisible />
                                     <View style={styles.detailsBlock}>
                                         <View style={styles.detailRow}>
-                                            <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>{formatCalendarDate(item.eventDate)}</Text>
+                                            <Ionicons name="calendar-outline" size={15} color={PRIMARY} />
+                                            <Text style={[styles.detailText, { flex: 1 }]}>{schedule}{!isExpanded && isTomorrow ? ' · Tomorrow' : ''}</Text>
                                         </View>
-                                        <View style={styles.detailRow}>
-                                            <Ionicons name="pricetags-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText} numberOfLines={isExpanded ? undefined : 1}>
-                                                {item.vendorOrders?.map((o: any) => o.serviceName).join(", ")}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.detailRow}>
-                                            <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                            <Text style={styles.detailText}>
-                                                Total for {services.length} {services.length === 1 ? "package" : "packages"} · {displayBookingMoney(bookingTotal, item)}
-                                                {discount > 0 && <Text style={styles.originalBookingPrice}>  {displayBookingMoney(original, item)}</Text>}
-                                            </Text>
-                                            {discount > 0 && <Text style={styles.bookingDiscountBadge}>{discountLabel}</Text>}
-                                        </View>
-
-                                        {(item.vendorOrders || []).map((booking: any) => (
-                                            <BookingCancellationDetails key={booking._id} booking={booking} timeZone={bookingTimeZone(item)} audience="vendor" refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
-                                        ))}
-
-                                        {/* Expanded order details - shown only when the card is tapped */}
-                                        {isExpanded && (
-                                            <View style={styles.expandedBlock}>
-                                                {/* Order ID - highlighted, always first */}
-                                                <View style={styles.orderIdBadge}>
-                                                    <Ionicons name="receipt-outline" size={14} color={PRIMARY} />
-                                                    <Text style={styles.orderIdText}>Order ID: {item._id}</Text>
-                                                </View>
-
-                                                {/* Event Details */}
-                                                <Text style={styles.expandedSubTitle}>Event Details</Text>
-                                                {!!item.eventName && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="calendar-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Event Name: {item.eventName}</Text>
-                                                    </View>
-                                                )}
-                                                {!!item.eventType && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="pricetag-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Event Type: {item.eventType}</Text>
-                                                    </View>
-                                                )}
-                                                {!!item.eventDate && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="calendar-number-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Date: {formatCalendarDate(item.eventDate)}</Text>
-                                                    </View>
-                                                )}
-                                                {!!item.guests && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="people-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Guests: {item.guests}</Text>
-                                                    </View>
-                                                )}
-
-                                                {!!(item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city) && (
-                                                    <View style={styles.detailRow}><Ionicons name="location-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>City: {item?.eventCityId?.name || item?.eventCity?.name || item?.city?.name || item?.city}</Text></View>
-                                                )}
-                                                <Text style={[styles.detailText, { fontSize: 11 }]}>Times shown in {bookingTimeZone(item).replace(/_/g, ' ')}</Text>
-                                                {!!item?.eventStartDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Start Time: {formatBookingTime(item.eventStartDateTime, bookingTimeZone(item))}</Text></View>}
-                                                {!!item?.eventEndDateTime && <View style={styles.detailRow}><Ionicons name="time-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>End Time: {formatBookingTime(item.eventEndDateTime, bookingTimeZone(item))}</Text></View>}
-                                                {!!item?.eventAddress && <View style={styles.detailRow}><Ionicons name="navigate-outline" size={14} color="#8A8A8A" /><Text style={styles.detailText}>Event Address: {item.eventAddress}</Text></View>}
-
+                                        {isExpanded && <>
+                                            <Text style={styles.detailText}>{[city, item.guests != null ? `${item.guests} guests` : '', item.eventType].filter(Boolean).join(' · ')}</Text>
+                                            {!!item.eventAddress && <TouchableOpacity style={styles.detailRow} accessibilityRole="link"
+                                                onPress={() => openOrderLink('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([item.eventAddress, city].filter(Boolean).join(', ')))}>
+                                                <Ionicons name="location-outline" size={16} color={PRIMARY} />
+                                                <Text style={[styles.detailText, styles.linkText]}>{item.eventAddress}</Text>
+                                            </TouchableOpacity>}
+                                        </>}
+                                        {!isExpanded && <>
+                                            <Text style={styles.detailText}>{services.length} {services.length === 1 ? 'package' : 'packages'} · {displayBookingMoney(bookingTotal, item)}</Text>
+                                            <Text style={styles.moneyLine}>Received {displayBookingMoney(totalPaid, item)} · Pending {displayBookingMoney(totalRemaining, item)}</Text>
+                                            {Number.isFinite(nextCompletion) && <Text style={styles.detailText}>Next completion · {formatBookingActivityTime(new Date(nextCompletion).toISOString(), zone)}</Text>}
+                                        </>}
+                                    </View>
+                                    {isExpanded && <>
                                                 {getVendorStatus(item) === "no_longer_assigned" && (() => {
                                                     const service = (item.vendorOrders || []).find((vo: any) => vo.replacementOutcome === "NO_LONGER_ASSIGNED");
                                                     const request = rescheduleRequests.find((r: any) =>
@@ -920,11 +892,24 @@ const OrderSummary = () => {
                                                         const request = actionable ?? group[0];
                                                         if (!actionable && group.every(row => services.some((booking: any) => String(booking._id) === String(row.vendorOrderId) && booking.laterTimeRequest?.clientAcceptedSuggestion))) return null;
                                                         const busy = respondingRequestId === request._id;
+                                                        const applied = group.every(row => row.resolutionStatus === 'APPLIED');
+                                                        const showDetails = expandedSchedule === key;
                                                         return (
                                                             <View key={key} style={styles.rescheduleCard}>
+                                                                {!actionable && <TouchableOpacity style={styles.detailRow} accessibilityRole="button"
+                                                                    accessibilityState={{ expanded: showDetails }}
+                                                                    onPress={() => setExpandedSchedule(showDetails ? null : key)}>
+                                                                    <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
+                                                                    <Text style={[styles.rescheduleTitle, { flex: 1 }]}>
+                                                                        {applied ? `Date changed ${formatCalendarDate(request.oldEventDate)} → ${formatCalendarDate(request.newEventDate)} · Accepted ✓`
+                                                                            : group.every(row => row.status === 'ACCEPTED') ? 'Schedule accepted · Awaiting update' : 'Schedule change history'}
+                                                                    </Text>
+                                                                    <Ionicons name={showDetails ? 'chevron-up' : 'chevron-down'} size={16} color={PRIMARY} />
+                                                                </TouchableOpacity>}
+                                                                {(actionable || showDetails) && <>
                                                                 <View style={styles.rescheduleHeader}>
                                                                     <Ionicons name="calendar-outline" size={17} color={PRIMARY} />
-                                                                    <Text style={styles.rescheduleTitle}>Review Reschedule Request</Text>
+                                                                    <Text style={styles.rescheduleTitle}>{actionable ? "Review Reschedule Request" : "Schedule change details"}</Text>
                                                                 </View>
                                                                 <Text style={styles.rescheduleLine}>
                                                                     New date: {new Date(request.newEventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
@@ -934,7 +919,6 @@ const OrderSummary = () => {
                                                                 </Text>
                                                                 <Text style={styles.rescheduleReason}>Reason: {request.reason || 'Not provided'}</Text>
                                                                 <Text style={styles.rescheduleLine}>Request sent: {formatBookingActivityTime(request.createdAt, bookingTimeZone(item))}</Text>
-                                                                <Text style={styles.rescheduleReason}>Times shown in {bookingTimeZone(item)}</Text>
                                                                 <Text style={styles.rescheduleTitle}>Affected packages ({group.length})</Text>
                                                                 {group.map(row => {
                                                                     const booking = services.find((service: any) => String(service._id) === String(row.vendorOrderId));
@@ -970,94 +954,119 @@ const OrderSummary = () => {
                                                                         </TouchableOpacity>
                                                                     </View>
                                                                 )}
+                                                                </>}
                                                             </View>
                                                         );
                                                     })}
 
-                                                {/* Organizer Details */}
-                                                {item.vendorOrders?.some((v:any)=>v.paymentVerificationOverdue) && (
-                                                    <Text style={{color:'#9B2335',paddingVertical:10}}>Payment verification overdue — service not secured. Awaiting Admin review.</Text>
-                                                )}
-                                                <Text style={styles.expandedSubTitle}>Organizer Details</Text>
-                                                {!!item.organizerId?.name && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="person-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Name: {item.organizerId.name}</Text>
-                                                    </View>
-                                                )}
-                                                {!!item.organizerId?.email && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="mail-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Email: {item.organizerId.email}</Text>
-                                                    </View>
-                                                )}
-                                                {!!item.organizerId?.phone && (
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="call-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Phone: {item.organizerId.phone}</Text>
-                                                    </View>
-                                                )}
 
-                                                {/* Services */}
-                                                {Array.isArray(item.vendorOrders) && item.vendorOrders.length > 0 && (
-                                                    <>
-                                                        <Text style={styles.expandedSubTitle}>Services</Text>
-                                                        {item.vendorOrders.map((service: any, idx: number) => {
-                                                            const vendorPackages = Array.isArray(service?.vendorId?.packages) ? service.vendorId.packages : [];
-                                                            const selectedPackage = vendorPackages.find((pkg: any) => String(pkg?._id || pkg?.id) === String(service?.packageId || ""));
-                                                            const { total, paid, remaining } = amounts[idx];
-                                                            return (
-                                                              <View key={service?._id || idx} style={styles.serviceDetailCard}>
-                                                                <Text style={styles.serviceDetailTitle}>{service?.serviceName || "Service"}</Text>
-                                                                <Text style={styles.serviceDetailText}>Status: {String(service?.status || "pending").replace(/_/g, " ")}</Text>
-                                                                {service.quantity != null && <Text style={styles.serviceDetailText}>Quantity: {service.quantity}</Text>}
-                        {service.pricingMethod && <Text style={styles.serviceDetailText}>Pricing: {pricingLabel(service)}</Text>}
-                        {service.personCount != null && <Text style={styles.serviceDetailText}>People: {service.personCount}</Text>}
-                        {service.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included: {Number(service.groupSize) * Number(service.quantity || 1)}</Text>}
-                                                                {service.delivery ? <DeliveryDetails pkg={service} timeZone={bookingTimeZone(item)} /> : <><Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment Start Time' : 'Start Time'}: {service?.eventStartDateTime ? formatBookingTime(service.eventStartDateTime, bookingTimeZone(item)) : "Not provided"}</Text>
-                                                                <Text style={styles.serviceDetailText}>{String(selectedPackage?.bookingType || service?.bookingType || '').toUpperCase() === 'TIME_SLOT_BASED' ? 'Appointment End Time' : 'End Time'}: {service?.eventEndDateTime ? formatBookingTime(service.eventEndDateTime, bookingTimeZone(item)) : "Not provided"}</Text></>}
-                                                                <Text style={styles.serviceDetailText}>Booking Amount: {displayBookingMoney(total, service.currency ? service : item)}</Text>
-                                                                <Text style={styles.serviceDetailText}>Paid: {displayBookingMoney(paid, service.currency ? service : item)}</Text>
-                                                                <Text style={styles.serviceDetailText}>Remaining: {displayBookingMoney(remaining, service.currency ? service : item)}</Text>
-                                                                <Text style={styles.serviceDetailText}>Payment Status: {String(service?.paymentStatus || "UNPAID").replace(/_/g, " ")}</Text>
-                                                              </View>
-                                                            );
-                                                        })}
-                                                    </>
-                                                )}
-                                                <View style={styles.serviceDetailCard}>
-                                                    {/* Package totals */}
-                                                    <Text style={styles.expandedSubTitle}>Package totals</Text>
-                                                    {discount > 0 && (
-                                                        <Text style={styles.detailText}>Original price: {displayBookingMoney(original, item)}</Text>
-                                                    )}
-                                                    {services.map((service: any, index: number) => amounts[index].discount > 0 && (
-                                                        <Text key={service._id || index} style={styles.detailText}>
-                                                            {service.promotionCode ? `Discount (${service.promotionCode})` : "Discount"}: −{displayBookingMoney(amounts[index].discount, item)}
-                                                        </Text>
-                                                    ))}
-                                                    <Text style={styles.serviceDetailTitle}>Total for {services.length} {services.length === 1 ? "package" : "packages"} · {displayBookingMoney(bookingTotal, item)}</Text>
-                                                    <Text style={styles.detailText}>Total paid: {displayBookingMoney(totalPaid, item)}</Text>
-                                                    <Text style={styles.detailText}>Total remaining: {displayBookingMoney(totalRemaining, item)}</Text>
-                                                    {platformFee > 0 && (
-                                                        <Text style={styles.detailText}>Platform Fee: −{displayBookingMoney(platformFee, item)}</Text>
-                                                    )}
-                                                    <View style={styles.detailRow}>
-                                                        <Ionicons name="cash-outline" size={14} color="#8A8A8A" />
-                                                        <Text style={styles.detailText}>Your Earnings: {displayBookingMoney(earnings, item)}</Text>
-                                                    </View>
-                                                    {!!item.status && (
-                                                        <View style={styles.detailRow}>
-                                                            <Ionicons name="information-circle-outline" size={14} color="#8A8A8A" />
-                                                            <Text style={[styles.detailText, { textTransform: "capitalize" }]}>Status: {getVendorStatus(item) === "no_longer_assigned" ? "No Longer Assigned" : getVendorStatus(item) === PAYMENT_EXPIRED_STATUS ? "Payment Expired" : getVendorStatus(item) === EXPIRED_STATUS ? "Request Expired" : getVendorStatus(item)}</Text>
-                                                        </View>
-                                                    )}
-
-                                                </View>
-                                            </View>
+                                        {services.some((booking: any) => booking.paymentVerificationOverdue) && (
+                                            <Text style={styles.rescheduleWarning}>Payment verification overdue — service not secured. Awaiting Admin review.</Text>
                                         )}
-                                    </View>
-
+                                        {!closed && <View style={styles.bookingActions}>
+                                        {!!scheduleHold && <Text accessibilityRole="alert" style={styles.rescheduleReason}>{scheduleHold}</Text>}
+                                        {pending.length > 0 && (
+                                            <TouchableOpacity
+                                                disabled={acceptanceDisabled}
+                                                style={[styles.completeButton, acceptanceDisabled && styles.disabledAction]}
+                                                onPress={() => pending.length === 1
+                                                    ? mark(item._id, pending[0]._id, "confirmed")
+                                                    : confirmAcceptPackages(item, pending)}
+                                            >
+                                                <Ionicons name="checkmark-outline" size={14} color="#fff" />
+                                                <Text style={styles.buttonText}>{pending.length === 1 ? 'Accept Package' : 'Accept All Pending Packages'}</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                        </View>}
+                                        {!!services.length && <Text style={styles.expandedSubTitle}>Packages</Text>}
+                                        {services.map((booking: any, index: number) => {
+                                            const { total, paid, remaining } = amounts[index];
+                                            const moneyContext = booking.currency ? booking : item;
+                                            const packageKey = String(booking._id || index);
+                                            const detailsOpen = expandedPackage === packageKey;
+                                            const completionTime = getVendorCompletionTime(booking);
+                                            const canComplete = canCompleteVendorBooking(booking);
+                                            const showCompletion = !closed && booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED';
+                                            const paymentLabel = String(booking.paymentStatus || 'UNPAID');
+                                            return (
+                                                <View key={packageKey} style={styles.serviceDetailCard}>
+                                                    <TouchableOpacity style={styles.detailRow} accessibilityRole="button" accessibilityState={{ expanded: detailsOpen }}
+                                                        onPress={() => setExpandedPackage(detailsOpen ? null : packageKey)}>
+                                                        <Text style={[styles.serviceDetailTitle, { flex: 1 }]}>{booking.serviceName || 'Package'}</Text>
+                                                        <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{titleCase(String(booking.status || 'pending'))}</Text></View>
+                                                        <Ionicons name={detailsOpen ? 'chevron-up' : 'chevron-down'} size={15} color={PRIMARY} />
+                                                    </TouchableOpacity>
+                                                    {booking.delivery ? <DeliveryDetails pkg={booking} timeZone={zone} /> : (
+                                                        <Text style={styles.serviceDetailText}>
+                                                            {booking.personCount != null ? `${booking.personCount} people · ` : ''}
+                                                            {booking.eventStartDateTime && formatBookingDate(booking.eventStartDateTime, zone) === eventDay &&
+                                                                (!booking.eventEndDateTime || formatBookingDate(booking.eventEndDateTime, zone) === eventDay)
+                                                                ? [formatBookingTime(booking.eventStartDateTime, zone), booking.eventEndDateTime && formatBookingTime(booking.eventEndDateTime, zone)].filter(Boolean).join(' – ')
+                                                                : slotLabel(booking.eventStartDateTime, booking.eventEndDateTime)}
+                                                        </Text>
+                                                    )}
+                                                    {detailsOpen && <View style={styles.packageDetails}>
+                                                        {booking.quantity != null && <Text style={styles.serviceDetailText}>Quantity · {booking.quantity}</Text>}
+                                                        {!!booking.pricingMethod && <Text style={styles.serviceDetailText}>Pricing · {pricingLabel(booking)}</Text>}
+                                                        {booking.pricingMethod === 'GROUP' && <Text style={styles.serviceDetailText}>People included · {Number(booking.groupSize) * Number(booking.quantity || 1)}</Text>}
+                                                    </View>}
+                                                    <View style={styles.detailRow}>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={styles.moneyLine}>{displayBookingMoney(total, moneyContext)}</Text>
+                                                            {amounts[index].discount > 0 && <Text style={styles.serviceDetailText}>
+                                                                {booking.promotionCode ? `Discount (${booking.promotionCode})` : 'Discount'} · −{displayBookingMoney(amounts[index].discount, moneyContext)}
+                                                            </Text>}
+                                                        </View>
+                                                        <View style={styles.statusBadge}><Text style={styles.statusBadgeText}>{paymentLabel === 'PARTIALLY_PAID' ? 'Partially paid' : titleCase(paymentLabel)}</Text></View>
+                                                    </View>
+                                                    <View style={styles.paymentTrack}>
+                                                        <View style={[styles.paymentFill, { width: `${total > 0 ? Math.max(0, Math.min(100, paid / total * 100)) : 0}%` }]} />
+                                                    </View>
+                                                    <Text style={styles.serviceDetailText}>Paid {displayBookingMoney(paid, moneyContext)} · Left {displayBookingMoney(remaining, moneyContext)}</Text>
+                                                    {showCompletion && (canComplete ? (
+                                                        <TouchableOpacity accessibilityRole="button" disabled={completingBookingId !== null}
+                                                            accessibilityState={{ disabled: completingBookingId !== null, busy: completingBookingId === booking._id }}
+                                                            style={[styles.completeButton, styles.finishButton, completingBookingId !== null && styles.disabledAction]}
+                                                            onPress={() => confirmCompletion(item._id, booking)}>
+                                                            <Ionicons name="checkmark-outline" size={16} color="#fff" />
+                                                            <Text style={styles.buttonText}>{completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}</Text>
+                                                        </TouchableOpacity>
+                                                    ) : <View style={styles.detailRow}>
+                                                        <Ionicons name="lock-closed-outline" size={14} color={PRIMARY} />
+                                                        <Text style={styles.completionHint}>{completionTime === null ? 'Scheduled service time unavailable.'
+                                                            : completionTime > Date.now() ? `Unlocks in ${timeUntilCompletion(completionTime)}`
+                                                            : 'Completion unlocks once payment is secured.'}</Text>
+                                                    </View>)}
+                                                    <BookingCancellationDetails booking={booking} timeZone={zone} audience="vendor"
+                                                        refundState={{ record: refunds[String(booking._id)], loading: refundLoading, error: refundError }} />
+                                                </View>
+                                            );
+                                        })}
+                                        <View style={styles.detailsBlock}>
+                                            <Text style={styles.moneyLine}>Total {displayBookingMoney(bookingTotal, item)} · Received {displayBookingMoney(totalPaid, item)} · Pending {displayBookingMoney(totalRemaining, item)}</Text>
+                                            {discount > 0 && <Text style={styles.detailText}>Original price {displayBookingMoney(original, item)}</Text>}
+                                            {platformFee > 0 && <Text style={styles.detailText}>Platform fee {displayBookingMoney(platformFee, item)} · Net booking value {displayBookingMoney(earnings, item)}</Text>}
+                                        </View>
+                                        <View style={styles.serviceDetailCard}>
+                                            <Text style={styles.serviceDetailTitle}>Organizer</Text>
+                                            {!!organizer?.name && <Text style={styles.detailText}>{organizer.name}</Text>}
+                                            <View style={styles.contactRow}>
+                                                {!!organizer?.phone && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Call organizer"
+                                                    style={styles.iconAction} onPress={() => openOrderLink(`tel:${String(organizer.phone).replace(/[^+\d]/g, '')}`)}>
+                                                    <Ionicons name="call-outline" size={20} color={PRIMARY} />
+                                                </TouchableOpacity>}
+                                                {!!organizer?.email && <TouchableOpacity accessibilityRole="link" accessibilityLabel="Email organizer"
+                                                    style={styles.iconAction} onPress={() => openOrderLink(`mailto:${encodeURIComponent(organizer.email)}`)}>
+                                                    <Ionicons name="mail-outline" size={20} color={PRIMARY} />
+                                                </TouchableOpacity>}
+                                                {!closed && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Message organizer"
+                                                    style={styles.iconAction} onPress={() => handleMessageButtonClick(organizer, undefined, zone)}>
+                                                    <Ionicons name="chatbubble-ellipses-outline" size={20} color={PRIMARY} />
+                                                </TouchableOpacity>}
+                                            </View>
+                                        </View>
+                                    </>}
+                                    {isExpanded && <>
                                     {!!(proposalBooking || proposalAnchor) && (
                                         <VendorScheduleProposal
                                             key={proposalBooking?.vendorScheduleProposal?.id || proposalAnchor._id}
@@ -1097,49 +1106,6 @@ const OrderSummary = () => {
                                         </View>
                                     ) : (
                                     <View style={styles.bookingActions}>
-                                        {!!scheduleHold && <Text accessibilityRole="alert" style={styles.rescheduleReason}>{scheduleHold}</Text>}
-                                        {pending.length > 0 && (
-                                            <TouchableOpacity
-                                                disabled={acceptanceDisabled}
-                                                style={[styles.completeButton, acceptanceDisabled && styles.disabledAction]}
-                                                onPress={() => pending.length === 1
-                                                    ? mark(item._id, pending[0]._id, "confirmed")
-                                                    : confirmAcceptPackages(item, pending)}
-                                            >
-                                                <Ionicons name="checkmark-outline" size={14} color="#fff" />
-                                                <Text style={styles.buttonText}>{pending.length === 1 ? 'Accept Package' : 'Accept All Pending Packages'}</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                        {services
-                                                .filter((booking: any) => booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED')
-                                                .map((booking: any) => {
-                                                    const canComplete = canCompleteVendorBooking(booking);
-                                                    const time = getVendorCompletionTime(booking);
-                                                    const hint = time === null
-                                                        ? 'Scheduled service time unavailable.'
-                                                        : time > Date.now()
-                                                            ? `Button unlocks at ${formatBookingActivityTime(new Date(time).toISOString(), bookingTimeZone(item))}.`
-                                                            : 'Button unlocks once payment is secured.';
-                                                    return (
-                                                        <View key={booking._id} style={styles.completionAction}>
-                                                            {(item.vendorOrders || []).length > 1 && <Text style={styles.detailText}>{booking.serviceName}</Text>}
-                                                            <TouchableOpacity
-                                                                accessibilityRole="button"
-                                                                disabled={!canComplete || completingBookingId !== null}
-                                                                accessibilityState={{ disabled: !canComplete || completingBookingId !== null, busy: completingBookingId === booking._id }}
-                                                                style={[styles.completeButton, styles.finishButton, (!canComplete || completingBookingId !== null) && styles.disabledAction]}
-                                                                onPress={() => confirmCompletion(item._id, booking)}
-                                                            >
-                                                                <Ionicons name="checkmark-outline" size={16} color={canComplete && completingBookingId === null ? "#fff" : "#626262"} />
-                                                                <Text style={[styles.buttonText, (!canComplete || completingBookingId !== null) && styles.disabledActionText]}>
-                                                                    {completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}
-                                                                </Text>
-                                                            </TouchableOpacity>
-                                                            {!canComplete && <Text style={styles.completionHint}>{hint}</Text>}
-                                                        </View>
-                                                    );
-                                                })}
-
                                         {getVendorStatus(item) !== "cancelled" && (
                                             <View style={styles.actionButtons}>
                                                 <TouchableOpacity
@@ -1150,26 +1116,50 @@ const OrderSummary = () => {
                                                     <Ionicons name="chatbubble-ellipses-outline" size={16} color={PRIMARY} />
                                                     <Text style={styles.messageButtonText}>Message</Text>
                                                 </TouchableOpacity>
-                                                {getVendorStatus(item) !== "completed" && (
-                                                    <TouchableOpacity
-                                                        accessibilityRole="button"
-                                                        style={styles.deleteButton}
-                                                        onPress={() => handleDelete(item._id, item.vendorOrders?.[0]?._id)}
-                                                    >
-                                                        <Ionicons name="close-circle-outline" size={16} color="#fff" />
-                                                        <Text style={styles.deleteButtonText}>Cancel Order</Text>
-                                                    </TouchableOpacity>
-                                                )}
                                             </View>
                                         )}
                                     </View>
                                     )}
+                                        <TouchableOpacity style={styles.historyToggle} accessibilityRole="button" accessibilityState={{ expanded: historyOpen }}
+                                            onPress={() => setExpandedHistory(historyOpen ? null : item._id)}>
+                                            <Text style={styles.serviceDetailTitle}>History</Text>
+                                            <Ionicons name={historyOpen ? 'chevron-up' : 'chevron-down'} size={16} color={PRIMARY} />
+                                        </TouchableOpacity>
+                                        {historyOpen && <>
+                                            <Text style={styles.orderIdText}>Order ID: {item._id}</Text>
+                                            <BookingActivity bookings={services} timeZone={zone} cancellationDetailsVisible hideTimeZone />
+                                            <Text style={styles.serviceDetailText}>Times shown in {zone.replace(/_/g, ' ')}</Text>
+                                        </>}
+                                    </>}
                                 </View>
-                            </TouchableOpacity>
+                            </View>
                         );
                     }}
                 />
             </View>
+            <Modal visible={!!orderOptions} transparent animationType="fade" onRequestClose={() => setOrderOptions(null)}>
+                <View style={styles.cancellationOverlay}>
+                    <View style={styles.cancellationPanel} accessibilityViewIsModal>
+                        <Text style={styles.cancellationTitle}>{orderOptions?.packages.length === 1 ? 'Cancel booking' : 'Choose a package to cancel'}</Text>
+                        <ScrollView style={styles.optionsList}>
+                            {orderOptions?.packages.map(booking => (
+                                <TouchableOpacity key={booking._id} style={styles.historyToggle} accessibilityRole="button"
+                                    onPress={() => {
+                                        const orderId = orderOptions.id;
+                                        setOrderOptions(null);
+                                        void handleDelete(orderId, booking._id);
+                                    }}>
+                                    <Text style={styles.rescheduleWarning}>{booking.serviceName || 'Package'}</Text>
+                                    <Ionicons name="chevron-forward" size={16} color={PRIMARY} />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <TouchableOpacity style={styles.cancellationKeep} onPress={() => setOrderOptions(null)}>
+                            <Text style={styles.messageButtonText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
             <Modal visible={!!cancellation} transparent animationType="slide" onRequestClose={() => { if (!cancellationLock.current) setCancellation(null); }}>
                 <KeyboardAvoidingView style={styles.cancellationOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
                     <View style={styles.cancellationPanel}>
@@ -1203,39 +1193,33 @@ const OrderSummary = () => {
     );
 };
 
-const SummaryCard = ({
-    label,
-    value,
-    icon,
-    isActive = false
-}: {
-    label: string,
-    value: number,
-    icon: keyof typeof Ionicons.glyphMap,
-    isActive?: boolean
+const SummaryCard = ({ label, value, icon, isActive = false }: {
+    label: string;
+    value: number;
+    icon: keyof typeof Ionicons.glyphMap;
+    isActive?: boolean;
 }) => (
-    <View
-        style={[
-            styles.summaryCard,
-            {
-                backgroundColor: getCardColor(label),
-                borderColor: getCardColor(label),
-            },
-            isActive && {
-                transform: [{ scale: 1.05 }],
-            },
-        ]}
-    >
-        <View style={styles.summaryIconWrap}>
-            <Ionicons name={icon} size={18} color={isActive ? PRIMARY : "#FFFFFF"} />
-        </View>
-        <Text style={[styles.summaryValue, isActive && styles.summaryValueActive]}>{value}</Text>
-        <Text style={[styles.summaryLabel, isActive && styles.summaryLabelActive]}>{label}</Text>
-        {isActive && <View style={styles.activeIndicator} />}
+    <View style={[styles.filterChip, isActive && styles.filterChipActive]}>
+        <Ionicons name={icon} size={14} color={isActive ? '#FFF' : getCardColor(label)} />
+        <Text style={[styles.filterText, isActive && styles.filterTextActive]}>{label} {value}</Text>
     </View>
 );
 
 const styles = StyleSheet.create({
+    guideInset: { marginRight: 42 },
+    filterChip: { minHeight: 38, marginRight: 7, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF', borderRadius: 20, borderWidth: 1, borderColor: '#EAD7E5' },
+    filterChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+    filterText: { color: PRIMARY, fontSize: 12, fontWeight: '700' },
+    filterTextActive: { color: '#FFF' },
+    iconAction: { minWidth: 38, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    optionsList: { flexGrow: 0, maxHeight: 320, marginVertical: 12 },
+    moneyLine: { color: PRIMARY, fontWeight: '800', fontSize: 13 },
+    linkText: { flex: 1, color: PRIMARY, textDecorationLine: 'underline' },
+    packageDetails: { gap: 4, paddingVertical: 5 },
+    paymentTrack: { height: 6, backgroundColor: '#EBD8E8', borderRadius: 3, overflow: 'hidden', marginVertical: 5 },
+    paymentFill: { height: '100%', backgroundColor: PRIMARY },
+    contactRow: { flexDirection: 'row', gap: 8 },
+    historyToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     cancellationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     cancellationPanel: { width: '100%', maxWidth: 560, maxHeight: '85%', backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20 },
     cancellationTitle: { fontSize: 20, color: PRIMARY, fontWeight: '800' },
@@ -1324,60 +1308,6 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "flex-start",
         paddingHorizontal: 12,
-    },
-    summaryCard: {
-        width: 92,
-        height: 116,
-        paddingVertical: 12,
-        paddingHorizontal: 6,
-        borderRadius: 14,
-        alignItems: "center",
-        justifyContent: "flex-start",
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1.5,
-        borderColor: "#F0DDEA",
-        marginHorizontal: 3,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
-    },
-
-    summaryIconWrap: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: "rgba(255,255,255,0.22)",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 6,
-    },
-    activeIndicator: {
-        position: "absolute",
-        bottom: -1,
-        height: 4,
-        width: "38%",
-        backgroundColor: "#FFF",
-        borderRadius: 5,
-    },
-    summaryValue: {
-        fontSize: 19,
-        fontWeight: "800",
-        color: "#FFFFFF",
-    },
-    summaryValueActive: {
-        color: "#FFFFFF",
-    },
-    summaryLabel: {
-        fontSize: 10,
-        color: "#FFFFFF",
-        fontWeight: "600",
-        marginTop: 2,
-        textAlign: "center",
-    },
-    summaryLabelActive: {
-        color: "rgba(255,255,255,0.85)",
     },
     ordersList: {
         flex: 1,
