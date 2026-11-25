@@ -128,8 +128,8 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'Go to Your Availability and tap Edit availability. Find Maximum bookings at the same time above Working Days.',
         'Use the minus and plus buttons to set your limit. Choose 1 for one booking at a time, or 2 if your team can handle two bookings during the same hours.',
         'Tap Save Availability. The limit applies across all your packages, including multiple packages in the same order.',
-        'The timeline shows green for free, amber for partly booked and red for full. The hours summary and capacity rows show how much time falls into each category. A partly booked window may still accept another booking if the full service window fits.',
-        'Tap the timeline or Show all slots for the free windows. Booked slots group packages from the same order, and capacity rows show how many bookings are in use. Full means no more simultaneous bookings. Over limit highlights capacity already exceeded.',
+        'Green means free and red means a slot has an existing booking. A red slot may still have room under your simultaneous booking limit. The counts show free and booked slots.',
+        'Tap the timeline or Show all slots to see hourly rows for both available and booked times. Booked slots group packages from the same order. An over-limit note appears on the hourly row only when the booking limit is exceeded.',
       ] },
       service, delivery, status, timing,
       { id: 'manage', title: 'Take action in Order Summary', summary: 'Review and respond to the correct vendor booking.', steps: [
