@@ -124,14 +124,6 @@ const COLORS = {
   danger: '#dc3545',
 };
 
-// TODO: replace with your real delete-event API call from services/
-// e.g. import deleteVendorOrder from '@/services/deleteVendorOrder';
-const deleteEventPlaceholder = async (_eventId: string) => {
-  // Simulated network delay so the UI feels real while you wire up the backend call.
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  return { success: true };
-};
-
 const vendorStatusStyleMap: Record<string, { bg: string; text: string; icon: any }> = {
   pending: { bg: '#FFF3CD', text: '#B8860B', icon: 'time-outline' },
   accepted: { bg: '#E7F0FF', text: '#007AFF', icon: 'checkmark-circle-outline' },
@@ -238,7 +230,6 @@ const MyEventsScreen = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [paymentBreakdowns, setPaymentBreakdowns] = useState<Record<string, any>>({});
   const [paymentNow, setPaymentNow] = useState(Date.now());
@@ -449,37 +440,6 @@ const MyEventsScreen = () => {
     fetchData();
   };
 
-  const handleDelete = (eventId: string, eventName: string) => {
-    Alert.alert(
-      'Delete Event',
-      `Are you sure you want to delete "${eventName}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingId(eventId);
-            try {
-              // Replace deleteEventPlaceholder with your real backend call, e.g.:
-              // await deleteVendorOrder(eventId);
-              const res = await deleteEventPlaceholder(eventId);
-              if (res.success) {
-                smoothLayout();
-                setEvents((prev) => prev.filter((e) => e._id !== eventId));
-              }
-            } catch (error) {
-              console.error('Error deleting event:', error);
-              Alert.alert('Error', 'Could not delete this event. Please try again.');
-            } finally {
-              setDeletingId(null);
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const handleMessage = async (vendor: any, historyOnly = false, timeZone = 'UTC') => {
     try {
       const user = await resolveUser();
@@ -558,7 +518,13 @@ const MyEventsScreen = () => {
     setEventTab(end < Date.now() ? 'past' : 'upcoming');
     setPaymentFilter(false);
   }, [targetOrderId, events]);
-  const visibleEvents = eventRows.filter(row => paymentFilter ? row.actions.length > 0 : row.past === (eventTab === 'past'));
+  const eventsByTab = {
+    upcoming: eventRows.filter(row => !row.past),
+    past: eventRows.filter(row => row.past),
+  };
+  const visibleEvents = paymentFilter
+    ? eventRows.filter(row => row.actions.length > 0)
+    : eventsByTab[eventTab];
   const countdown = (deadline: number) =>
     deadline <= paymentNow ? 'Overdue' : `${Math.ceil((deadline - paymentNow) / 3600000)} hrs left`;
   const paidFor = (booking: any) => {
@@ -677,14 +643,15 @@ const MyEventsScreen = () => {
                 <TouchableOpacity key={tab} style={[styles.eventTab, !paymentFilter && eventTab === tab && styles.eventTabSelected]}
                   accessibilityRole="tab" accessibilityState={{ selected: !paymentFilter && eventTab === tab }}
                   onPress={() => { setEventTab(tab); setPaymentFilter(false); }}>
-                  <Text style={styles.totalLabel}>{tab === 'upcoming' ? 'Upcoming' : 'Past'}</Text>
+                  <Text style={[styles.totalLabel, !paymentFilter && eventTab === tab && styles.eventTabSelectedText]}>
+                    {tab === 'upcoming' ? 'Upcoming' : 'Past'} ({eventsByTab[tab].length})
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
             {!visibleEvents.length && <Text style={styles.packageText}>{paymentFilter ? 'No payments due.' : 'No events in this tab.'}</Text>}
             {visibleEvents.map(({ event, groups: vendorGroups, actions }, eventIndex) => {
               const timeZone = bookingTimeZone(event);
-              const isDeleting = deletingId === event._id;
               const eventExpanded = expandedEvents[event._id] ?? paymentFilter;
               const badge = getDateBadge(event.eventDate);
               const allVendorOrders: any[] = Array.isArray(event.vendorOrders)
@@ -715,7 +682,7 @@ const MyEventsScreen = () => {
 
               return (
                 <FadeInUp key={event._id} index={eventIndex}>
-                  <View style={[styles.card, isDeleting && styles.cardDeleting]}>
+                  <View style={styles.card}>
                     {/* ───── Event header ───── */}
                     <View style={styles.cardTopRow}>
                       <TouchableOpacity
@@ -774,8 +741,7 @@ const MyEventsScreen = () => {
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={styles.deleteButton}
-                        disabled={isDeleting}
+                        style={styles.eventOptionsButton}
                         activeOpacity={0.7}
                         accessibilityLabel="Event options"
                         onPress={() => Alert.alert('Event options', undefined, [
@@ -792,14 +758,9 @@ const MyEventsScreen = () => {
                             },
                           }) },
                           { text: 'Close', style: 'cancel' },
-                          { text: 'Delete', style: 'destructive', onPress: () => handleDelete(event._id, event.eventName) },
                         ])}
                       >
-                        {isDeleting ? (
-                          <ActivityIndicator size="small" color={COLORS.danger} />
-                        ) : (
-                          <Ionicons name="ellipsis-horizontal" size={17} color={COLORS.primary} />
-                        )}
+                        <Ionicons name="ellipsis-horizontal" size={17} color={COLORS.primary} />
                       </TouchableOpacity>
                     </View>
 
@@ -1796,7 +1757,8 @@ export default MyEventsScreen;
 const styles = StyleSheet.create({
   eventTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   eventTab: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 12, backgroundColor: '#FFFFFF' },
-  eventTabSelected: { backgroundColor: COLORS.primarySoft },
+  eventTabSelected: { backgroundColor: COLORS.primary },
+  eventTabSelectedText: { color: '#FFFFFF' },
   countdown: { color: COLORS.danger, fontWeight: '700', marginTop: 4 },
   eventPaymentStrip: { marginTop: 10, backgroundColor: COLORS.primarySoft, borderRadius: 12, padding: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   vendorSheetBackdrop: { flex: 1, backgroundColor: '#0006', justifyContent: 'flex-end' },
@@ -2022,9 +1984,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 5 },
   },
-  cardDeleting: {
-    opacity: 0.5,
-  },
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -2101,11 +2060,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
   },
-  deleteButton: {
+  eventOptionsButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#FDEAEC',
+    backgroundColor: COLORS.primarySoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 10,
