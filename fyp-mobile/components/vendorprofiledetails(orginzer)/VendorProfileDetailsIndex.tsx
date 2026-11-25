@@ -13,6 +13,7 @@ import { deliveryFee, deliverySettings } from '@/utils/deliveryBooking';
 import { growthApi } from '@/services/growthApiClient';
 import { formatServiceOffset } from '@/utils/serviceWindowInput';
 import BookingReviewNotice from './BookingReviewNotice';
+import VendorScheduleCalendar from './VendorScheduleCalendar';
 import { reportMarketplaceLoadError } from '@/services/reportMarketplaceLoadError';
 // client side detail section
 // fyp-mobile/components/vendorprofiledetails/VendorProfileDetailsIndex.tsx
@@ -103,45 +104,6 @@ const getTodayDateKey = () => {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-const timeStringToMinutes = (time: string) => {
-  const [h, m] = time.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-};
-
-const minutesToTimeString = (mins: number) => {
-  const h = Math.floor(mins / 60) % 24;
-  const m = mins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-};
-
-const breakIntoHourlySlots = (
-  start: string,
-  end: string,
-  intervalMinutes: number = 60,
-) => {
-  const slots: { start: string; end: string }[] = [];
-
-  let cursor = timeStringToMinutes(start);
-  const endMinutes = timeStringToMinutes(end);
-
-  while (cursor < endMinutes) {
-    const slotEnd = cursor + intervalMinutes;
-
-    if (slotEnd > endMinutes) {
-      break;
-    }
-
-    slots.push({
-      start: minutesToTimeString(cursor),
-      end: minutesToTimeString(slotEnd),
-    });
-
-    cursor = slotEnd;
-  }
-
-  return slots;
 };
 
 const formatEventDate = (
@@ -494,7 +456,7 @@ const phase6AvailablePackageIds = useMemo(() => {
 
     const [activeTab, setActiveTab] =
       useState<
-        'Details' | 'Contact' | 'Packages' | 'Reviews'
+        'Details' | 'Contact' | 'Packages' | 'Reviews' | 'Availability'
       >('Details');
 
     const [isClientView, setIsClientView] = useState(false);
@@ -654,8 +616,6 @@ const [availabilityCheck, setAvailabilityCheck] =
     const [availabilityLoading, setAvailabilityLoading] =
       useState(false);
 
-      const [slotsExpanded, setSlotsExpanded] =
-      useState(false);
 
     const isEventMode =
       bookingMode === 'event' &&
@@ -663,9 +623,6 @@ const [availabilityCheck, setAvailabilityCheck] =
       !!startTime &&
       Number(durationMinutes) > 0;
 
-    const isBrowseMode =
-      bookingMode === 'browse' ||
-      !isEventMode;
 
     const fetchVendorAvailability = async () => {
       if (!vendorData?._id) {
@@ -903,83 +860,6 @@ useEffect(() => {
 
   loadCities();
 }, []);
-
-  type TodayAvailabilitySummary = {
-  day: string;
-  rangeStart: string;
-  rangeEnd: string;
-  hourlySlots: { start: string; end: string }[];
-};
-
-const getTodayVendorSlots = (
-  availability: VendorAvailabilityResponse | null,
-): TodayAvailabilitySummary | null => {
-  if (!availability) {
-    return null;
-  }
-
-  const todayKey = getTodayDateKey();
-  const parsedDate = new Date(`${todayKey}T00:00:00`);
-  const dayCode = DAY_CODES[parsedDate.getDay()];
-
-  let windows: { start: string; end: string }[] = [];
-
-  if (
-    Array.isArray(availability.daySlots) &&
-    availability.daySlots.length > 0
-  ) {
-    const dayConfig = availability.daySlots.find(
-      (day) => day.day === dayCode,
-    );
-
-    if (!dayConfig || !dayConfig.enabled) {
-      return null;
-    }
-
-    windows = Array.isArray(dayConfig.slots)
-      ? dayConfig.slots
-      : [];
-  } else if (
-    availability.workingHoursStart &&
-    availability.workingHoursEnd
-  ) {
-    windows = [
-      {
-        start: availability.workingHoursStart,
-        end: availability.workingHoursEnd,
-      },
-    ];
-  } else {
-    return null;
-  }
-
-  if (windows.length === 0) {
-    return null;
-  }
-
-  const hourlySlots = windows.flatMap((window) =>
-    breakIntoHourlySlots(window.start, window.end),
-  );
-
-  if (hourlySlots.length === 0) {
-    return null;
-  }
-
-  const rangeStart = windows[0].start;
-  const rangeEnd = windows[windows.length - 1].end;
-
-  return {
-    day: dayCode,
-    rangeStart,
-    rangeEnd,
-    hourlySlots,
-  };
-};
-
-const todayAvailabilitySummary =
-  getTodayVendorSlots(
-    vendorAvailability,
-  );
 
     const REVIEWS_LIMIT = 20;
 
@@ -2649,7 +2529,7 @@ const serviceCityNamesFromIds =
 
               <View style={styles.heroTabRail}>
                 {(
-                  (isPackageOnlyMode
+                  [...(isPackageOnlyMode
                     ? [
                         {
                           name: 'Packages',
@@ -2693,8 +2573,10 @@ const serviceCityNamesFromIds =
                           icon: 'star-outline',
                           id: 'tab-reviews',
                         },
-                      ]) as {
-                    name: 'Details' | 'Contact' | 'Packages' | 'Reviews';
+                      ]),
+                    ...(!isOwnerView ? [{ name: 'Availability', icon: 'calendar-outline', id: 'tab-availability' }] : []),
+                  ] as {
+                    name: 'Details' | 'Contact' | 'Packages' | 'Reviews' | 'Availability';
                     icon: keyof typeof Ionicons.glyphMap;
                     id: string;
                   }[]
@@ -2733,6 +2615,13 @@ const serviceCityNamesFromIds =
             </View>
           </View>
           {/* ================================================= */}
+          {activeTab === 'Availability' && vendorData?._id && (
+            <VendorScheduleCalendar
+              key={JSON.stringify([vendorData._id, isEventMode ? eventDate : null])}
+              vendorId={String(vendorData._id)}
+              initialDate={isEventMode ? (Array.isArray(eventDate) ? eventDate[0] : eventDate) : undefined}
+            />
+          )}
           {/* DETAILS */}
           {/* ================================================= */}
 
@@ -3846,278 +3735,20 @@ const serviceCityNamesFromIds =
               }
             >
               {/* ================================================= */}
-              {/* NORMAL BROWSE MODE - GENERAL AVAILABILITY */}
-              {/* ================================================= */}
-
-              {isBrowseMode && (
-                <View
-                  style={
-                    styles.generalAvailabilityCard
-                  }
-                >
-                  <View
-                    style={
-                      styles.generalAvailabilityHeader
-                    }
-                  >
-                    <View
-                      style={
-                        styles.generalAvailabilityIcon
-                      }
-                    >
-                      <Ionicons
-                        name="calendar-outline"
-                        size={18}
-                        color={
-                          PRIMARY
-                        }
-                      />
-                    </View>
-
-                    <View
-                      style={{
-                        flex: 1,
-                      }}
-                    >
-                      <Text
-                        style={
-                          styles.generalAvailabilityTitle
-                        }
-                      >
-                        Vendor Availability
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.generalAvailabilitySubtitle
-                        }
-                      >
-                       Today's working slots
-                      </Text>
-                    </View>
-
-                    {availabilityLoading && (
-                      <ActivityIndicator
-                        size="small"
-                        color={
-                          PRIMARY
-                        }
-                      />
-                    )}
+              {!isEventMode && (
+                <View style={styles.bookingNotesBox}>
+                  <View style={styles.bookingNotesHeader}>
+                    <Ionicons name="information-circle-outline" size={17} color={PRIMARY} />
+                    <Text style={styles.bookingNotesTitle}>Booking Notes</Text>
                   </View>
-
-                  <View
-                    style={
-                      styles.availabilityDivider
-                    }
-                  />
-
-                  {availabilityLoading ? (
-                    <View
-                      style={
-                        styles.generalLoadingBox
-                      }
-                    >
-                      <ActivityIndicator
-                        size="small"
-                        color={
-                          PRIMARY
-                        }
-                      />
-
-                      <Text
-                        style={
-                          styles.generalLoadingText
-                        }
-                      >
-                        Loading
-                        availability...
-                      </Text>
-                    </View>
-                  ) : todayAvailabilitySummary ? (
-  <>
-    <Text
-      style={
-        styles.generalSectionLabel
-      }
-    >
-      Today's
-      Slots
-    </Text>
-
-    <TouchableOpacity
-      testID="today-slots-toggle"
-      style={
-        styles.slotSummaryCard
-      }
-      onPress={() =>
-        setSlotsExpanded(
-          (prev) => !prev,
-        )
-      }
-      activeOpacity={0.8}
-    >
-      <View
-        style={
-          styles.slotSummaryDay
-        }
-      >
-        <Text
-          style={
-            styles.weeklySlotDayText
-          }
-        >
-          {
-            todayAvailabilitySummary.day
-          }
-        </Text>
-      </View>
-
-      <View
-        style={
-          styles.slotSummaryTime
-        }
-      >
-        <Ionicons
-          name="time-outline"
-          size={15}
-          color={
-            PRIMARY
-          }
-        />
-
-        <Text
-          style={
-            styles.weeklySlotTimeText
-          }
-        >
-          {formatTimeDisplay(
-            todayAvailabilitySummary.rangeStart,
-          )}{' '}
-          -{' '}
-          {formatTimeDisplay(
-            todayAvailabilitySummary.rangeEnd,
-          )}
-        </Text>
-      </View>
-
-      <Ionicons
-        name={
-          slotsExpanded
-            ? 'chevron-up'
-            : 'chevron-down'
-        }
-        size={18}
-        color={PRIMARY}
-      />
-    </TouchableOpacity>
-
-    {slotsExpanded && (
-      <View
-        style={
-          styles.hourlySlotList
-        }
-      >
-        {todayAvailabilitySummary.hourlySlots.map(
-          (
-            slot,
-            index,
-          ) => (
-            <View
-              key={`${slot.start}-${slot.end}-${index}`}
-              style={
-                styles.hourlySlotRow
-              }
-            >
-              <Ionicons
-                name="time-outline"
-                size={14}
-                color={
-                  PRIMARY
-                }
-              />
-
-              <Text
-                style={
-                  styles.hourlySlotText
-                }
-              >
-                {formatTimeDisplay(
-                  slot.start,
-                )}{' '}
-                -{' '}
-                {formatTimeDisplay(
-                  slot.end,
-                )}
-              </Text>
-            </View>
-          ),
-        )}
-      </View>
-    )}
-  </>
-) : (
-                    <View
-                      style={
-                        styles.noGeneralAvailability
-                      }
-                    >
-                      <Ionicons
-                        name="close-circle-outline"
-                        size={18}
-                        color="#C0392B"
-                      />
-
-                      <Text
-                        style={
-                          styles.noGeneralAvailabilityText
-                        }
-                      >
-                        Vendor has not
-                        configured
-                        working hours
-                        yet.
-                      </Text>
-                    </View>
-                  )}
-
-         {/* Booking Notes */}
-<View style={styles.bookingNotesBox}>
-  <View style={styles.bookingNotesHeader}>
-    <Ionicons
-      name="information-circle-outline"
-      size={17}
-      color={PRIMARY}
-    />
-
-    <Text style={styles.bookingNotesTitle}>
-      Booking Notes
-    </Text>
-  </View>
-
-  {getBookingNoticeMinutes(
-    vendorAvailability,
-    eventDate,
-  ) !== null ? (
-    <Text style={styles.bookingNote}>
-      • {formatBookingNotice(
-        getBookingNoticeMinutes(
-          vendorAvailability,
-          eventDate,
-        ) ?? undefined,
-      )}
-    </Text>
-  ) : (
-    <Text style={styles.bookingNote}>
-      • No minimum advance booking notice specified.
-    </Text>
-  )}
-</View>
+                  <Text style={styles.bookingNote}>
+                    • {getBookingNoticeMinutes(vendorAvailability, eventDate) === null
+                      ? 'No minimum advance booking notice specified.'
+                      : formatBookingNotice(getBookingNoticeMinutes(vendorAvailability, eventDate) ?? undefined)}
+                  </Text>
                 </View>
               )}
 
-              {/* ================================================= */}
-              {/* EVENT MODE - EVENT AVAILABILITY */}
               {/* ================================================= */}
 
               {hasEventTiming && (

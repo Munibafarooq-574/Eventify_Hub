@@ -11,6 +11,49 @@ function fixture(){
  const model:any={find:jest.fn(()=>q([booking])),countDocuments:jest.fn(filter=>q(booking.eventStartDateTime<filter.eventStartDateTime.$lt&&booking.eventEndDateTime>filter.eventEndDateTime.$gt?1:0))};
  const s:any=Object.create(VendorAvailabilityService.prototype);Object.assign(s,{userModel:{findById:()=>q(vendor)},vendorOrderModel:model,cityService:{requireCityTimeZone:async()=>'Asia/Karachi'},featureAccessService:{hasActiveSubscription:async()=>true}});return{s,model,vendor};
 }
+describe('Public vendor schedule', () => {
+  it('labels a held slot booked without returning booking details', async () => {
+    const { s } = fixture();
+    const day = await s.getPublicSchedule(id, '2026-10-26');
+    expect(day.unavailable).toBe(false);
+    expect(day.slots).toContainEqual({
+      start: new Date('2026-10-26T15:00:00Z'),
+      end: new Date('2026-10-26T16:00:00Z'),
+      booked: true,
+    });
+    expect(day.slots).toContainEqual({
+      start: new Date('2026-10-26T16:00:00Z'),
+      end: new Date('2026-10-26T17:00:00Z'),
+      booked: false,
+    });
+    expect(day).not.toHaveProperty('bookings');
+  });
+
+  it('leaves an occupied slot available when the vendor has spare capacity', async () => {
+    const { s, vendor } = fixture();
+    vendor.availabilitySettings.maxConcurrentBookings = 2;
+    const day = await s.getPublicSchedule(id, '2026-10-26');
+    expect(day.slots.every((slot: { booked: boolean }) => !slot.booked)).toBe(true);
+  });
+
+  it.each(['Away for the day', undefined])('only returns an entered blocked-date reason (%s)', async (reason) => {
+    const { s, model, vendor } = fixture();
+    vendor.availabilitySettings.blockedDates = [new Date('2026-10-26')];
+    vendor.availabilitySettings.blockedDateReasons = reason ? [{ date: '2026-10-26', reason }] : [];
+    const day = await s.getPublicSchedule(id, '2026-10-26');
+    expect(day).toMatchObject({ unavailable: true, reason, slots: [] });
+    expect(model.find).not.toHaveBeenCalled();
+  });
+
+  it('reports a closed legacy working day as unavailable', async () => {
+    const { s, vendor } = fixture();
+    vendor.availabilitySettings.workingDays = [{ day: 'MON', enabled: false }];
+    await expect(s.getPublicSchedule(id, '2026-10-26')).resolves.toMatchObject({
+      unavailable: true, slots: [],
+    });
+  });
+});
+
 describe('Authoritative calendar and half-hour availability',()=>{
  beforeEach(()=>{jest.useFakeTimers();jest.setSystemTime(new Date('2026-10-25T12:00:00Z'))});afterEach(()=>jest.useRealTimers());
  it('accepts ISO calendar dates and returns bookings without the orders page limit',async()=>{const f=fixture();const day=await f.s.getDaySlots(id,'2026-10-26');expect(day.bookings).toHaveLength(1);expect(day.bookings[0].start).toEqual(new Date('2026-10-26T15:00:00Z'));expect(f.model.find.mock.calls[0][0].status.$in).toEqual(['pending','accepted','completed']);expect(day.date).toBe('2026-10-26')});

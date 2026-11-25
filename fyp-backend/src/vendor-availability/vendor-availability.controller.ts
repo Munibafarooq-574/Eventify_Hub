@@ -117,6 +117,11 @@ setAvailability(
     );
   }
 
+  @Get(':vendorId/schedule')
+  getPublicSchedule(@Param('vendorId') vendorId: string, @Query('date') date?: string) {
+    return this.service.getPublicSchedule(vendorId, date);
+  }
+
   @Get(':vendorId/slots')
   getSlots(@Param('vendorId') vendorId: string, @Query('date') date: string) {
     return this.service.getDaySlots(vendorId, date);

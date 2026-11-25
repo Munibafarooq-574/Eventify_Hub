@@ -1036,10 +1036,39 @@ return {
    * Vendor-facing calendar:
    * booked / pending / available slots for one day.
    */
+  async getPublicSchedule(vendorId: string, date?: string) {
+    const day = await this.getDaySlots(vendorId, date, true);
+    const { date: selectedDate, timeZone, workingSlots, bookings, schedule } = day;
+    const base = { date: selectedDate, timeZone };
+    if (schedule?.blocked || !workingSlots.length) {
+      return { ...base, unavailable: true, reason: schedule?.reason, slots: [] };
+    }
+
+    const slots = workingSlots.flatMap((window) => {
+      const first = eventLocalToUtc(selectedDate, window.start, timeZone).getTime();
+      const last = eventLocalToUtc(selectedDate, window.end, timeZone).getTime();
+      const result: { start: Date; end: Date; booked: boolean }[] = [];
+      for (let start = first; start < last;) {
+        const end = Math.min(start + 60 * 60000, last);
+        const occupied = bookings.filter((booking) =>
+          new Date(booking.start).getTime() < end && new Date(booking.end).getTime() > start,
+        ).length;
+        result.push({ start: new Date(start), end: new Date(end), booked: occupied >= (schedule?.capacity ?? 1) });
+        start = end;
+      }
+      return result;
+    });
+    return { ...base, unavailable: !slots.length, slots };
+  }
+
   async getDaySlots(
     vendorId: string,
-    dateStr: string,
+    requestedDate: string | undefined,
+    publicSchedule = false,
   ) {
+    if (publicSchedule && !Types.ObjectId.isValid(vendorId)) {
+      throw new NotFoundException('Vendor not found');
+    }
     const vendor = await this.userModel
       .findById(vendorId)
       .select('availabilitySettings role businessCityId')
@@ -1062,7 +1091,15 @@ return {
     const vendorTimeZone = await this.cityService.requireCityTimeZone(
       String((vendor as any).businessCityId),
     );
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    let dateStr = requestedDate;
+    if (publicSchedule && dateStr === undefined) {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: vendorTimeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+      }).formatToParts();
+      const { year, month, day } = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+      dateStr = `${year}-${month}-${day}`;
+    }
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       throw new BadRequestException('Calendar date must use YYYY-MM-DD');
     }
     const dayStart = eventLocalToUtc(dateStr, '00:00', vendorTimeZone);
@@ -1124,8 +1161,19 @@ return {
     // Existing bookings for this day
     // ---------------------------------------------------------
 
-    const bookings =
-      await this.vendorOrderModel.find({
+    const blocked = publicSchedule && (settings.blockedDates ?? []).some((date: Date) => toDateKey(date) === dateStr);
+    const reason = blocked
+      ? settings.blockedDateReasons?.find((item: { date: string; reason: string }) => item.date === dateStr)?.reason?.trim()
+      : undefined;
+    const legacyDays: { day: string; enabled: boolean }[] = settings.workingDays ?? [];
+    if (publicSchedule && (blocked || (!daySlotConfig && legacyDays.length && !legacyDays.some(
+      (day) => day.day === dayCode && day.enabled,
+    )))) {
+      workingSlots = [];
+    }
+    const bookings = publicSchedule && !workingSlots.length
+      ? []
+      : await this.vendorOrderModel.find({
         vendorId:
           new Types.ObjectId(vendorId),
 
@@ -1178,6 +1226,8 @@ return {
     : [],
 
   workingSlots,
+
+  ...(publicSchedule ? { schedule: { blocked, reason, capacity: Number(settings.maxConcurrentBookings) || 1 } } : {}),
 
   bookings: bookings.map((b) => ({
     orderId: b.orderId?.toString(),

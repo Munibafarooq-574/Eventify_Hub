@@ -64,3 +64,18 @@ export default function getVendorAvailability(vendorId: string) {
     `/vendor-availability/${vendorId}`,
   );
 }
+
+export type VendorPublicSchedule = {
+  date: string;
+  timeZone: string;
+  unavailable: boolean;
+  reason?: string;
+  slots: { start: string; end: string; booked: boolean }[];
+};
+
+export function getVendorPublicSchedule(vendorId: string, date?: string) {
+  const query = date === undefined ? '' : `?date=${encodeURIComponent(date)}`;
+  return growthApi.get<VendorPublicSchedule>(
+    `/vendor-availability/${encodeURIComponent(vendorId)}/schedule${query}`,
+  );
+}
