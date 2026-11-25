@@ -90,7 +90,7 @@ const NotificationsScreen: React.FC = () => {
                 contentContainerStyle={styles.list}
             />
 
-            <BottomNavigationFinal />
+            <BottomNavigationFinal viewedNotifications={notifications} />
         </View>
     );
 };
