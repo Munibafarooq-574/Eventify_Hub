@@ -24,7 +24,7 @@ type WorkingDay = { day: string; enabled: boolean };
 type TimeSlotConfig = { start: string; end: string };
 type DaySlotConfig = { day: string; enabled: boolean; slots: TimeSlotConfig[]; advanceNoticeOptionsMinutes?: number[] };
 type AvailabilitySettings = { minimumWorkingWindowMinutes?: number; workingDays?: WorkingDay[]; workingHoursStart?: string; workingHoursEnd?: string; daySlots?: DaySlotConfig[]; blockedDates?: string[]; advanceNoticeOptionsMinutes?: number[]; maxConcurrentBookings?: number };
-type GeneratedSlot = { start: string; end: string; status: "available" | "booked"; booking?: any; durationMinutes?: number; belowMinimum?: boolean; concurrent?: number };
+type GeneratedSlot = { start: string; end: string; status: "available" | "booked"; booking?: any; durationMinutes?: number; belowMinimum?: boolean; startMs: number; endMs: number };
 
 const FILTERS: { key: ViewMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "day", label: "Selected day", icon: "today-outline" },
@@ -305,6 +305,7 @@ const isWorkingDay = useCallback((date: string) => {
 const selectedDayBookings = useMemo(() => {
   if (daySnapshot?.date !== selectedDate) return [];
   return (daySnapshot.bookings || []).filter((booking) => isBlockingBookingStatus(booking.status)).map((booking) => ({
+    orderId: booking.orderId,
     status: booking.status,
     eventName: booking.serviceName || "Booked",
     eventStartDateTime: booking.start,
@@ -359,13 +360,11 @@ const dayAvailability = useMemo(() => {
       });
 
       const booking = overlaps[0];
-      const concurrent = overlaps.reduce((peak, order) => {
-        const instant = Math.max(slotStartKey, new Date(order.eventStartDateTime).getTime());
-        const count = overlaps.filter(other => new Date(other.eventStartDateTime).getTime() <= instant &&
-          new Date(other.eventEndDateTime).getTime() > instant).length;
-        return Math.max(peak, count);
-      }, 0);
-      slots.push({ concurrent, start: formatTime(cursor, daySnapshot?.timeZone), end: formatTime(slotEnd, daySnapshot?.timeZone), status: booking ? "booked" : "available", booking, durationMinutes, belowMinimum });
+      slots.push({
+        startMs: slotStartKey, endMs: slotEndKey,
+        start: formatTime(cursor, daySnapshot?.timeZone), end: formatTime(slotEnd, daySnapshot?.timeZone),
+        status: booking ? 'booked' : 'available', booking, durationMinutes, belowMinimum,
+      });
       cursor = slotEnd;
     }
   });
@@ -419,19 +418,54 @@ const monthLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-U
 /**
  * AVAILABILITY SUMMARY & HANDLERS
  */
-const displaySlots = dayAvailability.slots.reduce<GeneratedSlot[]>((rows, slot) => {
+const capacity = Math.max(1, daySnapshot?.maxConcurrentBookings ?? availability?.maxConcurrentBookings ?? 1);
+const bookingWindows = selectedDayBookings.map(booking => ({
+  start: new Date(booking.eventStartDateTime).getTime(),
+  end: new Date(booking.eventEndDateTime).getTime(),
+})).filter(window => window.start < window.end);
+const capacitySegments = dayAvailability.slots.flatMap(slot => {
+  const overlapping = bookingWindows.filter(window => window.start < slot.endMs && window.end > slot.startMs);
+  const boundaries = [...new Set([slot.startMs, slot.endMs, ...overlapping.flatMap(window => [
+    Math.max(slot.startMs, window.start), Math.min(slot.endMs, window.end),
+  ])])].sort((first, second) => first - second);
+  return boundaries.slice(0, -1).map((start, index) => ({
+    start,
+    end: boundaries[index + 1],
+    use: overlapping.filter(window => window.start <= start && start < window.end).length,
+    belowMinimum: !!slot.belowMinimum,
+  }));
+});
+const displaySlots = capacitySegments.reduce<typeof capacitySegments>((rows, slot) => {
   const previous = rows[rows.length - 1];
-  if (slot.status === 'booked' && previous?.status === 'booked' && previous.booking === slot.booking && previous.end === slot.start) {
+  if (previous?.end === slot.start && previous.use === slot.use && previous.belowMinimum === slot.belowMinimum) {
     rows[rows.length - 1] = { ...previous, end: slot.end };
   } else {
     rows.push(slot);
   }
   return rows;
 }, []);
-
-const availableSlotCount = dayAvailability.slots.filter((slot) => slot.status === "available" && !slot.belowMinimum).length;
-
-const bookedSlotCount = dayAvailability.slots.filter((slot) => slot.status === "booked").length;
+const capacityColor = (use: number) => use >= capacity ? '#AE2639' : use > 1 ? '#D47516' : use === 1 ? '#E8AD49' : '#278A4B';
+const capacityMinutes = capacitySegments.reduce((totals, slot) => {
+  const bucket = slot.use >= capacity ? 'full' : slot.use > 0 ? 'partial' : 'free';
+  totals[bucket] += (slot.end - slot.start) / 60_000;
+  return totals;
+}, { free: 0, partial: 0, full: 0 });
+const formatCapacityHours = (minutes: number) => {
+  const rounded = Math.round(minutes);
+  const hours = Math.floor(rounded / 60);
+  const remaining = rounded % 60;
+  return remaining ? `${hours}h ${remaining}m` : `${hours} hrs`;
+};
+const bookedGroups = new Map<string, typeof selectedDayBookings>();
+[...selectedDayBookings].sort((first, second) =>
+  new Date(first.eventStartDateTime).getTime() - new Date(second.eventStartDateTime).getTime()
+).forEach((booking, index) => {
+  const key = booking.orderId ? `order-${booking.orderId}` : `booking-${index}`;
+  const group = bookedGroups.get(key) ?? [];
+  group.push(booking);
+  bookedGroups.set(key, group);
+});
+const orderById = new Map(orders.map(order => [String(order._id ?? order.id), order]));
 
 const bookingNoticeLabel = useMemo(() => {
   if (!availability) return null;
@@ -517,7 +551,7 @@ return (
           <View style={styles.statsRow}>
             {([{ key: 'total', label: 'Total', value: bookingLists.total.length }, { key: 'upcoming', label: 'Upcoming', value: bookingLists.upcoming.length },
               { key: 'pending', label: 'Pending', value: bookingLists.pending.length }] as const).map(chip => (
-              <TouchableOpacity key={chip.key} style={[styles.filterChip, viewMode === chip.key && styles.filterChipActive]}
+              <TouchableOpacity key={chip.key} style={[styles.filterChip, styles.statFilter, viewMode === chip.key && styles.filterChipActive]}
                 accessibilityRole="button" accessibilityState={{ selected: viewMode === chip.key }}
                 onPress={() => setViewMode(chip.key)}>
                 <Text style={[styles.filterChipText, viewMode === chip.key && styles.filterChipTextActive]}>{chip.label} {chip.value}</Text>
@@ -658,11 +692,10 @@ return (
         accessibilityRole="button" accessibilityLabel={showSlots ? 'Hide all slots' : 'See all slots'}
         accessibilityState={{ expanded: showSlots }} onPress={toggleSlots}>
         <View style={styles.timeline}>
-          {dayAvailability.slots.map((slot, index) => (
+          {capacitySegments.map((slot, index) => (
             <View key={index} style={{
-              flex: slot.durationMinutes ?? 60,
-              backgroundColor: (slot.concurrent ?? 0) > 1 ? '#781D2B'
-                : slot.status === 'booked' ? '#B23D49' : slot.belowMinimum ? '#B6A9B0' : '#278A4B',
+              flex: slot.end - slot.start,
+              backgroundColor: slot.use === 0 && slot.belowMinimum ? '#B6A9B0' : capacityColor(slot.use),
             }} />
           ))}
         </View>
@@ -671,75 +704,67 @@ return (
             {tick.label}
           </Text>)}
         </View>
-        <Text style={styles.slotLink}>{showSlots ? 'Tap to hide all slots' : 'Tap to see all slots'}</Text>
       </TouchableOpacity>}
       <View style={styles.slotSummaryRow}>
-        <View style={styles.slotSummaryItem}>
-          <View style={[styles.summaryDot, { backgroundColor: "#278A4B" }]} />
-          <Text style={styles.summaryText}>{availableSlotCount} free</Text>
-        </View>
-        <View style={styles.slotSummaryItem}>
-          <View style={[styles.summaryDot, { backgroundColor: "#B23D49" }]} />
-          <Text style={styles.summaryText}>{bookedSlotCount} booked</Text>
-        </View>
+        {([{ label: 'Free', color: '#278A4B' }, { label: 'Partly booked', color: '#D47516' },
+          { label: 'Full', color: '#AE2639' }]).map(item => (
+          <View key={item.label} style={styles.slotSummaryItem}>
+            <View style={[styles.summaryDot, { backgroundColor: item.color }]} />
+            <Text style={styles.summaryText}>{item.label}</Text>
+          </View>
+        ))}
       </View>
-
-      {dayAvailability.slots.some(slot => (slot.concurrent ?? 0) > 1) && (
-        <Text style={styles.timelineLabel}>Dark red indicates overlapping bookings.</Text>
-      )}
+      <Text style={styles.slotSectionTitle}>Available for new bookings</Text>
+      <Text style={styles.timelineLabel}>Fully free: {formatCapacityHours(capacityMinutes.free)} · Partly booked: {formatCapacityHours(capacityMinutes.partial)} · Full: {formatCapacityHours(capacityMinutes.full)}</Text>
+      <View style={styles.slotsGrid}>
+        {displaySlots.filter(slot => slot.use > 0).map(slot => <View key={slot.start} style={styles.capacityRow}>
+          <Text style={styles.slotTime}>{formatTime(new Date(slot.start), daySnapshot?.timeZone)} – {formatTime(new Date(slot.end), daySnapshot?.timeZone)}</Text>
+          <Text style={[styles.slotStatus, slot.use >= capacity && styles.overlapText]}>
+            {slot.use} of {capacity} in use{slot.use > capacity ? ` · Over limit by ${slot.use - capacity}. Check this booking.`
+              : slot.use === capacity ? ' · Full · no new bookings' : ''}
+          </Text>
+        </View>)}
+      </View>
     </>
   )}
   {!dayLoading && !dayError && <>
     <Text style={styles.slotSectionTitle}>Booked slots</Text>
     <View style={styles.slotsGrid}>
-      {selectedDayBookings.length ? [...selectedDayBookings]
-        .sort((first, second) => new Date(first.eventStartDateTime).getTime() - new Date(second.eventStartDateTime).getTime())
-        .map((booking, index) => {
-          const overlapNames = [...new Set(selectedDayBookings.filter(other => other !== booking &&
-            new Date(other.eventStartDateTime).getTime() < new Date(booking.eventEndDateTime).getTime() &&
-            new Date(other.eventEndDateTime).getTime() > new Date(booking.eventStartDateTime).getTime())
-            .map(other => other.eventName))];
-          return <View key={index} style={[styles.slotCard, styles.bookedSlot]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.slotTime}>{formatTime(booking.eventStartDateTime, daySnapshot?.timeZone)} – {formatTime(booking.eventEndDateTime, daySnapshot?.timeZone)}</Text>
-            <Text style={styles.slotStatus}>{booking.eventName}</Text>
-            {overlapNames.length > 0 && <Text style={styles.overlapText}>
-              Overlaps with {overlapNames.join(', ')} · Limit {availability?.maxConcurrentBookings ?? 1} at once
-            </Text>}
-          </View>
-        </View>; }) : <Text style={styles.slotStatus}>No booked slots</Text>}
+      {bookedGroups.size ? Array.from(bookedGroups, ([key, bookings]) => {
+        const orderId = bookings[0].orderId;
+        const order = orderId ? orderById.get(orderId) : undefined;
+        return <View key={key} style={[styles.slotCard, styles.bookingGroup]}>
+          {!!order?.eventName && <Text style={styles.slotTime}>
+            {order.eventName}{order.organizerId?.name ? ` · ${order.organizerId.name}` : ''}
+          </Text>}
+          {bookings.map((booking, index) => <View key={index} style={styles.capacityRow}>
+            <Text style={styles.slotTime}>{booking.eventName}</Text>
+            <Text style={styles.slotStatus}>{formatTime(booking.eventStartDateTime, daySnapshot?.timeZone)} – {formatTime(booking.eventEndDateTime, daySnapshot?.timeZone)}</Text>
+          </View>)}
+          {!!orderId && <TouchableOpacity accessibilityRole="button" onPress={() =>
+            router.push({ pathname: '/vendorordersummary', params: { orderId } })}>
+            <Text style={styles.slotLink}>{bookings.length > 1 ? 'Same order · Open order ›' : 'Open order ›'}</Text>
+          </TouchableOpacity>}
+        </View>;
+      }) : <Text style={styles.slotStatus}>No booked slots</Text>}
     </View>
   </>}
       {dayAvailability.slots.length > 0 && <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSlots }}
         style={styles.scheduleAction} onPress={toggleSlots}>
         <Text style={styles.slotLink}>{showSlots ? 'Hide all slots ▴' : 'Show all slots ▾'}</Text>
       </TouchableOpacity>}
-      {showSlots && (dayAvailability.slots.length === 0 ? (
-        <View style={styles.noSlots}>
-          <Ionicons name="calendar-outline" size={24} color="#9B9B9B" />
-          <Text style={styles.noSlotsText}>No time slots available.</Text>
-        </View>
-      ) : (
-        <View style={styles.slotsGrid}>
-          {displaySlots.map((slot, index) => {
-            const booked = slot.status === "booked";
-            return (
-              <View key={`${slot.start}-${slot.end}-${index}`} style={[styles.slotCard, booked ? styles.bookedSlot : styles.freeSlot]}>
-                <View style={[styles.slotIcon, booked ? styles.bookedSlotIcon : styles.freeSlotIcon]}>
-                  <Ionicons name={booked ? "lock-closed-outline" : "checkmark-outline"} size={16} color={booked ? "#C0392B" : "#278A4B"} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.slotTime}>{slot.start} - {slot.end}</Text>
-                  <Text style={styles.slotStatus}>{booked ? slot.booking?.eventName || "Booked" : slot.belowMinimum ? `${slot.durationMinutes} min — below minimum working window` : "Available"}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ))}
+      {showSlots && <View style={styles.slotsGrid}>
+        {displaySlots.filter(slot => slot.use === 0).map(slot => <View key={slot.start} style={[styles.slotCard, styles.freeSlot]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.slotTime}>{formatTime(new Date(slot.start), daySnapshot?.timeZone)} – {formatTime(new Date(slot.end), daySnapshot?.timeZone)}</Text>
+            <Text style={styles.slotStatus}>{slot.belowMinimum ? 'Below minimum working window' : `0 of ${capacity} in use · Free`}</Text>
+          </View>
+        </View>)}
+        {displaySlots.every(slot => slot.use > 0) && <Text style={styles.slotStatus}>All working times already have a booking. Check remaining capacity above.</Text>}
+      </View>}
 
   <TouchableOpacity style={styles.scheduleAction} accessibilityRole="button" accessibilityLabel="About availability"
-    onPress={() => Alert.alert('Availability', 'Availability is checked again before a booking is confirmed.')}>
+    onPress={() => Alert.alert('Booking capacity', `You can handle up to ${capacity} bookings at the same time. Partly booked times still have capacity. The complete service window and booking notice are checked before confirmation.`)}>
     <Ionicons name="information-circle-outline" size={20} color={PRIMARY} />
   </TouchableOpacity>
 </View>
@@ -866,6 +891,9 @@ export default MyEventsScreen;
  */
 
 const styles = StyleSheet.create({
+  statFilter: { flex: 1, justifyContent: 'center', paddingHorizontal: 6 },
+  capacityRow: { gap: 2, paddingVertical: 5 },
+  bookingGroup: { flexDirection: 'column', alignItems: 'stretch', gap: 4, backgroundColor: '#FAF7F9', borderColor: '#E9DCE5' },
   stickyFilters: { backgroundColor: '#F8E9F0', paddingVertical: 10, gap: 8 },
   rulesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
   ruleChip: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12, backgroundColor: '#F1EFF0' },
@@ -905,7 +933,7 @@ const styles = StyleSheet.create({
   headerTitleWrap: { alignItems: "center" },
   headerTitle: { fontSize: 19, fontWeight: "800", color: "#FFFFFF" },
   headerSubtitle: { fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 2 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 110 },
+  listContent: { paddingHorizontal: 18, paddingBottom: 110 },
   statsRow: { flexDirection: "row", gap: 10, marginTop: 18, marginBottom: 4 },
   statCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 16, paddingVertical: 12, alignItems: "center", borderWidth: 1, borderColor: "#F0DDEA" },
   statIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: PRIMARY_LIGHT, justifyContent: "center", alignItems: "center", marginBottom: 5 },
@@ -945,7 +973,7 @@ const styles = StyleSheet.create({
   workingHours: { fontSize: 14, color: PRIMARY, fontWeight: "800", marginTop: 2, lineHeight: 20 },
   totalMinutesText: { fontSize: 10, color: "#8A8A8A", marginTop: 3 },
   slotCount: { fontSize: 11, color: "#278A4B", fontWeight: "800" },
-  slotSummaryRow: { flexDirection: "row", alignItems: "center", marginTop: 12, gap: 16 },
+  slotSummaryRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 12, gap: 16 },
   slotSummaryItem: { flexDirection: "row", alignItems: "center" },
   summaryDot: { width: 8, height: 8, borderRadius: 4, marginRight: 5 },
   summaryText: { fontSize: 11, color: "#666", fontWeight: "600" },
