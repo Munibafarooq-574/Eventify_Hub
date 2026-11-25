@@ -45,12 +45,6 @@ interface Order {
 const titleCase = (value: string) => value.toLowerCase().replace(/_/g, ' ')
     .replace(/\b\w/g, letter => letter.toUpperCase());
 
-const timeUntilCompletion = (time: number) => {
-    const minutes = Math.max(1, Math.ceil((time - Date.now()) / 60000));
-    const hours = Math.floor(minutes / 60);
-    return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
-};
-
 const openOrderLink = (url: string) => {
     void Linking.openURL(url).catch(() => Alert.alert('Unable to open link'));
 };
@@ -1022,12 +1016,10 @@ const OrderSummary = () => {
                                                     ) : <View style={styles.detailRow}>
                                                         <Ionicons name="lock-closed-outline" size={14} color={PRIMARY} />
                                                         <View style={{ flex: 1 }}>
-                                                            <Text style={styles.completionHint}>{completionTime === null ? 'Mark Completed · Scheduled service time unavailable.'
-                                                                : completionTime > Date.now() ? `Mark Completed available in ${timeUntilCompletion(completionTime)}`
-                                                                : 'Mark Completed available once payment is secured.'}</Text>
-                                                            {completionTime !== null && completionTime > Date.now() && <Text style={styles.scheduleMeta}>
-                                                                {completionTime === new Date(booking.eventEndDateTime).getTime() ? 'After service ends' : 'At scheduled delivery'} · {formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}
-                                                            </Text>}
+                                                            <Text style={[styles.completionHint, { textAlign: 'left', fontWeight: '700' }]}>Mark Completed</Text>
+                                                            <Text style={styles.scheduleMeta}>{completionTime === null ? 'Scheduled service time unavailable.'
+                                                                : completionTime > Date.now() ? `Available from ${formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}`
+                                                                : 'Available once payment is secured.'}</Text>
                                                         </View>
                                                     </View>)}
                                                     <BookingCancellationDetails booking={booking} timeZone={zone} audience="vendor"
