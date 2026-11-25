@@ -149,11 +149,19 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
     introduction: 'Manage your own assignment, understand payment deadlines and respond clearly to your client.',
     quickSteps: ['Expand order → review package and service time', 'Accept in time → check payment status', 'Fulfil service → mark completed when allowed'],
     sections: [
-      { id: 'orders', title: 'Find and check the right booking', summary: 'Use status cards, then expand the order.', steps: [
-        'Use All or a status card to filter your orders. Expand the booking and check the event, client, package quantity, service timing, address and booking ID.',
-        'Booking Total includes the saved discount. Your Earnings subtracts any platform fee. Check Paid and Remaining to see how much the client has actually paid.',
-        'Booking activity records requests, acceptance and other saved actions. Pull down to refresh when checking a recent client decision or payment update.',
-      ] }, status, service, delivery,
+      { id: 'orders', title: 'Read your Order Summary', summary: 'Use the filter chips and expand an order for package details.', steps: [
+        'Open My Orders and swipe the filter chips to see more statuses. Tap a chip to filter the list. The text and icon on each card identify its status.',
+        'The collapsed card shows the event schedule, package count, Received, Pending and the next scheduled completion when available.',
+        'Expand the order to see the address, package slots and payment progress. Tap the address to open Maps, or tap a package to see quantity and pricing.',
+        'Received is the recorded amount paid by the client. Pending is the unpaid balance. Net booking value appears when a platform fee applies.',
+        'Open History at the bottom for the order ID, booking activity and the event city timezone. Pull down to refresh recent changes.',
+      ] },
+      { id: 'statuses', title: 'Booking status and Closed orders', summary: 'Check the order chip and each package’s status.', steps: [
+        'Pending means a request is awaiting acceptance. Processing means the vendor accepted and the required advance is still being secured. Confirmed means the booking is secured.',
+        'Accepted applies to the package. Completed means the vendor marked the service as provided. Check the separate payment chip for the recorded balance.',
+        'Closed groups Request Expired, Payment Expired and No Longer Assigned. Each card shows its specific status. Cancelled orders have their own filter.',
+        'Request Expired means the request window ended. Payment Expired means the payment window ended. No Longer Assigned means the booking is no longer assigned to you. Open a closed order for details, chat history or support.',
+      ] }, service, delivery,
       { id: 'accept', title: 'Accept a new request', summary: 'Review the slots before accepting pending packages.', steps: [
         'Use Accept Package for one pending package or Accept All Pending Packages for several. Review the slots in the confirmation. If any package fails the check, the entire acceptance is rolled back.',
         'If successful, your booking becomes Processing / Accepted. The client sees the required advance and its exact deadline. Acceptance alone does not mean money has been paid.',
@@ -161,7 +169,7 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
       ] }, timing,
       { id: 'payment', title: 'Understand payment and expiry', summary: 'Confirm the booking’s status before providing service.', steps: [
         'Payment Required means the client still needs to secure the advance. Awaiting confirmation means a payment was submitted but has not become successful.',
-        'Confirmed / Partially Paid means the required advance is secured. Paid means the full recorded booking amount has been paid. If no advance is required, zero paid can be correct.',
+        'The package payment chip shows whether payment is required, Partially paid or Fully paid. Fully paid means the recorded balance is zero. The Fully Paid filter lists completed orders with all packages paid.',
         'An unpaid booking can expire at its payment deadline. A pending payment past the preparation cutoff is overdue and the service is not secured; do not treat it as paid.',
         'Request Expired and No longer assigned records are kept for history. They do not offer acceptance, completion or new messages. View chat history lets you read previous messages; Contact Support is available for help. Payment expiry for one assignment does not expire other vendors.',
         'After service completion, the client handles any remaining balance using the displayed remaining-payment deadline. Refresh to check the recorded result.',
@@ -174,23 +182,23 @@ export const bookingGuides: Record<BookingGuideKind, BookingGuide> = {
         'These actions are restricted to before the event starts. The same pending request cannot be repeatedly created to send duplicate updates.',
       ] },
       { id: 'reschedule', title: 'Respond to a client’s date/time request', summary: 'Review the proposed schedule before agreeing.', steps: [
-        'Open Review Reschedule Request in the booking. Compare the original and requested event/service times, duration, reason and response deadline.',
+        'Open the amber Review Reschedule Request card. Compare the current and proposed package slots and check the reason. Once applied, the compact Rescheduled banner shows the date change. Tap it to review the old and new package slots.',
         'Confirm availability if you can fulfil the new schedule, or choose the unavailable response if you cannot. Availability is checked again; a message in chat is not an approval.',
         'Your response applies only to your assignment. In a multi-vendor event, follow the group result; the original schedule remains until the required decisions or replacement steps complete.',
         'If the client keeps the original schedule, continue with the original booking. If they replace your assignment, read No longer assigned and the resulting history before taking further action.',
       ] },
       { id: 'cancel', title: 'Cancel your assignment responsibly', summary: 'Review the cancellation preview and enter a reason.', steps: [
-        'Use Cancel Order on your vendor booking. Check the package, client, event, payment, client refund and any vendor penalty in the preview.',
+        'Open the ⋯ menu and select the package to cancel. Review the payment, client refund and any vendor penalty before confirming.',
         'Enter the required reason, reload an expired preview if needed, then confirm. Only your assignment is cancelled; the event and other vendors remain.',
         'Pending or unpaid cancellations have no monetary vendor penalty under the current rule. For bookings with successful payment, the saved cancellation policy and notice determine any penalty.',
         'Client refunds and vendor penalties are different amounts. Follow their recorded status and decision details; a refund request is not proof the refund has completed.',
       ] },
       { id: 'complete-chat', title: 'Complete service and contact the client', summary: 'Finish only your work, then check the remaining payment.', steps: [
-        'Use Message on an available booking to open that client’s chat. Chat does not replace a formal booking, cancellation or schedule action.',
-        'Mark Completed stays grey until the scheduled delivery time or your booked service end time is reached and any required advance payment is secured. Check the hint under the button. Tap the green button and confirm after providing the service.',
+        'Use Call or Email in the Organizer card when those contact details are available. Tap Chat to open the in-app conversation.',
+        'Each package shows when Mark Completed becomes available in the event city timezone. It unlocks at the booked service end time, or at the scheduled delivery time for deliveries, once any required advance is secured. Tap Mark Completed and confirm after providing the service.',
         'Completion applies only to your vendor booking. If money remains, the client gets the remaining-payment action and its separate deadline; completion does not itself mark the balance paid.',
-        'Tap Fully Paid Orders on the Vendor Dashboard or Fully Paid in Order Summary to see completed orders with no balance left. These orders show a Paid in Full badge.',
-        'If your subscription is inactive, manage valid existing bookings through My Orders and open Message from the booking. The general Messages list can be restricted. Expiry of your subscription does not itself cancel customer bookings.',
+        'Tap Fully Paid Orders on the Vendor Dashboard or Fully Paid in Order Summary to see completed orders with no balance left.',
+        'If your subscription is inactive, manage valid existing bookings through My Orders and open Chat in the Organizer card. The general Messages list can be restricted. Expiry of your subscription does not itself cancel customer bookings.',
       ] },
     ],
   },
