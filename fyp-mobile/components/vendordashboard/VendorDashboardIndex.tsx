@@ -22,11 +22,12 @@ import {
 } from "@/store";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, usePathname } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import {
     ActivityIndicator,
+    AppState,
     Alert,
     Dimensions,
     Image,
@@ -67,7 +68,21 @@ function formatPKR(amount: number): string {
     return `${currencySymbol()} ${Math.round(amount).toLocaleString("en-PK")}`;
 }
 
+const ACCESS_FRESH_MS = 60_000;
+type VerifiedDashboardAccess = { userId: string; token: string; verifiedAt: number; access: SubscriptionAccessState };
+let verifiedDashboardAccess: VerifiedDashboardAccess | undefined;
+
+const hasActiveDashboardPlan = (access: SubscriptionAccessState | null | undefined) =>
+    access?.accessAllowed === true && access.subscriptionRequired === false &&
+    Date.parse(access.subscription?.endDate ?? '') > Date.now();
+
 const DashboardScreen = () => {
+    const pathname = usePathname();
+    const renewalVisited = useRef(false);
+    const subscriptionRequest = useRef(0);
+    useEffect(() => {
+        if (pathname === '/subscriptionscreen') renewalVisited.current = true;
+    }, [pathname]);
     const insets = useSafeAreaInsets();
 
     const [username, setUsername] = useState<string>("");
@@ -359,94 +374,126 @@ if (!user?._id) {
     }
 }, []);
 
-const fetchSubscriptionAccess = React.useCallback(async () => {
+const fetchSubscriptionAccess = React.useCallback(async (
+    session?: { userId: string; token: string },
+    isFocused = () => true,
+) => {
+    const requestId = ++subscriptionRequest.current;
+    const isCurrent = () => requestId === subscriptionRequest.current && isFocused();
+    let userId = '';
+    let token: string | null = null;
+    setSubscriptionLoading(true);
+    setSubscriptionError(false);
     try {
-        const user = await getUserData();
-
-        if (!user?._id) {
-            setSubscriptionAccess(null);
-            return;
-        }
-
-        setSubscriptionLoading(true);
-        setSubscriptionError(false);
-
-        const access = await getSubscriptionAccessState(user._id);
+        userId = session?.userId ?? String((await getUserData())?._id ?? '');
+        token = session?.token ?? (await getSecureData('token')) ?? null;
+        if (!isCurrent()) return;
+        if (!userId || !token) throw new Error('Vendor session unavailable');
+        const access = await getSubscriptionAccessState(userId);
+        if (!isCurrent()) return;
+        verifiedDashboardAccess = { userId, token, verifiedAt: Date.now(), access };
         setSubscriptionAccess(access);
-        try {
-            const history = await getSubscriptionHistory(user._id);
-            const payments = history.filter(item => item.paymentSubmittedAt);
-            payments.sort((a, b) => new Date(b.paymentSubmittedAt!).getTime() - new Date(a.paymentSubmittedAt!).getTime());
-            setLatestPayment(payments[0] ?? null);
-        } catch (historyError) {
-            console.warn("Unable to load subscription payment history:", historyError);
-        }
     } catch (error) {
-        console.error("Error fetching subscription access:", error);
-
-        // Subscription failure must never break vendor dashboard.
-        setSubscriptionError(true);
-        setSubscriptionAccess(null);
+        if (!isCurrent()) return;
+        console.error('Error fetching subscription access:', error);
+        const cached = verifiedDashboardAccess;
+        if (cached?.userId !== userId || cached?.token !== token ||
+            Date.now() - cached.verifiedAt >= ACCESS_FRESH_MS || !hasActiveDashboardPlan(cached.access)) {
+            setSubscriptionError(true);
+            setSubscriptionAccess(null);
+        }
     } finally {
-        setSubscriptionLoading(false);
+        if (isCurrent()) {
+            setSubscriptionLoading(false);
+            setInitialLoading(false);
+        }
+    }
+    if (!userId || !token || !isCurrent()) return;
+    try {
+        const history = await getSubscriptionHistory(userId);
+        const payments = history.filter(item => item.paymentSubmittedAt);
+        payments.sort((a, b) => new Date(b.paymentSubmittedAt!).getTime() - new Date(a.paymentSubmittedAt!).getTime());
+        if (isCurrent()) setLatestPayment(payments[0] ?? null);
+    } catch (error) {
+        console.warn('Unable to load subscription payment history:', error);
     }
 }, []);
 
-    // Runs all three fetches together (in parallel) so the page loads
-    // as fast as possible instead of waiting for one after another.
-    const loadAllData = React.useCallback(async () => {
-        await Promise.allSettled([
-            fetchData(),
-            fetchAnalytics(),
-            fetchSubscriptionAccess(),
-        ]);
-        // Whatever the outcome (success or error on any of them), stop
-        // showing the full-screen loader after the first attempt.
-        setInitialLoading(false);
-    }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
+    const refreshSubscription = React.useCallback(() => fetchSubscriptionAccess(), [fetchSubscriptionAccess]);
+    const { refreshControl: subscriptionRefreshControl } = usePullToRefresh(refreshSubscription);
 
-    const { refreshControl: subscriptionRefreshControl } = usePullToRefresh(fetchSubscriptionAccess);
-
-    // Pull-to-refresh handler
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
-        await Promise.allSettled([
-            fetchData(),
-            fetchAnalytics(),
-            fetchSubscriptionAccess(),
-        ]);
+        await Promise.allSettled([fetchData(), fetchAnalytics(), refreshSubscription()]);
         setRefreshing(false);
-    }, [fetchData, fetchAnalytics, fetchSubscriptionAccess]);
+    }, [fetchData, fetchAnalytics, refreshSubscription]);
 
-useFocusEffect(
-  React.useCallback(() => {
-    let active = true;
+    useFocusEffect(React.useCallback(() => {
+        let active = true;
+        let checking = false;
+        const loadDashboard = async (force = false) => {
+            if (!active || checking) return;
+            checking = true;
+            try {
+                const [user, token] = await Promise.all([getUserData(), getSecureData('token')]);
+                if (!active) return;
+                const userId = String(user?._id ?? '');
+                const lastVerified = verifiedDashboardAccess;
+                const cached = userId && token && lastVerified?.userId === userId && lastVerified.token === token
+                    ? lastVerified : undefined;
+                const fresh = !!cached && Date.now() - cached.verifiedAt < ACCESS_FRESH_MS;
+                const valid = hasActiveDashboardPlan(cached?.access);
+                if (cached && valid) {
+                    setCheckingApproval(false);
+                    setSubscriptionAccess(cached.access);
+                    setSubscriptionError(false);
+                    setSubscriptionLoading(false);
+                    setInitialLoading(false);
+                }
+                if ((!fresh || force) && !(await checkVendorApproval())) return;
+                if (!active) return;
+                setCheckingApproval(false);
+                void fetchData();
+                void fetchAnalytics();
+                if (!fresh || !valid || force || renewalVisited.current) {
+                    renewalVisited.current = false;
+                    await fetchSubscriptionAccess(userId && token ? { userId, token } : undefined, () => active);
+                }
+            } finally {
+                checking = false;
+            }
+        };
+        void loadDashboard().catch(error => {
+            if (active) {
+                console.error('Dashboard verification failed:', error);
+                setCheckingApproval(false);
+                setSubscriptionError(true);
+                setInitialLoading(false);
+            }
+        });
+        const app = AppState.addEventListener('change', state => {
+            if (state === 'active') void loadDashboard(true).catch(error => console.error('Dashboard refresh failed:', error));
+        });
+        return () => { active = false; app.remove(); };
+    }, [checkVendorApproval, fetchData, fetchAnalytics, fetchSubscriptionAccess]));
 
-    const loadDashboardSafely =
-      async () => {
-        const approved =
-          await checkVendorApproval();
-
-        if (
-          !active ||
-          !approved
-        ) {
-          return;
-        }
-
-        await loadAllData();
-      };
-
-    loadDashboardSafely();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    checkVendorApproval,
-    loadAllData,
-  ]),
-);
+    useEffect(() => {
+        const expiry = Date.parse(subscriptionAccess?.subscription?.endDate ?? '');
+        const remaining = expiry - Date.now();
+        if (!(remaining > 0)) return;
+        let timeout: ReturnType<typeof setTimeout>;
+        const waitForExpiry = () => {
+            const delay = expiry - Date.now();
+            if (delay > 0) {
+                timeout = setTimeout(waitForExpiry, Math.min(delay, 2_147_483_647));
+                return;
+            }
+            setSubscriptionAccess(current => current ? { ...current } : current);
+            void refreshSubscription();
+        };
+        waitForExpiry();
+        return () => clearTimeout(timeout);
+    }, [subscriptionAccess, refreshSubscription]);
 
     // Expired: show once whenever the dashboard is opened/focused.
 // Expiring soon: keep the existing once-per-day reminder.
@@ -615,15 +662,7 @@ useFocusEffect(
     }
 
     // Subscription access guard — before normal dashboard render.
-const subscriptionEndTime = subscriptionAccess?.subscription?.endDate
-    ? new Date(subscriptionAccess.subscription.endDate).getTime()
-    : NaN;
-
-const hasValidSubscription =
-    subscriptionAccess?.accessAllowed === true &&
-    subscriptionAccess.subscriptionRequired === false &&
-    Number.isFinite(subscriptionEndTime) &&
-    subscriptionEndTime > Date.now();
+const hasValidSubscription = hasActiveDashboardPlan(subscriptionAccess);
 
 if (!hasValidSubscription) {
     return (
@@ -1027,7 +1066,7 @@ if (!hasValidSubscription) {
 
             {/* ---------- Subscription Status ---------- */}
             <View style={styles.subscriptionSection}>
-                {subscriptionLoading ? (
+                {subscriptionLoading && !subscriptionAccess ? (
                     <View style={styles.subscriptionSkeleton} />
                 ) : subscriptionAccess ? (
                     <SubscriptionStatusBanner
@@ -1043,7 +1082,7 @@ if (!hasValidSubscription) {
                     <TouchableOpacity
                         style={styles.subscriptionLoadError}
                         activeOpacity={0.8}
-                        onPress={fetchSubscriptionAccess}
+                        onPress={() => void refreshSubscription()}
                     >
                         <Ionicons
                             name="refresh-outline"

@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import getConversationList from '@/services/getConversationList';
 import getUserNotifications from '@/services/getNotifications';
 import getVendorOrderStats from '@/services/getVendorOrderStats';
-import { getUserData } from '@/store';
+import { getSecureData, getUserData } from '@/store';
 import { connectSocket, listenMessageSeen, onMessageDeletedForEveryone, onNewMessage, registerUser } from '@/utils/socketService';
 
 type Tab = {
@@ -42,7 +42,10 @@ const vendorTabs: Tab[] = [
 
 type BadgeCounts = Record<NonNullable<Tab['badge']>, number>;
 let tabTransition: { route: Href; from: number } | undefined;
+let badgeSnapshot: { userId: string; token: string; counts: BadgeCounts } | undefined;
 const emptyCounts: BadgeCounts = { messages: 0, notifications: 0, orders: 0 };
+const countUnreadConversations = (rows: { unreadCount?: number }[]) =>
+  rows.filter(row => Number(row.unreadCount) > 0).length;
 type NotificationItem = { _id?: string; isRead?: boolean };
 
 const seenKey = (userId: string) => `bottom-navigation:viewed-notifications:${userId}`;
@@ -101,51 +104,68 @@ export default function BottomNavigationFinal({ viewedNotifications }: { viewedN
 
   useFocusEffect(useCallback(() => {
     let focused = true;
-    let inFlight = false;
-    let queued = false;
+    const running = new Set<keyof BadgeCounts>();
+    const queued = new Set<keyof BadgeCounts>();
     let timer: ReturnType<typeof setTimeout> | undefined;
     let userId = '';
+    let token = '';
     let vendor = false;
-    const refresh = async () => {
+    const publish = (update: Partial<BadgeCounts>) => {
+      const cached = badgeSnapshot;
+      if (!focused || !cached || cached.userId !== userId || cached.token !== token) return;
+      const counts = { ...cached.counts, ...update };
+      badgeSnapshot = { userId, token, counts };
+      setBadges(counts);
+    };
+    const refreshBadge = async (key: keyof BadgeCounts, request: () => Promise<unknown>) => {
       if (!focused || !userId || AppState.currentState === 'background') return;
-      if (inFlight) { queued = true; return; }
-      inFlight = true;
-      const [chat, secondary] = await Promise.allSettled([
-        getConversationList(userId),
-        vendor
-          ? getVendorOrderStats('Vendor', userId).then(stats => ({ orders: Number(stats.pending) || 0 }))
+      if (running.has(key)) { queued.add(key); return; }
+      running.add(key);
+      try {
+        await request();
+      } catch {
+        // Keep the previous count when a background refresh fails.
+      } finally {
+        running.delete(key);
+        if (queued.delete(key)) void refreshBadge(key, request);
+      }
+    };
+    const refresh = () => {
+      void refreshBadge('messages', () => getConversationList(userId, rows => {
+          publish({ messages: countUnreadConversations(rows) });
+        }).then(rows => publish({ messages: countUnreadConversations(rows) })));
+      void refreshBadge(vendor ? 'orders' : 'notifications', () => vendor
+          ? getVendorOrderStats('Vendor', userId).then(stats => publish({ orders: Number(stats.pending) || 0 }))
           : Promise.all([getUserNotifications(userId), seenNotificationIds(userId)]).then(([items, seen]) => {
               const viewed = new Set(seen);
               const unread = new Set<string>();
               if (Array.isArray(items)) for (const item of items as NotificationItem[]) {
                 if (item._id && !item.isRead && !viewed.has(item._id)) unread.add(item._id);
               }
-              return { notifications: unread.size };
-            }),
-      ]);
-      if (focused) {
-        setBadges(previous => ({
-          ...previous,
-          ...(!vendor && pathname === '/bottomnotification' ? { notifications: 0 } : secondary.status === 'fulfilled' ? secondary.value : {}),
-          ...(chat.status === 'fulfilled' ? {
-            messages: chat.value.filter((item: { unreadCount?: number }) => Number(item.unreadCount) > 0).length,
-          } : {}),
-        }));
-      }
-      inFlight = false;
-      if (queued) { queued = false; void refresh(); }
+              publish({ notifications: pathname === '/bottomnotification' ? 0 : unread.size });
+            }));
     };
     const scheduleRefresh = () => {
       clearTimeout(timer);
       timer = setTimeout(() => void refresh(), 300);
     };
     let unsubscribe: (() => void)[] = [];
-    void getUserData().then(saved => {
-      if (!focused || !saved?._id) return;
+    void Promise.all([getUserData(), getSecureData('token')]).then(([saved, sessionToken]) => {
+      if (!focused) return;
+      if (!saved?._id || !sessionToken) {
+        setUser(undefined);
+        setBadges(emptyCounts);
+        badgeSnapshot = undefined;
+        return;
+      }
+      token = sessionToken;
       userId = String(saved._id);
       vendor = saved.role === 'Vendor';
       setUser({ id: userId, vendor });
-      setBadges(emptyCounts);
+      const cached = badgeSnapshot;
+      const counts = cached?.userId === userId && cached.token === token ? cached.counts : emptyCounts;
+      badgeSnapshot = { userId, token, counts };
+      setBadges(pathname === '/bottomnotification' ? { ...counts, notifications: 0 } : counts);
       const socket = connectSocket();
       // The inbox also registers on mount. Reuse the same connection.
       if (pathname !== '/vendormessages') registerUser(userId);
