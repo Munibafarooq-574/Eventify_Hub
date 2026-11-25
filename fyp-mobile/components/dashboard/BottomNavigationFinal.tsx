@@ -1,9 +1,10 @@
+import { useDashboardStack, type DashboardTabRoute } from '@/utils/useDashboardStack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import { router, useFocusEffect, usePathname, type Href } from 'expo-router';
+import { useFocusEffect, usePathname, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +18,7 @@ import { connectSocket, listenMessageSeen, onMessageDeletedForEveryone, onNewMes
 type Tab = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route: Href;
+  route: DashboardTabRoute;
   color: string;
   badge?: 'messages' | 'notifications' | 'orders';
 };
@@ -66,6 +67,7 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
   onNotificationCountChange?: (count: number) => void;
 }) {
   const pathname = usePathname();
+  const resetDashboard = useDashboardStack();
   const viewingNotifications = pathname === '/bottomnotification' || pathname === '/vendornotifications';
   const { bottom } = useSafeAreaInsets();
   const [user, setUser] = useState<{ id: string; vendor: boolean }>();
@@ -224,7 +226,10 @@ export default function BottomNavigationFinal({ viewedNotifications, onNotificat
     if (navigating.current || tab.route === pathname || !user) return;
     navigating.current = true;
     tabTransition = !reduceMotion && activeTab >= 0 ? { route: tab.route, from: activeTab } : undefined;
-    router.navigate(tab.route);
+    if (!resetDashboard(user.vendor ? '/vendordashboard' : '/dashboard', tab.route, true)) {
+      navigating.current = false;
+      tabTransition = undefined;
+    }
   };
 
   return (

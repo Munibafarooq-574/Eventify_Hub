@@ -1,3 +1,4 @@
+import { useDashboardStack } from '@/utils/useDashboardStack';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     View,
@@ -20,6 +21,7 @@ const { width, height } = Dimensions.get('window');
 
 const SplashScreen: React.FC = () => {
     const router = useRouter();
+    const resetDashboard = useDashboardStack();
 
     // Animation values
     const bubbleOpacity = useRef(new Animated.Value(0.7)).current;
@@ -105,7 +107,9 @@ const SplashScreen: React.FC = () => {
                 setShowRetry(true);
                 return;
             }
-            router.replace(routes[result]);
+            const route = routes[result];
+            if (route === '/dashboard' || route === '/vendordashboard') resetDashboard(route);
+            else router.replace(route);
         });
 
         return () => {
@@ -114,7 +118,7 @@ const SplashScreen: React.FC = () => {
             clearTimeout(animationTimer);
             controller.abort();
         };
-    }, [attempt, router]);
+    }, [attempt, resetDashboard, router]);
 
     // Function to render bubbles
     const renderBubbles = () => {

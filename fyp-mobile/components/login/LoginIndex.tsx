@@ -1,3 +1,4 @@
+import { useDashboardStack } from '@/utils/useDashboardStack';
 import Login from '@/services/login';
 import { getSubscriptionAccessState } from '@/services/getSubscriptionAccessState';
 import { startUserSession } from '@/store';
@@ -10,6 +11,7 @@ import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity
 import Toast from 'react-native-toast-message';
 
 export default function LoginScreen() {
+  const resetDashboard = useDashboardStack();
   const [isDisabled, setIsDisabled] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const google = Asset.fromModule(require('@/assets/images/google-icon.png')).uri;
@@ -101,9 +103,9 @@ export default function LoginScreen() {
       !access.subscriptionRequired &&
       isWithinSubscriptionPeriod
     ) {
-      router.replace("/vendordashboard");
+      resetDashboard("/vendordashboard");
     } else {
-  router.replace("/vendordashboard");
+  resetDashboard("/vendordashboard");
 }
   } catch (subscriptionError) {
     console.error(
@@ -141,7 +143,7 @@ export default function LoginScreen() {
     router.replace("/vendorprofilepending");
   }
 } else {
-  router.replace("/dashboard");
+  resetDashboard("/dashboard");
 }
   } catch (e: any) {
     console.log(e);
