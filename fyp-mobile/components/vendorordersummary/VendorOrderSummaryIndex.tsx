@@ -45,6 +45,13 @@ interface Order {
 const titleCase = (value: string) => value.toLowerCase().replace(/_/g, ' ')
     .replace(/\b\w/g, letter => letter.toUpperCase());
 
+const completionTimeLeft = (time: number, now: number) => {
+    const minutes = Math.ceil((time - now) / 60_000);
+    if (minutes <= 0) return '';
+    const hours = Math.floor(minutes / 60);
+    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+};
+
 const openOrderLink = (url: string) => {
     void Linking.openURL(url).catch(() => Alert.alert('Unable to open link'));
 };
@@ -964,7 +971,12 @@ const OrderSummary = () => {
                                             const packageKey = String(booking._id || index);
                                             const detailsOpen = expandedPackage === packageKey;
                                             const completionTime = getVendorCompletionTime(booking);
-                                            const canComplete = canCompleteVendorBooking(booking);
+                                            const completionNow = Date.now();
+                                            const timeLeft = completionTime === null ? '' : completionTimeLeft(completionTime, completionNow);
+                                            const bookedPackage = booking.vendorId?.packages?.find((pkg: any) => String(pkg._id) === String(booking.packageId));
+                                            const completionLabel = (booking.bookingType || bookedPackage?.bookingType) === 'DELIVERY_BASED'
+                                                ? 'Scheduled delivery' : 'After service ends';
+                                            const canComplete = canCompleteVendorBooking(booking, completionNow);
                                             const showCompletion = !closed && booking.status === 'accepted' && booking.replacementOutcome !== 'NO_LONGER_ASSIGNED';
                                             const paymentLabel = String(booking.paymentStatus || 'UNPAID').toUpperCase();
                                             const paymentTone = paymentLabel === 'PAID' ? 'paid' : paymentLabel === 'PARTIALLY_PAID' ? 'partially_paid'
@@ -1013,13 +1025,16 @@ const OrderSummary = () => {
                                                             <Ionicons name="checkmark-outline" size={16} color="#fff" />
                                                             <Text style={styles.buttonText}>{completingBookingId === booking._id ? 'Completing…' : 'Mark Completed'}</Text>
                                                         </TouchableOpacity>
-                                                    ) : <View style={styles.detailRow}>
-                                                        <Ionicons name="lock-closed-outline" size={14} color={PRIMARY} />
+                                                    ) : <View style={styles.completionNotice}>
+                                                        <Ionicons name="lock-closed-outline" size={15} color={PRIMARY} />
                                                         <View style={{ flex: 1 }}>
-                                                            <Text style={[styles.completionHint, { textAlign: 'left', fontWeight: '700' }]}>Mark Completed</Text>
+                                                            <Text style={styles.moneyLine}>Mark Completed</Text>
                                                             <Text style={styles.scheduleMeta}>{completionTime === null ? 'Scheduled service time unavailable.'
-                                                                : completionTime > Date.now() ? `Available from ${formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}`
+                                                                : timeLeft ? `Available in ${timeLeft}`
                                                                 : 'Available once payment is secured.'}</Text>
+                                                            {completionTime !== null && !!timeLeft && <Text style={styles.scheduleMeta}>
+                                                                {completionLabel} · {formatBookingActivityTime(new Date(completionTime).toISOString(), zone)}
+                                                            </Text>}
                                                         </View>
                                                     </View>)}
                                                     <BookingCancellationDetails booking={booking} timeZone={zone} audience="vendor"
@@ -1206,6 +1221,7 @@ const styles = StyleSheet.create({
     paymentFill: { height: '100%', backgroundColor: PRIMARY },
     contactRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     contactAction: { minHeight: 44, paddingHorizontal: 10, flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 10, backgroundColor: PRIMARY_LIGHT },
+    completionNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: PRIMARY_LIGHT },
     scheduleMeta: { color: '#675961', fontSize: 12, marginTop: 4 },
     historyToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     cancellationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 20 },
