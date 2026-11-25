@@ -1050,11 +1050,11 @@ return {
       const result: { start: Date; end: Date; booked: boolean }[] = [];
       for (let start = first; start < last;) {
         const end = Math.min(start + 60 * 60000, last);
-        const occupied = bookings.filter((booking) =>
+        const booked = bookings.some((booking) =>
           booking.start !== undefined && booking.end !== undefined &&
           booking.start.getTime() < end && booking.end.getTime() > start,
-        ).length;
-        result.push({ start: new Date(start), end: new Date(end), booked: occupied >= (schedule?.capacity ?? 1) });
+        );
+        result.push({ start: new Date(start), end: new Date(end), booked });
         start = end;
       }
       return result;
@@ -1234,7 +1234,7 @@ return {
 
   workingSlots,
 
-  ...(publicSchedule ? { schedule: { blocked, reason, today, blockedDates, capacity: Number(settings.maxConcurrentBookings) || 1 } } : {}),
+  ...(publicSchedule ? { schedule: { blocked, reason, today, blockedDates } } : {}),
 
   bookings: bookings.map((b) => ({
     orderId: b.orderId?.toString(),

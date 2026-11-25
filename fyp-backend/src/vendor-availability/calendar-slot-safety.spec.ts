@@ -43,11 +43,15 @@ describe('Public vendor schedule', () => {
     expect(day).not.toHaveProperty('bookings');
   });
 
-  it('leaves an occupied slot available when the vendor has spare capacity', async () => {
+  it('shows the existing booking even when the vendor has spare capacity', async () => {
     const { s, vendor } = fixture();
-    vendor.availabilitySettings.maxConcurrentBookings = 2;
+    vendor.availabilitySettings.maxConcurrentBookings = 4;
     const day = await s.getPublicSchedule(id, '2026-10-26');
-    expect(day.slots.every((slot: { booked: boolean }) => !slot.booked)).toBe(true);
+    expect(day.slots.filter((slot: { booked: boolean }) => slot.booked)).toEqual([{
+      start: new Date('2026-10-26T15:00:00Z'),
+      end: new Date('2026-10-26T16:00:00Z'),
+      booked: true,
+    }]);
   });
 
   it.each(['Away for the day', undefined])('only returns an entered blocked-date reason (%s)', async (reason) => {
