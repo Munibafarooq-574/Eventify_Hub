@@ -29,7 +29,7 @@ const COLORS = {
   border: '#F3DCE8',
 };
 
-const Header: React.FC = () => {
+const Header = ({ unreadNotifications = 0 }: { unreadNotifications?: number }) => {
   const [draft] = useState(createBookingDraftStore);
   const [username, setUsername] = useState(""); // State for username
   const [avatar, setAvatar] = useState(""); // Profile picture URL, if set
@@ -196,9 +196,15 @@ const Header: React.FC = () => {
           <TouchableOpacity
             style={styles.iconButton}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'}
             onPress={() => router.push('/bottomnotification')}>
             <Ionicons name="notifications-outline" size={22} color={COLORS.primary} />
-            <View style={styles.notificationDot} />
+            {unreadNotifications > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.cartBadgeText}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -491,14 +497,17 @@ cartBadgeText: {
   fontSize: 9,
   fontWeight: '800',
 },
-  notificationDot: {
+  notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: COLORS.accent,
+    top: 3,
+    right: 3,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
     borderWidth: 1,
     borderColor: COLORS.card,
   },

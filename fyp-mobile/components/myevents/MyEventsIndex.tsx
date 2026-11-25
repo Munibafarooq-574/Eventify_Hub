@@ -569,13 +569,7 @@ const MyEventsScreen = () => {
 
         <Text style={styles.title}>My Events</Text>
 
-        <TouchableOpacity
-          //onPress={() => router.push('/cartmanagment')}
-          style={styles.headerIconButton}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="cart-outline" size={22} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerIconButtonSpacer} />
       </View>
 
       <BookingUserGuide kind="clientEvents" primary={COLORS.primary} />
@@ -1853,6 +1847,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     backgroundColor: COLORS.bg,
   },
+  headerIconButtonSpacer: { width: 40 },
   headerIconButton: {
     width: 40,
     height: 40,

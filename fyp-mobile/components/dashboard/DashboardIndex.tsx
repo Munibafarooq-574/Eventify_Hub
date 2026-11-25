@@ -23,6 +23,7 @@ const COLORS = {
 };
 
 const DashboardIndex: React.FC = () => {
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [locationStatus, setLocationStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [location, setLocation] = useState<{ countryCode: string | null; cityId: string | null; cityName?: string }>();
   const [locationRetry, setLocationRetry] = useState(0);
@@ -59,7 +60,7 @@ const DashboardIndex: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <Header />
+        <Header unreadNotifications={unreadNotifications} />
         {locationStatus === 'ready' && location ? (
           <DashboardRefreshContext.Provider key={`${location.countryCode}|${location.cityId}`} value={sections}>
             <View style={styles.content}>
@@ -97,7 +98,7 @@ const DashboardIndex: React.FC = () => {
           </View>
         )}
       </ScrollView>
-      <BottomNavigationFinal />
+      <BottomNavigationFinal onNotificationCountChange={setUnreadNotifications} />
     </View>
   );
 };

@@ -59,11 +59,17 @@ async function seenNotificationIds(userId: string): Promise<string[]> {
   }
 }
 
-export default function BottomNavigationFinal({ viewedNotifications }: { viewedNotifications?: NotificationItem[] }) {
+export default function BottomNavigationFinal({ viewedNotifications, onNotificationCountChange }: {
+  viewedNotifications?: NotificationItem[];
+  onNotificationCountChange?: (count: number) => void;
+}) {
   const pathname = usePathname();
   const { bottom } = useSafeAreaInsets();
   const [user, setUser] = useState<{ id: string; vendor: boolean }>();
   const [badges, setBadges] = useState(emptyCounts);
+  useEffect(() => {
+    onNotificationCountChange?.(badges.notifications);
+  }, [badges.notifications, onNotificationCountChange]);
   const [width, setWidth] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
   const position = useRef(new Animated.Value(0)).current;
