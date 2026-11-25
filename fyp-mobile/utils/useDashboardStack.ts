@@ -1,4 +1,4 @@
-import { CommonActions, useNavigationContainerRef } from 'expo-router';
+import { useNavigationContainerRef } from 'expo-router';
 import { useCallback } from 'react';
 
 export type DashboardRoute = '/dashboard' | '/vendordashboard';
@@ -17,7 +17,8 @@ export function useDashboardStack() {
             ? current.routes[0] : { name: dashboardName };
         const routes = tab === dashboard ? [root] : [root, { name: tab.slice(1) }];
         navigation.dispatch({
-            ...CommonActions.reset({ ...current, stale: false, index: routes.length - 1, routes }),
+            type: 'RESET',
+            payload: { ...current, stale: false, index: routes.length - 1, routes },
             target: current.key,
         });
         return true;
