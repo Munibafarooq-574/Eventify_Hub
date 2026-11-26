@@ -94,22 +94,35 @@ const SplashScreen: React.FC = () => {
     useEffect(() => {
         let active = true;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12_000);
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<'retry'>(resolve => {
+            timeout = setTimeout(() => {
+                resolve('retry');
+                controller.abort();
+            }, 20_000);
+        });
         let animationTimer: ReturnType<typeof setTimeout> | undefined;
         const animationDelay = new Promise<void>(resolve => {
             animationTimer = setTimeout(resolve, attempt === 0 ? 4000 : 0);
         });
 
-        void Promise.all([restoreStartupSession(controller.signal), animationDelay]).then(([result]) => {
-            clearTimeout(timeout);
-            if (!active || result === 'cancelled') return;
-            if (result === 'retry') {
+        const session = Promise.race([restoreStartupSession(controller.signal), deadline])
+            .finally(() => clearTimeout(timeout));
+
+        void Promise.all([session, animationDelay]).then(([result]) => {
+            if (!active) return;
+            if (result === 'retry' || result === 'cancelled') {
                 setShowRetry(true);
                 return;
             }
             const route = routes[result];
-            if (route === '/dashboard' || route === '/vendordashboard') resetDashboard(route);
-            else router.replace(route);
+            if (route === '/dashboard' || route === '/vendordashboard') {
+                if (!resetDashboard(route)) setShowRetry(true);
+            } else {
+                router.replace(route);
+            }
+        }).catch(() => {
+            if (active) setShowRetry(true);
         });
 
         return () => {
